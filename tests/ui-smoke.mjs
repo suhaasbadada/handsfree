@@ -53,6 +53,7 @@ try {
   assert.equal(await evaluate(`['change-shortcut','mic','permissions','download','reset','sounds','sound-volume'].every(id=>document.getElementById(id).disabled)`), true, 'Native controls are unavailable before the backend connects');
   await evaluate(`window.calls = []; window.fixture = {phase:'idle',message:'Select a text field and press Fn.', progress:0,model_ready:true,microphone:true,accessibility:true,input_monitoring:true,hotkey:true,transcript:'',sounds:true,sound_volume:50,sound_style:'tap',shortcut:{code:'Fn',modifiers:0},shortcut_label:'Fn',stats:{words:0,transcriptions:0,speech_seconds:0,saved_seconds:0},persistence_error:''}; window.__TAURI_INTERNALS__ = { invoke: async (command,args) => { window.calls.push({command,args}); if(command==='status') return structuredClone(window.fixture); if(command==='set_sounds') window.fixture.sounds=args.enabled; if(command==='set_sound_style') window.fixture.sound_style=args.style; if(command==='set_shortcut'){if(window.rejectShortcut) throw 'Could not save shortcut'; window.fixture.shortcut=args.shortcut;window.fixture.shortcut_label=args.shortcut.code==='Fn'?'Fn':args.shortcut.code==='Space'?'Option + Space':'Control + Shift + J';} if(command==='reset_stats') window.fixture.stats={words:0,transcriptions:0,speech_seconds:0,saved_seconds:0}; } }; document.getElementById('feedback').hidden=true;`);
   await until(`document.getElementById('ready-title').textContent==='Ready'`);
+  assert.deepEqual(await evaluate(`['words','saved','count'].map(id=>document.getElementById(id).textContent)`), ['0','0 sec','0'], 'First-launch totals are real zeros');
   assert.equal(await evaluate(`document.querySelectorAll('details').length`), 0, 'No disclosure maze in the app or its dialogs');
   assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('nav button'),b=>({name:b.getAttribute('aria-label'),title:b.title,text:b.textContent.trim(),icon:!!b.querySelector('svg')}))`), [{name:'Overview',title:'Overview',text:'',icon:true},{name:'Settings',title:'Settings',text:'',icon:true}], 'Icon navigation retains accessible button names and tooltips');
   const accessibility = await send('Accessibility.getFullAXTree');
@@ -84,8 +85,7 @@ try {
   // Duration saves independently of sound/shortcut, rolls back failed writes,
   // and reflects refreshed persisted values without starting capture.
   await evaluate(`window.fixture.recording_limit=120; const limitInvoke=window.__TAURI_INTERNALS__.invoke; window.__TAURI_INTERNALS__.invoke=async(command,args)=>{ if(command==='set_recording_limit'){if(window.rejectLimit)throw 'Could not save recording limit';window.fixture.recording_limit=args.seconds;} return limitInvoke(command,args); };`);
-  assert.equal(await evaluate(`document.getElementById('copy').disabled`), true);
-  assert.equal(await evaluate(`document.querySelector('.transcript-section').getBoundingClientRect().height<96 && document.getElementById('transcript').textContent==='Your next dictation appears here.'`), true, 'Empty transcript is a quiet line, not a tall blank panel');
+  assert.equal(await evaluate(`!document.getElementById('copy') && !document.getElementById('transcript') && !document.querySelector('.transcript-section')`), true, 'No transcript or manual copy surface');
   await evaluate(`document.getElementById('nav-settings').click()`);
   assert.equal(await evaluate(`document.getElementById('overview').hidden && !document.getElementById('settings').hidden`), true);
   assert.equal(await evaluate(`document.querySelector('.readiness').hidden`), true, 'No readiness card when ready');
@@ -228,13 +228,12 @@ try {
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='reset_stats' && c.args.confirmed).length`), 1);
   await evaluate(`document.getElementById('nav-overview').click(); window.fixture.transcript='<script>unsafe</script> & a thought'; window.fixture.stats={words:100,transcriptions:4,speech_seconds:45,saved_seconds:105};`);
   await until(`document.getElementById('words').textContent==='100'`);
-  assert.equal(await evaluate(`document.getElementById('transcript').innerHTML`), '&lt;script&gt;unsafe&lt;/script&gt; &amp; a thought');
-  await evaluate(`document.getElementById('copy').click()`);
-  await until(`document.getElementById('feedback').textContent.startsWith('Copied.')`);
-  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='copy_transcript').length`), 1);
+  assert.equal(await evaluate(`document.body.textContent.includes(window.fixture.transcript)`), false, 'Confidential payload is never rendered, even as escaped text');
+  assert.ok(!(await send('Accessibility.getFullAXTree')).nodes.some(node=>node.name?.value?.includes('<script>unsafe</script>')), 'Payload absent from accessibility tree');
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='copy_transcript').length`), 0);
   await evaluate(`window.fixture.phase='copied'; window.fixture.message='Copied. Automatic paste skipped: Not pasted [start:no-original-focus].';`);
   await until(`document.getElementById('phase').textContent==='Copied' && document.getElementById('dot').className==='copied'`);
-  assert.equal(await evaluate(`document.getElementById('cancel').hidden && !document.getElementById('copy').disabled && !document.getElementById('preview-sound').disabled && !document.getElementById('change-shortcut').disabled`), true, 'Copied fallback is ready, not an error or busy state');
+  assert.equal(await evaluate(`document.getElementById('cancel').hidden && !document.getElementById('preview-sound').disabled && !document.getElementById('change-shortcut').disabled && !document.body.textContent.includes(window.fixture.transcript)`), true, 'Copied fallback is ready without exposing payload');
   assert.equal(await evaluate(`getComputedStyle(document.getElementById('dot')).backgroundColor`), 'rgb(112, 107, 104)', 'Normal fallback is graphite; muted red is reserved for recording/active controls');
   assert.match(await evaluate(`document.getElementById('message').textContent`), /start:no-original-focus/);
   await evaluate(`document.getElementById('nav-settings').click();document.getElementById('feedback').hidden=true;window.fixture.message='Select a text field and press Fn.'`);
@@ -242,7 +241,8 @@ try {
   assert.equal(await evaluate(`document.querySelector('footer').getBoundingClientRect().bottom<=innerHeight`), true, `Ready settings fit the normal window: ${JSON.stringify(await evaluate(`Array.from(document.querySelectorAll('aside,header,.settings-intro,#settings .card,.local-data,.status,footer')).map(e=>({name:e.className||e.tagName,height:e.getBoundingClientRect().height,bottom:e.getBoundingClientRect().bottom}))`))}`);
   await evaluate(`window.fixture.phase='idle'`);
   await evaluate(`window.fixture.transcript='A little less typing. A little more room to think.'; document.getElementById('feedback').hidden=true;`);
-  await until(`document.getElementById('transcript').textContent.startsWith('A little less')`);
+  await delay(900);
+  assert.equal(await evaluate(`document.body.textContent.includes(window.fixture.transcript)`), false);
   for (const theme of ['light','dark']) {
     await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-color-scheme',value:theme}]});
     assert.deepEqual(await evaluate(`({scheme:getComputedStyle(document.documentElement).colorScheme,bg:getComputedStyle(document.documentElement).backgroundColor,text:getComputedStyle(document.documentElement).color})`), {scheme:'light',bg:'rgb(247, 246, 243)',text:'rgb(48, 46, 45)'}, 'The app stays intentionally light even on a dark system');
@@ -258,7 +258,8 @@ try {
         assert.equal(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth`), true, `No horizontal overflow at ${width}px, ${theme}, ${tab}`);
         assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('button, select, input')).filter(e=>e.getClientRects().length && (e.getBoundingClientRect().right>innerWidth || e.getBoundingClientRect().left<0)).map(e=>e.id)`), [], 'All controls fit');
         if (tab==='settings') assert.equal(await evaluate(`(() => {const label=document.querySelector('.shortcut-row h3').getBoundingClientRect(),value=document.querySelector('.shortcut-value').getBoundingClientRect();return value.top>=label.bottom || value.left>=label.right;})()`), true, 'Shortcut value never overlaps its label');
-        assert.equal(await evaluate(`(() => {const s=getComputedStyle(document.querySelector('.transcript-section'));return s.backgroundColor==='rgba(0, 0, 0, 0)' && s.borderTopWidth==='0px' && s.boxShadow==='none' && getComputedStyle(document.getElementById('transcript')).minHeight==='0px';})()`), true, 'Transcript has no card background, border, shadow or forced blank height');
+        assert.equal(await evaluate(`['words','saved','count'].every(id=>{const s=getComputedStyle(document.getElementById(id));return s.color==='rgb(166, 74, 69)' && s.opacity==='1'})`), true, 'Readable muted brand red numbers, not faded opacity');
+        assert.equal(await evaluate(`(() => {const status=document.querySelector('.status').getBoundingClientRect(),nav=document.querySelector('nav').getBoundingClientRect();return status.top>=nav.bottom && Math.abs(status.right-nav.right)<1 && !document.querySelector('main .status');})()`), true, 'Compact status aligns to navigation upper right');
       }
       await evaluate(`document.getElementById('change-shortcut').click()`);
       await until(recording);
@@ -285,11 +286,11 @@ try {
       const geometry = await evaluate(`(() => {
         const dot=document.getElementById('dot').getBoundingClientRect();
         const title=document.getElementById('phase').getBoundingClientRect();
-        const text=document.querySelector('.status>div').getBoundingClientRect();
+        const text=document.getElementById('phase').getBoundingClientRect();
         const cancel=document.getElementById('cancel').getBoundingClientRect();
         return {fits:document.documentElement.scrollWidth<=innerWidth,
           aligned:dot.top>=title.top && dot.bottom<=title.bottom,
-          wraps:document.getElementById('message').scrollWidth<=text.width+1,
+          wraps:document.getElementById('message').scrollWidth<=document.querySelector('main').clientWidth+1,
           separated:!cancel.width || cancel.top>=text.bottom || cancel.left>=text.right,
           label:document.getElementById('phase').textContent};
       })()`);
@@ -317,7 +318,7 @@ try {
        writeFileSync(join(process.env.UI_SCREENSHOT_DIR, `${tab}-first-run-320.png`), Buffer.from(shot.data,'base64'));
      }
    }
-   console.log('UI smoke passed: visible essentials, no details, accessible icon navigation and aligned 40px geometry, uniform controls, recording limit save/rollback/refresh, 16 first-run combinations, download retry/progress, shortcut focus/Escape/timeout/validation/save failure, volume/idle-only preview, reset confirmation, safe transcript/copy, light/dark responsive layout. No microphone capture.');
+   console.log('UI smoke passed: private payload never rendered, activity metrics, upper-right status, accessible navigation, uniform controls, preferences, 16 first-run combinations, download retry/progress, shortcuts, reset, light/dark responsive layout. No microphone capture.');
 } finally {
   socket?.close();
   browser.kill('SIGTERM');

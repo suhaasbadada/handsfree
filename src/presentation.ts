@@ -1,5 +1,5 @@
 export function phaseLabel(phase: string): string {
-  return ({ idle: 'Ready', copied: 'Copied', setup_required: 'Setup needs attention', not_pasted: 'Not pasted · transcript saved', recording: 'Listening', processing: 'Finding your words', downloading: 'Downloading model', error: 'Needs attention' } as Record<string,string>)[phase] ?? 'Connecting';
+  return ({ idle: 'Ready', copied: 'Copied', setup_required: 'Setup needed', not_pasted: 'Not pasted', recording: 'Listening', processing: 'Processing', downloading: 'Downloading', error: 'Needs attention' } as Record<string,string>)[phase] ?? 'Connecting';
 }
 export function canCancel(phase: string): boolean {
   return ['recording', 'processing'].includes(phase);

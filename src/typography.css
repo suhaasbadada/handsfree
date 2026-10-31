@@ -5,16 +5,14 @@ button, input, select, kbd { font-family: inherit; }
 h1 { font-size: 32px; font-weight: 600; letter-spacing: -.9px; line-height: 1.25; }
 h2 { font-size: 16px; font-weight: 600; letter-spacing: -.2px; }
 h3 { font-size: 14px; font-weight: 500; }
-.hero p { font-size: 15px; }
+.hero h1 { font-size: 18px; letter-spacing: -.3px; }
+.hero p { font-size: 13px; }
 .subtle, .state, footer, .metrics article > span { font-size: 12px; }
-.metrics strong { font-size: 32px; font-weight: 600; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
-.setting-row p, .status p, .readiness p, .feedback { font-size: 13px; }
-.status strong { font-size: 14px; font-weight: 500; }
-.transcript { font-size: 16px; }
-.transcript.empty { font-size: 14px; }
+.metrics strong { font-size: clamp(28px, 5vw, 52px); font-weight: 600; letter-spacing: -1.5px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.setting-row p, .status-detail, .readiness p, .feedback { font-size: 13px; }
+.status strong { font-size: 12px; font-weight: 500; }
 kbd { font-size: 13px; }
 @media (max-width: 650px) {
   .brand { font-size: 18px; }
-  .metrics strong { font-size: 27px; }
   h1 { font-size: 28px; }
 }

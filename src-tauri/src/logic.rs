@@ -178,7 +178,7 @@ pub fn copied_message(paste_code: i32) -> String {
 
 pub fn paste_message(code: i32) -> String {
     if code == 0 {
-        return "Paste shortcut sent to your original field (insertion not confirmed). If nothing appeared, use Copy text on Overview.".into();
+        return "Paste shortcut sent to your original field (insertion not confirmed).".into();
     }
     let (reason, action) = match code {
         1 => ("accessibility-denied", "Accessibility access is unavailable. Enable HandsFree in Privacy & Security → Accessibility, then restart the same app copy."),
@@ -186,20 +186,20 @@ pub fn paste_message(code: i32) -> String {
         3 => ("no-original-focus", "The app did not expose a focused Accessibility element when recording started. Click inside its text field before tapping Fn; custom editors may not support Accessibility."),
         4 => ("app-changed", "The frontmost app changed. Stay in the original app until transcription finishes."),
         5 => ("no-current-focus", "The app no longer exposes its focused field. Keep the original text field focused until transcription finishes."),
-        6 => ("field-changed", "The focused Accessibility element changed or was recreated by the app. Keep the same field focused; dynamic editors may require manual Copy text."),
+        6 => ("field-changed", "The focused Accessibility element changed or was recreated by the app. Keep the same field focused until transcription finishes."),
         7 | 12 => ("secure-field", "Password/secure fields cannot receive dictation. Choose a non-password text field before starting."),
-        8 | 13 => ("unsupported-field", "The field does not expose supported text editing through Accessibility. Select an editable text field before starting; this editor may require manual Copy text."),
+        8 | 13 => ("unsupported-field", "The field does not expose supported text editing through Accessibility. Select an editable text field before starting."),
         9 | 14 => ("read-only-field", "The field is disabled or read-only. Choose an enabled, editable field before starting."),
-        10 => ("clipboard-write-failed", "macOS could not put the transcript on the clipboard. Try Copy text on Overview."),
-        11 => ("paste-event-failed", "macOS could not create the Paste shortcut. Try Copy text on Overview."),
+        10 => ("clipboard-write-failed", "macOS could not put the transcript on the clipboard. Please try dictating again."),
+        11 => ("paste-event-failed", "macOS could not create the Paste shortcut. Please try dictating again."),
         15 => ("handsfree-focused", "HandsFree was focused when recording started. Close settings and select a text field in another app before tapping Fn."),
-        _ => ("invalid-paste-result", "The paste request could not be completed. Try Copy text on Overview."),
+        _ => ("invalid-paste-result", "The paste request could not be completed. Please try dictating again."),
     };
     let stage = match code {
         2 | 3 | 12..=15 => "start",
         _ => "finish",
     };
-    format!("Not pasted [{stage}:{reason}]. {action} Your transcript is kept on Overview for this session; use Copy text.")
+    format!("Not pasted [{stage}:{reason}]. {action}")
 }
 
 #[cfg(test)]
@@ -278,7 +278,8 @@ mod tests {
         for code in 1..=15 {
             let message = paste_message(code);
             assert!(message.starts_with("Not pasted ["));
-            assert!(message.contains("Copy text"));
+            assert!(!message.contains("Copy text"));
+            assert!(!message.contains("Overview"));
             assert!(!message.contains("invalid-paste-result"));
         }
         assert!(paste_message(3).contains("start:no-original-focus"));

@@ -33,7 +33,7 @@ HandsFree is an open-source, local-first dictation companion. Tap a shortcut, sp
 - **Private by design:** Whisper runs on your Mac with Apple Silicon Metal acceleration. Download the model once; dictate offline afterward.
 - **Stay in flow:** a compact recording capsule, live mic meter, and Escape to cancel.
 - **Your shortcut:** Fn / 🌐, a preset, or a custom key combination.
-- **Practical controls:** optional listening sounds, last-transcript copy, and local usage totals.
+- **Practical controls:** optional listening sounds and local usage totals. Dictation text stays out of the app window.
 - **Safer insertion:** checks the original app and field before submitting Paste; otherwise copies for manual paste.
 
 ## Use cases

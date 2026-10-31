@@ -10,14 +10,13 @@ const logo = new URL('../src-tauri/icons/icon.png', import.meta.url).href;
 document.querySelector('#app')!.innerHTML = `
 <div class="shell">
  <aside><a class="brand" href="#overview" aria-label="HandsFree overview"><img src="${logo}" alt="" width="36" height="36"><span>HandsFree</span></a>
-  <nav aria-label="Main navigation"><button id="nav-overview" class="nav active" aria-label="Overview" title="Overview" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-6v-6h-4v6H4Z"/></svg></button><button id="nav-settings" class="nav" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg></button></nav></aside>
+  <div class="header-right"><nav aria-label="Main navigation"><button id="nav-overview" class="nav active" aria-label="Overview" title="Overview" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-6v-6h-4v6H4Z"/></svg></button><button id="nav-settings" class="nav" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg></button></nav><section class="status" aria-label="App status"><span id="dot" aria-hidden="true"></span><strong id="phase" aria-live="polite">Connecting…</strong><button id="cancel" hidden aria-label="Cancel dictation" title="Cancel dictation">×</button></section></div></aside>
  <main>
  <section id="overview" aria-labelledby="overview-title">
-   <div class="hero"><h1 id="overview-title">Dictation</h1><p>Press <kbd id="overview-shortcut">Fn</kbd> to dictate</p><p class="hint">Press again to finish · Esc to cancel</p></div>
+   <div class="hero"><h1 id="overview-title">Your activity</h1><p>Press <kbd id="overview-shortcut">Fn</kbd> to dictate</p></div>
    <section class="card readiness"><div><h2 id="ready-title">Finish setting up</h2><p id="ready-detail">Checking permissions and model…</p></div><button id="setup" class="primary">Open settings</button></section>
    <section id="overview-model" class="card readiness" hidden aria-label="English model"><div><h2>English model</h2><p id="overview-model-state">One-time download · Works offline afterward</p></div><button id="overview-download" class="primary" disabled>Download English model (~148 MB)</button></section>
-   <div class="metrics" aria-label="Local usage since tracking began"><article><strong id="words">0</strong><span>Words dictated</span></article><article><strong id="saved">0 min</strong><span tabindex="0" title="Estimate per dictation: typing at 40 words/minute, minus recording time, never below zero. Not a productivity measurement.">Estimated time saved</span></article><article><strong id="count">0</strong><span>Dictations</span></article></div>
-    <section class="transcript-section" aria-labelledby="transcript-title"><div class="card-heading"><h2 id="transcript-title">Transcript</h2><button id="copy" disabled>Copy text</button></div><p id="transcript" class="transcript empty">Your next dictation appears here.</p></section>
+   <div class="metrics" aria-label="Local usage since tracking began"><article><strong id="words">0</strong><span>Words</span></article><article><strong id="saved">0 sec</strong><span tabindex="0" title="Estimate per dictation: typing at 40 words/minute, minus recording time, never below zero. Not a productivity measurement.">Time saved<small>Estimated</small></span></article><article><strong id="count">0</strong><span>Dictations</span></article></div>
  </section>
  <section id="settings" hidden aria-labelledby="settings-title">
   <div class="settings-intro"><h1 id="settings-title">Settings</h1></div>
@@ -37,7 +36,7 @@ document.querySelector('#app')!.innerHTML = `
   </section>
    <section class="local-data" aria-labelledby="data-title"><div class="setting-row"><div><h2 id="data-title">Usage totals</h2></div><button id="reset" class="danger" aria-haspopup="dialog">Reset totals</button></div><p class="subtle">Audio and transcription stay on this Mac.</p></section>
  </section>
- <section class="status" aria-label="App status"><span id="dot" aria-hidden="true"></span><div><strong id="phase">Connecting…</strong><p id="message" aria-live="polite"></p></div><button id="cancel" hidden>Cancel</button></section>
+ <p id="message" class="status-detail" aria-live="polite" hidden></p>
  <p id="feedback" class="feedback" role="status" hidden></p><p id="storage-error" class="feedback" role="status" hidden></p>
   </main>
   <footer><span class="footer-brand">HandsFree <span id="app-version">0.1.1</span> <span class="beta-badge">BETA</span></span><span>English · On-device transcription</span></footer>
@@ -166,7 +165,6 @@ async function downloadModel() {
 el('download').onclick = () => void downloadModel();
 el('overview-download').onclick = () => void downloadModel();
 el('cancel').onclick = () => void action('cancel');
-el('copy').onclick = async () => { if (await action('copy_transcript')) feedback('Copied. Paste it wherever you need it.'); };
 const sounds = el('sounds') as HTMLInputElement;
 const recordingLimit = el('recording-limit') as HTMLSelectElement;
 recordingLimit.onchange = async () => {
@@ -223,10 +221,10 @@ async function refreshStatus() {
     const requests = (current as Status & { permission_requests?: number }).permission_requests ?? 0;
     if (requests !== seenPermissionRequests) { seenPermissionRequests = requests; navigate('settings'); }
     el('phase').textContent = current.phase === 'idle' && !readiness(current) ? 'Setup needed' : phaseLabel(current.phase);
-    // The idle instruction already lives above the transcript. Keep backend
-    // diagnostics and busy/copy states visible without repeating that hint.
+    // Keep diagnostics outside the compact header; never render dictation payloads.
     const idleHint = `Select a text field and press ${current.shortcut_label}.`;
     el('message').textContent = current.phase === 'idle' && current.message === idleHint ? '' : current.message;
+    el('message').hidden = !el('message').textContent;
     el('dot').className = current.phase;
     button('mic').disabled = current.microphone;
     el('mic').textContent = current.microphone ? 'Allowed' : 'Allow';
@@ -252,9 +250,6 @@ async function refreshStatus() {
     el('progress').hidden = current.phase !== 'downloading';
     (el('progress') as HTMLProgressElement).value = current.progress;
     el('cancel').hidden = !canCancel(current.phase);
-    button('copy').disabled = !current.transcript;
-    el('transcript').textContent = current.transcript || 'Your next dictation appears here.';
-    el('transcript').classList.toggle('empty', !current.transcript);
     if (!soundsPending) {
       sounds.checked = current.sounds;
       el('sound-state').textContent = current.sounds ? 'On' : 'Off';

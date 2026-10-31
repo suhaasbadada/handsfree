@@ -32,10 +32,10 @@ test('Fn readiness explains actual missing access and stale hooks separately', (
 test('all states have user-facing labels and unknown state is safe', () => {
   assert.equal(phaseLabel('idle'), 'Ready');
   assert.equal(phaseLabel('recording'), 'Listening');
-  assert.equal(phaseLabel('processing'), 'Finding your words');
+  assert.equal(phaseLabel('processing'), 'Processing');
   assert.equal(phaseLabel('error'), 'Needs attention');
-  assert.equal(phaseLabel('setup_required'), 'Setup needs attention');
-  assert.equal(phaseLabel('not_pasted'), 'Not pasted · transcript saved');
+  assert.equal(phaseLabel('setup_required'), 'Setup needed');
+  assert.equal(phaseLabel('not_pasted'), 'Not pasted');
   assert.equal(phaseLabel('copied'), 'Copied');
   assert.equal(canCancel('copied'), false);
   assert.equal(phaseLabel('unexpected'), 'Connecting');
