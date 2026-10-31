@@ -23,7 +23,7 @@ document.querySelector('#app')!.innerHTML = `
   <div class="settings-intro"><h1 id="settings-title">Settings</h1></div>
   <section class="card preferences" aria-labelledby="preferences-title"><h2 id="preferences-title">Preferences</h2>
    <div class="setting-row"><div><h3>Shortcut</h3></div><kbd id="saved-shortcut">Fn</kbd><button id="change-shortcut" aria-haspopup="dialog">Change…</button></div>
-   <div class="setting-row listening-row"><div><h3>Listening sound</h3></div><div class="sound-selection"><select id="sound-style" aria-label="Listening sound style"><option value="tap">Soft chime</option><option value="bell">Gentle notes</option></select><button id="preview-sound" disabled>Preview</button></div><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Listening sound"><span aria-hidden="true"></span></label></div>
+    <div class="setting-row listening-row"><div><h3>Listening sound</h3></div><div class="sound-selection"><button id="preview-sound" disabled>Preview</button></div><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Listening sound"><span aria-hidden="true"></span></label></div>
    <details class="sound-options"><summary>Sound options</summary><div class="sound-controls"><label for="sound-volume">Volume</label><input id="sound-volume" type="range" min="0" max="100" step="1" value="50" aria-describedby="volume-percent"><output id="volume-percent" for="sound-volume">50%</output></div><p class="subtle">If Bluetooth delays listening, turn the cue off.</p></details>
   </section>
   <section class="card setup-card" aria-labelledby="setup-title"><div class="card-heading"><h2 id="setup-title">Setup</h2><span id="setup-state" class="subtle" role="status">Checking…</span></div>
@@ -52,7 +52,6 @@ let soundsPending = false;
 let volumePending = false;
 let volumeEditing = false;
 let previewPending = false;
-let stylePending = false;
 let shortcutPending = false;
 let capturing = false;
 let captureTimer: ReturnType<typeof setTimeout> | undefined;
@@ -131,12 +130,6 @@ recorder.onkeydown = e => {
 };
 recorder.onblur = () => { if (capturing && !shortcutPending) void stopCapture(); };
 window.addEventListener('blur', () => { if (capturing) void stopCapture(); });
-const style = el('sound-style') as HTMLSelectElement;
-style.onchange = async () => {
-  stylePending = true; style.disabled = true;
-  if (!await action('set_sound_style', {style: style.value})) style.value = current?.sound_style ?? 'tap';
-  stylePending = false; style.disabled = false;
-};
 el('download').onclick = () => void action('download_model');
 el('cancel').onclick = () => void action('cancel');
 el('copy').onclick = async () => { if (await action('copy_transcript')) feedback('Copied. Paste it wherever you need it.'); };
@@ -205,8 +198,6 @@ async function refresh() {
     el('transcript').textContent = current.transcript || `No transcript yet. Choose a text field in another app and press ${current.shortcut_label} to begin.`;
     el('transcript').classList.toggle('empty', !current.transcript);
     if (!soundsPending) sounds.checked = current.sounds;
-    if (!stylePending) style.value = current.sound_style;
-    style.disabled = stylePending || !isIdle();
     el('overview-shortcut').textContent = current.shortcut_label;
     el('saved-shortcut').textContent = current.shortcut_label;
     for (const id of ['shortcut-fn', 'shortcut-option', 'shortcut-control', 'record-shortcut']) button(id).disabled = shortcutPending || !canEditShortcut() || capturing;

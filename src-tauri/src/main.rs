@@ -359,7 +359,7 @@ async fn set_shortcut(shortcut: shortcut::Shortcut) -> Result<(), String> {
 #[tauri::command]
 async fn set_sound_style(style: String) -> Result<(), String> {
     if !["tap", "bell"].contains(&style.as_str()) {
-        return Err("Choose Soft chime or Gentle notes.".into());
+        return Err("Unknown legacy sound preference.".into());
     }
     tauri::async_runtime::spawn_blocking(move || {
         let s = state();

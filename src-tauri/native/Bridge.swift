@@ -69,43 +69,40 @@ enum CapsuleGeometry {
 }
 enum StartCue {
     static let rate = 44100
-    static var style = 0
-    static func duration(style: Int) -> Double { style == 1 ? 0.44 : 0.38 }
-    static var duration: Double { duration(style: style) }
-    static var samples: [Int16] { samples(style: style) }
-    // Raised-cosine attack and release keep both value and slope continuous.
-    // The long exponential body rings naturally; the final taper is already quiet.
-    static func envelope(time: Double, length: Double) -> Double {
-        guard time > 0 && time < length else { return 0 }
-        let attack = 0.020
-        let release = 0.100
+    static let duration = 0.22
+    // A rounded, airy tactile transient, not a note. No oscillators or resonators.
+    static func envelope(time: Double) -> Double {
+        guard time > 0 && time < duration else { return 0 }
+        let attack = 0.016
+        let release = 0.070
         let rise = 0.5 - 0.5 * cos(.pi * min(time / attack, 1))
-        let fall = 0.5 - 0.5 * cos(.pi * min((length - time) / release, 1))
-        return rise * fall * exp(-4.5 * time / length)
+        let fall = 0.5 - 0.5 * cos(.pi * min((duration - time) / release, 1))
+        return rise * fall * fall * exp(-time / 0.065)
     }
-    static func samples(style: Int) -> [Int16] {
-        let length = duration(style: style)
-        func note(_ time: Double, _ duration: Double, _ frequency: Double) -> Double {
-            let phase = 2 * Double.pi * frequency * time
-            // Sine-led, with just a little rounded octave and soft bell shimmer.
-            let body = sin(phase) + 0.10 * sin(phase * 2) * exp(-12 * max(time, 0))
-                + 0.035 * sin(phase * 3.002) * exp(-20 * max(time, 0))
-            return envelope(time: time, length: duration) * body
+    static var samples: [Int16] {
+        var seed: UInt32 = 0x48F2A713
+        var lowBody = 0.0, soft = 0.0, softer = 0.0
+        let highpass = 1 - exp(-2 * Double.pi * 160 / Double(rate))
+        let lowpass = 1 - exp(-2 * Double.pi * 1100 / Double(rate))
+        var shaped: [Double] = []
+        for i in 0..<Int(Double(rate) * duration) {
+            seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5
+            let noise = Double(seed) / Double(UInt32.max) * 2 - 1
+            // Remove sub-bass, then two gentle lowpasses remove the sharp hiss.
+            lowBody += highpass * (noise - lowBody)
+            soft += lowpass * (noise - lowBody - soft)
+            softer += lowpass * (soft - softer)
+            shaped.append(softer * envelope(time: Double(i) / Double(rate)))
         }
-        return (0..<Int(Double(rate) * length)).map { i in
-            let t = Double(i) / Double(rate)
-            // Persisted tap = Soft chime; bell = Gentle notes. No preference migration.
-            let tone = style == 1
-                ? 0.78 * note(t, 0.32, 440) + note(t - 0.115, length - 0.115, 554.365)
-                : note(t, length, 523.251)
-            return Int16((tone * 11500).rounded())
-        }
+        let gain = 10500 / shaped.map { abs($0) }.max()!
+        return shaped.map { Int16(($0 * gain).rounded()) }
     }
 }
 @_cdecl("hf_sound_style") public func soundStyle(_ style: Int32) {
-    main { StartCue.style = style == 1 ? 1 : 0; cue?.stop(); cue = nil }
+    // Deprecated ABI: saved tap/bell preferences both use the same cue.
+    // Deliberately no player mutation, playback, or capture side effects.
 }
-// Original soft cues, synthesized locally (no borrowed audio).
+// Original filtered-noise cue, synthesized locally (no borrowed audio).
 private func makeCue() -> AVAudioPlayer? {
     let rate = StartCue.rate
     let samples = StartCue.samples

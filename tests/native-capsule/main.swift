@@ -6,11 +6,15 @@ let points = CapsuleGeometry.checkmark(in: NSRect(x: 0, y: 0, width: 34, height:
 precondition(points[0].x < points[1].x && points[1].x < points[2].x)
 precondition(points[1].y > points[0].y && points[1].y > points[2].y, "Check vertex must point down in flipped coordinates")
 precondition(points[2].y < points[0].y, "Check must have a longer rising right arm")
-for style in [0, 1] {
-    StartCue.style = style
+do {
     let samples = StartCue.samples
     precondition(samples.count == Int(StartCue.duration * Double(StartCue.rate)))
-    precondition(StartCue.duration == (style == 1 ? 0.44 : 0.38))
+    precondition(StartCue.duration == 0.22)
+    precondition(samples == StartCue.samples, "Deterministic noise, no random playback variation")
+    for legacyStyle: Int32 in [0, 1] {
+        soundStyle(legacyStyle)
+        precondition(samples == StartCue.samples, "Both legacy styles normalize to one cue")
+    }
     precondition(samples.first == 0 && samples.last == 0)
     let peak = samples.map { abs(Int($0)) }.max()!
     precondition(peak > 3000 && peak < 14000, "Gentle audible headroom, never clipped")
@@ -32,22 +36,27 @@ for style in [0, 1] {
         }
         return hypot(real, imaginary) / Double(end - start)
     }
-    let fundamental = style == 1 ? 440.0 : 523.251
-    precondition(magnitude(fundamental, 0.025, 0.09) > magnitude(2 * fundamental, 0.025, 0.09) * 5, "Warm fundamental dominates subtle harmonics")
     precondition((0.035...0.10).contains(level), "Moderate RMS, not a nearly silent or over-loud impulse")
-    precondition(rms(0, 0.005) < rms(0.015, 0.030) * 0.15, "20 ms soft attack")
-    precondition(rms(0.20, 0.25) > 0.005, "Audible body lasts beyond the old short cues")
+    precondition(rms(0, 0.003) < rms(0.015, 0.030) * 0.15, "16 ms rounded attack")
+    precondition(rms(0.06, 0.12) > 0.015, "Soft body, not just a tiny click")
     precondition(rms(StartCue.duration - 0.10, StartCue.duration - 0.05) > rms(StartCue.duration - 0.05, StartCue.duration), "Natural decaying tail")
     precondition(rms(StartCue.duration - 0.01, StartCue.duration) < 0.0001, "No truncated ringing at the endpoint")
-    precondition(StartCue.envelope(time: 0, length: 0.32) == 0)
-    precondition(StartCue.envelope(time: 0.32, length: 0.32) == 0)
-    if style == 1 {
-        precondition(rms(0.13, 0.16) > rms(0.09, 0.11), "Second note rises gently over the first note’s decay")
-        precondition(magnitude(554.365, 0.15, 0.22) > magnitude(440, 0.15, 0.22) * 3, "Consonant upper note emerges over the overlapping first note")
+    precondition(StartCue.envelope(time: 0) == 0)
+    precondition(StartCue.envelope(time: StartCue.duration) == 0)
+    // Full-window DFT bins give an approximate power spectrum without audio I/O.
+    let powers = (1...2200).map { bin in pow(magnitude(Double(bin) / StartCue.duration, 0, StartCue.duration), 2) }
+    let total = powers.reduce(0, +)
+    func power(_ low: Double, _ high: Double) -> Double {
+        powers.enumerated().filter { (low..<high).contains(Double($0.offset + 1) / StartCue.duration) }.reduce(0) { $0 + $1.element }
     }
-    print("Cue \(style): \(samples.count) samples / \(StartCue.duration)s, peak \(peak), RMS \(level), max step \(steps.max()!)")
+    precondition(powers.max()! / total < 0.08, "No single pure-tone dominance")
+    precondition(power(160, 1600) / total > 0.70, "Warm low-mid noise, not a bass thump or bright click")
+    precondition(power(4000, 10000) / total < 0.015, "No sharp broadband highs")
+    precondition(power(0, 80) / total < 0.04, "No loud sub-bass")
+    precondition(power(200, 500) > total * 0.10 && power(500, 1200) > total * 0.10, "Broad non-tonal body")
+    precondition(powers.max()! > powers.min()! * 100, "Filtered, nonconstant spectrum")
+    print("Cue: \(samples.count) samples / \(StartCue.duration)s, peak \(peak), RMS \(level), max step \(steps.max()!), strongest bin \(powers.max()! / total)")
 }
-precondition(StartCue.samples(style: 0) != StartCue.samples(style: 1))
 for mods: UInt32 in 0...15 {
     for code: Int64 in [0, 49, 53, 63] {
         for repeating in [false, true] {
@@ -125,4 +134,4 @@ overlay(1); overlay(2); overlay(4)
 RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.3))
 precondition((app.windows.first { $0 is NSPanel }!.contentView as! PillView).capsuleRect == recordingRect)
 overlay(0)
-print("Native capsule geometry, state layout, nonactivation, shortcut matching and cue profiles passed without capture")
+print("Native capsule geometry, state layout, nonactivation, shortcut matching and nonmusical cue passed without capture")

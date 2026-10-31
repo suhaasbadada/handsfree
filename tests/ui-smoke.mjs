@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const binary = process.env.BROWSER_BINARY;
+const port = process.env.UI_PORT ?? '5187';
 if (!binary) throw new Error('Set BROWSER_BINARY to a Chromium-compatible browser. Start npm run dev -- --port 5187 first.');
 const profile = mkdtempSync(join(tmpdir(), 'handsfree-ui-'));
 const browser = spawn(binary, ['--headless', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=9237', `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' });
@@ -33,7 +34,7 @@ async function until(expression) {
 try {
   let page;
   for (let attempt = 0; attempt < 100; attempt++) {
-    try { page = await (await fetch('http://127.0.0.1:9237/json/new?http://127.0.0.1:5187', { method: 'PUT' })).json(); break; }
+    try { page = await (await fetch(`http://127.0.0.1:9237/json/new?http://127.0.0.1:${port}`, { method: 'PUT' })).json(); break; }
     catch { await delay(50); }
   }
   assert.ok(page?.webSocketDebuggerUrl, 'Headless browser started');
@@ -95,9 +96,9 @@ try {
   assert.equal(await evaluate(`document.getElementById('shortcut-dialog').open && document.getElementById('shortcut-recorder').hidden && window.calls.filter(c=>c.command==='capture_shortcut').at(-1).args.active===false`), true, 'Recording timeout releases native capture and keeps dialog usable');
   await evaluate(`window.setTimeout=window.realTimeout;document.getElementById('close-shortcut').click()`);
   await evaluate(`document.querySelector('.sound-options').open=true`);
-  await evaluate(`window.rejectShortcut=false;document.getElementById('sound-style').value='bell';document.getElementById('sound-style').dispatchEvent(new Event('change'))`);
-  await until(`window.fixture.sound_style==='bell' && !document.getElementById('sound-style').disabled`);
-  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='preview_sound').length`), 0, 'Sound selection never autoplays');
+  await evaluate(`window.rejectShortcut=false;window.fixture.sound_style='bell'`);
+  assert.equal(await evaluate(`document.getElementById('sound-style')===null`), true, 'One cue, no style selector even with a legacy preference');
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='preview_sound').length`), 0, 'Opening sound options never autoplays');
   await evaluate(`document.getElementById('sounds').click()`);
   await until(`window.fixture.sounds===false && !document.getElementById('sounds').disabled`);
   await evaluate(`window.fixture.sound_volume=50; const oldInvoke=window.__TAURI_INTERNALS__.invoke; window.__TAURI_INTERNALS__.invoke=async(command,args)=>{ if(command==='set_sound_volume') window.fixture.sound_volume=args.volume; return oldInvoke(command,args); };`);
@@ -173,7 +174,7 @@ try {
       await evaluate(`document.getElementById('close-shortcut').click()`);
     }
   }
-  console.log('UI smoke passed: compact ready settings, missing setup/download progress, shortcut dialog focus/Escape/timeout/presets/validation/save failure, sound styles/toggle/volume/idle-only preview, reset, counts, safe transcript/copy, light/dark responsive layout. No microphone capture or screenshots.');
+  console.log('UI smoke passed: compact ready settings, missing setup/download progress, shortcut dialog focus/Escape/timeout/presets/validation/save failure, single cue without selector/autoplay, toggle/volume/idle-only preview, reset, counts, safe transcript/copy, light/dark responsive layout. No microphone capture or screenshots.');
 } finally {
   socket?.close();
   browser.kill('SIGTERM');
