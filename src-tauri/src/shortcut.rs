@@ -32,29 +32,22 @@ pub struct Shortcut {
 impl Default for Shortcut {
     fn default() -> Self {
         Self {
-            code: if cfg!(windows) { "Space" } else { "Fn" }.into(),
-            modifiers: if cfg!(windows) { 5 } else { 0 },
+            code: if cfg!(windows) { "ControlRight" } else { "Fn" }.into(),
+            modifiers: 0,
         }
     }
 }
 impl Shortcut {
+    // An explicit physical-key gesture, not a generic unmodified Control chord.
+    // Legacy {code, modifiers} combinations retain their exact meaning.
+    #[cfg(any(windows, test))]
+    pub fn is_right_control_tap(&self) -> bool {
+        self.code == "ControlRight" && self.modifiers == 0
+    }
     pub fn keycode(&self) -> Option<i32> {
         #[cfg(windows)]
         {
-            let code = self.code.as_bytes();
-            match self.code.as_str() {
-                "Space" => Some(0x20),
-                _ if code.len() == 4
-                    && code.starts_with(b"Key")
-                    && code[3].is_ascii_uppercase() =>
-                {
-                    Some(code[3] as i32)
-                }
-                _ if code.len() == 6 && code.starts_with(b"Digit") && code[5].is_ascii_digit() => {
-                    Some(code[5] as i32)
-                }
-                _ => None,
-            }
+            self.windows_keycode()
         }
         #[cfg(not(windows))]
         Some(match self.code.as_str() {
@@ -99,65 +92,98 @@ impl Shortcut {
             _ => return None,
         })
     }
+    #[cfg(any(windows, test))]
+    fn windows_keycode(&self) -> Option<i32> {
+        let code = self.code.as_bytes();
+        match self.code.as_str() {
+            "ControlRight" if self.modifiers == 0 => Some(0xA3),
+            "Space" => Some(0x20),
+            _ if code.len() == 4 && code.starts_with(b"Key") && code[3].is_ascii_uppercase() => {
+                Some(code[3] as i32)
+            }
+            _ if code.len() == 6 && code.starts_with(b"Digit") && code[5].is_ascii_digit() => {
+                Some(code[5] as i32)
+            }
+            _ => None,
+        }
+    }
     pub fn validate(&self) -> Result<(), String> {
         #[cfg(windows)]
         {
-            if self.keycode().is_none() || self.modifiers & !15 != 0 || self.modifiers & 11 == 0 {
-                return Err(
-                    "Use Control, Alt or Windows with a letter, number or Space. Fn is macOS-only."
-                        .into(),
-                );
-            }
-            // Plain Windows/Windows-Shift chords belong to the shell. Modified
-            // Windows chords are allowed except known shell/desktop actions.
-            let windows_reserved = self.modifiers & 8 != 0
-                && (self.modifiers & 3 == 0
-                    || ["Space", "KeyL", "KeyD", "KeyQ", "KeyB", "KeyR", "KeyK"]
-                        .contains(&self.code.as_str()));
-            if windows_reserved
-                || (self.code == "Space" && [1, 2].contains(&self.modifiers))
-                || (self.modifiers & 3 == 1
-                    && [
-                        "KeyA", "KeyC", "KeyV", "KeyX", "KeyZ", "KeyS", "KeyW", "KeyF", "KeyN",
-                        "KeyO", "KeyP",
-                    ]
-                    .contains(&self.code.as_str()))
-            {
-                return Err("That shortcut is reserved for Windows or common app actions. Try Control + Shift + Space.".into());
-            }
-            Ok(())
+            self.validate_windows()
         }
         #[cfg(not(windows))]
         {
-            if self.code == "Fn" && self.modifiers == 0 {
-                return Ok(());
-            }
-            if self.code == "Fn"
-                || self.keycode().is_none()
-                || self.modifiers & !15 != 0
-                || self.modifiers & 11 == 0
-            {
-                return Err("Use Control, Option or Command with a letter, number or Space. Fn must be used alone.".into());
-            }
-            // Avoid system shortcuts and common destructive/editing commands even
-            // with additional modifiers (e.g. Command-Shift-Q and Command-Option-V).
-            if (self.modifiers & 8 != 0
-                && [
-                    "KeyA", "KeyC", "KeyV", "KeyX", "KeyZ", "KeyQ", "KeyW", "KeyH", "KeyM", "KeyN",
-                    "KeyO", "KeyP", "KeyS", "KeyF", "KeyT", "Space",
-                ]
-                .contains(&self.code.as_str()))
-                || (self.code == "Space" && self.modifiers == 1)
-                || (self.modifiers & 8 != 0
-                    && self.modifiers & 4 != 0
-                    && self.code.starts_with("Digit"))
-            {
-                return Err("That shortcut is reserved for macOS or common app actions. Try Option + Space or Control + Shift + Space.".into());
-            }
-            Ok(())
+            self.validate_macos()
         }
     }
+    #[cfg(any(windows, test))]
+    fn validate_windows(&self) -> Result<(), String> {
+        if self.is_right_control_tap() {
+            return Ok(());
+        }
+        if self.code == "ControlRight" {
+            return Err("Right Ctrl must be tapped alone.".into());
+        }
+        if self.windows_keycode().is_none() || self.modifiers & !15 != 0 || self.modifiers & 11 == 0
+        {
+            return Err(
+                "Use Control, Alt or Windows with a letter, number or Space. Fn is macOS-only."
+                    .into(),
+            );
+        }
+        // Plain Windows/Windows-Shift chords belong to the shell. Modified
+        // Windows chords are allowed except known shell/desktop actions.
+        let windows_reserved = self.modifiers & 8 != 0
+            && (self.modifiers & 3 == 0
+                || ["Space", "KeyL", "KeyD", "KeyQ", "KeyB", "KeyR", "KeyK"]
+                    .contains(&self.code.as_str()));
+        if windows_reserved
+            || (self.code == "Space" && [1, 2].contains(&self.modifiers))
+            || (self.modifiers & 3 == 1
+                && [
+                    "KeyA", "KeyC", "KeyV", "KeyX", "KeyZ", "KeyS", "KeyW", "KeyF", "KeyN", "KeyO",
+                    "KeyP",
+                ]
+                .contains(&self.code.as_str()))
+        {
+            return Err("That shortcut is reserved for Windows or common app actions. Try Control + Shift + Space.".into());
+        }
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    fn validate_macos(&self) -> Result<(), String> {
+        if self.code == "Fn" && self.modifiers == 0 {
+            return Ok(());
+        }
+        if self.code == "Fn"
+            || self.keycode().is_none()
+            || self.modifiers & !15 != 0
+            || self.modifiers & 11 == 0
+        {
+            return Err("Use Control, Option or Command with a letter, number or Space. Fn must be used alone.".into());
+        }
+        // Avoid system shortcuts and common destructive/editing commands even
+        // with additional modifiers (e.g. Command-Shift-Q and Command-Option-V).
+        if (self.modifiers & 8 != 0
+            && [
+                "KeyA", "KeyC", "KeyV", "KeyX", "KeyZ", "KeyQ", "KeyW", "KeyH", "KeyM", "KeyN",
+                "KeyO", "KeyP", "KeyS", "KeyF", "KeyT", "Space",
+            ]
+            .contains(&self.code.as_str()))
+            || (self.code == "Space" && self.modifiers == 1)
+            || (self.modifiers & 8 != 0
+                && self.modifiers & 4 != 0
+                && self.code.starts_with("Digit"))
+        {
+            return Err("That shortcut is reserved for macOS or common app actions. Try Option + Space or Control + Shift + Space.".into());
+        }
+        Ok(())
+    }
     pub fn label(&self) -> String {
+        if self.code == "ControlRight" && self.modifiers == 0 {
+            return "Right Ctrl".into();
+        }
         if self.code == "Fn" {
             return "Fn".into();
         }
@@ -183,6 +209,40 @@ impl Shortcut {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn explicit_gesture_and_legacy_combinations_roundtrip_without_migration() {
+        for (json, tap) in [
+            (r#"{"code":"ControlRight","modifiers":0}"#, true),
+            (r#"{"code":"Space","modifiers":5}"#, false),
+            (r#"{"code":"KeyJ","modifiers":2}"#, false),
+        ] {
+            let shortcut: Shortcut = serde_json::from_str(json).unwrap();
+            assert_eq!(shortcut.is_right_control_tap(), tap);
+            assert!(shortcut.validate_windows().is_ok());
+            assert_eq!(serde_json::to_string(&shortcut).unwrap(), json);
+        }
+        for code in ["Control", "ControlLeft", "AltRight", "Fn"] {
+            assert!(Shortcut {
+                code: code.into(),
+                modifiers: 0
+            }
+            .validate_windows()
+            .is_err());
+        }
+        assert!(Shortcut {
+            code: "ControlRight".into(),
+            modifiers: 1
+        }
+        .validate_windows()
+        .is_err());
+        #[cfg(not(windows))]
+        assert!(Shortcut {
+            code: "ControlRight".into(),
+            modifiers: 0
+        }
+        .validate()
+        .is_err());
+    }
     #[test]
     fn collisions_and_denied_saves_restore_the_old_binding() {
         let old = Shortcut::default();
@@ -252,8 +312,8 @@ mod tests {
     #[test]
     #[cfg(windows)]
     fn windows_defaults_mapping_and_reservations() {
-        assert_eq!(Shortcut::default().keycode(), Some(0x20));
-        assert_eq!(Shortcut::default().modifiers, 5);
+        assert_eq!(Shortcut::default().keycode(), Some(0xA3));
+        assert_eq!(Shortcut::default().modifiers, 0);
         assert!(Shortcut::default().validate().is_ok());
         assert!(Shortcut {
             code: "KeyJ".into(),

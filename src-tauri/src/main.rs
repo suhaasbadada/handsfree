@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod cancellation;
+#[cfg(any(windows, test))]
+mod control_tap;
 mod logic;
 mod platform;
 mod shortcut;

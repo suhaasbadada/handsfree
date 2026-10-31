@@ -105,7 +105,7 @@ try {
   assert.deepEqual(await evaluate(`['change-shortcut','recording-limit','preview-sound','reset'].map(id=>document.getElementById(id).getBoundingClientRect().height)`), [36,36,36,36], 'Settings actions and select share one control height');
   const recording = `document.getElementById('change-shortcut').getAttribute('aria-pressed')==='true'`;
   const stopped = `document.getElementById('change-shortcut').getAttribute('aria-pressed')==='false' && !document.getElementById('change-shortcut').disabled`;
-  const key = (code, mods = '') => evaluate(`document.getElementById('change-shortcut').dispatchEvent(new KeyboardEvent('keydown',{code:'${code}',${mods}bubbles:true,cancelable:true}))`);
+  const key = (code, mods = '') => evaluate(`['keydown','keyup'].forEach(type=>document.getElementById('change-shortcut').dispatchEvent(new KeyboardEvent(type,{code:'${code}',${mods}bubbles:true,cancelable:true})))`);
   await evaluate(`document.getElementById('change-shortcut').click()`);
   await until(recording);
   assert.equal(await evaluate(`document.activeElement.id==='change-shortcut' && document.getElementById('saved-shortcut').textContent==='Press shortcut…' && !document.querySelector('dialog[open]')`), true, 'Single inline recorder, no modal or presets');
@@ -335,7 +335,7 @@ try {
    // Native platform, not browser UA: this Windows fixture runs in a Mac browser.
    await evaluate(`Object.assign(window.fixture,{platform:'windows',phase:'idle',message:'',model_ready:true,microphone:true,accessibility:false,input_monitoring:false,hotkey:true,shortcut:{code:'Space',modifiers:5},shortcut_label:'Control + Shift + Space'});document.getElementById('feedback').hidden=true`);
    await until(`document.getElementById('overview-shortcut').textContent==='Ctrl + Shift + Space' && document.getElementById('setup-state').textContent==='Ready'`);
-   assert.equal(await evaluate(`document.getElementById('shortcut-fn').hidden && document.getElementById('shortcut-fn').textContent==='Use default' && document.getElementById('permissions-row').hidden && document.getElementById('permissions').disabled && !document.body.innerText.includes('this Mac') && !document.body.innerText.includes('Fn')`), true, 'Windows has no Fn preset or Mac permission pane');
+   assert.equal(await evaluate(`!document.getElementById('shortcut-fn').hidden && document.getElementById('shortcut-fn').textContent==='Use default' && document.getElementById('permissions-row').hidden && document.getElementById('permissions').disabled && !document.body.innerText.includes('this Mac') && !document.body.innerText.includes('Fn')`), true, 'Legacy Windows preference is retained with an explicit default reset, not silently migrated');
    const windowsCallsStart = await evaluate(`window.calls.length`);
    for (let mask = 0; mask < 32; mask++) {
      const model = !!(mask & 1), mic = !!(mask & 2), ax = !!(mask & 4), input = !!(mask & 8), hook = !!(mask & 16);
@@ -368,15 +368,29 @@ try {
    await until(`${stopped} && document.getElementById('shortcut-feedback').textContent.includes('Could not save')`);
    assert.equal(await evaluate(`document.getElementById('saved-shortcut').textContent`), 'Ctrl + Alt + Win + J', 'Windows registration failure restores the previous binding');
    await evaluate(`window.rejectShortcut=false;document.getElementById('shortcut-fn').click()`);
+   await until(`${stopped} && document.getElementById('saved-shortcut').textContent==='Right Ctrl'`);
+   assert.deepEqual(await evaluate(`window.calls.filter(c=>c.command==='set_shortcut').at(-1).args.shortcut`), {code:'ControlRight',modifiers:0}, 'Use default persists Right Ctrl, never Fn');
+   // Actual modifier-first sequences: never finalize a modifier keydown.
+   await evaluate(`document.getElementById('change-shortcut').click()`);
+   await until(recording);
+   const tapSaves = await evaluate(`window.calls.filter(c=>c.command==='set_shortcut').length`);
+   await evaluate(`document.getElementById('change-shortcut').dispatchEvent(new KeyboardEvent('keydown',{code:'ControlRight',ctrlKey:true,bubbles:true,cancelable:true}))`);
+   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='set_shortcut').length`), tapSaves, 'Right Ctrl keydown does not finalize capture');
+   await evaluate(`document.getElementById('change-shortcut').dispatchEvent(new KeyboardEvent('keyup',{code:'ControlRight',bubbles:true,cancelable:true}))`);
+   await until(`${stopped} && window.calls.filter(c=>c.command==='set_shortcut').length===${tapSaves + 1}`);
+   await evaluate(`document.getElementById('change-shortcut').click()`);
+   await until(recording);
+   await evaluate(`for(const [code,mods] of [['ControlRight',{ctrlKey:true}],['ShiftLeft',{ctrlKey:true,shiftKey:true}],['Space',{ctrlKey:true,shiftKey:true}]]) document.getElementById('change-shortcut').dispatchEvent(new KeyboardEvent('keydown',{code,...mods,bubbles:true,cancelable:true}))`);
    await until(`${stopped} && document.getElementById('saved-shortcut').textContent==='Ctrl + Shift + Space'`);
-   assert.deepEqual(await evaluate(`window.calls.filter(c=>c.command==='set_shortcut').at(-1).args.shortcut`), {code:'Space',modifiers:5}, 'Use default persists the Windows binding, never Fn');
+   await evaluate(`document.getElementById('shortcut-fn').click()`);
+   await until(`${stopped} && document.getElementById('saved-shortcut').textContent==='Right Ctrl'`);
    await evaluate(`window.realTimeout=window.setTimeout;window.setTimeout=(fn,ms,...args)=>window.realTimeout(fn,ms===15000?30:ms,...args);document.getElementById('change-shortcut').click()`);
    await until(`${stopped} && document.getElementById('shortcut-feedback').textContent.includes('timed out')`);
    await evaluate(`window.setTimeout=window.realTimeout`);
    assert.equal(await evaluate(`window.calls.filter(c=>c.command==='capture_shortcut').at(-1).args.active`), false, 'Windows timeout releases native shortcut capture');
    await evaluate(`const windowsCaptureInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='capture_shortcut'&&args.active)throw 'Could not record Windows shortcut';return windowsCaptureInvoke(command,args);};document.getElementById('change-shortcut').click()`);
    await until(`${stopped} && document.getElementById('shortcut-feedback').textContent.includes('Could not record Windows shortcut')`);
-   assert.equal(await evaluate(`document.getElementById('saved-shortcut').textContent`), 'Ctrl + Shift + Space', 'Windows capture-start failure restores the saved binding');
+   assert.equal(await evaluate(`document.getElementById('saved-shortcut').textContent`), 'Right Ctrl', 'Windows capture-start failure restores the saved binding');
    await evaluate(`window.__TAURI_INTERNALS__.invoke=windowsCaptureInvoke`);
    for (const seconds of [120,180,240,300]) {
      await evaluate(`document.getElementById('recording-limit').value='${seconds}';document.getElementById('recording-limit').dispatchEvent(new Event('change'))`);

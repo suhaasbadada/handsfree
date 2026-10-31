@@ -198,6 +198,34 @@ pub fn validate_recording_limit(seconds: u32) -> Result<(), String> {
 mod tests {
     use super::*;
     #[test]
+    fn shortcuts_are_preserved_and_missing_preferences_use_platform_default() {
+        for (code, modifiers) in [("Space", 5), ("KeyJ", 2)] {
+            let json = format!(r#"{{"shortcut":{{"code":"{code}","modifiers":{modifiers}}}}}"#);
+            let store: Store = serde_json::from_str(&json).unwrap();
+            assert_eq!(store.shortcut.code, code);
+            assert_eq!(store.shortcut.modifiers, modifiers);
+            assert_eq!(
+                serde_json::from_str::<Store>(&serde_json::to_string(&store).unwrap()).unwrap(),
+                store
+            );
+        }
+        assert_eq!(
+            serde_json::from_str::<Store>("{}").unwrap().shortcut,
+            crate::shortcut::Shortcut::default()
+        );
+        #[cfg(windows)]
+        {
+            assert!(Store::default().shortcut.is_right_control_tap());
+            let store: Store =
+                serde_json::from_str(r#"{"shortcut":{"code":"ControlRight","modifiers":0}}"#)
+                    .unwrap();
+            assert_eq!(
+                serde_json::from_str::<Store>(&serde_json::to_string(&store).unwrap()).unwrap(),
+                store
+            );
+        }
+    }
+    #[test]
     #[cfg(windows)]
     fn denied_replacement_preserves_old_settings_and_cleans_temporary() {
         let dir =

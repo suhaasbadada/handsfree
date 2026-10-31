@@ -41,7 +41,7 @@ Mac beta and experimental Windows beta are available; Linux is planned.
 
 - **Private by design:** Whisper runs locally with Apple Silicon Metal on Mac or CPU inference on Windows. Download the model once; dictate offline afterward. Windows CPU transcription may be slower.
 - **Stay in flow:** a compact recording capsule, live mic meter, and Escape to cancel.
-- **Your shortcut:** Fn / 🌐 on Mac, Ctrl+Shift+Space on Windows, or a custom key combination.
+- **Your shortcut:** Fn / 🌐 on Mac, Right Ctrl in current Windows source, or a custom key combination. The published Windows beta.1 still uses Ctrl+Shift+Space.
 - **Practical controls:** optional listening sounds and local usage totals. Dictation text stays out of the app window.
 - **Safer insertion:** checks the original app and field before submitting Paste; otherwise copies for manual paste.
 
@@ -68,6 +68,8 @@ Windows ARM and 32-bit Windows are unsupported. Linux has no release date.
 ## Install
 
 **Windows:** run the [EXE above](#download-for-windows-exe), then follow the [Windows guide](docs/WINDOWS.md): allow desktop microphone access in Windows Settings, explicitly download the English model (~148 MB), and use **Ctrl+Shift+Space**. Mac Accessibility/Input Monitoring permissions do not apply. Review the experimental limitations before testing.
+
+Current Windows source (not yet shipped in that EXE) defaults to a short **Right Ctrl** tap: release within 400 ms to start or finish. Existing saved shortcuts, including Ctrl+Shift+Space, are preserved; choose **Use default** in Settings to opt in after upgrading to a build containing this change.
 
 ### Mac
 

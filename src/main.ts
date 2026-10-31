@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getVersion } from '@tauri-apps/api/app';
 import './style.css';
 import './typography.css';
-import { defaultShortcut, shortcutFromEvent, shortcutLabel, type Shortcut } from './shortcut';
+import { defaultShortcut, ShortcutRecorder, shortcutLabel, type Shortcut } from './shortcut';
 import { phaseLabel, canCancel, formatTime, readiness, readinessDetail } from './presentation';
 
 type Status = { platform?: 'windows' | 'macos'; phase: string; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: 'clean' | 'warm'; recording_limit: number; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
@@ -96,6 +96,8 @@ el('setup').onclick = () => {
 el('mic').onclick = () => void action('request_microphone');
 el('permissions').onclick = () => { if (current && current.platform !== 'windows') void action('request_permissions'); };
 const recorder = button('change-shortcut');
+const recordedKeys = new ShortcutRecorder();
+let captureGeneration = 0;
 function shortcutFeedback(message: string) {
   el('shortcut-feedback').hidden = !message; el('shortcut-feedback').textContent = message;
 }
@@ -113,7 +115,7 @@ function renderShortcut() {
 async function stopCapture() {
   if (!capturing || captureStopping) return;
   const restoreFocus = document.activeElement === recorder;
-  capturing = false; captureStopping = true; clearTimeout(captureTimer); renderShortcut();
+  capturing = false; captureGeneration++; recordedKeys.reset(); captureStopping = true; clearTimeout(captureTimer); renderShortcut();
   try { await captureStart; await invoke('capture_shortcut', { active: false }); }
   catch (e) { shortcutFeedback(String(e)); }
   finally { captureStopping = false; renderShortcut(); if (restoreFocus) restoreRecorderFocus(); }
@@ -136,27 +138,46 @@ el('shortcut-fn').onclick = () => { if (current) void saveShortcut(defaultShortc
 el('stop-shortcut').onclick = () => void stopCapture();
 recorder.onclick = async e => {
   if (!canEditShortcut() || shortcutPending || capturing || captureStopping) return;
-  capturing = true; activationHeld = e.detail === 0; shortcutFeedback(''); renderShortcut(); recorder.focus();
+  capturing = true; captureGeneration++; recordedKeys.reset(); activationHeld = e.detail === 0; shortcutFeedback(''); renderShortcut(); recorder.focus();
+  const generation = captureGeneration;
   try {
     captureStart = invoke('capture_shortcut', {active: true});
     await captureStart;
-    if (!capturing || !canEditShortcut()) { await stopCapture(); return; }
-    captureTimer = setTimeout(() => { void stopCapture(); shortcutFeedback('Shortcut recording timed out.'); }, 15000);
-  } catch (e) { capturing = false; renderShortcut(); shortcutFeedback(String(e)); }
+    if (!capturing || generation !== captureGeneration) return;
+    if (!canEditShortcut()) { await stopCapture(); return; }
+    captureTimer = setTimeout(() => {
+      if (!capturing || generation !== captureGeneration) return;
+      void stopCapture(); shortcutFeedback('Shortcut recording timed out.');
+    }, 15000);
+  } catch (e) {
+    if (generation !== captureGeneration) return;
+    capturing = false; captureGeneration++; recordedKeys.reset(); renderShortcut(); shortcutFeedback(String(e));
+  }
 };
 recorder.onkeydown = e => {
   if (!capturing || shortcutPending) return;
   if (e.code === 'Tab') { void stopCapture(); return; }
   e.preventDefault(); e.stopPropagation();
-  if (e.repeat || e.isComposing) return;
   if (e.code === 'Escape') { void stopCapture(); return; }
   if (activationHeld && (e.code === 'Enter' || (e.code === 'Space' && !e.ctrlKey && !e.altKey && !e.metaKey))) return;
   if (captureStart && captureStopping) return;
-  if (/^(Control|Alt|Shift|Meta)/.test(e.code)) return;
-   try { const shortcut = shortcutFromEvent(e, current?.platform); void captureStart?.then(() => { if (capturing) void saveShortcut(shortcut); }).catch(error => shortcutFeedback(String(error))); }
+   try { queueRecordedShortcut(recordedKeys.key(e, true, current?.platform)); }
   catch (error) { shortcutFeedback(String(error)); }
 };
-recorder.onkeyup = () => { activationHeld = false; };
+function queueRecordedShortcut(shortcut: Shortcut | undefined) {
+  if (!shortcut) return;
+  const generation = captureGeneration;
+  void captureStart?.then(() => { if (capturing && generation === captureGeneration && !captureStopping) void saveShortcut(shortcut); }).catch(error => shortcutFeedback(String(error)));
+}
+recorder.onkeyup = e => {
+  activationHeld = false;
+  if (!capturing || shortcutPending || captureStopping) return;
+  e.preventDefault(); e.stopPropagation();
+  queueRecordedShortcut(recordedKeys.key(e, false, current?.platform));
+};
+window.addEventListener('pointerdown', () => recordedKeys.interrupt());
+window.addEventListener('wheel', () => recordedKeys.interrupt(), { passive: true });
+window.addEventListener('pagehide', () => { recordedKeys.reset(); if (capturing) void stopCapture(); });
 recorder.onblur = () => { if (capturing && !shortcutPending) void stopCapture(); };
 window.addEventListener('blur', () => { if (capturing) void stopCapture(); });
 async function downloadModel() {

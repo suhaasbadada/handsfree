@@ -54,6 +54,13 @@ Close settings to keep the app in the menu bar. Left-click its waveform icon for
 
 ## Dashboard, sounds, and local usage
 
+**Windows shortcut source change (not yet in published beta.1):** new/missing
+preferences and **Use default** select Right Ctrl alone, released within 400 ms.
+The recorder waits for its keyup; modifier-first custom combinations still save
+on the combination keydown. All existing saved bindings, including Ctrl+Shift+Space,
+remain unchanged. See [Windows gesture and upgrade instructions](WINDOWS.md#current-source-right-ctrl-not-in-the-published-beta1-exe).
+The Fn, CGEvent and permission details below apply to macOS and are unchanged.
+
 The main window intentionally stays light regardless of the system appearance: warm white surfaces, graphite text/actions, muted-red active/recording accents, rounded top navigation with SVG icons, and native system type. There are no blue/purple interface accents. The original liked rounded-square waveform logo is unchanged; the menu-bar template remains monochrome. Overview shows real local usage totals, the saved shortcut, and the last transcript with manual **Copy text**. Setup appears only when something is missing. Settings groups shortcuts, sound, permissions/model, and local privacy controls. The native pill shares the light palette without changing its dimensions, actions, or animation.
 
 **Dock lifecycle:** `LSUIElement` remains the background default. Initial dashboard display and explicit reopen use the main-thread native `hf_dashboard_visible(true)` helper to set regular activation policy and load the bundled app icon. Closing the main window hides it and sets accessory policy, leaving the menu-bar app running. Only explicit dashboard opens focus its window; recording/processing never change activation policy or activate the app. Diagnostics includes the actual native `activation_policy` (0 regular, 1 accessory). Native tests exercise both policies and assert that recording preserves accessory mode and its non-key capsule.

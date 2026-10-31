@@ -3,7 +3,8 @@
 ## Scope
 
 The experimental Windows x64 beta is [public](WINDOWS.md): existing dashboard/settings,
-local English transcription, Ctrl+Shift+Space or a custom global shortcut,
+local English transcription, Right Ctrl alone or a custom global shortcut in current source
+(published beta.1 still uses Ctrl+Shift+Space),
 recording controls, audio cues, safe insertion and clipboard fallback, and an
 NSIS EXE installer. Linux, cloud services, new models and UI redesigns are out
 of scope. Fn remains a macOS-only option.

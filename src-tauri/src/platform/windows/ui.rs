@@ -1,4 +1,5 @@
 //! One Win32 message-loop owner for hotkeys, Escape and the no-activate HUD.
+use crate::control_tap::{is_right_control, ControlTap};
 use std::{
     sync::{
         atomic::{AtomicBool, AtomicI32, Ordering},
@@ -7,6 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 use windows::core::BOOL;
+use windows::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK};
 use windows::Win32::UI::HiDpi::GetDpiForWindow;
 use windows::{
     core::w,
@@ -18,6 +20,9 @@ use windows::{
     },
 };
 static CALLBACK: Mutex<Option<extern "C" fn(i32)>> = Mutex::new(None);
+static TAP: Mutex<ControlTap> = Mutex::new(ControlTap::new());
+static RIGHT_CONTROL: AtomicBool = AtomicBool::new(false);
+static CLOCK: OnceLock<Instant> = OnceLock::new();
 pub static REASON: AtomicI32 = AtomicI32::new(0);
 pub static CAPTURING: AtomicBool = AtomicBool::new(false);
 pub static PHASE: AtomicI32 = AtomicI32::new(0);
@@ -106,6 +111,37 @@ fn modifiers(mask: u32) -> HOT_KEY_MODIFIERS {
         )
 }
 unsafe extern "system" fn keyboard(code: i32, message: WPARAM, data: LPARAM) -> LRESULT {
+    if code >= 0 {
+        let key = &*(data.0 as *const KBDLLHOOKSTRUCT);
+        let down = matches!(message.0 as u32, WM_KEYDOWN | WM_SYSKEYDOWN);
+        let up = matches!(message.0 as u32, WM_KEYUP | WM_SYSKEYUP);
+        let physical_right = is_right_control(
+            key.vkCode,
+            key.scanCode,
+            key.flags & LLKHF_EXTENDED != KBDLLHOOKSTRUCT_FLAGS(0),
+        );
+        let injected =
+            key.flags & (LLKHF_INJECTED | LLKHF_LOWER_IL_INJECTED) != KBDLLHOOKSTRUCT_FLAGS(0);
+        let trigger = {
+            let mut tap = TAP.lock().unwrap();
+            if injected || !physical_right || !(down || up) {
+                tap.interrupt();
+                false
+            } else {
+                tap.key(
+                    down,
+                    CLOCK.get_or_init(Instant::now).elapsed().as_millis() as u64,
+                    GetForegroundWindow().0 as usize,
+                    RIGHT_CONTROL.load(Ordering::Acquire)
+                        && !CAPTURING.load(Ordering::Acquire)
+                        && !other_keys_held(),
+                )
+            }
+        };
+        if trigger {
+            dispatch(7);
+        }
+    }
     if code >= 0
         && message.0 as u32 == WM_KEYDOWN
         && !CAPTURING.load(Ordering::Acquire)
@@ -120,6 +156,35 @@ unsafe extern "system" fn keyboard(code: i32, message: WPARAM, data: LPARAM) -> 
         }
     }
     CallNextHookEx(None, code, message, data)
+}
+// Async state is sampled before the current hook event changes it. Exclude the
+// generic Ctrl alias and the physical key itself, but NOT left Ctrl (AltGr).
+unsafe fn other_keys_held() -> bool {
+    (1..=254).any(|vk| {
+        vk != VK_CONTROL.0 as i32 && vk != VK_RCONTROL.0 as i32 && GetAsyncKeyState(vk) < 0
+    })
+}
+unsafe fn reset_tap() {
+    TAP.lock()
+        .unwrap()
+        .reset(GetAsyncKeyState(VK_RCONTROL.0 as i32) < 0);
+}
+unsafe extern "system" fn mouse(code: i32, message: WPARAM, data: LPARAM) -> LRESULT {
+    if code >= 0 && message.0 as u32 != WM_MOUSEMOVE {
+        TAP.lock().unwrap().interrupt();
+    }
+    CallNextHookEx(None, code, message, data)
+}
+unsafe extern "system" fn foreground(
+    _: HWINEVENTHOOK,
+    _: u32,
+    _: HWND,
+    _: i32,
+    _: i32,
+    _: u32,
+    _: u32,
+) {
+    TAP.lock().unwrap().interrupt();
 }
 #[derive(Clone, Copy)]
 struct Hud {
@@ -175,30 +240,37 @@ unsafe fn run(receiver: mpsc::Receiver<Command>, ready: mpsc::SyncSender<u32>) {
     };
     SetWindowLongPtrW(hwnd, GWLP_USERDATA, (&mut *hud as *mut Hud) as isize);
     let hook = SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard), instance, 0).ok();
-    let mut binding = (0x20, 5);
-    let mut registered = RegisterHotKey(None, 1, modifiers(binding.1), binding.0).is_ok();
-    REASON.store(
-        if hook.is_none() {
-            102
-        } else if registered {
-            1
-        } else {
-            101
-        },
-        Ordering::Release,
+    let mouse_hook = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse), instance, 0).ok();
+    let focus_hook = SetWinEventHook(
+        EVENT_SYSTEM_FOREGROUND,
+        EVENT_SYSTEM_FOREGROUND,
+        None,
+        Some(foreground),
+        0,
+        0,
+        WINEVENT_OUTOFCONTEXT,
     );
+    let tap_hooks_ready = mouse_hook.is_some() && !focus_hook.is_invalid();
+    let mut hooks_ready = hook.is_some() && tap_hooks_ready;
+    RIGHT_CONTROL.store(hooks_ready, Ordering::Release);
+    reset_tap();
+    let mut binding = (VK_RCONTROL.0 as u32, 0);
+    let mut registered = false;
+    REASON.store(if !hooks_ready { 102 } else { 1 }, Ordering::Release);
     let _ = ready.send(GetCurrentThreadId());
     let mut message = MSG::default();
     'messages: while GetMessageW(&mut message, None, 0, 0).0 > 0 {
-        if message.message == WM_HOTKEY && !CAPTURING.load(Ordering::Acquire) {
+        if message.message == WM_HOTKEY && registered && !CAPTURING.load(Ordering::Acquire) {
             dispatch(7);
         }
         if message.message == WM_APP {
             for command in receiver.try_iter() {
                 match command {
                     Command::Probe(reply) => {
-                        let connected = hook.is_some()
-                            && (registered || CAPTURING.load(Ordering::Acquire))
+                        let connected = hooks_ready
+                            && (RIGHT_CONTROL.load(Ordering::Acquire)
+                                || registered
+                                || CAPTURING.load(Ordering::Acquire))
                             && REASON.load(Ordering::Acquire) == 1;
                         let _ = reply.send(connected);
                     }
@@ -207,14 +279,19 @@ unsafe fn run(receiver: mpsc::Receiver<Command>, ready: mpsc::SyncSender<u32>) {
                             let _ = UnregisterHotKey(None, 1);
                         }
                         binding = (code as u32, mask);
+                        reset_tap();
+                        let right = binding == (VK_RCONTROL.0 as u32, 0);
+                        hooks_ready = hook.is_some() && (!right || tap_hooks_ready);
+                        RIGHT_CONTROL.store(right && hooks_ready, Ordering::Release);
                         // Binding validation runs even while shortcut capture is
                         // active; immediately unregister a successful probe.
-                        registered = RegisterHotKey(None, 1, modifiers(mask), code as u32).is_ok();
-                        let accepted = registered && hook.is_some();
+                        registered =
+                            !right && RegisterHotKey(None, 1, modifiers(mask), code as u32).is_ok();
+                        let accepted = (right || registered) && hooks_ready;
                         REASON.store(
-                            if hook.is_none() {
+                            if !hooks_ready {
                                 102
-                            } else if registered {
+                            } else if right || registered {
                                 1
                             } else {
                                 101
@@ -228,18 +305,20 @@ unsafe fn run(receiver: mpsc::Receiver<Command>, ready: mpsc::SyncSender<u32>) {
                         let _ = reply.send(accepted);
                     }
                     Command::Capture(value) => {
+                        reset_tap();
                         CAPTURING.store(value, Ordering::Release);
                         if registered {
                             let _ = UnregisterHotKey(None, 1);
                             registered = false;
                         }
                         if !value {
-                            registered =
-                                RegisterHotKey(None, 1, modifiers(binding.1), binding.0).is_ok();
+                            let right = binding == (VK_RCONTROL.0 as u32, 0);
+                            registered = !right
+                                && RegisterHotKey(None, 1, modifiers(binding.1), binding.0).is_ok();
                             REASON.store(
-                                if hook.is_none() {
+                                if !hooks_ready {
                                     102
-                                } else if registered {
+                                } else if right || registered {
                                     1
                                 } else {
                                     101
@@ -249,6 +328,11 @@ unsafe fn run(receiver: mpsc::Receiver<Command>, ready: mpsc::SyncSender<u32>) {
                         }
                     }
                     Command::Phase(phase) => {
+                        // Cancellation/automatic finish must not let a Ctrl
+                        // pressed in the previous phase restart dictation.
+                        if hud.phase != phase {
+                            reset_tap();
+                        }
                         hud.phase = phase;
                         PHASE.store(phase, Ordering::Release);
                         hud.deadline = if phase >= 3 {
@@ -312,6 +396,14 @@ unsafe fn run(receiver: mpsc::Receiver<Command>, ready: mpsc::SyncSender<u32>) {
         let _ = UnregisterHotKey(None, 1);
     }
     REASON.store(103, Ordering::Release);
+    RIGHT_CONTROL.store(false, Ordering::Release);
+    reset_tap();
+    if !focus_hook.is_invalid() {
+        let _ = UnhookWinEvent(focus_hook);
+    }
+    if let Some(hook) = mouse_hook {
+        let _ = UnhookWindowsHookEx(hook);
+    }
     if let Some(hook) = hook {
         let _ = UnhookWindowsHookEx(hook);
     }

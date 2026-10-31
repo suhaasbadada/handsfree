@@ -57,7 +57,7 @@ loading, all future builds, or every Windows installation. WebView2 is still req
    checksum verified). Setup requires internet; transcription runs locally after
    download. No account or cloud transcription API is required.
 3. Focus a disposable text field in a normal, non-elevated app. The Windows
-   default shortcut is **Ctrl+Shift+Space**; Fn / 🌐 is Mac-only. Tap once to start,
+   published beta.1 default shortcut is **Ctrl+Shift+Space**; Fn / 🌐 is Mac-only. Tap once to start,
    speak briefly, then tap again to finish. **Escape** cancels recording.
    The shared settings retain the two-minute default recording limit and
    optional listening tones; use Settings to adjust them.
@@ -71,6 +71,21 @@ and the downloaded model persist; the clipboard and clipboard managers may
 retain copied text. Do not share recordings, private text, settings, or models
 in bug reports. Report Windows version/build, CPU architecture, app/version,
 candidate commit, and synthetic reproduction steps instead.
+
+### Current source: Right Ctrl (not in the published beta.1 EXE)
+
+New preferences and **Use default** in source-built Windows candidates use
+**Right Ctrl** alone. Press and release within **400 ms** to start; tap again to
+finish. Holding it, repeating it, using it with another key or mouse button,
+AltGr, injected input, and changing foreground windows cancel the gesture.
+Normal Ctrl messages pass through to other apps. Left Ctrl alone never triggers.
+Existing saved bindings—including the old Ctrl+Shift+Space default—are kept
+exactly; choose **Settings → Use default** to opt in. Custom combinations still
+work: click **Record shortcut**, hold modifiers, then press a letter, number or
+Space. To record Right Ctrl alone, release it promptly; Escape, Cancel, Tab,
+loss of focus, or the recording timeout leaves the saved binding unchanged.
+If the Windows hooks cannot connect, Settings reports the shortcut unavailable;
+no RegisterHotKey success alone can make Right Ctrl ready.
 
 ## Build a candidate on Windows
 

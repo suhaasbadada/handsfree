@@ -10,8 +10,24 @@ CPU transcription passed; live microphone/editor/installer acceptance is pending
 `src-tauri/src/platform` selects Swift FFI on macOS and Rust/Win32 on Windows.
 Linux deliberately fails compilation. Swift source, Mac configuration, signing
 and installed application are unchanged. Mac keeps Fn, native keycodes, Metal
-and existing preferences. Windows uses Ctrl+Shift+Space and CPU inference with
+and existing preferences. Current Windows source uses a release-only Right Ctrl
+tap (400 ms maximum), while the published beta.1 still uses Ctrl+Shift+Space.
+Saved bindings are never rewritten; existing users can choose **Use default**.
+Windows uses CPU inference with
 four threads; physical DOM shortcut codes are translated to Windows VK codes.
+
+The explicit `{ "code": "ControlRight", "modifiers": 0 }` binding identifies
+the physical right-side tap, distinct from all legacy `{code, modifiers}`
+combinations. No generic bare Control binding is accepted. A platform-independent
+recognizer handles repeats, holds, interruptions and stale releases. Win32's
+low-level keyboard hook requires the right VK, extended flag and scan code,
+samples already-held keys/buttons, rejects injected input, and observes rather
+than consumes Ctrl. A mouse hook invalidates button/wheel chords and a foreground
+event hook invalidates focus changes. Capture and binding changes reset state,
+including an already-held Right Ctrl. Custom chords still use RegisterHotKey,
+with registration/persistence rollback and capture suspension. Hook installation
+failures are surfaced; Windows may silently remove a timed-out low-level hook,
+so live hardware responsiveness remains an acceptance check.
 
 Tauri 2.7's build helper validates only the common dependency's feature list,
 not Cargo's target feature union. `build.rs` applies a build-helper-only override
