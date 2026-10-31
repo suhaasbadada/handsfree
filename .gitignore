@@ -4,3 +4,9 @@ src-tauri/target/
 src-tauri/gen/
 .DS_Store
 *.log
+*.p12
+*.pfx
+*.key
+*.pem
+.env
+.env.*

@@ -1,0 +1,135 @@
+// Optional local browser smoke check. Does not launch HandsFree or use the mic.
+// BROWSER_BINARY='/path/to/Chromium' node tests/ui-smoke.mjs
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
+
+const binary = process.env.BROWSER_BINARY;
+if (!binary) throw new Error('Set BROWSER_BINARY to a Chromium-compatible browser. Start npm run dev -- --port 5187 first.');
+const profile = mkdtempSync(join(tmpdir(), 'handsfree-ui-'));
+const browser = spawn(binary, ['--headless', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=9237', `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' });
+let socket;
+let id = 0;
+const pending = new Map();
+function send(method, params = {}) {
+  return new Promise((resolve, reject) => {
+    const request = ++id;
+    pending.set(request, { resolve, reject });
+    socket.send(JSON.stringify({ id: request, method, params }));
+  });
+}
+async function evaluate(expression) {
+  const result = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+  if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails));
+  return result.result.value;
+}
+async function until(expression) {
+  for (let i = 0; i < 100; i++) { if (await evaluate(expression)) return; await delay(50); }
+  throw new Error(`Timed out: ${expression}`);
+}
+try {
+  let page;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    try { page = await (await fetch('http://127.0.0.1:9237/json/new?http://127.0.0.1:5187', { method: 'PUT' })).json(); break; }
+    catch { await delay(50); }
+  }
+  assert.ok(page?.webSocketDebuggerUrl, 'Headless browser started');
+  socket = new WebSocket(page.webSocketDebuggerUrl);
+  await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
+  socket.onmessage = event => {
+    const message = JSON.parse(event.data);
+    if (pending.has(message.id)) {
+      const request = pending.get(message.id); pending.delete(message.id);
+      if (message.error) request.reject(new Error(JSON.stringify(message.error))); else request.resolve(message.result);
+    }
+  };
+  await send('Emulation.setDeviceMetricsOverride', { width: 980, height: 820, deviceScaleFactor: 1, mobile: false });
+  await until(`Boolean(document.getElementById('nav-settings'))`);
+  await evaluate(`window.calls = []; window.fixture = {phase:'idle',message:'Select a text field and press Fn.', progress:0,model_ready:true,microphone:true,accessibility:true,input_monitoring:true,hotkey:true,transcript:'',sounds:true,sound_volume:50,sound_style:'tap',shortcut:{code:'Fn',modifiers:0},shortcut_label:'Fn',stats:{words:0,transcriptions:0,speech_seconds:0,saved_seconds:0},persistence_error:''}; window.__TAURI_INTERNALS__ = { invoke: async (command,args) => { window.calls.push({command,args}); if(command==='status') return structuredClone(window.fixture); if(command==='set_sounds') window.fixture.sounds=args.enabled; if(command==='set_sound_style') window.fixture.sound_style=args.style; if(command==='set_shortcut'){if(window.rejectShortcut) throw 'Could not save shortcut'; window.fixture.shortcut=args.shortcut;window.fixture.shortcut_label=args.shortcut.code==='Fn'?'Fn':args.shortcut.code==='Space'?'Option + Space':'Control + Shift + J';} if(command==='reset_stats') window.fixture.stats={words:0,transcriptions:0,speech_seconds:0,saved_seconds:0}; } }; document.getElementById('feedback').hidden=true;`);
+  await until(`document.getElementById('ready-title').textContent.includes('You’re ready')`);
+  assert.equal(await evaluate(`document.getElementById('copy').disabled`), true);
+  await evaluate(`document.getElementById('nav-settings').click()`);
+  assert.equal(await evaluate(`document.getElementById('overview').hidden && !document.getElementById('settings').hidden`), true);
+  assert.equal(await evaluate(`document.querySelector('.readiness').hidden`), true, 'No readiness card when ready');
+  await evaluate(`document.getElementById('shortcut-option').click()`);
+  await until(`document.getElementById('saved-shortcut').textContent==='Option + Space' && !document.getElementById('record-shortcut').disabled`);
+  await evaluate(`document.getElementById('record-shortcut').click()`);
+  await until(`!document.getElementById('shortcut-recorder').hidden`);
+  await evaluate(`document.getElementById('shortcut-recorder').dispatchEvent(new KeyboardEvent('keydown',{code:'KeyQ',metaKey:true,bubbles:true,cancelable:true}))`);
+  assert.equal(await evaluate(`document.getElementById('shortcut-recorder').hidden`), false, 'Reserved combo stays unsaved');
+  await evaluate(`document.getElementById('shortcut-recorder').dispatchEvent(new KeyboardEvent('keydown',{code:'KeyJ',ctrlKey:true,shiftKey:true,bubbles:true,cancelable:true}))`);
+  await until(`document.getElementById('shortcut-recorder').hidden && document.getElementById('saved-shortcut').textContent==='Control + Shift + J'`);
+  assert.deepEqual(await evaluate(`window.calls.filter(c=>c.command==='set_shortcut').at(-1).args.shortcut`), {code:'KeyJ',modifiers:5});
+  await until(`!document.getElementById('shortcut-fn').disabled`);
+  await evaluate(`window.rejectShortcut=true;document.getElementById('shortcut-fn').click()`);
+  await until(`document.getElementById('feedback').textContent.includes('Could not save')`);
+  assert.equal(await evaluate(`document.getElementById('saved-shortcut').textContent`), 'Control + Shift + J', 'Failed save preserves active shortcut');
+  await evaluate(`window.rejectShortcut=false;document.getElementById('sound-style').value='bell';document.getElementById('sound-style').dispatchEvent(new Event('change'))`);
+  await until(`window.fixture.sound_style==='bell' && !document.getElementById('sound-style').disabled`);
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='preview_sound').length`), 0, 'Sound selection never autoplays');
+  await evaluate(`document.getElementById('sounds').click()`);
+  await until(`window.fixture.sounds===false && !document.getElementById('sounds').disabled`);
+  await evaluate(`window.fixture.sound_volume=50; const oldInvoke=window.__TAURI_INTERNALS__.invoke; window.__TAURI_INTERNALS__.invoke=async(command,args)=>{ if(command==='set_sound_volume') window.fixture.sound_volume=args.volume; return oldInvoke(command,args); };`);
+  await until(`document.getElementById('volume-percent').textContent==='50%'`);
+  await evaluate(`const slider=document.getElementById('sound-volume'); for(let n=51;n<=70;n++){slider.value=String(n); slider.dispatchEvent(new Event('input'));}`);
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='set_sound_volume').length`), 0, 'Dragging never sends IPC');
+  assert.equal(await evaluate(`document.getElementById('volume-percent').textContent`), '70%');
+  await evaluate(`document.getElementById('sound-volume').dispatchEvent(new Event('change'))`);
+  await until(`window.fixture.sound_volume===70 && !document.getElementById('sound-volume').disabled`);
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='set_sound_volume').length`), 1, 'One commit on release');
+  await until(`!document.getElementById('preview-sound').disabled`);
+  await evaluate(`document.getElementById('preview-sound').click(); document.getElementById('preview-sound').click();`);
+  await until(`window.calls.some(c=>c.command==='preview_sound')`);
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='preview_sound').length`), 1, 'Explicit preview works while sounds muted, without repeat');
+  for (const phase of ['recording', 'processing', 'downloading']) {
+    await evaluate(`window.fixture.phase=${JSON.stringify(phase)}`);
+    await until(`document.getElementById('dot').className===${JSON.stringify(phase)}`);
+    assert.equal(await evaluate(`document.getElementById('preview-sound').disabled`), true);
+    await evaluate(`document.getElementById('preview-sound').click()`);
+  }
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='preview_sound').length`), 1, 'No preview while busy');
+  await evaluate(`window.fixture.phase='idle'`);
+  await until(`!document.getElementById('preview-sound').disabled`);
+  await evaluate(`document.getElementById('reset').click()`);
+  assert.equal(await evaluate(`document.getElementById('reset-dialog').open`), true);
+  assert.equal(await evaluate(`window.calls.some(c=>c.command==='reset_stats')`), false);
+  await evaluate(`document.getElementById('keep-stats').click()`);
+  assert.equal(await evaluate(`window.calls.some(c=>c.command==='reset_stats')`), false);
+  await evaluate(`document.getElementById('reset').click(); document.getElementById('confirm-reset').click()`);
+  await until(`!document.getElementById('reset-dialog').open`);
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='reset_stats' && c.args.confirmed).length`), 1);
+  await evaluate(`document.getElementById('nav-overview').click(); window.fixture.transcript='<script>unsafe</script> & a thought'; window.fixture.stats={words:100,transcriptions:4,speech_seconds:45,saved_seconds:105};`);
+  await until(`document.getElementById('words').textContent==='100'`);
+  assert.equal(await evaluate(`document.getElementById('transcript').innerHTML`), '&lt;script&gt;unsafe&lt;/script&gt; &amp; a thought');
+  await evaluate(`document.getElementById('copy').click()`);
+  await until(`document.getElementById('feedback').textContent.startsWith('Copied.')`);
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='copy_transcript').length`), 1);
+  await evaluate(`window.fixture.phase='copied'; window.fixture.message='Copied — paste anywhere. Automatic paste skipped: Not pasted [start:no-original-focus].';`);
+  await until(`document.getElementById('phase').textContent==='Copied — paste anywhere' && document.getElementById('dot').className==='copied'`);
+  assert.equal(await evaluate(`document.getElementById('cancel').hidden && !document.getElementById('copy').disabled && !document.getElementById('preview-sound').disabled && !document.getElementById('record-shortcut').disabled`), true, 'Copied fallback is ready, not an error or busy state');
+  assert.equal(await evaluate(`getComputedStyle(document.getElementById('dot')).backgroundColor`), 'rgb(136, 181, 77)', 'Normal fallback is not red');
+  assert.match(await evaluate(`document.getElementById('message').textContent`), /start:no-original-focus/);
+  await evaluate(`window.fixture.phase='idle'`);
+  await evaluate(`window.fixture.transcript='A little less typing. A little more room to think.'; document.getElementById('feedback').hidden=true;`);
+  await until(`document.getElementById('transcript').textContent.startsWith('A little less')`);
+  for (const theme of ['light','dark']) {
+    await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-color-scheme',value:theme}]});
+    for (const width of [400, 560, 740, 980]) {
+      await send('Emulation.setDeviceMetricsOverride', { width, height: 820, deviceScaleFactor: 1, mobile: false });
+      for (const tab of ['overview','settings']) {
+        await evaluate(`document.getElementById('nav-${tab}').click()`);
+        assert.equal(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth`), true, `No horizontal overflow at ${width}px, ${theme}, ${tab}`);
+        assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('button, select, input')).filter(e=>e.getClientRects().length && (e.getBoundingClientRect().right>innerWidth || e.getBoundingClientRect().left<0)).map(e=>e.id)`), [], 'All controls fit');
+      }
+    }
+  }
+  console.log('UI smoke passed: navigation, shortcuts/presets/recorder/validation/save failure, sound switch/styles/volume/idle-only preview, reset, counts, transcript escaping, copy, light/dark responsive layout. No capture or screenshots.');
+} finally {
+  socket?.close();
+  browser.kill('SIGTERM');
+  await new Promise(resolve => browser.once('exit', resolve));
+  rmSync(profile, { recursive: true, force: true });
+}

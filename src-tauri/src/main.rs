@@ -1,5 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+mod cancellation;
 mod logic;
+mod shortcut;
+mod storage;
 use futures_util::StreamExt;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -8,7 +11,10 @@ use std::{
     fs,
     io::Read,
     path::{Path, PathBuf},
-    sync::{Mutex, OnceLock},
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Mutex, OnceLock,
+    },
     time::{Duration, Instant},
 };
 use tauri::{
@@ -25,27 +31,68 @@ const MODEL_URL: &str =
     "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin";
 unsafe extern "C" {
     fn hf_permissions() -> i32;
+    fn hf_microphone_status() -> i32;
     fn hf_request_microphone();
     fn hf_request_permissions();
+    fn hf_request_accessibility();
     fn hf_keyboard();
     fn hf_hook(callback: extern "C" fn(i32)) -> bool;
-    fn hf_record(path: *const std::ffi::c_char) -> bool;
+    fn hf_hook_state() -> i32;
+    fn hf_hook_reason() -> i32;
+    fn hf_record(
+        path: *const std::ffi::c_char,
+        epoch: u64,
+        allowed: extern "C" fn(u64) -> bool,
+    ) -> bool;
+    fn hf_sounds(enabled: bool);
+    fn hf_sound_volume(volume: f32);
+    fn hf_preview_sound() -> bool;
+    fn hf_sound_style(style: i32);
+    fn hf_shortcut(code: i32, modifiers: u32);
+    fn hf_capture_shortcut(active: bool);
     fn hf_stop();
+    fn hf_discard_target();
     fn hf_overlay(phase: i32);
-    fn hf_paste(text: *const std::ffi::c_char) -> bool;
+    fn hf_paste(
+        text: *const std::ffi::c_char,
+        epoch: u64,
+        allowed: extern "C" fn(u64) -> bool,
+    ) -> i32;
     fn hf_copy(text: *const std::ffi::c_char);
+    fn hf_copy_fallback(
+        text: *const std::ffi::c_char,
+        epoch: u64,
+        allowed: extern "C" fn(u64) -> bool,
+    ) -> i32;
     fn hf_cleanup();
 }
 static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
 static GESTURE: Mutex<logic::FnGesture> = Mutex::new(logic::FnGesture::new());
-static CONTROLS: OnceLock<std::sync::mpsc::Sender<Control>> = OnceLock::new();
+static CANCELLATION: cancellation::CancellationEpoch = cancellation::CancellationEpoch::new();
+static CONTROLS: OnceLock<std::sync::mpsc::Sender<(Control, u64)>> = OnceLock::new();
+static DIAGNOSTIC_WRITE: Mutex<()> = Mutex::new(());
+static EXECUTABLE_HASH: OnceLock<String> = OnceLock::new();
+static PERMISSION_REQUESTS: AtomicU32 = AtomicU32::new(0);
+extern "C" fn delivery_allowed(epoch: u64) -> bool {
+    CANCELLATION.allows(epoch)
+}
 enum Control {
     Toggle,
     Cancel,
+    Finish(Option<u64>),
 }
 fn enqueue(control: Control) {
+    // Invalidate before touching the state mutex or waiting for FIFO execution.
+    let epoch = if matches!(control, Control::Cancel) {
+        CANCELLATION.cancel()
+    } else {
+        CANCELLATION.current()
+    };
+    enqueue_at(control, epoch);
+}
+fn enqueue_at(control: Control, epoch: u64) {
     if let Some(sender) = CONTROLS.get() {
-        let _ = sender.send(control);
+        let _ = sender.send((control, epoch));
     }
 }
 
@@ -60,10 +107,20 @@ struct Status {
     input_monitoring: bool,
     hotkey: bool,
     transcript: String,
+    sounds: bool,
+    sound_volume: f32,
+    sound_style: String,
+    shortcut: shortcut::Shortcut,
+    shortcut_label: String,
+    stats: storage::Stats,
+    persistence_error: String,
+    permission_requests: u32,
 }
 struct Inner {
     status: Status,
     generation: u64,
+    session_epoch: u64,
+    store: storage::Store,
 }
 struct AppState {
     inner: Mutex<Inner>,
@@ -100,32 +157,136 @@ fn verified_model(path: &Path) -> bool {
     format!("{:x}", hash.finalize()) == MODEL_HASH
 }
 extern "C" fn native_event(event: i32) {
-    let toggle = GESTURE.lock().unwrap().event(event, Instant::now());
-    if toggle {
+    if event == 7 {
         enqueue(Control::Toggle);
+        return;
     }
+    let receipt_epoch = CANCELLATION.current();
     if event == 4 {
         enqueue(Control::Cancel);
+    }
+    let toggle = GESTURE
+        .lock()
+        .unwrap()
+        .event_with_epoch(event, Instant::now(), receipt_epoch);
+    if let Some(epoch) = toggle {
+        enqueue_at(Control::Toggle, epoch);
+    }
+    if event == 5 {
+        enqueue(Control::Finish(None));
     }
 }
 
 #[tauri::command]
 async fn status() -> Status {
+    refresh_status()
+}
+fn refresh_status() -> Status {
+    // Never hold the state mutex while synchronously dispatching to AppKit.
+    let p = unsafe { hf_permissions() };
+    let hotkey = unsafe { hf_hook(native_event) };
+    let hook_state = unsafe { hf_hook_state() };
+    let hook_reason = unsafe { hf_hook_reason() };
     let s = state();
     let mut inner = s.inner.lock().unwrap();
-    let p = unsafe { hf_permissions() };
     inner.status.microphone = p & 1 != 0;
     inner.status.accessibility = p & 2 != 0;
     inner.status.input_monitoring = p & 4 != 0;
-    inner.status.hotkey = unsafe { hf_hook(native_event) };
-    inner.status.clone()
+    inner.status.hotkey = hotkey;
+    inner.status.permission_requests = PERMISSION_REQUESTS.load(Ordering::Relaxed);
+    if ["idle", "setup_required"].contains(&inner.status.phase.as_str()) {
+        if let Some(message) = logic::setup_message(p, inner.status.model_ready, hotkey) {
+            inner.status.message = message;
+        } else if inner.status.phase == "setup_required"
+            || inner.status.message.starts_with("Not ready:")
+        {
+            inner.status.phase = "idle".into();
+            inner.status.message = format!(
+                "Select a text field and press {}.",
+                inner.store.shortcut.label()
+            );
+        }
+    }
+    let snapshot = inner.status.clone();
+    drop(inner);
+    write_diagnostic(&s, &snapshot, p, hook_state, hook_reason);
+    snapshot
+}
+fn write_diagnostic(
+    s: &AppState,
+    status: &Status,
+    permissions: i32,
+    hook_state: i32,
+    hook_reason: i32,
+) {
+    // Deliberately exclude transcript, usage, focus, and all audio. This file is
+    // readable without WebView/IPC and refreshed even when settings is hidden.
+    let diagnostic = serde_json::json!({
+        "schema": 1,
+        "updated_unix_seconds": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
+        "pid": std::process::id(),
+        "executable": std::env::current_exe().ok(),
+        "executable_sha256": EXECUTABLE_HASH.get(),
+        "bundle_identifier": "com.handsfree.local",
+        "version": env!("CARGO_PKG_VERSION"),
+        "permissions_bits": permissions,
+        "permission_requests_bits": PERMISSION_REQUESTS.load(Ordering::Relaxed),
+        "microphone": status.microphone,
+        "microphone_authorization_status": unsafe { hf_microphone_status() },
+        "accessibility": status.accessibility,
+        "input_monitoring": status.input_monitoring,
+        "hook_attempted": hook_reason != 0,
+        "hook_connected": status.hotkey,
+        "hook_state_bits": hook_state,
+        "hook_reason": match hook_reason { 1 => "connected", 2 => "input_monitoring_preflight_denied", 3 => "event_tap_creation_failed", 4 => "run_loop_source_creation_failed", 5 => "event_tap_disabled", _ => "not_attempted" },
+        "model_ready": status.model_ready,
+        "model_path": model_path(s),
+        "model_file_bytes": fs::metadata(model_path(s)).ok().map(|m| m.len()),
+        "model_expected_bytes": MODEL_SIZE,
+        "model_expected_sha256": MODEL_HASH,
+        "phase": status.phase,
+        "message": status.message,
+    });
+    let _writer = DIAGNOSTIC_WRITE.lock().unwrap();
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let result = (|| -> std::io::Result<()> {
+        let temporary = s.directory.join("diagnostics.json.tmp");
+        let mut file = fs::OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .mode(0o600)
+            .open(&temporary)?;
+        file.write_all(serde_json::to_string_pretty(&diagnostic)?.as_bytes())?;
+        fs::rename(temporary, s.directory.join("diagnostics.json"))
+    })();
+    if let Err(error) = result {
+        eprintln!("Cannot write local diagnostics: {error}");
+    }
+}
+#[derive(Serialize)]
+struct PermissionsDiagnostic {
+    pid: u32,
+    permissions: i32,
+    hook_state: i32,
+}
+#[tauri::command]
+async fn permissions_diagnostic() -> PermissionsDiagnostic {
+    PermissionsDiagnostic {
+        pid: std::process::id(),
+        permissions: unsafe { hf_permissions() },
+        hook_state: unsafe { hf_hook_state() },
+    }
 }
 #[tauri::command]
 async fn request_microphone() {
+    PERMISSION_REQUESTS.fetch_or(1, Ordering::Relaxed);
     unsafe { hf_request_microphone() }
 }
 #[tauri::command]
 async fn request_permissions() {
+    PERMISSION_REQUESTS.fetch_or(2, Ordering::Relaxed);
     unsafe { hf_request_permissions() }
 }
 #[tauri::command]
@@ -137,8 +298,189 @@ async fn cancel() {
     enqueue(Control::Cancel);
 }
 #[tauri::command]
+async fn set_sounds(enabled: bool) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let s = state();
+        let mut inner = s.inner.lock().unwrap();
+        let mut updated = inner.store.clone();
+        updated.sounds = enabled;
+        storage::save(&s.directory.join("usage.json"), &updated)?;
+        inner.store = updated;
+        inner.status.sounds = enabled;
+        inner.status.persistence_error.clear();
+        drop(inner);
+        unsafe {
+            hf_sounds(enabled);
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn capture_shortcut(active: bool) -> Result<(), String> {
+    if active && !shortcut_edit_allowed(&state().inner.lock().unwrap().status.phase) {
+        return Err("Finish dictation before recording a shortcut.".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || unsafe { hf_capture_shortcut(active) })
+        .await
+        .map_err(|e| e.to_string())
+}
+#[tauri::command]
+async fn set_shortcut(shortcut: shortcut::Shortcut) -> Result<(), String> {
+    shortcut.validate()?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let s = state();
+        let mut inner = s.inner.lock().unwrap();
+        if !shortcut_edit_allowed(&inner.status.phase) {
+            return Err("Finish dictation before changing the shortcut.".into());
+        }
+        let mut updated = inner.store.clone();
+        updated.shortcut = shortcut.clone();
+        storage::save(&s.directory.join("usage.json"), &updated)?;
+        inner.store = updated;
+        inner.status.shortcut = shortcut.clone();
+        inner.status.shortcut_label = shortcut.label();
+        inner.status.message = format!("Select a text field and press {}.", shortcut.label());
+        inner.status.persistence_error.clear();
+        drop(inner);
+        GESTURE
+            .lock()
+            .unwrap()
+            .event_with_epoch(6, Instant::now(), CANCELLATION.current());
+        unsafe {
+            hf_shortcut(shortcut.keycode().unwrap(), shortcut.modifiers);
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn set_sound_style(style: String) -> Result<(), String> {
+    if !["tap", "bell"].contains(&style.as_str()) {
+        return Err("Choose Soft tap or Soft bell.".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let s = state();
+        let mut inner = s.inner.lock().unwrap();
+        if !preview_allowed(&inner.status.phase) {
+            return Err("Finish dictation before changing the sound.".into());
+        }
+        let mut updated = inner.store.clone();
+        updated.sound_style = style.clone();
+        storage::save(&s.directory.join("usage.json"), &updated)?;
+        inner.store = updated;
+        inner.status.sound_style = style.clone();
+        inner.status.persistence_error.clear();
+        drop(inner);
+        unsafe {
+            hf_sound_style(if style == "bell" { 1 } else { 0 });
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn set_sound_volume(volume: f32) -> Result<(), String> {
+    storage::validate_volume(volume)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let s = state();
+        let mut inner = s.inner.lock().unwrap();
+        let mut updated = inner.store.clone();
+        updated.sound_volume = volume;
+        storage::save(&s.directory.join("usage.json"), &updated)?;
+        inner.store = updated;
+        inner.status.sound_volume = volume;
+        inner.status.persistence_error.clear();
+        drop(inner);
+        unsafe {
+            hf_sound_volume(volume / 100.0);
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+fn preview_allowed(phase: &str) -> bool {
+    matches!(phase, "idle" | "copied")
+}
+fn shortcut_edit_allowed(phase: &str) -> bool {
+    matches!(
+        phase,
+        "idle" | "setup_required" | "not_pasted" | "copied" | "error"
+    )
+}
+#[tauri::command]
+async fn preview_sound() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        if !preview_allowed(&state().inner.lock().unwrap().status.phase) {
+            return Err("Preview is available only while idle.".into());
+        }
+        // Native checks again on AppKit's queue: recording may start after the
+        // phase snapshot. No state lock is held while dispatching to AppKit.
+        if unsafe { hf_preview_sound() } {
+            Ok(())
+        } else {
+            Err("Sound is busy. Try again when idle.".into())
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+#[cfg(test)]
+mod sound_tests {
+    #[test]
+    fn shortcut_setup_does_not_require_a_working_old_shortcut() {
+        for phase in ["idle", "setup_required", "not_pasted", "copied", "error"] {
+            assert!(super::shortcut_edit_allowed(phase));
+        }
+        for phase in ["recording", "processing", "downloading", "unknown"] {
+            assert!(!super::shortcut_edit_allowed(phase));
+        }
+    }
+    #[test]
+    fn preview_only_while_idle() {
+        assert!(super::preview_allowed("idle"));
+        assert!(super::preview_allowed("copied"));
+        for phase in [
+            "recording",
+            "processing",
+            "downloading",
+            "setup_required",
+            "error",
+            "not_pasted",
+        ] {
+            assert!(!super::preview_allowed(phase));
+        }
+    }
+}
+#[tauri::command]
+async fn reset_stats(confirmed: bool) -> Result<(), String> {
+    if !confirmed {
+        return Err("Confirm before resetting usage totals.".into());
+    }
+    tauri::async_runtime::spawn_blocking(|| {
+        let s = state();
+        let mut inner = s.inner.lock().unwrap();
+        let mut updated = inner.store.clone();
+        updated.stats = storage::Stats::default();
+        storage::save(&s.directory.join("usage.json"), &updated)?;
+        inner.store = updated;
+        inner.status.stats = inner.store.stats.clone();
+        inner.status.persistence_error.clear();
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+#[tauri::command]
 async fn copy_transcript() -> Result<(), String> {
     let text = state().inner.lock().unwrap().status.transcript.clone();
+    if text.is_empty() {
+        return Err("No transcript to copy yet.".into());
+    }
     unsafe {
         hf_copy(cstring(&text)?.as_ptr());
     }
@@ -147,12 +489,18 @@ async fn copy_transcript() -> Result<(), String> {
 fn cancel_inner() {
     let s = state();
     let mut inner = s.inner.lock().unwrap();
+    // A cancellation enqueued earlier must not cancel a genuinely newer tap
+    // whose receipt epoch already includes that cancellation.
+    if CANCELLATION.allows(inner.session_epoch) {
+        return;
+    }
     if !["recording", "processing"].contains(&inner.status.phase.as_str()) {
         return;
     }
     inner.generation += 1;
     unsafe {
         hf_stop();
+        hf_discard_target();
         hf_overlay(0);
     }
     let _ = fs::remove_file(recording_path(&s));
@@ -161,11 +509,22 @@ fn cancel_inner() {
     if inner.status.phase == "recording" {
         inner.status.phase = "idle".into();
     }
-    inner.status.message = "Cancelled. No text was pasted.".into();
+    inner.status.message = "Cancelled.".into();
 }
-fn toggle_recording() {
+fn toggle_recording(finish: Option<Option<u64>>, epoch: u64) {
+    if !CANCELLATION.allows(epoch) {
+        return;
+    }
     let s = state();
     let mut inner = s.inner.lock().unwrap();
+    if !CANCELLATION.allows(epoch) {
+        return;
+    }
+    if let Some(generation) = finish {
+        if !logic::can_finish(&inner.status.phase, inner.generation, generation) {
+            return;
+        }
+    }
     if inner.status.phase == "recording" {
         unsafe {
             hf_stop();
@@ -174,8 +533,9 @@ fn toggle_recording() {
         inner.status.phase = "processing".into();
         inner.status.message = "Transcribing locally…".into();
         let generation = inner.generation;
+        let session_epoch = inner.session_epoch;
         drop(inner);
-        std::thread::spawn(move || transcribe(generation));
+        std::thread::spawn(move || transcribe(generation, session_epoch));
         return;
     }
     if ["processing", "downloading"].contains(&inner.status.phase.as_str()) {
@@ -183,9 +543,10 @@ fn toggle_recording() {
     }
     let permissions = unsafe { hf_permissions() };
     if !inner.status.model_ready || permissions & 7 != 7 {
-        inner.status.phase = "error".into();
+        inner.status.phase = "setup_required".into();
         inner.status.message =
-            "Open Handsfree from the menu bar to finish permissions and model setup.".into();
+            logic::setup_message(permissions, inner.status.model_ready, inner.status.hotkey)
+                .unwrap_or_default();
         unsafe {
             hf_overlay(3);
         }
@@ -206,7 +567,18 @@ fn toggle_recording() {
         inner.status.message = "Cannot create private recording file.".into();
         return;
     }
-    let started = cstring(&path.to_string_lossy()).is_ok_and(|p| unsafe { hf_record(p.as_ptr()) });
+    let started = cstring(&path.to_string_lossy())
+        .is_ok_and(|p| unsafe { hf_record(p.as_ptr(), epoch, delivery_allowed) });
+    if !CANCELLATION.allows(epoch) {
+        unsafe {
+            hf_stop();
+            hf_discard_target();
+        }
+        let _ = fs::remove_file(path);
+        inner.status.phase = "idle".into();
+        inner.status.message = "Cancelled.".into();
+        return;
+    }
     if !started {
         let _ = fs::remove_file(path);
         inner.status.phase = "error".into();
@@ -215,37 +587,34 @@ fn toggle_recording() {
         return;
     }
     inner.generation += 1;
+    inner.session_epoch = epoch;
     let generation = inner.generation;
     inner.status.phase = "recording".into();
-    inner.status.message = "Tap Fn to finish, Escape to cancel. Maximum 2 minutes.".into();
+    inner.status.message = format!(
+        "Press {} to finish, Escape to cancel. Maximum 2 minutes.",
+        inner.store.shortcut.label()
+    );
     unsafe {
         hf_overlay(1);
     }
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_secs(120)).await;
-        tauri::async_runtime::spawn_blocking(move || {
-            let s = state();
-            let mut inner = s.inner.lock().unwrap();
-            if inner.generation == generation && inner.status.phase == "recording" {
-                unsafe {
-                    hf_stop();
-                    hf_overlay(2);
-                }
-                inner.status.phase = "processing".into();
-                drop(inner);
-                transcribe(generation);
-            }
-        });
+        enqueue(Control::Finish(Some(generation)));
     });
 }
-fn transcribe(generation: u64) {
+fn transcribe(generation: u64, epoch: u64) {
     let s = state();
     let result = infer(&recording_path(&s), &model_path(&s));
+    let seconds = hound::WavReader::open(recording_path(&s))
+        .map(|r| r.duration() as f64 / r.spec().sample_rate as f64)
+        .unwrap_or(0.0);
     let _ = fs::remove_file(recording_path(&s));
     let mut inner = s.inner.lock().unwrap();
-    if inner.generation != generation {
+    if inner.generation != generation || !CANCELLATION.allows(epoch) {
         inner.status.phase = "idle".into();
+        inner.status.message = "Cancelled.".into();
         unsafe {
+            hf_discard_target();
             hf_overlay(0);
         }
         return;
@@ -253,24 +622,89 @@ fn transcribe(generation: u64) {
     match result {
         Ok(text) if text.is_empty() => {
             inner.status.phase = "idle".into();
-            inner.status.message = "No speech detected. Nothing pasted.".into();
+            inner.status.message = logic::NO_SPEECH_MESSAGE.into();
             unsafe {
-                hf_overlay(0);
+                hf_discard_target();
+                hf_overlay(4);
             }
         }
         Ok(text) => {
-            inner.status.transcript = text.clone();
-            let pasted = cstring(&text).is_ok_and(|p| unsafe { hf_paste(p.as_ptr()) });
-            inner.status.phase = "idle".into();
-            inner.status.message = if pasted { "Text sent to your original field. Ready for the next thought." } else { "Focus changed or the field is unsupported. Your transcript is saved below; use Copy text." }.into();
-            unsafe {
-                hf_overlay(if pasted { 0 } else { 3 });
+            let mut completed_stats = inner.store.stats.clone();
+            completed_stats.record(&text, seconds);
+            let result = match cstring(&text) {
+                Ok(p) => unsafe { hf_paste(p.as_ptr(), epoch, delivery_allowed) },
+                Err(_) => {
+                    unsafe { hf_discard_target() };
+                    -1
+                }
+            };
+            // Submitted Paste is not acknowledged by macOS: never copy again
+            // after submission. Refusals keep the same insertion-safe text.
+            let copy_result = if logic::should_copy_fallback(&text, result) {
+                match cstring(&text) {
+                    Ok(p) => unsafe { hf_copy_fallback(p.as_ptr(), epoch, delivery_allowed) },
+                    Err(_) => -1,
+                }
+            } else {
+                -1
+            };
+            // Cancellation can arrive while hf_paste waits for the main thread,
+            // including while inner is locked. Never publish a cancelled result.
+            if result == 16
+                || copy_result == 16
+                || CANCELLATION
+                    .accept(epoch, || {
+                        inner.store.stats = completed_stats;
+                        inner.status.stats = inner.store.stats.clone();
+                        inner.status.transcript = text;
+                    })
+                    .is_none()
+            {
+                inner.status.phase = "idle".into();
+                inner.status.message = "Cancelled.".into();
+                unsafe {
+                    hf_discard_target();
+                    hf_overlay(0);
+                }
+                return;
             }
+            let pasted = result == 0;
+            let copied = copy_result == 0;
+            inner.status.phase = if pasted {
+                "idle"
+            } else if copied {
+                "copied"
+            } else {
+                "not_pasted"
+            }
+            .into();
+            inner.status.message = if copied {
+                logic::copied_message(result)
+            } else {
+                logic::paste_message(result)
+            };
+            unsafe {
+                hf_overlay(if pasted {
+                    0
+                } else if copied {
+                    5
+                } else {
+                    3
+                });
+            }
+            // Disk sync is deliberately after delivery, never between inference
+            // completion and the final native focus / cancellation boundary.
+            inner.status.persistence_error =
+                storage::save(&s.directory.join("usage.json"), &inner.store)
+                    .err()
+                    .map(|e| format!("Usage couldn’t be saved: {e}"))
+                    .unwrap_or_default();
         }
         Err(e) => {
             inner.status.phase = "error".into();
             inner.status.message = e;
             unsafe {
+                hf_discard_target();
                 hf_overlay(3);
             }
         }
@@ -345,7 +779,8 @@ async fn download_model() -> Result<(), String> {
             inner.status.model_ready = true;
             inner.status.phase = "idle".into();
             inner.status.message =
-                "Model verified. Finish permissions, then select a text field and tap Fn.".into();
+                "Model verified. Finish permissions, then use your shortcut in a text field."
+                    .into();
         }
         Err(e) => {
             inner.status.phase = "error".into();
@@ -409,19 +844,45 @@ fn show_settings(app: &tauri::AppHandle) {
         let _ = window.set_focus();
     }
 }
+fn handle_permission_args(app: &tauri::AppHandle, args: &[String]) {
+    let requests = logic::permission_requests(args);
+    if !requests.microphone && !requests.accessibility {
+        return;
+    }
+    show_settings(app);
+    // Only explicit setup arguments request consent; never start capture/download.
+    if requests.accessibility {
+        PERMISSION_REQUESTS.fetch_or(2, Ordering::Relaxed);
+        unsafe { hf_request_accessibility() };
+    }
+    if requests.microphone {
+        PERMISSION_REQUESTS.fetch_or(1, Ordering::Relaxed);
+        unsafe { hf_request_microphone() };
+    }
+    refresh_status();
+}
 fn main() {
     let app = tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-            show_settings(app)
+        .plugin(tauri_plugin_single_instance::init(|app, args, _| {
+            show_settings(app);
+            handle_permission_args(app, &args);
         }))
         .invoke_handler(tauri::generate_handler![
             status,
+            permissions_diagnostic,
             request_microphone,
             request_permissions,
             open_keyboard,
             download_model,
             cancel,
-            copy_transcript
+            copy_transcript,
+            set_sounds,
+            set_sound_volume,
+            set_sound_style,
+            set_shortcut,
+            capture_shortcut,
+            preview_sound,
+            reset_stats
         ])
         .setup(|app| {
             let directory = app.path().app_local_data_dir()?;
@@ -431,18 +892,31 @@ fn main() {
             let _ = fs::remove_file(directory.join("recording.wav"));
             let _ = fs::remove_file(directory.join("model.download"));
             let ready = verified_model(&directory.join("ggml-base.en.bin"));
+            let (store, persistence_error) = match storage::load(&directory.join("usage.json")) {
+                Ok(store) => (store, String::new()),
+                Err(e) => (
+                    storage::Store::default(),
+                    format!("Local usage/settings couldn’t be read: {e}"),
+                ),
+            };
+            unsafe {
+                hf_sounds(store.sounds);
+                hf_sound_volume(store.sound_volume / 100.0);
+                hf_sound_style(if store.sound_style == "bell" { 1 } else { 0 });
+                hf_shortcut(store.shortcut.keycode().unwrap(), store.shortcut.modifiers);
+            }
             app.manage(AppState {
                 directory,
                 inner: Mutex::new(Inner {
                     generation: 0,
+                    session_epoch: CANCELLATION.current(),
                     status: Status {
                         phase: "idle".into(),
                         message: if ready {
-                            "Select a text field and tap Fn."
+                            format!("Select a text field and press {}.", store.shortcut.label())
                         } else {
-                            "Welcome. Complete the four steps below to begin."
-                        }
-                        .into(),
+                            "Welcome. Open Settings to finish setup.".into()
+                        },
                         progress: 0.,
                         model_ready: ready,
                         microphone: false,
@@ -450,18 +924,34 @@ fn main() {
                         input_monitoring: false,
                         hotkey: false,
                         transcript: String::new(),
+                        sounds: store.sounds,
+                        sound_volume: store.sound_volume,
+                        sound_style: store.sound_style.clone(),
+                        shortcut: store.shortcut.clone(),
+                        shortcut_label: store.shortcut.label(),
+                        stats: store.stats.clone(),
+                        persistence_error,
+                        permission_requests: 0,
                     },
+                    store,
                 }),
             });
             APP.set(app.handle().clone()).unwrap();
+            let executable_hash = std::env::current_exe()
+                .ok()
+                .and_then(|p| fs::read(p).ok())
+                .map(|bytes| format!("{:x}", Sha256::digest(bytes)))
+                .unwrap_or_default();
+            let _ = EXECUTABLE_HASH.set(executable_hash);
             let (sender, receiver) = std::sync::mpsc::channel();
             let _ = CONTROLS.set(sender);
             // Preserve Fn / Escape ordering; inference runs off this executor.
             std::thread::spawn(move || {
-                for control in receiver {
+                for (control, epoch) in receiver {
                     match control {
-                        Control::Toggle => toggle_recording(),
+                        Control::Toggle => toggle_recording(None, epoch),
                         Control::Cancel => cancel_inner(),
+                        Control::Finish(generation) => toggle_recording(Some(generation), epoch),
                     }
                 }
             });
@@ -473,14 +963,14 @@ fn main() {
                 None::<&str>,
             )?;
             let cancel = MenuItem::with_id(app, "cancel", "Cancel dictation", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "Quit Handsfree", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Quit HandsFree", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&settings, &cancel, &quit])?;
             TrayIconBuilder::new()
                 .icon(tauri::image::Image::from_bytes(include_bytes!(
                     "../icons/tray.png"
                 ))?)
                 .icon_as_template(true)
-                .tooltip("Handsfree · Fn to dictate")
+                .tooltip("HandsFree · Dictation")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
@@ -505,6 +995,12 @@ fn main() {
             unsafe {
                 hf_hook(native_event);
             }
+            refresh_status();
+            handle_permission_args(app.handle(), &std::env::args().collect::<Vec<_>>());
+            std::thread::spawn(|| loop {
+                std::thread::sleep(Duration::from_secs(2));
+                refresh_status();
+            });
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -514,7 +1010,7 @@ fn main() {
             }
         })
         .build(tauri::generate_context!())
-        .expect("Could not start Handsfree");
+        .expect("Could not start HandsFree");
     app.run(|app, event| {
         if let tauri::RunEvent::Exit = event {
             unsafe {
@@ -528,6 +1024,10 @@ fn main() {
 #[cfg(test)]
 mod audio_tests {
     use super::*;
+    #[test]
+    fn resetting_without_confirmation_never_touches_state() {
+        assert!(tauri::async_runtime::block_on(reset_stats(false)).is_err());
+    }
     #[test]
     fn silence_never_loads_a_model() {
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
