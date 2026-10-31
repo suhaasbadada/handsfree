@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Guard a clean Windows build and restore only Tauri's inactive Mac feature rewrite."""
+"""Guard clean build source and restore only Tauri's known platform feature rewrite.
+
+The historical filename is retained for Windows packaging callers.
+"""
 import argparse
 import base64
 import hashlib
@@ -26,7 +29,7 @@ def mac_features(document):
     return document["target"][MAC_TARGET]["dependencies"]["tauri"]["features"]
 
 
-def snapshot(root, state):
+def snapshot(root, state, platform="windows"):
     if status(root):
         raise ValueError("Build requires a clean worktree, including untracked files.")
     original = (root / MANIFEST).read_bytes()
@@ -36,6 +39,7 @@ def snapshot(root, state):
     if "macos-private-api" in document["dependencies"]["tauri"].get("features", []):
         raise ValueError("macos-private-api must not be enabled in common dependencies.")
     receipt = {
+        "platform": platform,
         "commit": git(root, "rev-parse", "HEAD").decode().strip(),
         "tree": git(root, "rev-parse", "HEAD^{tree}").decode().strip(),
         "manifest_base64": base64.b64encode(original).decode("ascii"),
@@ -47,8 +51,10 @@ def snapshot(root, state):
     print(receipt["manifest_sha256"])
 
 
-def restore(root, state):
+def restore(root, state, platform="windows"):
     receipt = json.loads(state.read_text(encoding="utf-8"))
+    if receipt.get("platform", "windows") != platform:
+        raise ValueError("Source snapshot platform mismatch.")
     original = base64.b64decode(receipt["manifest_base64"], validate=True)
     if hashlib.sha256(original).hexdigest() != receipt["manifest_sha256"]:
         raise ValueError("Source snapshot checksum mismatch; preserving all build evidence.")
@@ -65,13 +71,24 @@ def restore(root, state):
     if current != original:
         before = tomllib.loads(original.decode("utf-8"))
         after = tomllib.loads(current.decode("utf-8"))
-        if mac_features(before) != ["macos-private-api"] or mac_features(after) != []:
-            raise ValueError("Unrecognized Tauri feature rewrite; preserving changed manifest.")
-        after["target"][MAC_TARGET]["dependencies"]["tauri"]["features"] = ["macos-private-api"]
+        if platform == "macos":
+            common = before["dependencies"]["tauri"]["features"]
+            if (mac_features(after) != ["macos-private-api"]
+                    or after["dependencies"]["tauri"]["features"] != common + ["macos-private-api"]):
+                raise ValueError("Unrecognized Tauri feature rewrite; preserving changed manifest.")
+            after["dependencies"]["tauri"]["features"] = common
+        else:
+            if mac_features(before) != ["macos-private-api"] or mac_features(after) != []:
+                raise ValueError("Unrecognized Tauri feature rewrite; preserving changed manifest.")
+            after["target"][MAC_TARGET]["dependencies"]["tauri"]["features"] = ["macos-private-api"]
         if after != before:
             raise ValueError("Tauri changed additional manifest semantics; preserving changed manifest.")
         manifest.write_bytes(original)
         note = (
+            "Tauri CLI added only common tauri macos-private-api, already enabled by cfg(macos); "
+            "all other TOML fields were identical. Original Cargo.toml bytes restored after validation; "
+            "Mac-resolved dependencies unchanged."
+        ) if platform == "macos" else (
             "Tauri CLI removed only inactive cfg(macos) tauri macos-private-api; "
             "all other TOML fields (including common/Windows dependencies) were identical. "
             "Original Cargo.toml bytes restored after validation; Windows-resolved dependencies unchanged."
@@ -86,14 +103,15 @@ def main():
     parser.add_argument("operation", choices=["snapshot", "restore"])
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--state", type=Path, required=True)
+    parser.add_argument("--platform", choices=["windows", "macos"], default="windows")
     args = parser.parse_args()
     try:
         if args.operation == "snapshot":
-            snapshot(args.root.resolve(), args.state.resolve())
+            snapshot(args.root.resolve(), args.state.resolve(), args.platform)
         else:
-            restore(args.root.resolve(), args.state.resolve())
+            restore(args.root.resolve(), args.state.resolve(), args.platform)
     except (ValueError, KeyError, OSError, subprocess.CalledProcessError) as error:
-        print(f"Windows source guard: {error}", file=sys.stderr)
+        print(f"{args.platform} source guard: {error}", file=sys.stderr)
         return 1
     return 0
 

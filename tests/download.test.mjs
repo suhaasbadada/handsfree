@@ -101,11 +101,11 @@ test('public Windows coordinates are verified while unavailable fixtures still f
   assert.equal(windowsRelease.appVersion, '0.1.1');
   assert.equal(publishedWindowsUrl(windowsRelease), windowsRelease.installerUrl);
   assert.equal(publishedWindowsUrl(windowsDisabled), null);
-  assert.equal(release.publicAvailable, true);
-  assert.equal(release.dmgUrl, 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.2/HandsFree-0.1.1-beta.2-macos-arm64.dmg');
+  assert.equal(release.publicAvailable, false, 'Mac beta 3 is a staged candidate, independent from public Windows beta 2');
+  assert.equal(release.dmgUrl, 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.3/HandsFree-0.1.1-beta.3-macos-arm64.dmg');
   for (const arch of ['unknown', 'intel', 'arm64']) {
-    const state = downloadState({ os: 'windows', arch }, release, windowsDisabled);
-    assert.equal(state.url, release.dmgUrl);
+    const state = downloadState({ os: 'windows', arch }, enabled, windowsDisabled);
+    assert.equal(state.url, enabled.dmgUrl);
     assert.equal(state.label, 'Get Mac beta');
     assert.match(state.note, /No verified installer available yet/);
     assert.match(state.note, /Windows 10\/11 x64/);
@@ -156,7 +156,7 @@ test('Windows canonical URL validation fails closed for drafts, paths, extension
     { ...candidate, installerUrl: candidate.installerUrl.replace('/download/', '/draft/') },
     { ...candidate, installerUrl: 'javascript:alert(1)' }]) {
     assert.equal(publishedWindowsUrl(manifest), null);
-    assert.equal(downloadState({ os: 'windows', arch: 'unknown' }, release, manifest).url, release.dmgUrl);
+    assert.equal(downloadState({ os: 'windows', arch: 'unknown' }, enabled, manifest).url, enabled.dmgUrl);
   }
 });
 

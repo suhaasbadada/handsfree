@@ -12,12 +12,12 @@ const original = readFileSync(new URL('../src-tauri/Cargo.toml', import.meta.url
 const python = process.platform === 'win32' ? 'python' : 'python3';
 const normalized = () => original.toString().replace('features = ["macos-private-api"]', 'features = []');
 
-function fixture(callback) {
+function fixture(callback, platform = 'windows') {
   const root = mkdtempSync(join(tmpdir(), 'handsfree-source-state-'));
   const manifest = join(root, 'src-tauri/Cargo.toml');
   const state = join(root, 'src-tauri/target/source.json');
   const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
-  const run = operation => spawnSync(python, [helper, operation, '--root', root, '--state', state], { encoding: 'utf8' });
+  const run = operation => spawnSync(python, [helper, operation, '--root', root, '--state', state, '--platform', platform], { encoding: 'utf8' });
   try {
     mkdirSync(join(root, 'src-tauri'));
     writeFileSync(manifest, original);
@@ -114,6 +114,29 @@ test('changed source revision is rejected without restoring the manifest', () =>
   assert.match(result.stderr, /Source revision changed/);
   assert.equal(readFileSync(manifest, 'utf8'), normalized());
 }));
+
+const macNormalized = () => original.toString().replace('"tray-icon", "image-png"', '"tray-icon", "image-png", "macos-private-api"');
+test('Mac CLI common-feature addition is byte-restored while original Mac target feature remains', () => fixture(({ manifest, git, run }) => {
+  assert.equal(run('snapshot').status, 0);
+  writeFileSync(manifest, macNormalized());
+  const result = run('restore');
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Mac-resolved dependencies unchanged/);
+  assert.deepEqual(readFileSync(manifest), original);
+  assert.equal(git('status', '--porcelain'), '');
+}, 'macos'));
+
+for (const [name, mutate] of [
+  ['Mac target feature removed', text => text.replace('features = ["macos-private-api"]', 'features = []')],
+  ['Windows version changed', text => text.replace('cpal = "0.16"', 'cpal = "0.17"')],
+  ['another common feature added', text => text.replace('"image-png",', '"image-png", "test",')],
+]) test(`Mac guard rejects ${name} without overwriting source`, () => fixture(({ manifest, run }) => {
+  assert.equal(run('snapshot').status, 0);
+  const changed = mutate(macNormalized());
+  writeFileSync(manifest, changed);
+  assert.equal(run('restore').status, 1);
+  assert.equal(readFileSync(manifest, 'utf8'), changed);
+}, 'macos'));
 
 test('corrupted snapshot cannot overwrite a changed manifest', () => fixture(({ manifest, state, run }) => {
   assert.equal(run('snapshot').status, 0);

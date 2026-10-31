@@ -14,10 +14,12 @@ function sandbox(callback) {
     mkdirSync(join(root, 'scripts'));
     mkdirSync(join(root, 'bin'));
     copyFileSync(new URL('../scripts/package-release.sh', import.meta.url), join(root, 'scripts/package-release.sh'));
+    // Source guard has its own real-Git fixture tests; this sandbox isolates shell cleanup.
     const stub = (name, body) => writeFileSync(join(root, 'bin', name), `#!/bin/bash\n${body}\n`, { mode: 0o755 });
     stub('uname', 'if [[ "$1" == -s ]]; then echo Darwin; else echo arm64; fi');
     stub('git', 'if [[ "$1" == rev-parse ]]; then printf "%040d\\n" 1; fi');
     stub('npm', 'echo "mock build failed" >&2; exit 42');
+    stub('python3', 'if [[ "$2" == snapshot ]]; then touch "$6"; fi; exit 0');
     const run = (...args) => spawnSync('/bin/bash', [join(root, 'scripts/package-release.sh'), ...args], {
       encoding: 'utf8', env: { ...process.env, PATH: `${root}/bin:${process.env.PATH}` },
     });
@@ -40,7 +42,7 @@ posixTest('packaging rejects unsupported hosts before build', () => sandbox(({ r
   assert.ok(!readdirSync(root).includes('release'));
 }));
 
-for (const existing of ['HandsFree-0.1.1-beta.2-macos-arm64.dmg', 'SHA256SUMS', 'PROVENANCE.txt']) {
+for (const existing of ['HandsFree-0.1.1-beta.3-macos-arm64.dmg', 'SHA256SUMS', 'PROVENANCE.txt']) {
   posixTest(`packaging refuses to overwrite ${existing}`, () => sandbox(({ root, run }) => {
     mkdirSync(join(root, 'release'));
     writeFileSync(join(root, 'release', existing), 'preserve me');

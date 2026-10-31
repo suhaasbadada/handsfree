@@ -5,9 +5,10 @@ import { execFileSync } from 'node:child_process';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { verifyCompiledAssets } from './check-macos-assets.mjs';
 
-export const candidate = 'HandsFree-0.1.1-beta.2-macos-arm64.dmg';
-export const tag = 'v0.1.1-beta.2';
+export const candidate = 'HandsFree-0.1.1-beta.3-macos-arm64.dmg';
+export const tag = 'v0.1.1-beta.3';
 const names = [candidate, 'PROVENANCE.txt', 'SHA256SUMS'];
 const repo = 'suhaasbadada/handsfree';
 function requireThat(condition, message) { if (!condition) throw new Error(message); }
@@ -154,6 +155,7 @@ export async function main(args = process.argv.slice(2), { onInterrupt } = {}) {
     scope.markAttached();
     run('/usr/bin/hdiutil', ['attach', '-readonly', '-nobrowse', '-noautoopen', '-mountpoint', mount, dmg]);
     verifyApp(join(mount, 'HandsFree.app'), fingerprint);
+    verifyCompiledAssets(root, join(mount, 'HandsFree.app'));
     requireThat(readlinkSync(join(mount, 'Applications')) === '/Applications', 'Applications shortcut missing');
     const visible = readdirSync(mount).filter(name => !name.startsWith('.')).sort();
     requireThat(JSON.stringify(visible) === JSON.stringify(['Applications', 'HandsFree.app', 'Install HandsFree.txt', 'Licenses']), 'Unexpected visible disk-image root');

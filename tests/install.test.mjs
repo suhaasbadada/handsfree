@@ -31,7 +31,7 @@ test('hero Homebrew recommendation is scoped to supported Mac visitors and avail
     return elements.get(id);
   } };
   for (const os of ['mac', 'windows', 'linux', 'mobile', 'unknown']) for (const arch of ['arm64', 'unknown', 'intel']) {
-    renderDownload(document, { os, arch }, release);
+    renderDownload(document, { os, arch }, { ...release, publicAvailable: true });
     assert.equal(document.getElementById('hero-homebrew').hidden, os !== 'mac' || arch === 'intel');
   }
   renderDownload(document, { os: 'mac', arch: 'arm64' }, { ...release, publicAvailable: false });

@@ -68,9 +68,10 @@ try {
     if (await evaluate(`document.readyState === 'complete' && !!document.querySelector('h1')`)) break;
     await delay(50);
   }
-  const dmgUrl = 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.2/HandsFree-0.1.1-beta.2-macos-arm64.dmg';
-  assert.deepEqual(await evaluate(`({disabled:document.getElementById('primary-download').getAttribute('aria-disabled'), href:document.getElementById('primary-download').getAttribute('href')})`), {disabled:null,href:dmgUrl}, 'Published manifest offers a working direct download');
   await evaluate(`(async () => { window.downloadModule=await import('./download.js'); window.releaseModule=await import('./release.js'); })()`);
+  const { dmgUrl, publicAvailable } = await evaluate(`window.releaseModule.release`);
+  assert.deepEqual(await evaluate(`({disabled:document.getElementById('mac-card-download').getAttribute('aria-disabled'), href:document.getElementById('mac-card-download').getAttribute('href')})`),
+    publicAvailable ? {disabled:null,href:dmgUrl} : {disabled:'true',href:null}, 'Actual Mac link follows public/candidate availability, not a hardcoded previous release');
   for (const os of ['mac','windows','linux','mobile','unknown']) {
     await evaluate(`window.downloadModule.renderDownload(document,{os:${JSON.stringify(os)},arch:'unknown'},{...window.releaseModule.release,publicAvailable:true},{...window.releaseModule.windowsRelease,publicAvailable:false})`);
     const href = await evaluate(`document.getElementById('primary-download').getAttribute('href')`);
@@ -85,7 +86,7 @@ try {
   await evaluate(`window.downloadModule.renderDownload(document,{os:'mac',arch:'intel'},{...window.releaseModule.release,publicAvailable:true})`);
   assert.equal(await evaluate(`document.getElementById('primary-download').getAttribute('href')`), dmgUrl, 'Intel visitor may intentionally download for another Mac');
   assert.match(await evaluate(`document.getElementById('download-platform-note').textContent`), /Intel Macs are not supported/);
-  await evaluate(`window.downloadModule.renderDownload(document,{os:'mac',arch:'unknown'},window.releaseModule.release)`);
+  await evaluate(`window.downloadModule.renderDownload(document,{os:'mac',arch:'unknown'},{...window.releaseModule.release,publicAvailable:true},{...window.releaseModule.windowsRelease,publicAvailable:false})`);
   for (const width of [320, 390, 400, 560, 740, 768, 980, 1280]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
     const metrics = await evaluate(`new Promise(resolve => requestAnimationFrame(() => resolve({
@@ -259,7 +260,10 @@ try {
     if (await evaluate(`document.readyState === 'complete'`)) break;
     await delay(50);
   }
-  assert.equal(await evaluate(`document.getElementById('primary-download').getAttribute('href')`), dmgUrl, 'No-JS CTA directly downloads the published Mac beta');
+  // Candidate preparation deliberately retains the live beta 2 static fallback
+  // until public beta 3 bytes are verified and availability is enabled.
+  const publicDmgUrl = publicAvailable ? dmgUrl : 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.2/HandsFree-0.1.1-beta.2-macos-arm64.dmg';
+  assert.equal(await evaluate(`document.getElementById('primary-download').getAttribute('href')`), publicDmgUrl, 'No-JS CTA directly downloads the currently published Mac beta, never a draft candidate');
   assert.equal(await evaluate(`document.querySelector('noscript').getClientRects().length>0 && document.querySelectorAll('#primary-download svg.apple-logo[aria-hidden="true"] path').length===1`), true, 'No-JS requirements and Apple logo are visible');
   assert.equal(await evaluate(`!document.getElementById('demo-play') && document.getElementById('demo-pause').hidden && document.getElementById('demo-text').value === ${JSON.stringify(sample)}`), true, 'No-JS demo shows meaningful text and no inert control');
   for (const width of [320, 390, 768, 1280]) {

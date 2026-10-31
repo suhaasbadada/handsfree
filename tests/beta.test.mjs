@@ -30,14 +30,14 @@ test('README, release notes, installer guide and filename disclose beta without 
   assert.match(read('docs/releases/v0.1.1-beta.2.md'), /# HandsFree v0\.1\.1-beta\.2/);
   assert.match(read('docs/releases/v0.1.1-beta.2.md'), /Prerelease · Beta testing/);
   assert.match(read('docs/INSTALL.md'), /# Install HandsFree \(Mac beta\)/);
-  assert.match(read('scripts/package-release.sh'), /NAME=HandsFree-0\.1\.1-beta\.2-macos-arm64/);
+  assert.match(read('scripts/package-release.sh'), /NAME=HandsFree-0\.1\.1-beta\.3-macos-arm64/);
   assert.match(read('scripts/package-release.sh'), /-volname 'HandsFree Beta — drag to Applications'/);
   const config = JSON.parse(read('src-tauri/tauri.conf.json'));
   assert.equal(config.productName, 'HandsFree');
   assert.equal(config.identifier, 'com.handsfree.local');
 });
 
-test('beta 2 app, package, release manifest and audit versions stay coordinated', async () => {
+test('beta 3 candidate app, package, release manifest and audit versions stay coordinated', async () => {
   const { release } = await import('../site/release.js');
   const { candidate, tag } = await import('../scripts/check-release.mjs');
   const version = JSON.parse(read('package.json')).version;
@@ -47,7 +47,8 @@ test('beta 2 app, package, release manifest and audit versions stay coordinated'
   assert.equal(JSON.parse(read('src-tauri/tauri.conf.json')).version, version);
   assert.ok(read('src-tauri/Cargo.toml').includes(`version = "${version}"`));
   assert.ok(read('src-tauri/Cargo.lock').includes(`name = "handsfree"\nversion = "${version}"`));
-  assert.equal(release.version, `${version}-beta.2`);
+  assert.equal(release.version, `${version}-beta.3`);
+  assert.equal(release.publicAvailable, false, 'Candidate preparation must not enable an unverified public asset');
   assert.equal(tag, `v${release.version}`);
   assert.equal(candidate, `HandsFree-${release.version}-macos-arm64.dmg`);
   assert.ok(read('scripts/package-release.sh').includes(`NAME=${candidate.slice(0, -4)}`));
