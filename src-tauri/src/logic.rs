@@ -187,7 +187,7 @@ pub fn should_copy_fallback(text: &str, paste_code: i32) -> bool {
 pub fn copied_message(paste_code: i32) -> String {
     let diagnostic = paste_message(paste_code);
     let reason = diagnostic.split("]").next().unwrap_or("Not pasted");
-    format!("Copied — paste anywhere. Automatic paste skipped: {reason}].")
+    format!("Copied. Automatic paste skipped: {reason}].")
 }
 
 pub fn paste_message(code: i32) -> String {
@@ -311,7 +311,7 @@ mod tests {
     }
     #[test]
     fn copy_only_nonempty_refusals_never_submitted_or_cancelled() {
-        assert_eq!(copied_message(3), "Copied — paste anywhere. Automatic paste skipped: Not pasted [start:no-original-focus].");
+        assert_eq!(copied_message(3), "Copied. Automatic paste skipped: Not pasted [start:no-original-focus].");
         for code in 1..=15 {
             assert!(should_copy_fallback("final text", code));
         }

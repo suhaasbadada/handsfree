@@ -107,8 +107,8 @@ try {
   await evaluate(`document.getElementById('copy').click()`);
   await until(`document.getElementById('feedback').textContent.startsWith('Copied.')`);
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='copy_transcript').length`), 1);
-  await evaluate(`window.fixture.phase='copied'; window.fixture.message='Copied — paste anywhere. Automatic paste skipped: Not pasted [start:no-original-focus].';`);
-  await until(`document.getElementById('phase').textContent==='Copied — paste anywhere' && document.getElementById('dot').className==='copied'`);
+  await evaluate(`window.fixture.phase='copied'; window.fixture.message='Copied. Automatic paste skipped: Not pasted [start:no-original-focus].';`);
+  await until(`document.getElementById('phase').textContent==='Copied' && document.getElementById('dot').className==='copied'`);
   assert.equal(await evaluate(`document.getElementById('cancel').hidden && !document.getElementById('copy').disabled && !document.getElementById('preview-sound').disabled && !document.getElementById('record-shortcut').disabled`), true, 'Copied fallback is ready, not an error or busy state');
   assert.equal(await evaluate(`getComputedStyle(document.getElementById('dot')).backgroundColor`), 'rgb(136, 181, 77)', 'Normal fallback is not red');
   assert.match(await evaluate(`document.getElementById('message').textContent`), /start:no-original-focus/);

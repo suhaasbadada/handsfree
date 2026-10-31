@@ -35,7 +35,7 @@ test('all states have user-facing labels and unknown state is safe', () => {
   assert.equal(phaseLabel('error'), 'Needs attention');
   assert.equal(phaseLabel('setup_required'), 'Setup needs attention');
   assert.equal(phaseLabel('not_pasted'), 'Not pasted · transcript saved');
-  assert.equal(phaseLabel('copied'), 'Copied — paste anywhere');
+  assert.equal(phaseLabel('copied'), 'Copied');
   assert.equal(canCancel('copied'), false);
   assert.equal(phaseLabel('unexpected'), 'Connecting');
 });

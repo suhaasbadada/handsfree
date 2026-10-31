@@ -52,6 +52,10 @@ for text in ["Couldn’t hear you.\nTry again", "Needs attention\nOpen HandsFree
     let size = (text as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 10.5, weight: .medium)])
     precondition(size.width <= 132 && size.height <= 28, "Compact status text must fit without clipping")
 }
+for text in ["No speech", "Copied"] {
+    let size = (text as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 10.5, weight: .medium)])
+    precondition(size.width <= 132 && size.height <= 14, "Single-line status text must fit the centered 14 pt height")
+}
 for phase: Int32 in [1, 2, 3, 4, 5, 1] {
     overlay(phase)
     if phase == 1 || phase == 2 { precondition(!previewSound(), "No playback during capture or processing") }
@@ -70,6 +74,8 @@ for phase: Int32 in [1, 2, 3, 4, 5, 1] {
         RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.3))
         precondition((view as! PillView).capsuleRect == processingRect)
     }
+    if phase == 4 { precondition(view.accessibilityLabel() == "No speech") }
+    if phase == 5 { precondition(view.accessibilityLabel() == "Copied") }
     let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main!
     precondition(abs(panel.frame.midX - screen.visibleFrame.midX) < 0.01)
     // Exercise drawing and text layout for every state without starting capture.

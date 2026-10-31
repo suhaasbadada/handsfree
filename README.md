@@ -45,7 +45,7 @@ Select a text field in another app. Briefly tap **Fn / 🌐**, speak after the o
 
 For Fn, set macOS Keyboard → **“Press 🌐 key to” → Do Nothing**, and disable conflicting Fn/double-Fn macOS Dictation shortcuts. Some external keyboards do not expose Fn; choose a combination instead. Shortcuts are observed, not swallowed, so avoid conflicts with the foreground app. Secure Input can block them.
 
-If focus changes or a field is unsupported/secure/read-only, HandsFree does not automatically paste there. A successful transcript is copied instead: **Copied — paste anywhere**. You can also copy the last transcript from Overview. Fallback copy replaces your clipboard and leaves the transcript there; clipboard managers and Universal Clipboard may retain it. For a submitted Paste, the previous clipboard is restored after one second only if unchanged. Paste submission is **not confirmation** that the target accepted it; verify your text before retrying.
+If focus changes or a field is unsupported/secure/read-only, HandsFree does not automatically paste there. A successful transcript is copied instead: **Copied**. You can also copy the last transcript from Overview. Fallback copy replaces your clipboard and leaves the transcript there; clipboard managers and Universal Clipboard may retain it. For a submitted Paste, the previous clipboard is restored after one second only if unchanged. Paste submission is **not confirmation** that the target accepted it; verify your text before retrying.
 
 ## Beta limitations & privacy
 
