@@ -197,7 +197,7 @@ class PillView: NSView {
         tick = 0
         cancelButton.isHidden = value != 1
         finishButton.isHidden = value != 1
-        setAccessibilityLabel(value == 1 ? "HandsFree listening" : value == 2 ? "Transcribing" : value == 4 ? "Couldn’t hear you. Try again" : value == 5 ? "Copied — paste anywhere" : "HandsFree needs attention. Open settings")
+        setAccessibilityLabel(value == 1 ? "HandsFree listening" : value == 2 ? "Transcribing" : value == 4 ? "No speech" : value == 5 ? "Copied — paste anywhere" : "HandsFree needs attention. Open settings")
         setAccessibilityHelp(value == 2 ? "Press Escape or use Cancel in HandsFree to cancel dictation." : nil)
     }
     override func draw(_ dirtyRect: NSRect) {
@@ -222,10 +222,10 @@ class PillView: NSView {
                 NSBezierPath(ovalIn: NSRect(x: capsule.midX - 12 + CGFloat(i) * 10, y: capsule.midY - 2, width: 4, height: 4)).fill()
             }
         } else {
-            let text = phase == 4 ? "Couldn’t hear you.\nTry again" : phase == 5 ? "Copied\nPaste anywhere" : "Needs attention\nOpen HandsFree"
+            let text = phase == 4 ? "No speech" : phase == 5 ? "Copied\nPaste anywhere" : "Needs attention\nOpen HandsFree"
             let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .center
             let x: CGFloat = 9
-            let height: CGFloat = 28
+            let height: CGFloat = phase == 4 ? 14 : 28
             (text as NSString).draw(in: NSRect(x: x, y: (bounds.height-height)/2, width: bounds.width-x-9, height: height), withAttributes: [.font: NSFont.systemFont(ofSize: 10.5, weight: .medium), .foregroundColor: NSColor.white, .paragraphStyle: paragraph])
         }
     }
