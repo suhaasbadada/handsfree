@@ -9,6 +9,15 @@ HandsFree is a local-first desktop dictation project: turn speech into text with
 
 [Website](https://suhaasbadada.github.io/handsfree/) · [Source code](https://github.com/suhaasbadada/handsfree) · [MIT license](LICENSE)
 
+## Use cases
+
+- **AI coding prompts:** explain your goal and context for Claude Code or Codex instead of typing long instructions.
+- **Messages & email:** dictate a quick reply or a thoughtful update, then review and send.
+- **Notes & ideas:** capture a train of thought while it’s fresh; organize it afterward.
+- **First drafts:** talk through an opening, outline, or tricky paragraph, then edit.
+
+No special integration is required: insertion depends on the focused field, with clipboard fallback for terminals and other custom editors ([details](docs/INSTALL.md)); HandsFree doesn’t run commands.
+
 ## Platforms
 
 | Platform | Status |

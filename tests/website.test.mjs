@@ -16,6 +16,31 @@ test('open-source section uses an accessible GitHub icon without decorative arro
   assert.doesNotMatch(section, /↗|open-mark|Meet the project|Explore source/i);
 });
 
+test('use cases are concise, semantic, and honest about coding-tool support', () => {
+  const section = html.match(/<section[^>]*id="usecases"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(section);
+  assert.match(section, /aria-labelledby="usecases-title"/);
+  assert.match(section, /<h2 id="usecases-title">Talk through the work\.<\/h2>/);
+  assert.match(section, /<ul class="usecase-list" role="list">/);
+  assert.equal([...section.matchAll(/<li>/g)].length, 4);
+  for (const title of ['AI coding prompts', 'Messages &amp; email', 'Notes &amp; ideas', 'First drafts']) {
+    assert.ok(section.includes(`<h3>${title}</h3>`));
+  }
+  const readme = readFileSync(new URL('README.md', root), 'utf8');
+  const cases = readme.match(/## Use cases\n([\s\S]*?)\n## Platforms/)?.[1];
+  assert.ok(cases);
+  assert.equal([...cases.matchAll(/^- /gm)].length, 4);
+  for (const copy of [section, cases]) {
+    assert.match(copy, /Claude Code or Codex/);
+    assert.match(copy, /No special integration/);
+    assert.match(copy, /depends on the focused field/);
+    assert.match(copy, /clipboard/);
+    assert.match(copy, /HandsFree doesn’t run commands/);
+    assert.doesNotMatch(copy, /official|plugin|seamless integration|guaranteed/i);
+    assert.ok(copy.split(/\s+/).length < 180, 'Keep use cases scannable');
+  }
+});
+
 test('website local links and assets resolve within the Pages artifact', () => {
   const site = new URL('site/', root).pathname;
   const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);

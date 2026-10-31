@@ -88,6 +88,17 @@ try {
     assert.equal(metrics.scroll, metrics.width, `No horizontal overflow at ${width}px`);
     assert.ok(metrics.images, 'Icons loaded');
     assert.equal(metrics.styles, 'grid', 'Stylesheet loaded');
+    const usecases = await evaluate(`({
+      count: document.querySelectorAll('#usecases li').length,
+      columns: getComputedStyle(document.querySelector('.usecase-list')).gridTemplateColumns.split(' ').length,
+      contained: [...document.querySelectorAll('#usecases li')].every(item => {
+        const box = item.getBoundingClientRect();
+        return box.left >= 0 && box.right <= innerWidth && box.height > 0;
+      })
+    })`);
+    assert.equal(usecases.count, 4, 'Four readable use cases');
+    assert.equal(usecases.columns, width <= 760 ? 1 : 2, `Responsive use cases at ${width}px`);
+    assert.ok(usecases.contained, 'Use-case rows stay within the viewport');
     assert.equal(await evaluate(`document.querySelector('.site-header .beta-badge').textContent==='BETA' && document.querySelector('.site-header .beta-badge').getBoundingClientRect().width>0`), true, 'Visible uppercase beta identity at every width');
     assert.equal(await evaluate(`document.getElementById('primary-download').getBoundingClientRect().bottom < innerHeight`), true, `Primary action above fold at ${width}px`);
     console.log(`Light ${width}px: layout and assets passed`);
@@ -118,6 +129,10 @@ try {
   assert.deepEqual(await evaluate(`({value:document.getElementById('demo-text').value,readonly:document.getElementById('demo-text').readOnly,label:document.getElementById('demo-text').labels[0].textContent,hidden:document.getElementById('demo-play').hidden})`),
     { value: sample, readonly: true, label: 'Text', hidden: false }, 'Semantic, labelled text field and working demo button');
   const { nodes } = await send('Accessibility.getFullAXTree');
+  assert.ok(nodes.some(node => node.role?.value === 'region' && node.name?.value === 'Talk through the work.'), 'Use cases form a named accessible section');
+  for (const title of ['AI coding prompts', 'Messages & email', 'Notes & ideas', 'First drafts']) {
+    assert.ok(nodes.some(node => node.role?.value === 'heading' && node.name?.value === title), `Accessible use-case heading: ${title}`);
+  }
   assert.ok(nodes.some(node => node.role?.value === 'textbox' && node.name?.value === 'Text' && node.value?.value === sample), 'Transcript is a named textbox in the accessibility tree');
   async function activate(key = 'Enter') {
     await evaluate(`document.getElementById('demo-play').focus()`);
