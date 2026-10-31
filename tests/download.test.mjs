@@ -32,11 +32,12 @@ for (const [label, nav, hints, os, arch] of cases) test(`platform: ${label}`, ()
   assert.deepEqual(detectPlatform(nav, hints), { os, arch });
 });
 
-test('current manifest is explicitly unavailable; only a verified manifest permits a direct DMG', () => {
-  assert.equal(release.publicAvailable, false);
+test('published manifest permits a direct DMG; unavailable manifests remain disabled', () => {
+  assert.equal(release.publicAvailable, true);
   for (const arch of ['unknown', 'arm64']) {
     const platform = { os: 'mac', arch };
-    assert.equal(downloadState(platform, release).url, null);
+    assert.equal(downloadState(platform, { ...release, publicAvailable: false }).url, null);
+    assert.equal(downloadState(platform, release).url, release.dmgUrl);
     assert.equal(downloadState(platform, enabled).url, release.dmgUrl);
     assert.equal(downloadState(platform, enabled).detail, 'Apple Silicon · macOS 14+ · English');
   }
@@ -74,7 +75,7 @@ function fixtureDocument() {
 test('rendering transitions remove stale links and disabled state without click handlers or navigation', () => {
   const document = fixtureDocument();
   const cta = document.getElementById('primary-download');
-  renderDownload(document, { os: 'mac', arch: 'unknown' }, release);
+  renderDownload(document, { os: 'mac', arch: 'unknown' }, { ...release, publicAvailable: false });
   assert.equal(document.getElementById('download-requirements').textContent, 'Apple Silicon · macOS 14+ · English');
   assert.equal(cta.href, undefined);
   assert.equal(cta.getAttribute('aria-disabled'), 'true');
@@ -91,7 +92,7 @@ test('absent or rejected hints stay safe and initialization never requires GitHu
   for (const navigator of [mac, { ...mac, userAgentData: { getHighEntropyValues: async () => { throw new Error('denied'); } } }]) {
     const document = fixtureDocument();
     const state = await initializeDownload(document, navigator);
-    assert.equal(state.url, null);
-    assert.equal(document.getElementById('primary-download').href, undefined);
+    assert.equal(state.url, release.dmgUrl);
+    assert.equal(document.getElementById('primary-download').href, release.dmgUrl);
   }
 });

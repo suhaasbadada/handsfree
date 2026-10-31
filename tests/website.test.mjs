@@ -88,12 +88,12 @@ test('website is dependency-free with accessible, honest platform copy', () => {
   assert.match(css, /color-scheme:light;/);
   assert.doesNotMatch(css, /prefers-color-scheme/);
   assert.match(css, /focus-visible/);
-  assert.match(html, /No public Mac download yet/);
+  assert.match(html, /Experimental Mac beta available/);
   assert.equal([...html.matchAll(/Not implemented or available to download/g)].length, 2);
   assert.match(html, /href="https:\/\/github.com\/suhaasbadada\/handsfree\/releases">Release notes &amp; status/);
   assert.match(html, /<noscript>/);
   assert.equal([...html.matchAll(/class="button primary"/g)].length, 1, 'One primary action, not competing downloads');
-  assert.doesNotMatch(html, /releases\/download\//);
+  assert.match(html, /releases\/download\/v0\.1\.0-beta\.1\/HandsFree-0\.1\.0-beta\.1-macos-arm64\.dmg/);
   assert.match(html, /MIT license does not relicense dependencies/);
 });
 
