@@ -18,7 +18,7 @@ do {
     precondition(abs(player.duration - StartCue.duration) < 0.000001)
     precondition(player.format.sampleRate == Double(StartCue.rate) && player.numberOfChannels == 1)
     precondition(samples.count == Int(StartCue.duration * Double(StartCue.rate)))
-    precondition(StartCue.duration == 0.200)
+    precondition(StartCue.duration == 0.320)
     precondition(data == StartCue.data(resourceRoot: resourceRoot), "Exact deterministic bundled PCM")
     for legacyStyle: Int32 in [0, 1] {
         soundStyle(legacyStyle)
@@ -45,7 +45,7 @@ do {
         }
         return hypot(real, imaginary) / Double(end - start)
     }
-    precondition((0.045...0.12).contains(level), "Moderate RMS, not a nearly silent or over-loud impulse")
+    precondition((0.035...0.12).contains(level), "Moderate RMS, not a nearly silent or over-loud impulse")
     func peakIndex(_ from: Double, _ to: Double) -> Int {
         let range = Int(from * Double(StartCue.rate))..<Int(to * Double(StartCue.rate))
         return range.max { abs(Int(samples[$0])) < abs(Int(samples[$1])) }!
@@ -54,13 +54,17 @@ do {
     precondition(secondPeak - firstPeak == 3120, "Two tactile impacts exactly 65 ms apart")
     precondition((0.022...0.025).contains(Double(firstPeak) / Double(StartCue.rate)))
     let accent = rms(0.085, 0.150) / rms(0.020, 0.085)
-    precondition((1.40...1.48).contains(accent), "Approved 0.78:1 balance plus subtle 1 dB second accent")
-    precondition(rms(0, 0.020) == 0 && rms(0.180, 0.200) == 0, "At least 20 ms exact silence at each endpoint")
+    precondition((1.40...1.80).contains(accent), "Approved accented second impact with a moderate harmonic bloom")
+    precondition(rms(0, 0.020) == 0 && rms(0.300, 0.320) == 0, "At least 20 ms exact silence at each endpoint")
     for start in [0.020, 0.085] {
         precondition(rms(start, start + 0.001) < rms(start + 0.002, start + 0.006) * 0.4, "Soft attack")
         precondition(rms(start + 0.002, start + 0.015) * 0.5 > 0.05, "Clear at unchanged default 50% volume")
-        precondition(rms(start + 0.030, start + 0.050) < rms(start + 0.002, start + 0.015) * 0.02, "No long ring or noise bed")
     }
+    precondition(rms(0.050, 0.070) < rms(0.022, 0.035) * 0.02, "First tap retains approved short decay")
+    precondition((0.012...0.045).contains(rms(0.150, 0.230)), "Deliberately audible short chime after the second impact, not an invisible addition")
+    precondition(rms(0.230, 0.280) < rms(0.150, 0.200) * 0.5, "Chime decays rather than becoming a notification ring")
+    precondition(rms(0.290, 0.300) < 0.0005, "Smooth fade before final silence")
+    precondition(magnitude(1174.659, 0.150, 0.250) > magnitude(1450, 0.150, 0.250) * 8, "Intentional clean D6 harmonic energy in the tail")
     precondition(rms(0.070, 0.085) < 0.001, "Distinct quiet gap, not a fuzzy sustained click")
     // Full-window DFT bins give an approximate power spectrum without audio I/O.
     let powers = (1...Int(Double(StartCue.rate) * StartCue.duration / 2)).map { bin in pow(magnitude(Double(bin) / StartCue.duration, 0, StartCue.duration), 2) }
@@ -68,15 +72,10 @@ do {
     func power(_ low: Double, _ high: Double) -> Double {
         powers.enumerated().filter { (low..<high).contains(Double($0.offset + 1) / StartCue.duration) }.reduce(0) { $0 + $1.element }
     }
-    precondition(powers.max()! / total < 0.11, "Damped percussive body, not a sustained pure tone")
+    // A short pitched trail is intentional; the former no-pitch rule no longer applies.
     precondition(power(300, 4000) / total > 0.95, "Preserve approved tactile body, not unrelated high-passed fuzz")
     precondition(power(8000, 24000) / total < 0.001, "No harsh high-frequency hiss")
     precondition(power(0, 300) / total < 0.015, "No heavy bass thump")
-    func brightness(_ start: Double) -> Double {
-        let bins = (1...160).map { bin in pow(magnitude(Double(bin) * 50, start, start + 0.065), 2) }
-        return bins.dropFirst(40).reduce(0, +) / bins.reduce(0, +)
-    }
-    precondition(brightness(0.085) > brightness(0.020) * 1.1, "Second accent is subtly brighter, not merely louder")
     precondition(powers.max()! > powers.min()! * 100, "Filtered, nonconstant spectrum")
     print("Cue: \(samples.count) samples / \(StartCue.duration)s, peak \(peak), RMS \(level), max step \(steps.max()!), strongest bin \(powers.max()! / total)")
 }
@@ -182,4 +181,4 @@ precondition(activationPolicy() == Int32(NSApplication.ActivationPolicy.accessor
 precondition(!app.windows.first { $0 is NSPanel }!.isKeyWindow)
 overlay(0)
 app.setActivationPolicy(.prohibited)
-print("Native capsule geometry, state layout, nonactivation, shortcut matching and nonmusical cue passed without capture")
+print("Native capsule geometry, state layout, nonactivation, shortcut matching and double-tap chime cue passed without capture")

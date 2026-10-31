@@ -1,4 +1,4 @@
-"""Reproduce the approved double-tap with a livelier second tap.
+"""Reproduce the approved double-tap with a short original harmonic chime trail.
 
 Requires Python 3 + NumPy (generation only, not an app dependency).
 Original synthesis by HandsFree; no system or third-party audio assets.
@@ -50,6 +50,8 @@ def render(first, second, accent):
 
 
 def generate(reference=None):
+    global RNG
+    RNG = np.random.default_rng(20261030)
     # The audition generator consumed these three excitations before double-tap.
     # Preserve that RNG position, not a new seed or unrelated noise texture.
     for length in [.100, .047, .088]:
@@ -68,9 +70,24 @@ def generate(reference=None):
     # Same excitation/body; second texture cutoff +9.4% and level +1 dB only.
     # Keep original gain instead of normalizing away the accent (~7 dB headroom).
     brighter = impact(3500)
-    out = render(double, brighter, 10 ** (1 / 20)) * gain
+    body = render(double, brighter, 10 ** (1 / 20)) * gain
+    assert hashlib.sha256(np.rint(body * 32767).astype('<i2').tobytes()).hexdigest() == \
+        'a06aa064ba508173cc75ec560b3ccdc1db7db761d8fcc3d1eb5dd42fbfdd7a8e', \
+        'Preserve the complete approved 200 ms accented percussive body byte-for-byte'
+    out = np.zeros(round(.320 * SR))
+    out[:len(body)] = body
+    # One glassy harmonic bloom attached to the second impact, not a third tap.
+    # Leave both impact peaks intact; the soft bloom begins 10 ms after tap two.
+    t = np.arange(round(.205 * SR)) / SR
+    envelope = (1 - np.exp(-(t / .012) ** 2)) * np.exp(-t / .070)
+    envelope *= np.clip((.205 - t) / .035, 0, 1) ** 2
+    d6 = 1174.65907166963
+    shimmer = sum(level * np.sin(2 * np.pi * d6 * ratio * t)
+                  for ratio, level in [(1, 1), (1.5, .32), (2, .18)])
+    start = round(.095 * SR)
+    out[start:start + len(t)] += .115 * envelope * shimmer
     pcm = np.rint(out * 32767).astype('<i2')
-    assert np.max(np.abs(out)) < .46
+    assert np.max(np.abs(out)) < 10 ** (-6 / 20)
     assert np.all(pcm[:960] == 0) and np.all(pcm[-960:] == 0)
     return pcm
 
@@ -93,5 +110,5 @@ if __name__ == '__main__':
             wav.setsampwidth(2)
             wav.setframerate(SR)
             wav.writeframes(pcm.tobytes())
-    print(f'{path}: 200 ms, 65 ms spacing, peak {20*np.log10(np.max(np.abs(pcm.astype(float)))/32768):.2f} dBFS')
+    print(f'{path}: 320 ms, 65 ms impact spacing, 205 ms chime trail, peak {20*np.log10(np.max(np.abs(pcm.astype(float)))/32768):.2f} dBFS')
     print(f'SHA256 {hashlib.sha256(path.read_bytes()).hexdigest()}')
