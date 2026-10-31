@@ -1,5 +1,5 @@
 name: Bug report
-description: Something is not working in the current Mac beta
+description: Report a problem with the Mac or experimental Windows beta
 body:
   - type: markdown
     attributes:
@@ -9,14 +9,24 @@ body:
     id: version
     attributes:
       label: HandsFree version and source
-      placeholder: 0.1.0 beta, release tag or source commit
+      placeholder: App version, Mac/Windows release tag, or source commit
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS (Apple Silicon)
+        - Windows (x64 experimental beta)
+        - Other / source build
     validations:
       required: true
   - type: input
     id: environment
     attributes:
       label: Environment
-      placeholder: macOS version, Apple chip, affected app/version, microphone type
+      placeholder: OS version, CPU/chip, affected app/version, and microphone type
     validations:
       required: true
   - type: textarea

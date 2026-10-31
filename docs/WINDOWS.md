@@ -1,9 +1,13 @@
 # Experimental Windows beta
 
-**In development, not a verified public release.** The Windows backend and NSIS
-packaging are experimental. A successful hosted build is necessary, but does not
-prove that microphone capture, shortcuts, insertion, or installation work on a
-real PC. The published Apple Silicon Mac beta is unchanged.
+**[Download for Windows (.exe)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-windows-beta.1/HandsFree-0.1.1-windows-x64-setup.exe)**
+
+**Experimental · Windows 10/11 x64 · CPU · English.** Public beta
+[`v0.1.1-windows-beta.1`](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-windows-beta.1)
+is available; not yet hardware-tested. Hosted Windows compilation, native tests,
+NSIS packaging and actual CPU model transcription passed. This does not prove
+live microphone, editor, clean-PC installation or SmartScreen behavior.
+The published Apple Silicon Mac beta and Homebrew are unchanged.
 
 ## For testers
 
@@ -14,14 +18,10 @@ establishes installation or dictation reliability.
 Use a supported, security-updated Windows installation (Windows 10 may require
 ESU). CPU-only transcription may be substantially slower than Mac Metal.
 
-There is **no public Windows installer link yet**. Maintainers can retrieve a
-candidate from the [Windows beta candidate workflow](https://github.com/suhaasbadada/handsfree/actions/workflows/windows.yml)
-after its checks pass. GitHub may require login to download an Actions artifact;
-it expires after 14 days. This internal artifact container is not the installer.
-Extract it, then use `HandsFree-0.1.1-windows-x64-setup.exe`. Only trust a candidate
-from an expected commit and successful workflow run. Read `PROVENANCE.txt`,
-`LICENSE`, and `THIRD_PARTY_NOTICES` alongside it. Maintainers must not advertise
-an available download until the actual installer has been verified.
+Download the EXE above directly; no GitHub account, Actions ZIP or developer
+tools are needed. Read the release's `PROVENANCE.txt`, `POST-BUNDLE-AUDIT.txt`,
+`APP-DEPENDENCIES.json`, and license. Dependency notices and corresponding source
+are bundled with the app; the release also provides `THIRD_PARTY_SOURCES.tar.gz`.
 
 Compare the installer against `SHA256SUMS` in PowerShell:
 
@@ -30,6 +30,8 @@ Get-FileHash .\HandsFree-0.1.1-windows-x64-setup.exe -Algorithm SHA256
 ```
 
 A matching hash checks integrity against that file, not the publisher's identity.
+For this exact installer, SHA-256 is
+`9e851cd194101e512970c34d94976d547b8e2b30d58409570d10e565e74677b5`.
 This beta is **unsigned**: SmartScreen may warn about an unknown publisher. Only
 if you trust the official candidate and your organization's policy permits it,
 use **More info → Run anyway** when Windows offers it. If the option is absent,
@@ -39,18 +41,26 @@ The NSIS installer is per-user; it should not require administrator elevation
 for HandsFree itself. WebView2's Microsoft bootstrapper may need internet and
 additional permission if the runtime is absent. Do not run HandsFree elevated.
 Installation is not an automatic update to any existing app.
+The actual extracted beta.1 application was inspected as AMD64 PE32+ with
+31 direct imports, all Windows OS DLLs, and no MSVCP/VCRUNTIME or custom DLL
+dependency. No separate Visual C++ redistributable is needed for those inspected
+imports. This is evidence about this payload, not a guarantee about dynamic
+loading, all future builds, or every Windows installation. WebView2 is still required.
 
 ## First run and privacy
 
 1. Open HandsFree and its Settings. Enable microphone access for desktop apps in
    **Windows Settings → Privacy & security → Microphone** (Windows 11), or
    **Privacy → Microphone** (Windows 10). Choose a working default input device.
+   Mac Accessibility and Input Monitoring permissions do not apply on Windows.
 2. Explicitly download the English Whisper model (~148 MB from Hugging Face;
    checksum verified). Setup requires internet; transcription runs locally after
    download. No account or cloud transcription API is required.
 3. Focus a disposable text field in a normal, non-elevated app. The Windows
    default shortcut is **Ctrl+Shift+Space**; Fn / 🌐 is Mac-only. Tap once to start,
    speak briefly, then tap again to finish. **Escape** cancels recording.
+   The shared settings retain the two-minute default recording limit and
+   optional listening tones; use Settings to adjust them.
 4. Review the result. Speech recognition can make mistakes. Insertion is
    conservative: unsupported/custom editors, terminals, elevated windows,
    password fields, or changed focus may require manual paste or reject delivery.
@@ -105,8 +115,9 @@ normal and delay imports against an explicit Windows 10/11 OS DLL allowlist and
 `api-ms-win-`/`ext-ms-win-` API-set contracts. Unknown DLLs and redistributable
 CRT imports (including MSVCP140, VCRUNTIME140, and CONCRT140 variants) fail the
 build. No Microsoft redistributable DLLs are added. Do not broaden the allowlist
-without source evidence. The previous candidate's MSVCP140 import is not safe
-merely because Tauri statically links Rust's vcruntime.
+without source evidence. An earlier, unpublished candidate's MSVCP140 import
+was not safe merely because Tauri statically links Rust's vcruntime; the public
+beta.1 payload was separately inspected and has no such import.
 
 Outputs are under `release/windows-x64/`: an EXE, SHA-256 checksums, provenance,
 `APP-DEPENDENCIES.json` (actual app hash, architecture, normal/delay imports),
@@ -120,8 +131,8 @@ does not sign, publish a release, launch the app, record audio, or install anyth
 
 - Public `SHA256SUMS` covers exactly the five assets
   `HandsFree-0.1.1-windows-x64-setup.exe`, `APP-DEPENDENCIES.json`,
-  `PROVENANCE.txt`, `THIRD_PARTY_SOURCES.tar.gz`, and `LICENSE`. The planned
-  public release attaches those five files **plus `SHA256SUMS`**: six assets,
+  `PROVENANCE.txt`, `THIRD_PARTY_SOURCES.tar.gz`, and `LICENSE`. New candidates
+  attach those five files **plus `SHA256SUMS`**: six assets,
   no installer ZIP and no hundreds of individual notice attachments.
 - Internal `BUILD-SHA256SUMS` covers every CI artifact file, including the public
   manifest and hidden/nested notices, but excludes itself. It is not a public
@@ -134,11 +145,30 @@ Before publishing, verify the complete downloaded Actions artifact against
 The full notices and source remain inside the NSIS payload as well.
 A passing import gate establishes only direct/delay
 dependencies of that built app, not dynamic LoadLibrary behavior, installer
-operation, or clean-machine startup. Static C++ linkage is not verified until
-the real Windows build passes this gate; manual clean-PC acceptance remains
-required before distribution.
+operation, or clean-machine startup. The public beta.1 payload's imports were
+verified by extraction; future builds must pass this gate independently. The
+newer packaging/checksum pipeline at `1bb9112` does not change published beta.1
+bytes or retroactively establish a passing CI run for that newer commit.
 
-## Required manual acceptance before sharing
+## Published beta.1 provenance and verification
+
+The immutable installer was compiled from `1625d4874c15e2529b24adb04930bcd4efaf64df`.
+[Windows CI run 41191415412](https://github.com/suhaasbadada/handsfree/actions/runs/41191415412)
+passed full MSVC build/test/NSIS packaging and actual English-model CPU
+transcription, without microphone access. Source/packaged notices were reviewed.
+The published installer SHA above is unchanged from that build.
+
+The original CI metadata reported the raw pre-bundle EXE hash, not the
+Tauri-modified embedded app hash, and its artifact checksum listing omitted
+hidden notice files. The release transparently includes `POST-BUNDLE-AUDIT.txt`
+with the extracted payload's corrected hash and audit scope; original provenance
+is retained, not silently rewritten. Public `SHA256SUMS` covers six payload
+assets, including this audit, and is the seventh release asset. All seven were
+downloaded anonymously and verified by the publishing maintainer. The newer
+pipeline fixes future metadata/hidden-file coverage; it is independent of this
+release's post-bundle audit. No claim is made here about a later CI run's result.
+
+## Required manual acceptance before a hardware-tested label
 
 Record actual results, machine/OS details, commit, and installer hash. Do not mark
 unchecked items as passed. Automated CI does **not** perform these tests.
@@ -165,26 +195,25 @@ unchecked items as passed. Automated CI does **not** perform these tests.
 - [ ] Older supported x64 hardware: startup and CPU inference without illegal
       instructions; record timing rather than promising real-time transcription.
 
-Public release is a separate maintainer decision after build, notice review, and
-runtime acceptance. Keep Windows availability false on the website until then;
-never replace or hide the working Mac download to announce a Windows candidate.
+This public experimental release permits deliberate early testing; the unchecked
+hardware cases above remain outstanding, not waived or marked passed. Never
+replace or hide the working Mac download to announce a Windows beta.
 
 ## Website publication checklist (maintainers)
 
-The candidate distribution label is `v0.1.1-windows-beta.1`; the embedded app and
-installer version is `0.1.1`. `site/release.js` holds the candidate coordinates,
-but `windowsRelease.publicAvailable` stays **false**. A candidate URL in source
-is not evidence of a public release. Never use GitHub's `latest` endpoint for
-this prerelease.
+The public distribution label is `v0.1.1-windows-beta.1`; the embedded app and
+installer version is `0.1.1`. `site/release.js` has
+`windowsRelease.publicAvailable: true` after anonymous public asset verification.
+Never use GitHub's `latest` endpoint for this prerelease.
 
-After the release decision, verify the exact public, non-draft GitHub release
+For any future release decision, verify the exact public, non-draft GitHub release
 asset `HandsFree-0.1.1-windows-x64-setup.exe` (not an Actions ZIP), checksum, and
 provenance while logged out. Only then flip the Windows availability flag.
 The website accepts only the canonical GitHub repository URL, versioned Windows
 beta tag, and matching versioned x64 EXE name, without query strings or fragments.
 
-Update the static fallback in `site/index.html` at `windows-card-download`
-(direct EXE href; remove `aria-disabled` and `tabindex`; update label),
+Keep the static fallback in `site/index.html` at `windows-card-download`
+(direct EXE href; no `aria-disabled` or `tabindex`; download label),
 `windows-release-badge` (Experimental · x64), and `windows-release-status`
 (version, unsigned, not yet hardware-tested). Update its metadata descriptions
 and `noscript` copy, and the Windows status in this guide and README. Keep any

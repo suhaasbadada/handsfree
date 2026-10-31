@@ -5,6 +5,7 @@ import { release, windowsRelease } from '../site/release.js';
 
 const mac = { platform: 'MacIntel', userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', maxTouchPoints: 0 };
 const enabled = { ...release, publicAvailable: true };
+const windowsDisabled = { ...windowsRelease, publicAvailable: false };
 const cases = [
   ['Safari Apple Silicon with Intel UA', mac, {}, 'mac', 'unknown'],
   ['actual Intel with no hints is also unknown', mac, {}, 'mac', 'unknown'],
@@ -57,7 +58,7 @@ test('bad version, paths, schemas and truthy availability fail closed', () => {
       { ...enabled, dmgUrl: enabled.dmgUrl.replace('.dmg', '.zip') },
       { ...enabled, dmgUrl: `${enabled.dmgUrl}?token=secret` },
       { ...enabled, dmgUrl: enabled.dmgUrl.replace('github.com/', 'github.com.evil/') }]) {
-      assert.equal(downloadState(platform, manifest).url, null);
+      assert.equal(downloadState(platform, manifest, windowsDisabled).url, null);
     }
   }
 });
@@ -88,21 +89,22 @@ test('rendering transitions remove stale links and disabled state without click 
   assert.equal(document.getElementById('download-label').textContent, 'Download for Mac');
   assert.equal(cta.textContent, '', 'Parent/icon subtree is never replaced');
   assert.equal(cta.getAttribute('aria-label'), 'Download for Mac (Apple Silicon)');
-  renderDownload(document, { os: 'windows', arch: 'unknown' }, enabled);
+  renderDownload(document, { os: 'windows', arch: 'unknown' }, enabled, windowsDisabled);
   assert.equal(cta.href, enabled.dmgUrl);
   assert.equal(document.getElementById('download-label').textContent, 'Get Mac beta');
   assert.match(document.getElementById('download-platform-note').textContent, /Windows beta in testing/);
 });
 
-test('unverified Windows installers are never offered and public Mac stays available', () => {
-  assert.equal(windowsRelease.publicAvailable, false);
+test('public Windows coordinates are verified while unavailable fixtures still fail closed', () => {
+  assert.equal(windowsRelease.publicAvailable, true);
   assert.equal(windowsRelease.version, '0.1.1-windows-beta.1');
   assert.equal(windowsRelease.appVersion, '0.1.1');
-  assert.equal(publishedWindowsUrl(windowsRelease), null);
+  assert.equal(publishedWindowsUrl(windowsRelease), windowsRelease.installerUrl);
+  assert.equal(publishedWindowsUrl(windowsDisabled), null);
   assert.equal(release.publicAvailable, true);
   assert.equal(release.dmgUrl, 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.2/HandsFree-0.1.1-beta.2-macos-arm64.dmg');
   for (const arch of ['unknown', 'intel', 'arm64']) {
-    const state = downloadState({ os: 'windows', arch }, release);
+    const state = downloadState({ os: 'windows', arch }, release, windowsDisabled);
     assert.equal(state.url, release.dmgUrl);
     assert.equal(state.label, 'Get Mac beta');
     assert.match(state.note, /No verified installer available yet/);
@@ -140,7 +142,7 @@ test('independent Mac/Windows availability matrix with explicit cross-platform f
 test('Windows canonical URL validation fails closed for drafts, paths, extension and type confusion', () => {
   const candidate = { ...windowsRelease, publicAvailable: true };
   assert.equal(publishedWindowsUrl(candidate), windowsRelease.installerUrl);
-  for (const manifest of [null, {}, windowsRelease, { ...candidate, schemaVersion: 2 },
+  for (const manifest of [null, {}, windowsDisabled, { ...candidate, schemaVersion: 2 },
     { ...candidate, publicAvailable: 'true' }, { ...candidate, version: '../draft' },
     { ...candidate, version: ['0.1.1-windows-beta.1'] }, { ...candidate, version: Symbol('invalid') },
     { ...candidate, appVersion: ['0.1.1'] }, { ...candidate, appVersion: null },
@@ -184,7 +186,7 @@ test('availability revocation strips stale Windows and Mac hrefs from every cont
   renderDownload(document, platform, release, { ...windowsRelease, publicAvailable: true });
   assert.equal(document.getElementById('primary-download').href, windowsRelease.installerUrl);
   assert.equal(document.getElementById('primary-download').getAttribute('aria-label'), 'Download for Windows (x64 EXE)');
-  renderDownload(document, platform, { ...release, publicAvailable: false }, windowsRelease);
+  renderDownload(document, platform, { ...release, publicAvailable: false }, windowsDisabled);
   for (const id of ['primary-download', 'mac-card-download', 'secondary-mac-download', 'windows-card-download']) {
     const cta = document.getElementById(id);
     assert.equal(cta.href, undefined, id);

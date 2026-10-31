@@ -2,7 +2,7 @@
 
 ## Scope
 
-Prepare an experimental Windows x64 beta: the existing dashboard/settings,
+The experimental Windows x64 beta is [public](WINDOWS.md): existing dashboard/settings,
 local English transcription, Ctrl+Shift+Space or a custom global shortcut,
 recording controls, audio cues, safe insertion and clipboard fallback, and an
 NSIS EXE installer. Linux, cloud services, new models and UI redesigns are out
@@ -19,17 +19,24 @@ of scope. Fn remains a macOS-only option.
 
 ## Milestones
 
-1. Platform seam: native API selection, target dependencies, portable storage
+1. **Complete — platform seam:** native API selection, target dependencies, portable storage
    and target-specific configuration.
-2. Windows runtime: real microphone capture/resampling, registered shortcuts,
+2. **Complete — Windows runtime implementation:** real microphone capture/resampling, registered shortcuts,
    non-activating controls and conservative text delivery.
-3. Platform-aware settings: correct shortcut labels, microphone setup and
+3. **Complete — platform-aware settings:** correct shortcut labels, microphone setup and
    model download without macOS-only permission instructions.
-4. Windows CI: compile/test on a Windows runner and build a versioned NSIS
-   installer with checksums and provenance.
-5. Review, fix findings, and rerun Mac and Windows checks. Publish only artifacts
-   that passed the applicable build checks, labeled experimental and not yet
-   hardware-tested. Keep current Mac download available throughout.
+4. **Complete — review, native Windows CI, packaging and experimental publication:**
+   [run 41191415412](https://github.com/suhaasbadada/handsfree/actions/runs/41191415412)
+   passed full MSVC/native tests, NSIS build and real-model CPU transcription.
+   Public `v0.1.1-windows-beta.1` was built from `1625d4874c15e2529b24adb04930bcd4efaf64df`;
+   its seven public assets were anonymously verified. The post-bundle audit
+   transparently supplements original metadata without changing installer bytes.
+   Newer checksum/payload pipeline source `1bb9112` is independent; no later CI
+   result is claimed here. Mac beta and Homebrew remain unchanged.
+5. **Pending — manual hardware acceptance:** installation, microphone, actual
+   editors, clipboard, sound/HUD and SmartScreen checks in [the tester guide](WINDOWS.md).
+   Publication is experimental, not a hardware-tested label. Record real results
+   before claiming these cases passed; no scope expansion is required.
 
 ## Acceptance and boundaries
 

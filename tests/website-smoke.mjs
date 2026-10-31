@@ -72,13 +72,13 @@ try {
   assert.deepEqual(await evaluate(`({disabled:document.getElementById('primary-download').getAttribute('aria-disabled'), href:document.getElementById('primary-download').getAttribute('href')})`), {disabled:null,href:dmgUrl}, 'Published manifest offers a working direct download');
   await evaluate(`(async () => { window.downloadModule=await import('./download.js'); window.releaseModule=await import('./release.js'); })()`);
   for (const os of ['mac','windows','linux','mobile','unknown']) {
-    await evaluate(`window.downloadModule.renderDownload(document,{os:${JSON.stringify(os)},arch:'unknown'},{...window.releaseModule.release,publicAvailable:true})`);
+    await evaluate(`window.downloadModule.renderDownload(document,{os:${JSON.stringify(os)},arch:'unknown'},{...window.releaseModule.release,publicAvailable:true},{...window.releaseModule.windowsRelease,publicAvailable:false})`);
     const href = await evaluate(`document.getElementById('primary-download').getAttribute('href')`);
     assert.equal(href, dmgUrl, `${os}: Mac DMG remains available to every visitor`);
     assert.deepEqual(await evaluate(`({label:document.getElementById('download-label').textContent, name:document.getElementById('primary-download').getAttribute('aria-label'),icons:document.querySelectorAll('#primary-download svg.apple-logo[aria-hidden="true"] path').length})`),
       {label:os === 'mac' ? 'Download for Mac' : 'Get Mac beta', name:'Download for Mac (Apple Silicon)',icons:1});
     for (const manifest of ['{...window.releaseModule.release,publicAvailable:false}', '{...window.releaseModule.release,dmgUrl:"https://evil.invalid/bad.dmg"}']) {
-      await evaluate(`window.downloadModule.renderDownload(document,{os:${JSON.stringify(os)},arch:'unknown'},${manifest})`);
+      await evaluate(`window.downloadModule.renderDownload(document,{os:${JSON.stringify(os)},arch:'unknown'},${manifest},{...window.releaseModule.windowsRelease,publicAvailable:false})`);
       assert.equal(await evaluate(`document.getElementById('primary-download').hasAttribute('href')`), false, `${os}: unavailable/corrupt manifests fail closed`);
     }
   }

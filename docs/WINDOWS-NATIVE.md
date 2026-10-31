@@ -1,8 +1,9 @@
 # Windows native beta backend
 
-This documents source implementation, not a published or hardware-tested EXE.
-Windows 10/11 x64, desktop microphone access and WebView2 are required. The
-dashboard/website and hosted Windows CI are separate milestones.
+The [experimental Windows x64 beta is public](WINDOWS.md), not yet
+hardware-tested. Windows 10/11 x64, desktop microphone access and WebView2 are
+required. Hosted MSVC compilation, native tests, NSIS packaging and real-model
+CPU transcription passed; live microphone/editor/installer acceptance is pending.
 
 ## Platform boundary
 
@@ -137,7 +138,10 @@ Unix directory/file modes (0700/0600) and directory fsync remain in place.
 
 Automated compilation is not microphone, editor, installer or SmartScreen testing.
 
-## Verification performed on the Mac development host (2026-10-30)
+## Historical Mac-host verification (2026-10-30, before Windows CI)
+
+These early cross-target checks are historical, not the current Windows build
+status. The successful native MSVC run and published payload audit follow below.
 
 - `npm ci`, `npm test`: 108 passed (existing Swift SDK deprecation warnings).
 - `npm run build`: TypeScript and production Vite build passed.
@@ -157,13 +161,39 @@ Automated compilation is not microphone, editor, installer or SmartScreen testin
   tests. No production source contains that substitution.
 - Full `cargo check --target x86_64-pc-windows-gnu --tests` was attempted but
   blocked in `ring` because this Mac lacks `x86_64-w64-mingw32-gcc`. A real
-  Windows MSVC runner must build/test the complete app and installer next.
+  Windows MSVC runner was still required at this historical stage; it subsequently
+  passed the complete build described below.
 - `git diff --check` passed. Swift/native asset bytes, Mac Tauri configuration
   and signing script match the base commit. No installed app, speech models,
   microphone, credentials or user data were accessed or updated.
 
 Windows WASAPI, Win32/UIA editor behavior, clipboard restoration, sound playback,
 HUD input/DPI, NSIS installation and SmartScreen remain hardware/manual tests.
+
+## Native Windows verification and public beta.1 (2026-10-31)
+
+[CI run 41191415412](https://github.com/suhaasbadada/handsfree/actions/runs/41191415412)
+passed on source `1625d4874c15e2529b24adb04930bcd4efaf64df`: full MSVC app
+compilation, native tests, NSIS packaging and actual English-model CPU
+transcription, without microphone capture. These results supersede the earlier
+Mac-only inability to compile the full Windows app; they do not establish
+hardware/runtime acceptance.
+
+The public installer is immutable. Its actual extracted Tauri-bundled application
+was independently inspected as AMD64 PE32+, with 31 direct imports, all Windows
+OS DLLs, and no MSVCP/VCRUNTIME/custom DLL dependency. This inspected payload
+does not require a separate Visual C++ redistributable for those imports;
+WebView2 remains required. Dynamic loading and clean-machine launch are not
+proved by a PE import inspection.
+
+Original CI metadata used the raw cargo EXE hash and omitted hidden notices from
+its artifact hash listing. The public release preserves it and adds a transparent
+`POST-BUNDLE-AUDIT.txt` with the corrected embedded-payload hash and scope. Its
+public checksum manifest covers six payload assets; all seven public assets
+(including that manifest) were fetched anonymously and verified by the publishing
+maintainer. See [Windows provenance and installer SHA-256](WINDOWS.md#published-beta1-provenance-and-verification).
+Newer source `1bb9112` fixes future post-bundle metadata and hidden-file checksum
+coverage; it does not alter published bytes, and no later CI success is asserted.
 
 ### Independent-review fixes
 

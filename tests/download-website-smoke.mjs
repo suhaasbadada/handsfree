@@ -15,14 +15,14 @@ const profile = await mkdtemp(join(tmpdir(), 'handsfree-download-smoke-'));
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
-    const enabled = url.pathname.startsWith('/enabled/');
-    const relative = url.pathname.replace(/^\/(?:enabled\/)?/, '') || 'index.html';
+    const disabled = url.pathname.startsWith('/disabled/');
+    const relative = url.pathname.replace(/^\/(?:disabled\/)?/, '') || 'index.html';
     const path = resolve(root, relative);
     if (!path.startsWith(root)) { res.writeHead(403).end(); return; }
     let body = await readFile(path);
-    if (enabled && relative === 'release.js') {
-      // Only the intercepted fixture is enabled; real source and on-disk HTML stay unavailable.
-      body = Buffer.from(body.toString().replace(/(export const windowsRelease[\s\S]*?publicAvailable:) false/, '$1 true'));
+    if (disabled && relative === 'release.js') {
+      // Fixture revokes the real public manifest, exercising removal of static/stale EXE links.
+      body = Buffer.from(body.toString().replace(/(export const windowsRelease[\s\S]*?publicAvailable:) true/, '$1 false'));
     }
     res.setHeader('Content-Type', ({ '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png' })[extname(path)] || 'application/octet-stream');
     res.end(body);
@@ -80,12 +80,12 @@ try {
   await send('Network.enable');
   await send('Page.setDownloadBehavior', { behavior: 'deny' });
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
-  async function navigate(path, os = 'Windows', architecture = 'x86') {
+  async function navigate(path, os = 'Windows', architecture = 'x86', bitness = '64') {
     const userAgent = os === 'Windows' ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140.0.0.0 Safari/537.36'
       : os === 'macOS' ? 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/140.0.0.0 Safari/537.36'
         : 'Mozilla/5.0 (X11; Linux x86_64) Chrome/140.0.0.0 Safari/537.36';
     await send('Emulation.setUserAgentOverride', { userAgent, platform: os === 'Windows' ? 'Win32' : os === 'macOS' ? 'MacIntel' : 'Linux x86_64',
-      userAgentMetadata: { brands: [], fullVersionList: [], platform: os, platformVersion: '10.0', architecture, bitness: '64', model: '', mobile: false } });
+      userAgentMetadata: { brands: [], fullVersionList: [], platform: os, platformVersion: '10.0', architecture, bitness, model: '', mobile: false } });
     await send('Page.navigate', { url: `${origin}${path}?case=${++sequence}` });
     let ready = false;
     for (let i = 0; i < 100; i++) {
@@ -96,13 +96,16 @@ try {
     assert.ok(ready, 'Page initialized');
   }
   const visible = id => `getComputedStyle(document.getElementById(${JSON.stringify(id)})).display !== 'none'`;
-  await navigate('/');
+  assert.equal(windowsRelease.publicAvailable, true);
+  await navigate('/disabled/');
   assert.equal(await evaluate(`document.getElementById('primary-download').getAttribute('href')`), release.dmgUrl);
   assert.equal(await evaluate(`document.getElementById('windows-card-download').hasAttribute('href')`), false);
   assert.match(await evaluate(`document.getElementById('windows-card-download').textContent`), /Build verification pending/);
   assert.equal(await evaluate(visible('primary-windows-icon')), false);
-  for (const [os, arch, winPrimary] of [['Windows', 'x86', true], ['Windows', '', true], ['Windows', 'arm', false], ['macOS', 'arm', false], ['Linux', 'x86', false]]) {
-    await navigate('/enabled/', os, arch);
+  for (const motion of ['reduce', 'no-preference']) {
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: motion }] });
+  for (const [os, arch, winPrimary, bitness] of [['Windows', 'x86', true, '64'], ['Windows', '', true, '64'], ['Windows', 'arm', false, '64'], ['Windows', 'x86', false, '32'], ['macOS', 'arm', false, '64'], ['Linux', 'x86', false, '64']]) {
+    await navigate('/', os, arch, bitness);
     assert.equal(await evaluate(`document.getElementById('primary-download').getAttribute('href')`), winPrimary ? windowsRelease.installerUrl : release.dmgUrl);
     assert.equal(await evaluate(visible('primary-windows-icon')), winPrimary);
     assert.equal(await evaluate(visible('primary-apple-icon')), !winPrimary);
@@ -112,15 +115,18 @@ try {
     assert.equal(await evaluate(`document.getElementById('windows-card-download').getAttribute('href')`), windowsRelease.installerUrl);
     assert.match(await evaluate(`document.getElementById('windows-release-status').textContent`), /Not yet hardware-tested/);
     if (os === 'Windows' && arch === 'arm') assert.match(await evaluate(`document.getElementById('download-platform-note').textContent`), /Windows ARM is unsupported/);
+    if (bitness === '32') assert.match(await evaluate(`document.getElementById('download-platform-note').textContent`), /32-bit Windows is unsupported/);
     const { nodes } = await send('Accessibility.getFullAXTree');
     assert.ok(nodes.some(node => node.role?.value === 'link' && node.name?.value === 'Download for Mac (Apple Silicon)'));
     assert.ok(nodes.some(node => node.role?.value === 'link' && node.name?.value === 'Download for Windows (x64 EXE)'));
     for (const width of [320, 390, 768, 1280]) {
       await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
       assert.equal(await evaluate(`document.documentElement.scrollWidth === document.documentElement.clientWidth`), true, `No overflow at ${width}px`);
+      assert.equal(await evaluate(`document.getElementById('primary-download').getBoundingClientRect().bottom < innerHeight`), true, `Primary above fold at ${width}px (${motion})`);
     }
   }
-  await navigate('/enabled/');
+  }
+  await navigate('/');
   await evaluate(`(async () => { const {renderDownload} = await import('./download.js'); const {release,windowsRelease} = await import('./release.js'); renderDownload(document,{os:'windows',arch:'unknown'},{...release,publicAvailable:false},{...windowsRelease,publicAvailable:false}); })()`);
   assert.equal(await evaluate(`['primary-download','secondary-mac-download','mac-card-download','windows-card-download'].every(id => { const a=document.getElementById(id); return !a.hasAttribute('href') && a.getAttribute('aria-disabled') === 'true'; })`), true);
   await send('Emulation.setScriptExecutionDisabled', { value: true });
@@ -130,10 +136,17 @@ try {
     await delay(30);
   }
   assert.equal(await evaluate(`document.getElementById('primary-download').getAttribute('href')`), release.dmgUrl, 'Static Mac download works without JS');
-  assert.equal(await evaluate(`document.getElementById('windows-card-download').hasAttribute('href')`), false, 'Static Windows remains unavailable');
+  assert.equal(await evaluate(`document.getElementById('windows-card-download').getAttribute('href')`), windowsRelease.installerUrl, 'Static Windows x64 card offers the public EXE without JS');
+  for (const motion of ['reduce', 'no-preference']) {
+    await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: motion }] });
+    for (const width of [320, 390, 768, 1280]) {
+      await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+      assert.equal(await evaluate(`document.documentElement.scrollWidth === document.documentElement.clientWidth`), true, `No-JS fits at ${width}px (${motion})`);
+    }
+  }
   assert.deepEqual(errors, []);
   assert.equal(requests.some(url => /github\.com|\.(?:exe|dmg)(?:[?#]|$)/.test(url)), false, 'No automatic installer requests or GitHub API dependency');
-  console.log('Download website smoke passed: real disabled page, enabled fixture, Windows x64/unknown/ARM, Mac, Linux, icons, AX names, viewport widths, stale href revocation, no-JS and no auto-download.');
+  console.log('Download website smoke passed: real public page, disabled fixture, Windows x64/unknown/ARM/32-bit, Mac, Linux, icons, AX names, four viewport widths, normal/reduced motion, stale href revocation, no-JS and no auto-download.');
 } finally {
   socket?.close();
   browser.kill();
