@@ -29,7 +29,19 @@ pub struct Store {
     pub sound_style: String,
     pub sounds: bool,
     pub sound_volume: f32,
+    #[serde(deserialize_with = "read_recording_limit")]
+    pub recording_limit: u32,
     pub stats: Stats,
+}
+fn read_recording_limit<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<u32, D::Error> {
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(value
+        .as_u64()
+        .and_then(|n| u32::try_from(n).ok())
+        .filter(|n| validate_recording_limit(*n).is_ok())
+        .unwrap_or(120))
 }
 fn read_shortcut<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
@@ -49,6 +61,7 @@ impl Default for Store {
             sound_style: "tap".into(),
             sounds: false,
             sound_volume: 50.0,
+            recording_limit: 120,
             stats: Stats::default(),
         }
     }
@@ -58,6 +71,9 @@ pub fn load(path: &Path) -> Result<Store, String> {
         Ok(bytes) => {
             let mut store: Store = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
             store.sound_volume = store.sound_volume.clamp(0.0, 100.0);
+            if validate_recording_limit(store.recording_limit).is_err() {
+                store.recording_limit = 120;
+            }
             if store.shortcut.validate().is_err() {
                 store.shortcut = Default::default();
             }
@@ -111,10 +127,46 @@ pub fn validate_volume(volume: f32) -> Result<(), String> {
     }
     Ok(())
 }
+pub fn validate_recording_limit(seconds: u32) -> Result<(), String> {
+    if ![120, 180, 240, 300].contains(&seconds) {
+        return Err("Recording limit must be 2, 3, 4, or 5 minutes.".into());
+    }
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn duration_default_validation_and_roundtrip() {
+        assert_eq!(
+            serde_json::from_str::<Store>("{}").unwrap().recording_limit,
+            120
+        );
+        for seconds in [0, 60, 119, 121, 301, u32::MAX] {
+            assert!(validate_recording_limit(seconds).is_err());
+        }
+        for invalid in ["60", "301", "-1", "null", "\"300\"", "120.5"] {
+            let store: Store = serde_json::from_str(&format!(
+                r#"{{"recording_limit":{invalid},"sounds":true,"stats":{{"words":17}}}}"#
+            ))
+            .unwrap();
+            assert_eq!(store.recording_limit, 120);
+            assert!(store.sounds);
+            assert_eq!(store.stats.words, 17);
+        }
+        for seconds in [120, 180, 240, 300] {
+            assert!(validate_recording_limit(seconds).is_ok());
+            let s = Store {
+                recording_limit: seconds,
+                ..Store::default()
+            };
+            assert_eq!(
+                serde_json::from_str::<Store>(&serde_json::to_string(&s).unwrap()).unwrap(),
+                s
+            );
+        }
+    }
     #[test]
     fn silent_defaults_preserve_explicit_sound_preferences() {
         assert!(!Store::default().sounds);

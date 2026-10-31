@@ -4,7 +4,7 @@ import './typography.css';
 import { shortcutFromEvent, type Shortcut } from './shortcut';
 import { phaseLabel, canCancel, formatTime, readiness, readinessDetail } from './presentation';
 
-type Status = { phase: string; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: string; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
+type Status = { phase: string; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: string; recording_limit: number; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
 const logo = new URL('../src-tauri/icons/icon.png', import.meta.url).href;
 document.querySelector('#app')!.innerHTML = `
 <div class="shell">
@@ -23,6 +23,7 @@ document.querySelector('#app')!.innerHTML = `
   <div class="settings-intro"><h1 id="settings-title">Settings</h1></div>
   <section class="card preferences" aria-labelledby="preferences-title"><h2 id="preferences-title">Preferences</h2>
    <div class="setting-row"><div><h3>Shortcut</h3></div><kbd id="saved-shortcut">Fn</kbd><button id="change-shortcut" aria-haspopup="dialog">Change…</button></div>
+   <div class="setting-row"><div><h3><label for="recording-limit">Recording limit</label></h3></div><select id="recording-limit" title="Applies to the next recording"><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="240">4 minutes</option><option value="300">5 minutes</option></select></div>
     <div class="setting-row listening-row"><div><h3>Listening sound <span id="sound-state" class="state">Off</span></h3></div><div class="sound-selection"><button id="preview-sound" disabled>Preview</button></div><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Listening sound"><span aria-hidden="true"></span></label></div>
    <details class="sound-options"><summary>Sound options</summary><div class="sound-controls"><label for="sound-volume">Volume</label><input id="sound-volume" type="range" min="0" max="100" step="1" value="50" aria-describedby="volume-percent"><output id="volume-percent" for="sound-volume">50%</output></div><p class="subtle">If Bluetooth delays listening, turn the cue off.</p></details>
   </section>
@@ -35,7 +36,7 @@ document.querySelector('#app')!.innerHTML = `
    </div>
    <details class="setup-details"><summary>Setup details</summary><p id="setup-detail" class="subtle">Checking…</p><p class="subtle">Enable HandsFree in System Settings → Privacy & Security for missing permissions. If the shortcut is disconnected, quit and reopen the app.</p><p class="subtle">Whisper base.en · Verified download from Hugging Face. Transcription works offline after setup.</p></details>
   </section>
-   <section class="local-data" aria-labelledby="data-title"><h2 id="data-title">Local data</h2><div class="setting-row"><div><h3>Usage totals</h3><p>Counts and estimates, saved on this Mac.</p></div><button id="reset" class="danger">Reset totals…</button></div><details><summary>Privacy</summary><p class="subtle">Audio stays on this Mac and is deleted after completion, cancellation, or normal quit. A crash can leave temporary audio until the next launch. The last transcript stays in memory until you quit. No telemetry or transcript history. Paste briefly uses the clipboard; clipboard managers may retain it.</p></details></section>
+    <section class="local-data" aria-labelledby="data-title"><h2 id="data-title">Local data</h2><div class="setting-row"><div><h3>Usage totals</h3><p>Counts and estimates, saved on this Mac.</p></div><button id="reset" class="danger">Reset totals…</button></div><details><summary>Privacy</summary><p class="subtle">Audio is processed in memory on this Mac, not saved as recordings. The last transcript stays in memory until you quit. No telemetry or transcript history. Paste briefly uses the clipboard; clipboard managers may retain it.</p></details></section>
  </section>
  <section class="status" aria-label="App status"><span id="dot"></span><div><strong id="phase">Connecting…</strong><p id="message" aria-live="polite"></p></div><button id="cancel" hidden>Cancel</button></section>
  <p id="feedback" class="feedback" role="status" hidden></p><p id="storage-error" class="feedback" role="status" hidden></p>
@@ -47,13 +48,14 @@ document.querySelector('#app')!.innerHTML = `
 const el = (id: string) => document.getElementById(id)!;
 const button = (id: string) => el(id) as HTMLButtonElement;
 // Avoid presenting native actions as ready before the first backend response.
-for (const id of ['change-shortcut', 'mic', 'permissions', 'download', 'reset', 'sounds', 'sound-volume']) {
+for (const id of ['change-shortcut', 'mic', 'permissions', 'download', 'reset', 'sounds', 'sound-volume', 'recording-limit']) {
   (el(id) as HTMLInputElement | HTMLButtonElement).disabled = true;
 }
 let current: Status | undefined;
 let refreshing = false;
 let soundsPending = false;
 let volumePending = false;
+let limitPending = false;
 let volumeEditing = false;
 let previewPending = false;
 let shortcutPending = false;
@@ -138,6 +140,14 @@ el('download').onclick = () => void action('download_model');
 el('cancel').onclick = () => void action('cancel');
 el('copy').onclick = async () => { if (await action('copy_transcript')) feedback('Copied. Paste it wherever you need it.'); };
 const sounds = el('sounds') as HTMLInputElement;
+const recordingLimit = el('recording-limit') as HTMLSelectElement;
+recordingLimit.onchange = async () => {
+  if (limitPending) return;
+  limitPending = true; recordingLimit.disabled = true;
+  const success = await action('set_recording_limit', { seconds: Number(recordingLimit.value) });
+  if (!success) recordingLimit.value = String(current?.recording_limit ?? 120);
+  limitPending = false; recordingLimit.disabled = false;
+};
 // Commit once on release/key change, not on every pointer movement. Keep the
 // percentage local during a drag so background status polls cannot reset it.
 const volume = el('sound-volume') as HTMLInputElement;
@@ -179,6 +189,7 @@ async function refresh() {
     button('reset').disabled = false;
     if (!soundsPending) sounds.disabled = false;
     if (!volumePending) volume.disabled = false;
+    if (!limitPending) { recordingLimit.disabled = false; recordingLimit.value = String(current.recording_limit ?? 120); }
     const requests = (current as Status & { permission_requests?: number }).permission_requests ?? 0;
     if (requests !== seenPermissionRequests) { seenPermissionRequests = requests; navigate('settings'); }
     el('phase').textContent = current.phase === 'idle' && !readiness(current) ? 'Setup needed' : phaseLabel(current.phase);

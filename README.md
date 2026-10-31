@@ -51,7 +51,9 @@ No Windows/Linux release dates are promised. The current Mac implementation live
 
 ### Start dictating
 
-Select a text field in another app. Briefly tap **Fn / 🌐**, speak after the optional listening cue, then tap again to finish. **Escape** cancels. At two minutes, recording stops and transcribes automatically.
+Select a text field in another app. Briefly tap **Fn / 🌐**, speak after the optional listening cue, then tap again to finish. **Escape** cancels. The recording limit defaults to **2 minutes**; choose **2, 3, 4, or 5 minutes** in Settings for your next recording. At the limit, recording finishes automatically.
+
+Transcription begins privately in the background at natural pauses after enough audio has accumulated. Finish delivers one complete transcript, never partial text. This can reduce the final wait when you pause; uninterrupted speech remains one chunk and still needs transcription after Finish. Pause detection uses audio energy, not recognized words or punctuation.
 
 For Fn, set macOS Keyboard → **“Press 🌐 key to” → Do Nothing** and disable conflicting Fn/double-Fn Dictation shortcuts. Some external keyboards do not expose Fn; choose another shortcut instead. Avoid conflicts with the foreground app.
 
@@ -61,7 +63,7 @@ If automatic insertion is unavailable, the transcript is **Copied** for manual p
 
 Whisper can omit fillers, alter punctuation, or hallucinate. This is not guaranteed verbatim transcription: **review important text**. Automatic insertion depends on app Accessibility support; hardware, permissions, audio routing, Spaces, and individual editors still need real-world testing. No cloud fallback, translation, login auto-start, or automatic updater is included. Updates are manual: quit the app, replace the Applications copy, then reopen; macOS may require reauthorization.
 
-Audio is temporarily stored locally and deleted after completion/cancel/normal quit; a crash can leave it until next launch. The last transcript stays in process memory, not a history database. Only aggregate usage and settings persist alongside the model. See [detailed behavior, diagnostics, troubleshooting, and privacy](docs/DEVELOPMENT.md).
+Audio is processed in memory on this Mac, not saved as recordings. The last transcript stays in process memory, not a history database. Only aggregate usage and settings persist alongside the model. See [detailed behavior, diagnostics, troubleshooting, and privacy](docs/DEVELOPMENT.md).
 
 ## Development & help
 

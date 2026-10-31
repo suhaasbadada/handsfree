@@ -2,6 +2,7 @@ use std::{env, path::PathBuf, process::Command};
 fn main() {
     println!("cargo:rerun-if-changed=native/Bridge.swift");
     println!("cargo:rerun-if-changed=native/PastePolicy.swift");
+    println!("cargo:rerun-if-changed=native/AudioCapture.swift");
     let out = PathBuf::from(env::var("OUT_DIR").unwrap());
     let sdk = Command::new("xcrun")
         .args(["--show-sdk-path"])
@@ -26,6 +27,7 @@ fn main() {
             "arm64-apple-macosx14.0",
             "native/Bridge.swift",
             "native/PastePolicy.swift",
+            "native/AudioCapture.swift",
             "-o",
         ])
         .arg(out.join("libHandsfreeNative.a"))

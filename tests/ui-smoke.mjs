@@ -53,10 +53,22 @@ try {
   assert.equal(await evaluate(`['change-shortcut','mic','permissions','download','reset','sounds','sound-volume'].every(id=>document.getElementById(id).disabled)`), true, 'Native controls are unavailable before the backend connects');
   await evaluate(`window.calls = []; window.fixture = {phase:'idle',message:'Select a text field and press Fn.', progress:0,model_ready:true,microphone:true,accessibility:true,input_monitoring:true,hotkey:true,transcript:'',sounds:true,sound_volume:50,sound_style:'tap',shortcut:{code:'Fn',modifiers:0},shortcut_label:'Fn',stats:{words:0,transcriptions:0,speech_seconds:0,saved_seconds:0},persistence_error:''}; window.__TAURI_INTERNALS__ = { invoke: async (command,args) => { window.calls.push({command,args}); if(command==='status') return structuredClone(window.fixture); if(command==='set_sounds') window.fixture.sounds=args.enabled; if(command==='set_sound_style') window.fixture.sound_style=args.style; if(command==='set_shortcut'){if(window.rejectShortcut) throw 'Could not save shortcut'; window.fixture.shortcut=args.shortcut;window.fixture.shortcut_label=args.shortcut.code==='Fn'?'Fn':args.shortcut.code==='Space'?'Option + Space':'Control + Shift + J';} if(command==='reset_stats') window.fixture.stats={words:0,transcriptions:0,speech_seconds:0,saved_seconds:0}; } }; document.getElementById('feedback').hidden=true;`);
   await until(`document.getElementById('ready-title').textContent.includes('You’re ready')`);
+  // Duration saves independently of sound/shortcut, rolls back failed writes,
+  // and reflects refreshed persisted values without starting capture.
+  await evaluate(`window.fixture.recording_limit=120; const limitInvoke=window.__TAURI_INTERNALS__.invoke; window.__TAURI_INTERNALS__.invoke=async(command,args)=>{ if(command==='set_recording_limit'){if(window.rejectLimit)throw 'Could not save recording limit';window.fixture.recording_limit=args.seconds;} return limitInvoke(command,args); };`);
   assert.equal(await evaluate(`document.getElementById('copy').disabled`), true);
   await evaluate(`document.getElementById('nav-settings').click()`);
   assert.equal(await evaluate(`document.getElementById('overview').hidden && !document.getElementById('settings').hidden`), true);
   assert.equal(await evaluate(`document.querySelector('.readiness').hidden`), true, 'No readiness card when ready');
+  await until(`!document.getElementById('recording-limit').disabled`);
+  assert.deepEqual(await evaluate(`Array.from(document.getElementById('recording-limit').options,o=>o.value)`), ['120','180','240','300']);
+  await evaluate(`document.getElementById('recording-limit').value='300'; document.getElementById('recording-limit').dispatchEvent(new Event('change'))`);
+  await until(`window.fixture.recording_limit===300 && !document.getElementById('recording-limit').disabled`);
+  await evaluate(`window.rejectLimit=true; document.getElementById('recording-limit').value='180'; document.getElementById('recording-limit').dispatchEvent(new Event('change'))`);
+  await until(`document.getElementById('feedback').textContent.includes('Could not save recording limit') && !document.getElementById('recording-limit').disabled`);
+  assert.equal(await evaluate(`document.getElementById('recording-limit').value`), '300', 'Failed duration write rolls back');
+  await evaluate(`window.rejectLimit=false;window.fixture.recording_limit=240`);
+  await until(`document.getElementById('recording-limit').value==='240'`);
   assert.equal(await evaluate(`document.getElementById('setup-state').textContent==='Ready' && document.getElementById('setup-missing').hidden`), true, 'Ready setup is a single row, details optional');
   assert.equal(await evaluate(`document.getElementById('shortcut-dialog').open || document.querySelector('.sound-options').open`), false, 'Advanced controls are out of the way');
   await evaluate(`document.getElementById('change-shortcut').click()`);
@@ -181,7 +193,7 @@ try {
       await evaluate(`document.getElementById('close-shortcut').click()`);
     }
   }
-  console.log('UI smoke passed: compact ready settings, missing setup/download progress, shortcut dialog focus/Escape/timeout/presets/validation/save failure, single cue without selector/autoplay, toggle/volume/idle-only preview, reset, counts, safe transcript/copy, light/dark responsive layout. No microphone capture or screenshots.');
+  console.log('UI smoke passed: recording limit save/rollback/refresh, compact ready settings, missing setup/download progress, shortcut dialog focus/Escape/timeout/presets/validation/save failure, single cue without selector/autoplay, toggle/volume/idle-only preview, reset, counts, safe transcript/copy, light/dark responsive layout. No microphone capture or screenshots.');
 } finally {
   socket?.close();
   browser.kill('SIGTERM');

@@ -143,20 +143,6 @@ impl FnGesture {
     }
 }
 
-pub fn usable_audio(samples: &[f32]) -> bool {
-    if samples.len() < 6400 {
-        return false;
-    }
-    // Require at least 120ms above the quiet-room noise floor, not just one click.
-    samples
-        .chunks(320)
-        .filter(|chunk| {
-            (chunk.iter().map(|s| s * s).sum::<f32>() / chunk.len() as f32).sqrt() > 0.008
-        })
-        .count()
-        >= 6
-}
-
 /// Explicit overlay/timeout finish can never toggle an idle session back on.
 pub fn can_finish(phase: &str, current: u64, requested: Option<u64>) -> bool {
     phase == "recording" && requested.is_none_or(|generation| generation == current)
@@ -277,15 +263,6 @@ mod tests {
             gesture.event(1, now);
             assert!(gesture.event(2, now + Duration::from_millis(100)));
         }
-    }
-    #[test]
-    fn rejects_silence_clicks_and_short_audio() {
-        assert!(!usable_audio(&vec![0.0; 16000]));
-        assert!(!usable_audio(&vec![0.1; 1000]));
-        let mut click = vec![0.0; 16000];
-        click[100] = 1.;
-        assert!(!usable_audio(&click));
-        assert!(usable_audio(&vec![0.02; 16000]));
     }
     #[test]
     fn insertion_preserves_fillers_but_never_control_characters() {

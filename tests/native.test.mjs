@@ -6,6 +6,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+test('memory capture converter drains hardware-rate stereo and bounds producer backlog without a microphone', { skip: process.platform !== 'darwin' }, () => {
+  const directory = mkdtempSync(join(tmpdir(), 'handsfree-capture-'));
+  const root = fileURLToPath(new URL('../', import.meta.url));
+  try {
+    const sdk = execFileSync('xcrun', ['--show-sdk-path'], { encoding: 'utf8' }).trim();
+    const binary = join(directory, 'capture-tests');
+    execFileSync('swiftc', ['-O', '-sdk', sdk, '-Xcc', `-I${sdk}/usr/include`, '-swift-version', '5',
+      join(root, 'src-tauri/native/AudioCapture.swift'), join(root, 'tests/native-capture/main.swift'), '-o', binary]);
+    assert.match(execFileSync(binary, { encoding: 'utf8', timeout: 10000 }), /bounded overload passed without microphone/);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
 test('compact capsule, native shortcuts and nonmusical cue signal with idle-only preview guards', { skip: process.platform !== 'darwin' }, () => {
   const directory = mkdtempSync(join(tmpdir(), 'handsfree-capsule-'));
   const root = fileURLToPath(new URL('../', import.meta.url));
@@ -14,7 +26,7 @@ test('compact capsule, native shortcuts and nonmusical cue signal with idle-only
     const binary = join(directory, 'capsule-tests');
     // Optimize the DFT signal checks; -O retains Swift preconditions.
     execFileSync('swiftc', ['-O', '-sdk', sdk, '-Xcc', `-I${sdk}/usr/include`, '-swift-version', '5',
-      join(root, 'src-tauri/native/Bridge.swift'), join(root, 'src-tauri/native/PastePolicy.swift'),
+      join(root, 'src-tauri/native/Bridge.swift'), join(root, 'src-tauri/native/PastePolicy.swift'), join(root, 'src-tauri/native/AudioCapture.swift'),
       join(root, 'tests/native-capsule/main.swift'), '-o', binary]);
     assert.match(execFileSync(binary, { encoding: 'utf8', timeout: 10000 }), /Native capsule geometry, state layout, nonactivation, shortcut matching and nonmusical cue passed without capture/);
   } finally {
@@ -43,7 +55,7 @@ test('native paste/copy guard cancellation; fallback survives restore timers and
     const sdk = execFileSync('xcrun', ['--show-sdk-path'], { encoding: 'utf8' }).trim();
     const binary = join(directory, 'delivery-tests');
     execFileSync('swiftc', ['-sdk', sdk, '-Xcc', `-I${sdk}/usr/include`, '-swift-version', '5',
-      join(root, 'src-tauri/native/Bridge.swift'), join(root, 'src-tauri/native/PastePolicy.swift'),
+      join(root, 'src-tauri/native/Bridge.swift'), join(root, 'src-tauri/native/PastePolicy.swift'), join(root, 'src-tauri/native/AudioCapture.swift'),
       join(root, 'tests/native-delivery/main.swift'), '-o', binary]);
     const output = execFileSync(binary, { encoding: 'utf8', timeout: 10000 });
     assert.match(output, /Native queued-main cancellation boundary passed/);

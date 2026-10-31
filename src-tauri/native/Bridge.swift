@@ -28,7 +28,7 @@ private var callback: Callback?
 private var tap: CFMachPort?
 private var source: CFRunLoopSource?
 private var hookReason: Int32 = 0 // 0 unattempted, 1 connected, 2 permission, 3 port, 4 source, 5 disabled
-private var recorder: AVAudioRecorder?
+private var recorder: AudioCapture?
 private var meter: Timer?
 private var panel: NSPanel?
 private var pill: PillView?
@@ -442,8 +442,7 @@ private func validateTarget() -> PasteResult {
     return fieldStatus(now)
 }
 
-@_cdecl("hf_record") public func record(_ path: UnsafePointer<CChar>, _ epoch: UInt64, _ allowed: @convention(c) (UInt64) -> Bool) -> Bool {
-    let file = String(cString: path)
+@_cdecl("hf_record") public func record(_ generation: UInt64, _ epoch: UInt64, _ allowed: @convention(c) (UInt64) -> Bool, _ sink: @escaping @convention(c) (UInt64, UInt64, UnsafePointer<Float>?, Int32) -> Void) -> Bool {
     return main {
         guard allowed(epoch) else { return false }
         guard permissions() & 3 == 3, recorder == nil else { return false }
@@ -461,9 +460,7 @@ private func validateTarget() -> PasteResult {
             }
         }
         do {
-            let r = try AVAudioRecorder(url: URL(fileURLWithPath: file), settings: [AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 16000, AVNumberOfChannelsKey: 1, AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false])
-            r.isMeteringEnabled = true
-            guard r.prepareToRecord() else { clearTarget(); return false }
+            let r = try AudioCapture(generation: generation, epoch: epoch, sink: sink)
             guard allowed(epoch) else { clearTarget(); return false }
             let previewWasPlaying = cue?.isPlaying == true
             cue?.stop()
@@ -494,7 +491,8 @@ private func validateTarget() -> PasteResult {
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + quietTail) {
                     guard captureAllowed() else { return }
-                    if !r.record() { recorder = nil; audioBusy = false; clearTarget(); callback?(4) }
+                    do { try r.start() }
+                    catch { recorder = nil; audioBusy = false; clearTarget(); sink(generation, epoch, nil, -1) }
                 }
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + cueLength, execute: awaitCueCompletion)
@@ -537,8 +535,7 @@ private func validateTarget() -> PasteResult {
             meter = Timer.scheduledTimer(withTimeInterval: 1.0/30.0, repeats: true) { timer in
                 guard overlayGeneration == generation else { timer.invalidate(); return }
                 if phase == 1 {
-                    recorder?.updateMeters()
-                    let db = recorder?.averagePower(forChannel: 0) ?? -60
+                    let db = recorder?.level() ?? -60
                     pill?.level = CGFloat(max(0, min(1, (db + 55) / 45)))
                 } else if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
                     pill?.needsDisplay = true; timer.invalidate(); meter = nil; return

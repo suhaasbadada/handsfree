@@ -3,6 +3,7 @@ mod cancellation;
 mod logic;
 mod shortcut;
 mod storage;
+mod streaming;
 use futures_util::StreamExt;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -13,7 +14,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicU32, Ordering},
-        Mutex, OnceLock,
+        Arc, Mutex, OnceLock,
     },
     time::{Duration, Instant},
 };
@@ -42,9 +43,10 @@ unsafe extern "C" {
     fn hf_hook_state() -> i32;
     fn hf_hook_reason() -> i32;
     fn hf_record(
-        path: *const std::ffi::c_char,
+        generation: u64,
         epoch: u64,
         allowed: extern "C" fn(u64) -> bool,
+        sink: extern "C" fn(u64, u64, *const f32, i32),
     ) -> bool;
     fn hf_sounds(enabled: bool);
     fn hf_sound_volume(volume: f32);
@@ -75,6 +77,27 @@ static CONTROLS: OnceLock<std::sync::mpsc::Sender<(Control, u64)>> = OnceLock::n
 static DIAGNOSTIC_WRITE: Mutex<()> = Mutex::new(());
 static EXECUTABLE_HASH: OnceLock<String> = OnceLock::new();
 static PERMISSION_REQUESTS: AtomicU32 = AtomicU32::new(0);
+// Separate from Inner: native conversion callbacks must never acquire app state.
+static INGRESS: Mutex<streaming::Slot> = Mutex::new(streaming::Slot::new());
+extern "C" fn capture_audio(generation: u64, epoch: u64, samples: *const f32, count: i32) {
+    let Some(session) = INGRESS.lock().unwrap().get(generation, epoch) else {
+        return;
+    };
+    if !CANCELLATION.allows(epoch) {
+        return;
+    }
+    if count < 0 {
+        session.finish(Some(
+            "Microphone capture failed. Please check your input device.".into(),
+        ));
+        enqueue_at(Control::Finish(Some(generation)), epoch);
+    } else if count > 0 && !samples.is_null() {
+        // Native owns this slice only for the duration of the callback.
+        if session.push(unsafe { std::slice::from_raw_parts(samples, count as usize) }) {
+            enqueue_at(Control::Finish(Some(generation)), epoch);
+        }
+    }
+}
 extern "C" fn delivery_allowed(epoch: u64) -> bool {
     CANCELLATION.allows(epoch)
 }
@@ -82,6 +105,7 @@ enum Control {
     Toggle,
     Cancel,
     Finish(Option<u64>),
+    Complete(Arc<streaming::Session>, Result<String, String>),
 }
 fn enqueue(control: Control) {
     // Invalidate before touching the state mutex or waiting for FIFO execution.
@@ -112,6 +136,7 @@ struct Status {
     sounds: bool,
     sound_volume: f32,
     sound_style: String,
+    recording_limit: u32,
     shortcut: shortcut::Shortcut,
     shortcut_label: String,
     stats: storage::Stats,
@@ -321,6 +346,23 @@ async fn set_sounds(enabled: bool) -> Result<(), String> {
     .map_err(|e| e.to_string())?
 }
 #[tauri::command]
+async fn set_recording_limit(seconds: u32) -> Result<(), String> {
+    storage::validate_recording_limit(seconds)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let s = state();
+        let mut inner = s.inner.lock().unwrap();
+        let mut updated = inner.store.clone();
+        updated.recording_limit = seconds;
+        storage::save(&s.directory.join("usage.json"), &updated)?;
+        inner.store = updated;
+        inner.status.recording_limit = seconds;
+        inner.status.persistence_error.clear();
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+#[tauri::command]
 async fn capture_shortcut(active: bool) -> Result<(), String> {
     if active && !shortcut_edit_allowed(&state().inner.lock().unwrap().status.phase) {
         return Err("Finish dictation before recording a shortcut.".into());
@@ -500,19 +542,17 @@ fn cancel_inner() {
     if !["recording", "processing"].contains(&inner.status.phase.as_str()) {
         return;
     }
-    inner.generation += 1;
+    inner.status.phase = "processing".into();
+    inner.status.message = "Cancelling…".into();
+    drop(inner);
     unsafe {
         hf_stop();
         hf_discard_target();
         hf_overlay(0);
     }
-    let _ = fs::remove_file(recording_path(&s));
-    // Inference cannot be interrupted safely by freeing its context. Keep busy
-    // until it returns, but its generation can no longer paste anything.
-    if inner.status.phase == "recording" {
-        inner.status.phase = "idle".into();
+    if let Some(session) = INGRESS.lock().unwrap().current() {
+        session.cancel();
     }
-    inner.status.message = "Cancelled.".into();
 }
 fn toggle_recording(finish: Option<Option<u64>>, epoch: u64) {
     if !CANCELLATION.allows(epoch) {
@@ -529,19 +569,22 @@ fn toggle_recording(finish: Option<Option<u64>>, epoch: u64) {
         }
     }
     if inner.status.phase == "recording" {
+        inner.status.phase = "processing".into();
+        inner.status.message = "Transcribing locally…".into();
+        drop(inner);
         unsafe {
             hf_stop();
             hf_overlay(2);
         }
-        inner.status.phase = "processing".into();
-        inner.status.message = "Transcribing locally…".into();
-        let generation = inner.generation;
-        let session_epoch = inner.session_epoch;
-        drop(inner);
-        std::thread::spawn(move || transcribe(generation, session_epoch));
+        if let Some(session) = INGRESS.lock().unwrap().current() {
+            session.finish(None);
+        }
         return;
     }
     if ["processing", "downloading"].contains(&inner.status.phase.as_str()) {
+        return;
+    }
+    if INGRESS.lock().unwrap().current().is_some() {
         return;
     }
     let permissions = unsafe { hf_permissions() };
@@ -555,65 +598,69 @@ fn toggle_recording(finish: Option<Option<u64>>, epoch: u64) {
         }
         return;
     }
-    let path = recording_path(&s);
-    // Precreate with owner-only permissions before handing it to AVAudioRecorder.
-    use std::os::unix::fs::OpenOptionsExt;
-    if fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .mode(0o600)
-        .open(&path)
-        .is_err()
-    {
-        inner.status.phase = "error".into();
-        inner.status.message = "Cannot create private recording file.".into();
-        return;
-    }
-    let started = cstring(&path.to_string_lossy())
-        .is_ok_and(|p| unsafe { hf_record(p.as_ptr(), epoch, delivery_allowed) });
-    if !CANCELLATION.allows(epoch) {
-        unsafe {
-            hf_stop();
-            hf_discard_target();
-        }
-        let _ = fs::remove_file(path);
-        inner.status.phase = "idle".into();
-        inner.status.message = "Cancelled.".into();
-        return;
-    }
-    if !started {
-        let _ = fs::remove_file(path);
-        inner.status.phase = "error".into();
-        inner.status.message =
-            "Microphone could not start. Check permissions and your input device.".into();
-        return;
-    }
     inner.generation += 1;
     inner.session_epoch = epoch;
     let generation = inner.generation;
+    let limit = inner.store.recording_limit;
+    let session = Arc::new(streaming::Session::new(generation, epoch, limit));
+    if !INGRESS.lock().unwrap().start(session.clone()) {
+        return;
+    }
     inner.status.phase = "recording".into();
     inner.status.message = format!(
-        "Press {} to finish, Escape to cancel. Maximum 2 minutes.",
-        inner.store.shortcut.label()
+        "Press {} to finish, Escape to cancel. Maximum {} minutes.",
+        inner.store.shortcut.label(),
+        limit / 60
     );
-    unsafe {
-        hf_overlay(1);
+    drop(inner);
+    let started = unsafe { hf_record(generation, epoch, delivery_allowed, capture_audio) };
+    if started && CANCELLATION.allows(epoch) {
+        unsafe {
+            hf_overlay(1);
+        }
+    } else {
+        session.finish(Some(
+            "Microphone could not start. Check permissions and your input device.".into(),
+        ));
     }
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(120)).await;
-        enqueue(Control::Finish(Some(generation)));
-    });
+    std::thread::spawn(move || transcribe(session));
 }
-fn transcribe(generation: u64, epoch: u64) {
+fn transcribe(session: Arc<streaming::Session>) {
     let s = state();
-    let result = infer(&recording_path(&s), &model_path(&s));
-    let seconds = hound::WavReader::open(recording_path(&s))
-        .map(|r| r.duration() as f64 / r.spec().sample_rate as f64)
-        .unwrap_or(0.0);
-    let _ = fs::remove_file(recording_path(&s));
+    let result = infer(&session, &model_path(&s));
+    let epoch = session.epoch;
+    enqueue_at(Control::Complete(session, result), epoch);
+}
+fn complete_transcription(session: Arc<streaming::Session>, result: Result<String, String>) {
+    let s = state();
+    let generation = session.generation;
+    let epoch = session.epoch;
+    {
+        let inner = s.inner.lock().unwrap();
+        if inner.generation != generation || inner.session_epoch != epoch {
+            return;
+        }
+    }
+    if INGRESS.lock().unwrap().get(generation, epoch).is_none() {
+        return;
+    }
+    // All native teardown and final delivery execute on the same FIFO as
+    // start/finish/cancel. An early failure cannot race Finish's overlay, and a
+    // stale completion cannot stop or discard a newer session's native target.
+    // Even early inference failure/cancellation must drain the native producer
+    // before acknowledging teardown and allowing a new session.
+    unsafe {
+        hf_stop();
+    }
+    session.finish(None);
+    let result = session.check().and(result);
+    let seconds = session.seconds();
     let mut inner = s.inner.lock().unwrap();
-    if inner.generation != generation || !CANCELLATION.allows(epoch) {
+    if inner.generation != generation {
+        return;
+    }
+    INGRESS.lock().unwrap().release(generation, epoch);
+    if !CANCELLATION.allows(epoch) {
         inner.status.phase = "idle".into();
         inner.status.message = "Cancelled.".into();
         unsafe {
@@ -632,8 +679,7 @@ fn transcribe(generation: u64, epoch: u64) {
             }
         }
         Ok(text) => {
-            let mut completed_stats = inner.store.stats.clone();
-            completed_stats.record(&text, seconds);
+            drop(inner);
             let result = match cstring(&text) {
                 Ok(p) => unsafe { hf_paste(p.as_ptr(), epoch, delivery_allowed) },
                 Err(_) => {
@@ -651,6 +697,12 @@ fn transcribe(generation: u64, epoch: u64) {
             } else {
                 -1
             };
+            let mut inner = s.inner.lock().unwrap();
+            if inner.generation != generation {
+                return;
+            }
+            let mut completed_stats = inner.store.stats.clone();
+            completed_stats.record(&text, seconds);
             // Cancellation can arrive while hf_paste waits for the main thread,
             // including while inner is locked. Never publish a cancelled result.
             if result == 16
@@ -713,49 +765,46 @@ fn transcribe(generation: u64, epoch: u64) {
         }
     }
 }
-fn infer(audio: &Path, model: &Path) -> Result<String, String> {
-    let mut reader =
-        hound::WavReader::open(audio).map_err(|e| format!("Cannot read microphone audio: {e}"))?;
-    let spec = reader.spec();
-    if spec.sample_rate != 16000 || spec.channels != 1 || spec.bits_per_sample != 16 {
-        return Err("Microphone did not produce 16 kHz mono PCM.".into());
-    }
-    let samples: Vec<f32> = reader
-        .samples::<i16>()
-        .map(|s| s.map(|v| v as f32 / 32768.))
-        .collect::<Result<_, _>>()
-        .map_err(|e| e.to_string())?;
-    if !logic::usable_audio(&samples) {
-        return Ok(String::new());
-    }
-    let mut context_params = WhisperContextParameters::default();
-    context_params.use_gpu(true);
-    let context = WhisperContext::new_with_params(model, context_params)
-        .map_err(|e| format!("Cannot load model: {e}"))?;
-    let mut state = context.create_state().map_err(|e| e.to_string())?;
-    let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
-    params.set_language(Some("en"));
-    params.set_translate(false);
-    params.set_n_threads(4);
-    params.set_print_special(false);
-    params.set_print_progress(false);
-    params.set_print_realtime(false);
-    params.set_print_timestamps(false);
-    params.set_no_context(true);
-    params.set_suppress_blank(true);
-    // No rewriting, punctuation pass, or filler removal. Whisper can still omit disfluencies.
-    params.set_initial_prompt("Um, uh, well, you know, I mean, like, hmm. This is a verbatim transcript, including hesitations and repeated words.");
-    state
-        .full(params, &samples)
-        .map_err(|e| format!("Transcription failed: {e}"))?;
-    let mut output = String::new();
-    for segment in state.as_iter() {
-        if segment.no_speech_probability() > 0.6 {
-            continue;
-        }
-        output.push_str(segment.to_str().map_err(|e| e.to_string())?);
-    }
-    Ok(logic::insertion_text(&output))
+fn infer(session: &Arc<streaming::Session>, model: &Path) -> Result<String, String> {
+    streaming::run(
+        session,
+        || {
+            let mut context_params = WhisperContextParameters::default();
+            context_params.use_gpu(true);
+            WhisperContext::new_with_params(model, context_params)
+                .map_err(|e| format!("Cannot load model: {e}"))
+        },
+        |context, samples| {
+            let mut state = context.create_state().map_err(|e| e.to_string())?;
+            let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+            params.set_language(Some("en"));
+            params.set_translate(false);
+            params.set_n_threads(4);
+            params.set_print_special(false);
+            params.set_print_progress(false);
+            params.set_print_realtime(false);
+            params.set_print_timestamps(false);
+            params.set_no_context(true);
+            params.set_suppress_blank(true);
+            let active = session.clone();
+            params.set_abort_callback_safe(move || {
+                !CANCELLATION.allows(active.epoch) || active.cancelled.load(Ordering::Acquire)
+            });
+            // No rewriting, punctuation pass, or filler removal. Whisper can still omit disfluencies.
+            params.set_initial_prompt("Um, uh, well, you know, I mean, like, hmm. This is a verbatim transcript, including hesitations and repeated words.");
+            state
+                .full(params, samples)
+                .map_err(|e| format!("Transcription failed: {e}"))?;
+            let mut output = String::new();
+            for segment in state.as_iter() {
+                if segment.no_speech_probability() > 0.6 {
+                    continue;
+                }
+                output.push_str(segment.to_str().map_err(|e| e.to_string())?);
+            }
+            Ok(logic::insertion_text(&output))
+        },
+    )
 }
 
 #[tauri::command]
@@ -884,6 +933,7 @@ fn main() {
             cancel,
             copy_transcript,
             set_sounds,
+            set_recording_limit,
             set_sound_volume,
             set_sound_style,
             set_shortcut,
@@ -937,6 +987,7 @@ fn main() {
                         sounds: store.sounds,
                         sound_volume: store.sound_volume,
                         sound_style: store.sound_style.clone(),
+                        recording_limit: store.recording_limit,
                         shortcut: store.shortcut.clone(),
                         shortcut_label: store.shortcut.label(),
                         stats: store.stats.clone(),
@@ -962,6 +1013,9 @@ fn main() {
                         Control::Toggle => toggle_recording(None, epoch),
                         Control::Cancel => cancel_inner(),
                         Control::Finish(generation) => toggle_recording(Some(generation), epoch),
+                        Control::Complete(session, result) => {
+                            complete_transcription(session, result)
+                        }
                     }
                 }
             });
@@ -1043,21 +1097,10 @@ mod audio_tests {
     }
     #[test]
     fn silence_never_loads_a_model() {
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join(format!("target/silent-{}.wav", std::process::id()));
-        let spec = hound::WavSpec {
-            channels: 1,
-            sample_rate: 16000,
-            bits_per_sample: 16,
-            sample_format: hound::SampleFormat::Int,
-        };
-        let mut writer = hound::WavWriter::create(&path, spec).unwrap();
-        for _ in 0..16000 {
-            writer.write_sample(0i16).unwrap();
-        }
-        writer.finalize().unwrap();
-        let result = infer(&path, Path::new("/nonexistent-model.bin"));
-        fs::remove_file(path).unwrap();
+        let session = Arc::new(streaming::Session::new(1, CANCELLATION.current(), 120));
+        session.push(&vec![0.; 16000]);
+        session.finish(None);
+        let result = infer(&session, Path::new("/nonexistent-model.bin"));
         assert_eq!(result.unwrap(), "");
     }
     #[test]

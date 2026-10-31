@@ -18,3 +18,5 @@ main:has(#settings:not([hidden])) .status{padding-top:14px;padding-bottom:14px}
 @media(max-width:650px){#settings .preferences>.listening-row{flex-wrap:wrap}#settings .listening-row>.sound-selection{order:3;flex:0 0 100%}#settings .listening-row>div:first-child{flex:1}.listening-row .sound-selection select{max-width:190px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
 .beta-badge{display:inline-block;flex:none;border:1px solid #d9b8b2;border-radius:999px;padding:2px 8px;background:var(--active);color:#873c38;font-size:11px;font-weight:600;line-height:1.5;letter-spacing:0.02em}
+#settings .preferences{padding-top:18px;padding-bottom:18px}#settings .preferences>.setting-row{padding:10px 0}#settings .preferences>.setting-row:nth-of-type(2){border-bottom:1px solid var(--line)}#settings .preferences>.listening-row{padding-bottom:10px!important;border-bottom:0}
+.settings-intro{margin-bottom:14px}#settings .card{margin-bottom:12px}
