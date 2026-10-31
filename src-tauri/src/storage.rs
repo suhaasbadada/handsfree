@@ -26,12 +26,27 @@ impl Stats {
 pub struct Store {
     #[serde(deserialize_with = "read_shortcut")]
     pub shortcut: crate::shortcut::Shortcut,
+    #[serde(deserialize_with = "read_sound_style")]
     pub sound_style: String,
     pub sounds: bool,
     pub sound_volume: f32,
     #[serde(deserialize_with = "read_recording_limit")]
     pub recording_limit: u32,
     pub stats: Stats,
+}
+fn read_sound_style<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(value
+        .as_str()
+        .filter(|s| validate_sound_style(s).is_ok())
+        .unwrap_or("clean")
+        .into())
+}
+pub fn validate_sound_style(style: &str) -> Result<(), String> {
+    if !["clean", "warm"].contains(&style) {
+        return Err("Unknown sound profile.".into());
+    }
+    Ok(())
 }
 fn read_recording_limit<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
@@ -58,7 +73,7 @@ impl Default for Store {
     fn default() -> Self {
         Self {
             shortcut: crate::shortcut::Shortcut::default(),
-            sound_style: "tap".into(),
+            sound_style: "clean".into(),
             sounds: false,
             sound_volume: 50.0,
             recording_limit: 120,
@@ -77,8 +92,8 @@ pub fn load(path: &Path) -> Result<Store, String> {
             if store.shortcut.validate().is_err() {
                 store.shortcut = Default::default();
             }
-            if !["tap", "bell"].contains(&store.sound_style.as_str()) {
-                store.sound_style = "tap".into();
+            if validate_sound_style(&store.sound_style).is_err() {
+                store.sound_style = "clean".into();
             }
             if !store.stats.speech_seconds.is_finite()
                 || store.stats.speech_seconds < 0.0
@@ -138,6 +153,35 @@ pub fn validate_recording_limit(seconds: u32) -> Result<(), String> {
 mod tests {
     use super::*;
     #[test]
+    fn profiles_migrate_without_resetting_other_preferences() {
+        for style in ["tap", "bell", "unknown", "clean", "warm"] {
+            let expected = if style == "warm" { "warm" } else { "clean" };
+            let store: Store = serde_json::from_str(&format!(
+                r#"{{"sound_style":"{style}","sounds":true,"sound_volume":70,"recording_limit":300,"shortcut":{{"code":"Space","modifiers":5}},"stats":{{"words":19}}}}"#
+            )).unwrap();
+            assert_eq!(store.sound_style, expected);
+            assert!(store.sounds);
+            assert_eq!(store.sound_volume, 70.0);
+            assert_eq!(store.recording_limit, 300);
+            assert_eq!(store.shortcut.label(), "Control + Shift + Space");
+            assert_eq!(store.stats.words, 19);
+            assert_eq!(
+                serde_json::from_str::<Store>(&serde_json::to_string(&store).unwrap()).unwrap(),
+                store
+            );
+        }
+        for style in ["tap", "bell", "unknown", "", "Warm"] {
+            assert!(validate_sound_style(style).is_err());
+        }
+        for value in ["null", "42", "{}"] {
+            let store: Store =
+                serde_json::from_str(&format!(r#"{{"sound_style":{value},"sound_volume":70}}"#))
+                    .unwrap();
+            assert_eq!(store.sound_style, "clean");
+            assert_eq!(store.sound_volume, 70.0);
+        }
+    }
+    #[test]
     fn duration_default_validation_and_roundtrip() {
         assert_eq!(
             serde_json::from_str::<Store>("{}").unwrap().recording_limit,
@@ -188,7 +232,7 @@ mod tests {
         assert!(!legacy.sounds);
         assert_eq!(legacy.sound_volume, 50.0);
         assert_eq!(legacy.shortcut, Default::default());
-        assert_eq!(legacy.sound_style, "tap");
+        assert_eq!(legacy.sound_style, "clean");
         for value in [f32::NAN, f32::INFINITY, -1.0, 101.0] {
             assert!(validate_volume(value).is_err());
         }
@@ -212,14 +256,14 @@ mod tests {
             assert_eq!(store.stats.words, 7);
             assert!(!store.sounds);
             assert_eq!(store.sound_volume, 24.0);
-            assert_eq!(store.sound_style, "tap");
+            assert_eq!(store.sound_style, "clean");
         }
         let store: Store = serde_json::from_str(
             r#"{"shortcut":{"code":"Space","modifiers":5},"sound_style":"bell"}"#,
         )
         .unwrap();
         assert_eq!(store.shortcut.label(), "Control + Shift + Space");
-        assert_eq!(store.sound_style, "bell");
+        assert_eq!(store.sound_style, "clean");
     }
     #[test]
     fn counts_only_nonempty_and_clamps_estimate() {
@@ -244,6 +288,7 @@ mod tests {
         let mut store = Store {
             sounds: false,
             sound_volume: 42.0,
+            sound_style: "warm".into(),
             ..Store::default()
         };
         store.stats.record("hello there", 1.0);
@@ -263,6 +308,7 @@ mod tests {
         assert_eq!(load(&path).unwrap().stats, Stats::default());
         assert!(!load(&path).unwrap().sounds);
         assert_eq!(load(&path).unwrap().sound_volume, 42.0);
+        assert_eq!(load(&path).unwrap().sound_style, "warm");
         fs::write(&path, b"broken").unwrap();
         assert!(load(&path).is_err());
         fs::write(&path, br#"{"stats":{"speech_seconds":-1}}"#).unwrap();

@@ -85,28 +85,31 @@ enum CapsuleGeometry {
 }
 enum StartCue {
     static let rate = 48000
-    static let duration = 0.240
-    // Approved Clean pair; identical nonoverlapping grains at equal gain.
-    // Exact generated PCM, not a different native random implementation.
-    static func data(resourceRoot: URL? = Bundle.main.resourceURL) -> Data? {
-        guard let url = resourceRoot?.appendingPathComponent("sounds/listening.wav") else { return nil }
+    static let duration = 0.120
+    static func data(profile: String = "clean", resourceRoot: URL? = Bundle.main.resourceURL) -> Data? {
+        guard ["clean", "warm"].contains(profile), let url = resourceRoot?.appendingPathComponent("sounds/\(profile)-start.wav") else { return nil }
         return try? Data(contentsOf: url)
     }
 }
 enum EndCue {
-    static let duration = 0.120
-    static func data(resourceRoot: URL? = Bundle.main.resourceURL) -> Data? {
-        guard let url = resourceRoot?.appendingPathComponent("sounds/ending.wav") else { return nil }
+    static let duration = 0.240
+    static func data(profile: String = "clean", resourceRoot: URL? = Bundle.main.resourceURL) -> Data? {
+        guard ["clean", "warm"].contains(profile), let url = resourceRoot?.appendingPathComponent("sounds/\(profile)-end.wav") else { return nil }
         return try? Data(contentsOf: url)
     }
 }
+private var cueProfile = "clean"
+private var recordingCueProfile = "clean"
 @_cdecl("hf_sound_style") public func soundStyle(_ style: Int32) {
-    // Deprecated ABI: saved tap/bell preferences both use the same cue.
-    // Deliberately no player mutation, playback, or capture side effects.
+    // Only selects the next session. Never mutates an active player's profile.
+    main { cueProfile = style == 1 ? "warm" : "clean" }
 }
-// Preview and dictation share this one original, bundled cue (no borrowed audio).
 private func makeCue(ending: Bool = false) -> AVAudioPlayer? {
-    guard let data = ending ? EndCue.data() : StartCue.data() else { return nil }
+    let profile = ending ? recordingCueProfile : cueProfile
+    guard let data = ending ? EndCue.data(profile: profile) : StartCue.data(profile: profile) else {
+        NSLog("HandsFree: missing bundled %@ %@ sound", profile, ending ? "end" : "start")
+        return nil
+    }
     let player = try? AVAudioPlayer(data: data)
     player?.volume = cueVolume
     player?.prepareToPlay()
@@ -124,15 +127,14 @@ enum CuePolicy {
 @_cdecl("hf_preview_sound") public func previewSound() -> Bool {
     main {
         guard CuePolicy.canPreview(idle: true, busy: audioBusy, recording: recorder != nil, playing: cue?.isPlaying == true || endCue?.isPlaying == true) else { return false }
-        if cue == nil { cue = makeCue() }
-        cue?.currentTime = 0
-        return cue?.play() ?? false
+        guard let data = EndCue.data(profile: cueProfile), let player = try? AVAudioPlayer(data: data) else { return false }
+        endCue = player; player.volume = cueVolume
+        return player.play()
     }
 }
 @_cdecl("hf_sounds") public func sounds(_ enabled: Bool) {
     main {
         soundsEnabled = enabled
-        if enabled && cue == nil { cue = makeCue() }
         if !enabled { cue?.stop(); endCue?.stop() }
     }
 }
@@ -438,9 +440,12 @@ private func validateTarget() -> PasteResult {
             cue?.stop(); endCue?.stop()
             recorder = r
             audioBusy = true
+            recordingCueProfile = cueProfile
             if soundsEnabled {
-                if cue == nil { cue = makeCue() }
-                cue?.currentTime = 0; cue?.play()
+                cue = makeCue()
+                guard let player = cue, player.play() else {
+                    recorder = nil; audioBusy = false; clearTarget(); return false
+                }
             }
             let startPlayer = soundsEnabled ? cue : nil
             let cueLength = soundsEnabled ? (startPlayer?.duration ?? StartCue.duration) : 0
@@ -485,7 +490,7 @@ private func validateTarget() -> PasteResult {
             recorder = nil; cue?.stop()
             return captured
         }, allowed: { soundsEnabled && allowed(epoch) }, play: {
-            if endCue == nil { endCue = makeCue(ending: true) }
+            endCue = makeCue(ending: true)
             endCue?.currentTime = 0; endCue?.play()
         })
     }

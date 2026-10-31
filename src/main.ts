@@ -5,7 +5,7 @@ import './typography.css';
 import { shortcutFromEvent, type Shortcut } from './shortcut';
 import { phaseLabel, canCancel, formatTime, readiness, readinessDetail } from './presentation';
 
-type Status = { phase: string; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: string; recording_limit: number; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
+type Status = { phase: string; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: 'clean' | 'warm'; recording_limit: number; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
 const logo = new URL('../src-tauri/icons/icon.png', import.meta.url).href;
 document.querySelector('#app')!.innerHTML = `
 <div class="shell">
@@ -23,8 +23,8 @@ document.querySelector('#app')!.innerHTML = `
    <section class="card preferences" aria-labelledby="preferences-title"><h2 id="preferences-title">Preferences</h2>
     <div class="setting-row shortcut-row"><div><h3>Shortcut</h3></div><div class="shortcut-value"><button id="change-shortcut" aria-label="Record shortcut" title="Record shortcut" aria-pressed="false" aria-describedby="shortcut-feedback"><span id="saved-shortcut">Fn</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/></svg></button><button id="stop-shortcut" hidden>Cancel</button><button id="shortcut-fn" class="text-action" hidden>Use Fn</button></div><p id="shortcut-feedback" role="status" hidden></p></div>
     <div class="setting-row"><div><h3><label for="recording-limit">Recording limit</label></h3></div><select id="recording-limit" title="Applies to the next recording"><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="240">4 minutes</option><option value="300">5 minutes</option></select></div>
-    <div class="setting-row listening-row"><div><h3>Recording sounds</h3></div><span id="sound-state" class="state">Off</span><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Recording sounds"><span aria-hidden="true"></span></label></div>
-    <div class="setting-row volume-row"><h3><label for="sound-volume">Volume</label></h3><div class="sound-controls"><input id="sound-volume" type="range" min="0" max="100" step="1" value="50" aria-describedby="volume-percent"><output id="volume-percent" for="sound-volume">50%</output></div><button id="preview-sound" disabled>Preview</button></div>
+    <div class="setting-row listening-row"><div><h3>Sound</h3></div><select id="sound-style" aria-label="Sound"><option value="clean">Clean</option><option value="warm">Warm</option></select><span id="sound-state" class="state">Off</span><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Recording sounds"><span aria-hidden="true"></span></label></div>
+    <div class="setting-row volume-row"><h3><label for="sound-volume">Volume</label></h3><div class="sound-controls"><input id="sound-volume" type="range" min="0" max="100" step="1" value="50" aria-describedby="volume-percent"><output id="volume-percent" for="sound-volume">50%</output></div><button id="preview-sound" title="Preview sound" disabled>Preview</button></div>
   </section>
   <section class="card setup-card" aria-labelledby="setup-title"><div class="card-heading"><h2 id="setup-title">Setup</h2><span id="setup-state" class="subtle" role="status">Checking…</span></div>
    <div id="setup-missing">
@@ -45,12 +45,13 @@ document.querySelector('#app')!.innerHTML = `
 const el = (id: string) => document.getElementById(id)!;
 const button = (id: string) => el(id) as HTMLButtonElement;
 // Avoid presenting native actions as ready before the first backend response.
-for (const id of ['change-shortcut', 'mic', 'permissions', 'download', 'reset', 'sounds', 'sound-volume', 'recording-limit']) {
+for (const id of ['change-shortcut', 'mic', 'permissions', 'download', 'reset', 'sounds', 'sound-style', 'sound-volume', 'recording-limit']) {
   (el(id) as HTMLInputElement | HTMLButtonElement).disabled = true;
 }
 let current: Status | undefined;
 let refreshTask: Promise<void> | undefined;
 let soundsPending = false;
+let stylePending = false;
 let volumePending = false;
 let limitPending = false;
 let volumeEditing = false;
@@ -166,6 +167,15 @@ el('download').onclick = () => void downloadModel();
 el('overview-download').onclick = () => void downloadModel();
 el('cancel').onclick = () => void action('cancel');
 const sounds = el('sounds') as HTMLInputElement;
+const soundStyle = el('sound-style') as HTMLSelectElement;
+soundStyle.onchange = async () => {
+  if (stylePending || previewPending || !isIdle()) return;
+  const previous = current?.sound_style ?? 'clean';
+  stylePending = true; soundStyle.disabled = true; button('preview-sound').disabled = true;
+  const success = await action('set_sound_style', { style: soundStyle.value });
+  if (!success) soundStyle.value = previous;
+  stylePending = false; soundStyle.disabled = !isIdle() || previewPending;
+};
 const recordingLimit = el('recording-limit') as HTMLSelectElement;
 recordingLimit.onchange = async () => {
   if (limitPending) return;
@@ -187,11 +197,11 @@ volume.onchange = async () => {
   volumeEditing = false; volumePending = false; volume.disabled = false;
 };
 el('preview-sound').onclick = async () => {
-  if (previewPending || volumePending || volumeEditing || !isIdle()) return;
-  previewPending = true; button('preview-sound').disabled = true;
+  if (previewPending || stylePending || volumePending || volumeEditing || !isIdle()) return;
+  previewPending = true; soundStyle.disabled = true; button('preview-sound').disabled = true;
   await action('preview_sound');
   // One explicit click, one cue. Prevent rapid repeated previews.
-  setTimeout(() => { previewPending = false; button('preview-sound').disabled = !isIdle() || volumePending || volumeEditing; }, 400);
+  setTimeout(() => { previewPending = false; soundStyle.disabled = !isIdle() || stylePending; button('preview-sound').disabled = !isIdle() || stylePending || volumePending || volumeEditing; }, 400);
 };
 sounds.onchange = async () => {
   soundsPending = true; sounds.disabled = true;
@@ -258,7 +268,9 @@ async function refreshStatus() {
     if (capturing && !canEditShortcut() && !shortcutPending) void stopCapture();
     renderShortcut();
     if (!volumePending && !volumeEditing) { volume.value = String(current.sound_volume); showVolume(); }
-    button('preview-sound').disabled = !isIdle() || previewPending || volumePending || volumeEditing;
+    if (!stylePending) soundStyle.value = current.sound_style;
+    soundStyle.disabled = !isIdle() || stylePending || previewPending;
+    button('preview-sound').disabled = !isIdle() || stylePending || previewPending || volumePending || volumeEditing;
     el('words').textContent = current.stats.words.toLocaleString();
     el('count').textContent = current.stats.transcriptions.toLocaleString();
     el('saved').textContent = formatTime(current.stats.saved_seconds);

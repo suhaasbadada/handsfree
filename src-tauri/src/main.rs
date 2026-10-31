@@ -413,9 +413,7 @@ async fn set_shortcut(shortcut: shortcut::Shortcut) -> Result<(), String> {
 }
 #[tauri::command]
 async fn set_sound_style(style: String) -> Result<(), String> {
-    if !["tap", "bell"].contains(&style.as_str()) {
-        return Err("Unknown legacy sound preference.".into());
-    }
+    storage::validate_sound_style(&style)?;
     tauri::async_runtime::spawn_blocking(move || {
         let s = state();
         let mut inner = s.inner.lock().unwrap();
@@ -430,7 +428,7 @@ async fn set_sound_style(style: String) -> Result<(), String> {
         inner.status.persistence_error.clear();
         drop(inner);
         unsafe {
-            hf_sound_style(if style == "bell" { 1 } else { 0 });
+            hf_sound_style(if style == "warm" { 1 } else { 0 });
         }
         Ok(())
     })
@@ -1090,7 +1088,7 @@ fn main() {
             unsafe {
                 hf_sounds(store.sounds);
                 hf_sound_volume(store.sound_volume / 100.0);
-                hf_sound_style(if store.sound_style == "bell" { 1 } else { 0 });
+                hf_sound_style(if store.sound_style == "warm" { 1 } else { 0 });
                 hf_shortcut(store.shortcut.keycode().unwrap(), store.shortcut.modifiers);
             }
             app.manage(AppState {

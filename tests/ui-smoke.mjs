@@ -51,7 +51,7 @@ try {
   await until(`Boolean(document.getElementById('nav-settings'))`);
   assert.equal(await evaluate(`document.querySelector('footer .beta-badge').textContent==='BETA' && document.querySelector('footer .beta-badge').getBoundingClientRect().width>0 && !document.querySelector('.brand .beta-badge') && !document.querySelector('main footer') && document.getElementById('app-version').textContent==='0.1.1'`), true, 'Version, beta and language metadata live in the actual footer');
   assert.equal(await evaluate(`['change-shortcut','mic','permissions','download','reset','sounds','sound-volume'].every(id=>document.getElementById(id).disabled)`), true, 'Native controls are unavailable before the backend connects');
-  await evaluate(`window.calls = []; window.fixture = {phase:'idle',message:'Select a text field and press Fn.', progress:0,model_ready:true,microphone:true,accessibility:true,input_monitoring:true,hotkey:true,transcript:'',sounds:true,sound_volume:50,sound_style:'tap',shortcut:{code:'Fn',modifiers:0},shortcut_label:'Fn',stats:{words:0,transcriptions:0,speech_seconds:0,saved_seconds:0},persistence_error:''}; window.__TAURI_INTERNALS__ = { invoke: async (command,args) => { window.calls.push({command,args}); if(command==='status') return structuredClone(window.fixture); if(command==='set_sounds') window.fixture.sounds=args.enabled; if(command==='set_sound_style') window.fixture.sound_style=args.style; if(command==='set_shortcut'){if(window.rejectShortcut) throw 'Could not save shortcut'; window.fixture.shortcut=args.shortcut;window.fixture.shortcut_label=args.shortcut.code==='Fn'?'Fn':args.shortcut.code==='Space'?'Option + Space':'Control + Shift + J';} if(command==='reset_stats') window.fixture.stats={words:0,transcriptions:0,speech_seconds:0,saved_seconds:0}; } }; document.getElementById('feedback').hidden=true;`);
+  await evaluate(`window.calls = []; window.fixture = {phase:'idle',message:'Select a text field and press Fn.', progress:0,model_ready:true,microphone:true,accessibility:true,input_monitoring:true,hotkey:true,transcript:'',sounds:true,sound_volume:50,sound_style:'clean',shortcut:{code:'Fn',modifiers:0},shortcut_label:'Fn',stats:{words:0,transcriptions:0,speech_seconds:0,saved_seconds:0},persistence_error:''}; window.__TAURI_INTERNALS__ = { invoke: async (command,args) => { window.calls.push({command,args}); if(command==='status') return structuredClone(window.fixture); if(command==='set_sounds') window.fixture.sounds=args.enabled; if(command==='set_sound_style') window.fixture.sound_style=args.style; if(command==='set_shortcut'){if(window.rejectShortcut) throw 'Could not save shortcut'; window.fixture.shortcut=args.shortcut;window.fixture.shortcut_label=args.shortcut.code==='Fn'?'Fn':args.shortcut.code==='Space'?'Option + Space':'Control + Shift + J';} if(command==='reset_stats') window.fixture.stats={words:0,transcriptions:0,speech_seconds:0,saved_seconds:0}; } }; document.getElementById('feedback').hidden=true;`);
   await until(`document.getElementById('ready-title').textContent==='Ready'`);
   assert.deepEqual(await evaluate(`['words','saved','count'].map(id=>document.getElementById(id).textContent)`), ['0','0 sec','0'], 'First-launch totals are real zeros');
   assert.equal(await evaluate(`document.querySelectorAll('details').length`), 0, 'No disclosure maze in the app or its dialogs');
@@ -153,16 +153,17 @@ try {
   await until(stopped);
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='capture_shortcut').at(-1).args.active`), false, 'Delayed native start cannot outlive cancellation');
   await evaluate(`window.__TAURI_INTERNALS__.invoke=captureInvoke`);
-  await evaluate(`window.rejectShortcut=false;window.fixture.sound_style='bell'`);
-  assert.equal(await evaluate(`document.getElementById('sound-style')===null`), true, 'One cue, no style selector even with a legacy preference');
+  await evaluate(`window.rejectShortcut=false;window.fixture.sound_style='clean'`);
+  assert.deepEqual(await evaluate(`Array.from(document.getElementById('sound-style').options,o=>[o.value,o.textContent])`), [['clean','Clean'],['warm','Warm']], 'Only approved profiles are offered');
+  assert.equal(await evaluate(`document.getElementById('sound-style').getBoundingClientRect().height`), 36);
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='preview_sound').length`), 0, 'Visible sound controls never autoplay');
   await evaluate(`document.getElementById('sounds').click()`);
   await until(`window.fixture.sounds===false && !document.getElementById('sounds').disabled`);
   await until(`document.getElementById('sound-state').textContent==='Off'`);
   // Keep IPC unresolved across a real status poll: the pending user choice
   // must neither be overwritten nor re-enabled by the backend's old value.
-  await evaluate(`const pendingInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(['set_sounds','set_sound_volume','set_recording_limit'].includes(command))await new Promise(resolve=>window.releasePreference=resolve);return pendingInvoke(command,args);}`);
-  for (const [control, command, value] of [['sounds','set_sounds',true],['sound-volume','set_sound_volume','62'],['recording-limit','set_recording_limit','180']]) {
+  await evaluate(`const pendingInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(['set_sounds','set_sound_style','set_sound_volume','set_recording_limit'].includes(command))await new Promise(resolve=>window.releasePreference=resolve);return pendingInvoke(command,args);}`);
+  for (const [control, command, value] of [['sounds','set_sounds',true],['sound-style','set_sound_style','warm'],['sound-volume','set_sound_volume','62'],['recording-limit','set_recording_limit','180']]) {
     await evaluate(`{window.preferencePolls=window.calls.filter(c=>c.command==='status').length;const control=document.getElementById('${control}');${control==='sounds' ? 'control.click()' : `control.value='${value}';control.dispatchEvent(new Event('change'))`}}`);
     await until(`window.calls.filter(c=>c.command==='status').length>window.preferencePolls`);
     assert.equal(await evaluate(`document.getElementById('${control}').disabled`), true, `${command} stays disabled during a poll`);
@@ -171,6 +172,10 @@ try {
     await until(`!document.getElementById('${control}').disabled`);
   }
   await evaluate(`window.__TAURI_INTERNALS__.invoke=pendingInvoke;window.fixture.sounds=false`);
+  await evaluate(`const profileInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='set_sound_style')throw 'Could not save sound';return profileInvoke(command,args);};document.getElementById('sound-style').value='clean';document.getElementById('sound-style').dispatchEvent(new Event('change'))`);
+  await until(`!document.getElementById('sound-style').disabled && document.getElementById('sound-style').value==='warm'`);
+  assert.equal(await evaluate(`window.fixture.sound_style`), 'warm', 'Failed save rolls back instead of replacing persisted profile');
+  await evaluate(`window.__TAURI_INTERNALS__.invoke=profileInvoke`);
   await evaluate(`window.fixture.sound_volume=50; const oldInvoke=window.__TAURI_INTERNALS__.invoke; window.__TAURI_INTERNALS__.invoke=async(command,args)=>{ if(command==='set_sound_volume') window.fixture.sound_volume=args.volume; return oldInvoke(command,args); };`);
   await until(`document.getElementById('volume-percent').textContent==='50%'`);
   const volumeCommits = await evaluate(`window.calls.filter(c=>c.command==='set_sound_volume').length`);
@@ -183,11 +188,14 @@ try {
   await until(`!document.getElementById('preview-sound').disabled`);
   await evaluate(`document.getElementById('preview-sound').click(); document.getElementById('preview-sound').click();`);
   await until(`window.calls.some(c=>c.command==='preview_sound')`);
+  assert.equal(await evaluate(`document.getElementById('sound-style').disabled`), true, 'Profile cannot change during preview');
+  assert.equal(await evaluate(`window.fixture.sound_style`), 'warm', 'Preview auditions the selected profile');
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='preview_sound').length`), 1, 'Explicit preview works while sounds muted, without repeat');
   for (const phase of ['recording', 'processing', 'downloading']) {
     await evaluate(`window.fixture.phase=${JSON.stringify(phase)}`);
     await until(`document.getElementById('dot').className===${JSON.stringify(phase)}`);
     assert.equal(await evaluate(`document.getElementById('preview-sound').disabled`), true);
+    assert.equal(await evaluate(`document.getElementById('sound-style').disabled`), true, 'Profile selection is idle-only');
     await evaluate(`document.getElementById('preview-sound').click()`);
   }
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='preview_sound').length`), 1, 'No preview while busy');

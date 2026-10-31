@@ -10,29 +10,32 @@ precondition(points[1].y > points[0].y && points[1].y > points[2].y, "Check vert
 precondition(points[2].y < points[0].y, "Check must have a longer rising right arm")
 do {
     let resourceRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("src-tauri/native/assets")
-    let data = StartCue.data(resourceRoot: resourceRoot)!
-    precondition(StartCue.data(resourceRoot: nil) == nil, "Missing resources fail silently, never substitute another cue")
+    let data = EndCue.data(resourceRoot: resourceRoot)!
+    precondition(EndCue.data(resourceRoot: nil) == nil, "Missing resources never substitute another cue")
     precondition(String(data: data.prefix(4), encoding: .ascii) == "RIFF")
     precondition(String(data: data[36..<40], encoding: .ascii) == "data")
     let samples = stride(from: 44, to: data.count, by: 2).map { Int16(bitPattern: UInt16(data[$0]) | UInt16(data[$0 + 1]) << 8) }
     let player = try! AVAudioPlayer(data: data) // Decode only: never play audio.
-    precondition(abs(player.duration - StartCue.duration) < 0.000001)
+    precondition(abs(player.duration - EndCue.duration) < 0.000001)
     precondition(player.format.sampleRate == Double(StartCue.rate) && player.numberOfChannels == 1)
-    precondition(samples.count == Int(StartCue.duration * Double(StartCue.rate)))
-    precondition(StartCue.duration == 0.240)
+    precondition(samples.count == Int(EndCue.duration * Double(StartCue.rate)))
+    precondition(EndCue.duration == 0.240)
     precondition(SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() == "a1eb8aeadfc425a5a217e3d35732762571c16d7e03969a5f3b0bfe41dbde6856", "Exact user-approved Clean pair audition bytes")
-    let endData = EndCue.data(resourceRoot: resourceRoot)!
-    let endPlayer = try! AVAudioPlayer(data: endData) // Decode only, never play.
-    precondition(abs(endPlayer.duration - EndCue.duration) < 0.000001)
-    precondition(EndCue.data(resourceRoot: nil) == nil)
-    precondition(endData[44 + 1920..<44 + 9600] == data[44 + 1920..<44 + 9600], "Finish uses identical first grain PCM")
-    precondition(endData.suffix(1920).allSatisfy { $0 == 0 })
+    let startData = StartCue.data(resourceRoot: resourceRoot)!
+    let startPlayer = try! AVAudioPlayer(data: startData) // Decode only, never play.
+    precondition(abs(startPlayer.duration - StartCue.duration) < 0.000001)
+    precondition(StartCue.data(resourceRoot: nil) == nil)
+    precondition(startData[44 + 1920..<44 + 9600] == data[44 + 1920..<44 + 9600], "Start uses identical first grain PCM")
+    precondition(startData.suffix(1920).allSatisfy { $0 == 0 })
     precondition(samples[960..<4800] == samples[5760..<9600])
     precondition(samples[4800..<5760].allSatisfy { $0 == 0 }, "No overlap")
-    precondition(data == StartCue.data(resourceRoot: resourceRoot), "Exact deterministic bundled PCM")
-    for legacyStyle: Int32 in [0, 1] {
-        soundStyle(legacyStyle)
-        precondition(data == StartCue.data(resourceRoot: resourceRoot), "Both legacy styles normalize to one cue")
+    precondition(data == EndCue.data(resourceRoot: resourceRoot), "Exact deterministic bundled PCM")
+    for profile in ["clean", "warm"] {
+        let start = StartCue.data(profile: profile, resourceRoot: resourceRoot)!
+        let end = EndCue.data(profile: profile, resourceRoot: resourceRoot)!
+        precondition(abs(try! AVAudioPlayer(data: start).duration - 0.120) < 0.000001)
+        precondition(abs(try! AVAudioPlayer(data: end).duration - 0.240) < 0.000001)
+        precondition(start[44 + 1920..<44 + 9600] == end[44 + 1920..<44 + 9600])
     }
     precondition(samples.first == 0 && samples.last == 0)
     let peak = samples.map { abs(Int($0)) }.max()!
@@ -43,7 +46,7 @@ do {
         let window = samples[Int(from * Double(StartCue.rate))..<Int(to * Double(StartCue.rate))]
         return sqrt(window.reduce(0) { $0 + pow(Double($1) / 32768, 2) } / Double(window.count))
     }
-    let level = rms(0, StartCue.duration)
+    let level = rms(0, EndCue.duration)
     func magnitude(_ frequency: Double, _ from: Double, _ to: Double) -> Double {
         let start = Int(from * Double(StartCue.rate))
         let end = Int(to * Double(StartCue.rate))
@@ -74,16 +77,16 @@ do {
     precondition(rms(0.180, 0.200) < 0.001, "Smooth short decay before final silence")
     precondition(magnitude(820, 0.120, 0.200) > magnitude(1450, 0.120, 0.200) * 8, "Approved Clean fundamental")
     // Full-window DFT bins give an approximate power spectrum without audio I/O.
-    let powers = (1...Int(Double(StartCue.rate) * StartCue.duration / 2)).map { bin in pow(magnitude(Double(bin) / StartCue.duration, 0, StartCue.duration), 2) }
+    let powers = (1...Int(Double(StartCue.rate) * EndCue.duration / 2)).map { bin in pow(magnitude(Double(bin) / EndCue.duration, 0, EndCue.duration), 2) }
     let total = powers.reduce(0, +)
     func power(_ low: Double, _ high: Double) -> Double {
-        powers.enumerated().filter { (low..<high).contains(Double($0.offset + 1) / StartCue.duration) }.reduce(0) { $0 + $1.element }
+        powers.enumerated().filter { (low..<high).contains(Double($0.offset + 1) / EndCue.duration) }.reduce(0) { $0 + $1.element }
     }
     precondition(power(300, 4000) / total > 0.95, "Preserve approved glass grain spectrum")
     precondition(power(8000, 24000) / total < 0.01, "Bounded dry-tap high-frequency energy")
     precondition(power(0, 300) / total < 0.015, "No heavy bass thump")
     precondition(powers.max()! > powers.min()! * 100, "Filtered, nonconstant spectrum")
-    print("Cue: \(samples.count) samples / \(StartCue.duration)s, peak \(peak), RMS \(level), max step \(steps.max()!), strongest bin \(powers.max()! / total)")
+    print("Cue: \(samples.count) samples / \(EndCue.duration)s, peak \(peak), RMS \(level), max step \(steps.max()!), strongest bin \(powers.max()! / total)")
 }
 for mods: UInt32 in 0...15 {
     for code: Int64 in [0, 49, 53, 63] {
