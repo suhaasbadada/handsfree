@@ -201,7 +201,7 @@ where
     }
     process(segmenter.finish())?;
     session.check()?;
-    Ok(text.join(" "))
+    Ok(crate::transcript::clean(&text.join(" ")))
 }
 #[cfg(test)]
 mod tests {
@@ -270,6 +270,38 @@ mod tests {
         assert_eq!(rx.recv().unwrap(), 2);
         assert_eq!(loads.load(Ordering::SeqCst), 1);
         assert_eq!(session.seconds(), 9.1);
+    }
+    #[test]
+    fn final_cleanup_discards_artifact_chunks_and_counts_only_final_words() {
+        for tail in ["[NO_SPEECH].", "Hello,world! [APPLAUSE] don't stop."] {
+            let session = Session::new(1, 2, 120);
+            session.push(&speech(8 * RATE));
+            session.push(&vec![0.; RATE]);
+            session.push(&speech(1600));
+            session.finish(None);
+            let mut calls = 0;
+            let text = run(
+                &session,
+                || Ok(()),
+                |_, _| {
+                    calls += 1;
+                    Ok(if calls == 1 { "[BLANK_AUDIO]" } else { tail }.into())
+                },
+            )
+            .unwrap();
+            assert_eq!(calls, 2);
+            let mut stats = crate::storage::Stats::default();
+            stats.record(&text, session.seconds());
+            if tail == "[NO_SPEECH]." {
+                assert!(text.is_empty());
+                assert_eq!(stats, crate::storage::Stats::default());
+            } else {
+                assert_eq!(text, "Hello,world!   don't stop.");
+                assert_eq!(stats.words, 4);
+                assert_eq!(stats.transcriptions, 1);
+                assert_eq!(stats.speech_seconds, 9.1);
+            }
+        }
     }
     #[test]
     fn slow_backlog_finish_is_a_barrier_and_inference_stays_serial() {

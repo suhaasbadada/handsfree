@@ -4,6 +4,7 @@ mod logic;
 mod shortcut;
 mod storage;
 mod streaming;
+mod transcript;
 use futures_util::StreamExt;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -720,7 +721,10 @@ fn complete_transcription(session: Arc<streaming::Session>, result: Result<Strin
         }
     }
     session.finish(None);
-    let result = session.check().and(result);
+    let result = session
+        .check()
+        .and(result)
+        .map(|text| transcript::clean(&text));
     let seconds = session.seconds();
     let mut inner = s.inner.lock().unwrap();
     if inner.generation != generation {

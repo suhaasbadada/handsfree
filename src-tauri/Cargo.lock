@@ -1518,6 +1518,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-single-instance",
  "tokio",
+ "unicode-segmentation",
  "whisper-rs",
 ]
 

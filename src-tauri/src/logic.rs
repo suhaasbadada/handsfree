@@ -151,17 +151,7 @@ pub fn can_finish(phase: &str, current: u64, requested: Option<u64>) -> bool {
 /// Dictation inserts one line, never terminal control sequences or pasted Return.
 /// Do not rewrite words, repetitions, punctuation, or fillers.
 pub fn insertion_text(text: &str) -> String {
-    text.chars()
-        .map(|c| {
-            if c.is_control() || matches!(c, '\u{2028}' | '\u{2029}') {
-                ' '
-            } else {
-                c
-            }
-        })
-        .collect::<String>()
-        .trim()
-        .to_string()
+    crate::transcript::clean(text)
 }
 
 /// Native PasteResult codes. Diagnostics intentionally exclude AX values,

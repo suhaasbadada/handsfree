@@ -11,7 +11,7 @@ pub struct Stats {
 }
 impl Stats {
     pub fn record(&mut self, text: &str, seconds: f64) {
-        let words = text.split_whitespace().count() as u64;
+        let words = crate::transcript::count_words(text);
         if words == 0 || !seconds.is_finite() || seconds < 0.0 {
             return;
         }
@@ -277,6 +277,31 @@ mod tests {
         assert_eq!(stats.words, 5);
         assert_eq!(stats.speech_seconds, 22.0);
         assert_eq!(stats.saved_seconds, 4.0);
+    }
+    #[test]
+    fn artifacts_and_punctuation_never_change_any_usage_total() {
+        let mut stats = Stats {
+            transcriptions: 59,
+            words: 1466,
+            speech_seconds: 757.5,
+            saved_seconds: 1445.5,
+        };
+        let previous = stats.clone();
+        for text in [
+            "[BLANK_AUDIO]",
+            "[SILENCE] (music)!",
+            "[_NOSP_] <|nospeech|>",
+            "... ♪♫ 😀",
+            "[00:00:01.000 --> 00:00:02.000]",
+        ] {
+            stats.record(text, 10.0);
+            assert_eq!(stats, previous);
+        }
+        stats.record("Hello,world! [MUSIC] don't stop.", 2.0);
+        assert_eq!(stats.transcriptions, previous.transcriptions + 1);
+        assert_eq!(stats.words, previous.words + 4);
+        assert_eq!(stats.speech_seconds, previous.speech_seconds + 2.0);
+        assert_eq!(stats.saved_seconds, previous.saved_seconds + 4.0);
     }
     #[test]
     fn private_atomic_round_trip_and_reset() {
