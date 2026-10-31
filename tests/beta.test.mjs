@@ -8,12 +8,20 @@ test('app and landing brands show a semantic, visible Beta badge', () => {
   for (const path of ['src/main.ts', 'site/index.html']) {
     const source = read(path);
     assert.match(source, /aria-label="HandsFree beta (?:overview|home)"/);
-    assert.match(source, /<span class="beta-badge">Beta<\/span>/);
+    assert.match(source, /<(?:span|sup) class="beta-badge">Beta<\/(?:span|sup)>/);
     assert.equal([...source.matchAll(/class="beta-badge"/g)].length, 1, 'One unobtrusive badge per surface');
   }
   for (const path of ['src/style.css', 'site/styles.css']) {
-    assert.match(read(path), /\.beta-badge\{[^}]*color:#873c38;[^}]*font-size:11px/);
+    assert.match(read(path), /\.beta-badge\{[^}]*color:#873c38;[^}]*font-size:(?:10|11)px/);
   }
+});
+
+test('landing Beta is a small superscript, not a full-size wordmark or pill', () => {
+  assert.match(read('site/index.html'), /<sup class="beta-badge">Beta<\/sup>/);
+  const rule = read('site/styles.css').match(/\.beta-badge\{([^}]*)\}/)?.[1];
+  assert.match(rule, /top:-0\.55em/);
+  assert.match(rule, /font-size:10px/);
+  assert.doesNotMatch(rule, /border:|padding:|background:/);
 });
 
 test('README, release notes, installer guide and filename disclose beta without renaming the app', () => {
