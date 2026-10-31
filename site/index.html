@@ -13,6 +13,7 @@
     <link rel="icon" type="image/png" href="./assets/handsfree.png">
     <link rel="stylesheet" href="./styles.css">
     <script type="module" src="./download.js"></script>
+    <script type="module" src="./demo.js"></script>
     <title>HandsFree — A little less typing. A little more flow.</title>
   </head>
   <body>
@@ -40,13 +41,20 @@
           <p id="release-status" class="availability" role="status">No public Mac download yet. Publication pending dependency licensing review.</p>
           <noscript><p class="availability">JavaScript is off. Check <a href="https://github.com/suhaasbadada/handsfree/releases">published releases</a> for availability. Choose only the Apple Silicon Mac DMG; Intel Macs and mobile are unsupported.</p></noscript>
         </div>
-        <div class="voice-garden" role="img" aria-label="An illustrative sound wave surrounded by the words speak, pause, and carry on. Not an app screenshot.">
-          <span class="orbit orbit-one" aria-hidden="true"></span><span class="orbit orbit-two" aria-hidden="true"></span>
-          <span class="garden-label label-top" aria-hidden="true">a thought, out loud</span>
-          <div class="wave-seed" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-          <span class="garden-label label-bottom" aria-hidden="true">speak. pause. carry on.</span>
-          <span class="garden-caption" aria-hidden="true">A small illustration of a quieter workflow</span>
-        </div>
+        <figure class="dictation-demo" aria-label="Speech-to-text example" aria-describedby="demo-caption" data-state="done">
+          <div class="demo-card">
+            <div class="demo-capsule" aria-hidden="true">
+              <span class="demo-wave"><i></i><i></i><i></i><i></i><i></i></span>
+              <span id="demo-phase">Done</span>
+              <span class="demo-dots"><i></i><i></i><i></i></span>
+            </div>
+            <label class="demo-label" for="demo-text">Text</label>
+            <textarea id="demo-text" readonly rows="3" spellcheck="false">Let’s move our meeting to tomorrow morning.</textarea>
+            <button id="demo-play" type="button" aria-controls="demo-text" hidden>Play demo <span aria-hidden="true">↻</span></button>
+            <p id="demo-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
+          </div>
+          <figcaption id="demo-caption">Illustrative demo — no microphone access</figcaption>
+        </figure>
       </section>
 
       <div class="principles wrap" aria-label="Project principles"><span>Local-first by design</span><span>No account or paid API</span><span>Open source · MIT</span></div>

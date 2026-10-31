@@ -65,6 +65,18 @@ test('Pages deployment uses the static artifact, official actions and scoped per
   assert.doesNotMatch(workflow, /secrets\.|CNAME|npm |cargo /);
 });
 
+test('hero demonstrates dictation honestly with an accessible static fallback', () => {
+  assert.match(html, /<script type="module" src="\.\/demo.js"><\/script>/);
+  assert.match(html, /Illustrative demo — no microphone access/);
+  assert.match(html, /<label[^>]+for="demo-text">Text<\/label>/);
+  assert.match(html, /<textarea id="demo-text" readonly[^>]*>Let’s move our meeting to tomorrow morning\.<\/textarea>/);
+  assert.match(html, /<button id="demo-play"[^>]* hidden>Play demo/);
+  assert.match(html, /id="demo-status"[^>]*role="status"[^>]*aria-atomic="true"/);
+  assert.doesNotMatch(html + css, /voice-garden|wave-seed|garden-label|\borbit\b|infinite/);
+  const js = readFileSync(new URL('site/demo.js', root), 'utf8');
+  assert.doesNotMatch(js, /getUserMedia|SpeechRecognition|AudioContext|fetch\(/);
+});
+
 test('project license metadata and grant agree without relicensing dependencies', () => {
   const pkg = JSON.parse(readFileSync(new URL('package.json', root)));
   const lock = JSON.parse(readFileSync(new URL('package-lock.json', root)));

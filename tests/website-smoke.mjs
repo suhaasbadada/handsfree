@@ -9,6 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 const binary = process.env.BROWSER_BINARY;
 const port = process.env.SITE_PORT ?? '8765';
+const sitePath = process.env.SITE_PATH ?? '/';
 if (!binary) throw new Error('Set BROWSER_BINARY and serve site/ on http://127.0.0.1:8765 first.');
 const profile = mkdtempSync(join(tmpdir(), 'handsfree-website-'));
 const browser = spawn(binary, ['--headless', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
@@ -62,7 +63,7 @@ try {
     { name: 'prefers-reduced-motion', value: 'reduce' },
     { name: 'prefers-color-scheme', value: 'light' },
   ] });
-  await send('Page.navigate', { url: `http://127.0.0.1:${port}/` });
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}${sitePath}` });
   for (let attempt = 0; attempt < 100; attempt++) {
     if (await evaluate(`document.readyState === 'complete' && !!document.querySelector('h1')`)) break;
     await delay(50);
@@ -101,7 +102,7 @@ try {
     dark: matchMedia('(prefers-color-scheme:dark)').matches,
     scheme: getComputedStyle(document.documentElement).colorScheme,
     background: getComputedStyle(document.body).backgroundColor,
-    animation: getComputedStyle(document.querySelector('.wave-seed')).animationName,
+    animation: getComputedStyle(document.querySelector('.demo-wave i')).animationName,
     scroll: document.documentElement.scrollWidth, width: document.documentElement.clientWidth
   })`);
   assert.ok(dark.dark);
@@ -113,6 +114,40 @@ try {
   await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
   assert.equal(await evaluate('document.activeElement.textContent'), 'Skip to content');
   await screenshot('mobile-dark');
+  const sample = 'Let’s move our meeting to tomorrow morning.';
+  assert.deepEqual(await evaluate(`({value:document.getElementById('demo-text').value,readonly:document.getElementById('demo-text').readOnly,label:document.getElementById('demo-text').labels[0].textContent,hidden:document.getElementById('demo-play').hidden})`),
+    { value: sample, readonly: true, label: 'Text', hidden: false }, 'Semantic, labelled text field and working demo button');
+  const { nodes } = await send('Accessibility.getFullAXTree');
+  assert.ok(nodes.some(node => node.role?.value === 'textbox' && node.name?.value === 'Text' && node.value?.value === sample), 'Transcript is a named textbox in the accessibility tree');
+  async function activate(key = 'Enter') {
+    await evaluate(`document.getElementById('demo-play').focus()`);
+    const code = key === ' ' ? 'Space' : 'Enter';
+    const keyCode = key === ' ' ? 32 : 13;
+    await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: keyCode, text: key === ' ' ? ' ' : '\r' });
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: keyCode });
+  }
+  await activate();
+  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'done', 'Reduced motion finishes immediately');
+  assert.equal(await evaluate(`document.getElementById('demo-status').textContent`), `Done. ${sample}`, 'One complete transcript announcement');
+  assert.equal(await evaluate(`getComputedStyle(document.getElementById('demo-play')).outlineStyle`), 'solid', 'Visible keyboard focus');
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
+  await activate(' ');
+  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'listening', 'Space plays demo');
+  assert.equal(await evaluate(`document.getElementById('demo-text').value`), '');
+  await activate();
+  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'done', 'Enter resets active demo');
+  await delay(2400);
+  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'done', 'Reset has no stale transitions');
+  await activate();
+  await delay(1700);
+  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'processing');
+  assert.equal(await evaluate(`getComputedStyle(document.querySelector('.demo-dots')).display`), 'flex', 'Three processing dots shown');
+  await delay(800);
+  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'done');
+  assert.equal(await evaluate(`document.getElementById('demo-text').value`), sample, 'Complete transcript appears');
+  await activate();
+  await evaluate(`window.dispatchEvent(new PageTransitionEvent('pagehide'))`);
+  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'done', 'Leaving page cancels playback');
   assert.deepEqual(errors, []);
   await send('Emulation.setScriptExecutionDisabled', { value: true });
   await send('Page.reload');
@@ -122,7 +157,8 @@ try {
   }
   assert.equal(await evaluate(`document.getElementById('primary-download').hasAttribute('href')`), false, 'No-JS CTA cannot point at a draft');
   assert.equal(await evaluate(`document.querySelector('noscript').getClientRects().length>0 && document.getElementById('release-status').textContent.includes('No public Mac download')`), true, 'No-JS availability fallback is visible');
-  console.log('Dark mobile, reduced motion, keyboard skip link, and JavaScript errors: passed');
+  assert.equal(await evaluate(`document.getElementById('demo-play').hidden && document.getElementById('demo-text').value === ${JSON.stringify(sample)}`), true, 'No-JS demo shows meaningful text and no inert play button');
+  console.log('Dark mobile, demo playback/reset, reduced motion, keyboard, no-JS fallback, and JavaScript errors: passed');
 } finally {
   socket?.close();
   browser.kill();
