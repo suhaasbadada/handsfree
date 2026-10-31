@@ -8,6 +8,21 @@ const html = readFileSync(new URL('site/index.html', root), 'utf8');
 const css = readFileSync(new URL('site/styles.css', root), 'utf8');
 const workflow = readFileSync(new URL('.github/workflows/pages.yml', root), 'utf8');
 
+test('hero has a direct, accessible Mac download with a real decorative Apple SVG', () => {
+  const hero = html.match(/<section class="hero[\s\S]*?<\/section>/)[0];
+  const cta = hero.match(/<a id="primary-download"[\s\S]*?<\/a>/)[0];
+  assert.match(cta, /href="https:\/\/github.com\/suhaasbadada\/handsfree\/releases\/download\/[^\"]+\.dmg"/);
+  assert.match(cta, /aria-label="Download for Mac \(Apple Silicon\)"/);
+  assert.match(cta, /<svg class="apple-logo"[^>]*fill="currentColor"[^>]*aria-hidden="true"[^>]*focusable="false"><path d="[^"]+"\/><\/svg><span id="download-label">Download for Mac<\/span>/);
+  assert.doesNotMatch(cta, /aria-disabled|tabindex/);
+  assert.doesNotMatch(hero, /Explore (the )?source/);
+  assert.equal([...html.matchAll(/class="apple-logo"/g)].length, 2, 'Hero and Mac card use the same monochrome symbol');
+  const readme = readFileSync(new URL('README.md', root), 'utf8');
+  assert.ok(readme.indexOf('## Download') < readme.indexOf('## Features'));
+  assert.ok(readme.indexOf('### [Download for Mac (.dmg)]') < 1100, 'Download is in the first screen');
+  for (const link of ['CONTRIBUTING.md', 'SECURITY.md', 'LICENSE']) assert.ok(readme.includes(`](${link})`));
+});
+
 test('open-source section uses an accessible GitHub icon without decorative arrows', () => {
   const section = html.match(/<section class="open-note[\s\S]*?<\/section>/)?.[0];
   assert.ok(section);
@@ -90,7 +105,7 @@ test('website is dependency-free with accessible, honest platform copy', () => {
   assert.match(css, /focus-visible/);
   assert.match(html, /Experimental Mac beta available/);
   assert.equal([...html.matchAll(/Not implemented or available to download/g)].length, 2);
-  assert.match(html, /href="https:\/\/github.com\/suhaasbadada\/handsfree\/releases">Release notes &amp; status/);
+  assert.match(html, /href="https:\/\/github.com\/suhaasbadada\/handsfree\/releases\/download\/[^"]+">Download Mac beta/);
   assert.match(html, /<noscript>/);
   assert.equal([...html.matchAll(/class="button primary"/g)].length, 1, 'One primary action, not competing downloads');
   assert.match(html, /releases\/download\/v0\.1\.0-beta\.1\/HandsFree-0\.1\.0-beta\.1-macos-arm64\.dmg/);
@@ -129,7 +144,7 @@ test('hero demonstrates dictation honestly with an accessible static fallback', 
 
 test('hero is concise; architecture guidance and publication details are disclosed below', () => {
   const hero = html.match(/<section class="hero[\s\S]*?<\/section>/)[0];
-  assert.match(hero, /id="download-requirements"[^>]*>Apple Silicon · macOS 14\+ · English<\/p>/);
+  assert.match(hero, /id="download-requirements"[^>]*>For Apple Silicon Mac · macOS 14\+ · English<\/p>/);
   assert.doesNotMatch(hero, /About This Mac|licensing review|No public Mac download|id="release-status"/);
   assert.match(html, /<details class="release-note">[\s\S]*About This Mac[\s\S]*id="release-status"/);
 });

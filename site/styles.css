@@ -49,4 +49,5 @@
 .github-link{display:inline-flex;align-items:center;justify-content:center;flex:none;width:48px;height:48px;border:1px solid var(--line);border-radius:50%;color:var(--ink);text-decoration:none;background:var(--card)}
 .github-link:hover{background:var(--tint);border-color:var(--accent)}
 .open-note>div:first-child{flex:1}
+.button .apple-logo{flex:none}.hero-actions .button{gap:10px}.platform-symbol .apple-logo{display:block;width:30px;height:30px}.platform-note{font-size:0.74rem;max-width:50ch;margin-top:6px}.platform-note:empty{display:none}
 @media(max-width:380px){.site-header{flex-wrap:wrap;padding-block:18px;gap:12px}.site-header nav{margin-left:auto}}

@@ -1,82 +1,90 @@
-# HandsFree
+<p align="center"><a href="https://suhaasbadada.github.io/handsfree/"><img src="site/assets/handsfree.png" width="96" height="96" alt="HandsFree logo"></a></p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-38765b.svg)](LICENSE)
-[![Status: Beta](https://img.shields.io/badge/Status-Beta-a64a45.svg)](docs/releases/v0.1.0-beta.1.md)
+# HandsFree · BETA
 
 **Don’t lose your train of thought.**
 
 Say it while it’s clear. HandsFree turns your thoughts into text, without making typing the bottleneck.
 
-HandsFree is a local-first desktop dictation project: turn speech into text without sending it to a cloud transcription service. The goal is a simple, private dictation companion across macOS, Windows, and Linux. **Today, only the experimental macOS Apple Silicon beta is implemented.** Windows and Linux are planned, not available.
+[![License: MIT](https://img.shields.io/badge/License-MIT-706b68.svg)](LICENSE)
+[![Mac beta: v0.1.0-beta.1](https://img.shields.io/badge/Mac_beta-v0.1.0--beta.1-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.0-beta.1)
+[![Platform: Apple Silicon](https://img.shields.io/badge/Platform-Apple_Silicon-706b68.svg)](#platforms)
 
-[Website](https://suhaasbadada.github.io/handsfree/) · [Source code](https://github.com/suhaasbadada/handsfree) · [MIT license](LICENSE)
+## Download
+
+### [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.0-beta.1/HandsFree-0.1.0-beta.1-macos-arm64.dmg)
+
+**Apple Silicon Mac · macOS 14+ · English.** Intel Macs are unsupported. This beta is self-signed, not notarized: see [Open Anyway and installation guidance](docs/INSTALL.md). No developer tools needed.
+
+[Website](https://suhaasbadada.github.io/handsfree/) · [Releases](https://github.com/suhaasbadada/handsfree/releases) · [Report a bug](https://github.com/suhaasbadada/handsfree/issues)
+
+HandsFree is an open-source, local-first dictation companion. Tap a shortcut, speak, and get text in the field you started in. No account, paid API, telemetry, or cloud transcription service.
+
+## Features
+
+- **Private by design:** Whisper runs on your Mac with Apple Silicon Metal acceleration. Download the model once; dictate offline afterward.
+- **Stay in flow:** a compact recording capsule, live mic meter, and Escape to cancel.
+- **Your shortcut:** Fn / 🌐, a preset, or a custom key combination.
+- **Practical controls:** optional listening sounds, last-transcript copy, and local usage totals.
+- **Safer insertion:** checks the original app and field before submitting Paste; otherwise copies for manual paste.
 
 ## Use cases
 
 - **Think out loud with your coding assistant:** give Claude Code or Codex the goal, context, and details in your own words.
-- **Messages & email:** dictate a quick reply or a thoughtful update, then review and send.
-- **Notes & ideas:** capture a train of thought while it’s fresh; organize it afterward.
-- **First drafts:** talk through an opening, outline, or tricky paragraph, then edit.
+- **Messages & email:** say the reply you have in mind. Review it, then send.
+- **Notes & ideas:** capture a thought while it’s fresh; organize it afterward.
+- **First drafts:** talk through the rough version, then edit.
 
-No special integration is required: insertion depends on the focused field, with clipboard fallback for terminals and other custom editors ([details](docs/INSTALL.md)); HandsFree doesn’t run commands.
+No special integration is required: insertion depends on the focused field, with clipboard fallback for terminals and other custom editors. HandsFree doesn’t run commands.
 
 ## Platforms
 
 | Platform | Status |
 | --- | --- |
-| macOS 14+, Apple Silicon | Experimental beta · self-signed, not notarized |
+| macOS 14+, Apple Silicon | [Mac beta available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.0-beta.1) · self-signed, not notarized |
+| Intel Macs | Unsupported |
 | Windows | Planned; no build or download available |
 | Linux | Planned; no build or download available |
 
-No Windows/Linux release dates are promised. The current Mac implementation lives in the menu bar: tap a shortcut, speak, and tap again to transcribe into the text field you started in. Current beta features:
+No Windows or Linux release dates are promised.
 
-- **Local transcription** with Whisper and Apple Silicon Metal acceleration. No account, paid API, telemetry, or transcript uploads.
-- **Stay in flow:** a compact, focus-preserving recording capsule, live microphone meter, and Escape to cancel.
-- **Your shortcut:** Fn / 🌐, Option + Space, Control + Shift + Space, or a custom combination.
-- **Practical controls:** listening sounds off by default, last-transcript copy, and local usage totals. Warm light surfaces, graphite controls, and muted-red recording accents stay light regardless of system appearance. The Dock icon appears while the dashboard is open; closing it keeps HandsFree in the menu bar.
-- **Safer insertion:** checks the original app and field before submitting Paste; if insertion is refused, copies the transcript for manual paste instead.
+## Install
 
-## Download · Apple Silicon beta
+1. Open the DMG and drag **HandsFree.app to Applications**. Eject the disk image and launch the Applications copy before granting permissions.
+2. If macOS blocks this unnotarized beta, only if you trust the download, use **System Settings → Privacy & Security → Open Anyway**. Respect your organization’s policies; a local signature is not Apple approval.
+3. In HandsFree Settings, allow **Microphone**, then enable **Accessibility** and **Input Monitoring** in System Settings. Quit and reopen after changing permissions.
+4. Click **Download** for the English Whisper model (~148 MB from Hugging Face, checksum verified). This explicit, one-time setup needs internet; dictation works offline afterward.
 
-**[Download Mac beta · DMG](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.0-beta.1/HandsFree-0.1.0-beta.1-macos-arm64.dmg)** · Experimental, self-signed and not notarized. See [release preparation and upstream caveat](docs/RELEASING.md).
+Focus a text field, briefly tap **Fn / 🌐**, speak, and tap again to finish. **Escape** cancels. Choose a different shortcut in Settings if Fn conflicts with macOS or your keyboard. If insertion is unavailable, paste the copied transcript yourself. **Review important text:** speech recognition can make mistakes.
 
-[Published releases](https://github.com/suhaasbadada/handsfree/releases) · [Beta release notes](docs/releases/v0.1.0-beta.1.md)
+[Full installation and troubleshooting guide](docs/INSTALL.md) · [Beta release notes](docs/releases/v0.1.0-beta.1.md)
 
-**Requires macOS 14+ and Apple Silicon (M-series). English only.** Intel Macs are not supported; Windows and Linux are planned but unavailable. The prebuilt app needs **no Node.js, Rust, or developer tools**. The self-signed route is free: no paid Apple Developer membership or certificate installation required. Release label: `v0.1.0-beta.1`; internal app version: `0.1.0`.
+## Build from source
 
-### Install
+Requires Apple Silicon, macOS 14+, Node 22.18+ (24 recommended), Rust stable, CMake, and Xcode Command Line Tools with Swift and a macOS SDK.
 
-1. Open **HandsFree-0.1.0-beta.1-macos-arm64.dmg** and drag **HandsFree.app onto Applications before launching or granting permissions**. Eject the disk image, then open the Applications copy. No ZIP extraction is needed. Keep the disk image with its included license, third-party notices, and dependency source archive.
-2. Open `/Applications/HandsFree.app`. This beta is **not notarized** and is signed with a **local self-signed certificate, not Apple Developer ID**. macOS cannot verify its publisher and may block it. Only if you trust this download, use the normal **System Settings → Privacy & Security → Open Anyway** flow after attempting to open it. Wording and availability vary; if your organization's policy blocks it, **do not bypass that policy**. A local signature is not Apple approval or malware screening.
-3. In HandsFree's Settings, explicitly allow **Microphone**, then enable **Accessibility** and **Input Monitoring** in System Settings → Privacy & Security. If needed, add the installed app with **+**. Quit and reopen after changing permissions. HandsFree never grants access for you.
-4. Click **Download** for the English Whisper model (about **148 MB**, once, from Hugging Face). The app verifies its checksum. Internet is needed for this explicit setup download; dictation works offline afterward. No model is downloaded on launch.
+```sh
+git clone https://github.com/suhaasbadada/handsfree.git
+cd handsfree
+npm ci
+npm run tauri build -- --bundles app
+```
 
-### Start dictating
+The default build is **ad-hoc signed**, not notarized. Rebuilds can require renewed macOS permissions. For installed local updates, use `npm run build:local` with your existing signing identity; see [stable local signing and development](docs/DEVELOPMENT.md). Nothing installs automatically.
 
-Select a text field in another app. Briefly tap **Fn / 🌐**, speak after the optional listening cue, then tap again to finish. **Escape** cancels. The recording limit defaults to **2 minutes**; choose **2, 3, 4, or 5 minutes** in Settings for your next recording. At the limit, recording finishes automatically.
+```sh
+npm test       # automated checks
+npm run build  # frontend typecheck and production build
+```
 
-Transcription begins privately in the background at natural pauses after enough audio has accumulated. Finish delivers one complete transcript, never partial text. This can reduce the final wait when you pause; uninterrupted speech remains one chunk and still needs transcription after Finish. Pause detection uses audio energy, not recognized words or punctuation.
+## Contributing & support
 
-For Fn, set macOS Keyboard → **“Press 🌐 key to” → Do Nothing** and disable conflicting Fn/double-Fn Dictation shortcuts. Some external keyboards do not expose Fn; choose another shortcut instead. Avoid conflicts with the foreground app.
+Bug reports, documentation improvements, and focused contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) to get started; include your macOS version, Mac model, and affected app in bug reports, never private recordings or transcripts.
 
-If automatic insertion is unavailable, the transcript is **Copied** for manual paste. Clipboard managers and Universal Clipboard may retain that text. Submitted Paste is not confirmation the target accepted it: review your text before retrying. [Detailed installation guide](docs/INSTALL.md).
-
-## Beta limitations & privacy
-
-Whisper can omit fillers, alter punctuation, or hallucinate. This is not guaranteed verbatim transcription: **review important text**. Automatic insertion depends on app Accessibility support; hardware, permissions, audio routing, Spaces, and individual editors still need real-world testing. No cloud fallback, translation, login auto-start, or automatic updater is included. Updates are manual: quit the app, replace the Applications copy, then reopen; macOS may require reauthorization.
-
-Audio is processed in memory on this Mac, not saved as recordings. The last transcript stays in process memory, not a history database. Only aggregate usage and settings persist alongside the model. See [detailed behavior, diagnostics, troubleshooting, and privacy](docs/DEVELOPMENT.md).
-
-## Development & help
-
-- [Build, stable local signing, diagnostics, tests, and manual checklist](docs/DEVELOPMENT.md)
-- [Beta release notes](docs/releases/v0.1.0-beta.1.md)
-- [Release packaging and third-party licensing](docs/RELEASING.md)
-- [Beta readiness and remaining human testing](docs/release-readiness.md)
-- [Website and GitHub Pages setup](docs/WEBSITE.md)
-- [Contributing](CONTRIBUTING.md) · [Security reporting](SECURITY.md)
-- [Report an issue](https://github.com/suhaasbadada/handsfree/issues) — include macOS version, Mac model, affected app, and diagnostics; do not post private recordings or transcripts.
+- [Security policy](SECURITY.md) — report vulnerabilities responsibly.
+- [Development, privacy & diagnostics](docs/DEVELOPMENT.md) — local settings/usage persist; audio recordings and transcript history do not. Clipboard managers may retain copied text.
+- [Website development](docs/WEBSITE.md) · [Release packaging](docs/RELEASING.md)
 
 ## License
 
-HandsFree's own source code is available under the [MIT license](LICENSE), copyright 2026 Suhaas Badada. Third-party dependencies and speech models retain their own licenses. Their notices, sources, upstream caveat and the experimental distribution decision are documented in [release preparation](docs/RELEASING.md); this is not legal certification.
+HandsFree’s own code is [MIT licensed](LICENSE), © 2026 Suhaas Badada. Dependencies and speech models retain their own licenses. See [third-party notices and release caveats](docs/RELEASING.md) for upstream licensing details.

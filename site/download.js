@@ -20,12 +20,12 @@ export function detectPlatform({ userAgent = '', platform = '', maxTouchPoints =
 }
 
 export function downloadState(platform, manifest) {
-  const requirement = 'Apple Silicon · macOS 14+ · English';
-  if (platform.os === 'mac' && platform.arch === 'intel') return { label: 'Intel Macs not supported', detail: requirement, url: null };
-  if (platform.os === 'windows' || platform.os === 'linux') return { label: `${platform.os === 'windows' ? 'Windows' : 'Linux'} coming soon`, detail: 'Mac beta only · Windows & Linux planned', url: null };
-  if (platform.os !== 'mac') return { label: publishedUrl(manifest) ? 'Available on Apple Silicon Mac' : 'Mac beta coming soon', detail: requirement, url: null };
   const url = publishedUrl(manifest);
-  return { label: url ? 'Download for Mac' : 'Mac beta coming soon', detail: requirement, url };
+  const note = platform.os === 'mac' && platform.arch === 'intel' ? 'Intel Macs are not supported. Download only for another, Apple Silicon Mac.'
+    : platform.os === 'windows' ? 'Windows planned. This download is for an Apple Silicon Mac.'
+    : platform.os === 'linux' ? 'Linux planned. This download is for an Apple Silicon Mac.' : '';
+  return { label: url ? (platform.os === 'mac' ? 'Download for Mac' : 'Get Mac beta') : 'Mac beta coming soon',
+    detail: 'For Apple Silicon Mac · macOS 14+ · English', note, url };
 }
 
 function publishedUrl(manifest) {
@@ -40,7 +40,8 @@ function publishedUrl(manifest) {
 export function renderDownload(document, platform, manifest) {
   const state = downloadState(platform, manifest);
   const cta = document.getElementById('primary-download');
-  cta.textContent = state.label;
+  document.getElementById('download-label').textContent = state.label;
+  cta.setAttribute('aria-label', state.url ? 'Download for Mac (Apple Silicon)' : state.label);
   if (state.url) {
     cta.href = state.url;
     cta.removeAttribute('aria-disabled');
@@ -51,6 +52,7 @@ export function renderDownload(document, platform, manifest) {
     cta.setAttribute('tabindex', '-1');
   }
   document.getElementById('download-requirements').textContent = state.detail;
+  document.getElementById('download-platform-note').textContent = state.note;
   document.getElementById('release-status').textContent = publishedUrl(manifest)
     ? `Mac beta v${manifest.version} · DMG · Self-signed, not notarized.`
     : 'No public Mac download yet. Experimental beta assets are awaiting public verification.';

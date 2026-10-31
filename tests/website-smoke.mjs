@@ -68,17 +68,25 @@ try {
     if (await evaluate(`document.readyState === 'complete' && !!document.querySelector('h1')`)) break;
     await delay(50);
   }
-  assert.deepEqual(await evaluate(`({disabled:document.getElementById('primary-download').getAttribute('aria-disabled'), href:document.getElementById('primary-download').getAttribute('href')})`), {disabled:'true',href:null}, 'Draft manifest cannot produce a dead download');
+  const dmgUrl = 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.0-beta.1/HandsFree-0.1.0-beta.1-macos-arm64.dmg';
+  assert.deepEqual(await evaluate(`({disabled:document.getElementById('primary-download').getAttribute('aria-disabled'), href:document.getElementById('primary-download').getAttribute('href')})`), {disabled:null,href:dmgUrl}, 'Published manifest offers a working direct download');
   await evaluate(`(async () => { window.downloadModule=await import('./download.js'); window.releaseModule=await import('./release.js'); })()`);
   for (const os of ['mac','windows','linux','mobile','unknown']) {
     await evaluate(`window.downloadModule.renderDownload(document,{os:${JSON.stringify(os)},arch:'unknown'},{...window.releaseModule.release,publicAvailable:true})`);
     const href = await evaluate(`document.getElementById('primary-download').getAttribute('href')`);
-    assert.equal(href, os === 'mac' ? 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.0-beta.1/HandsFree-0.1.0-beta.1-macos-arm64.dmg' : null, `${os}: only Mac gets a direct DMG`);
+    assert.equal(href, dmgUrl, `${os}: Mac DMG remains available to every visitor`);
+    assert.deepEqual(await evaluate(`({label:document.getElementById('download-label').textContent, name:document.getElementById('primary-download').getAttribute('aria-label'),icons:document.querySelectorAll('#primary-download svg.apple-logo[aria-hidden="true"] path').length})`),
+      {label:os === 'mac' ? 'Download for Mac' : 'Get Mac beta', name:'Download for Mac (Apple Silicon)',icons:1});
+    for (const manifest of ['{...window.releaseModule.release,publicAvailable:false}', '{...window.releaseModule.release,dmgUrl:"https://evil.invalid/bad.dmg"}']) {
+      await evaluate(`window.downloadModule.renderDownload(document,{os:${JSON.stringify(os)},arch:'unknown'},${manifest})`);
+      assert.equal(await evaluate(`document.getElementById('primary-download').hasAttribute('href')`), false, `${os}: unavailable/corrupt manifests fail closed`);
+    }
   }
   await evaluate(`window.downloadModule.renderDownload(document,{os:'mac',arch:'intel'},{...window.releaseModule.release,publicAvailable:true})`);
-  assert.equal(await evaluate(`document.getElementById('primary-download').hasAttribute('href')`), false, 'Known Intel never gets ARM build');
+  assert.equal(await evaluate(`document.getElementById('primary-download').getAttribute('href')`), dmgUrl, 'Intel visitor may intentionally download for another Mac');
+  assert.match(await evaluate(`document.getElementById('download-platform-note').textContent`), /Intel Macs are not supported/);
   await evaluate(`window.downloadModule.renderDownload(document,{os:'mac',arch:'unknown'},window.releaseModule.release)`);
-  for (const width of [320, 390, 400, 560, 740, 980, 1280]) {
+  for (const width of [320, 390, 400, 560, 740, 768, 980, 1280]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
     const metrics = await evaluate(`new Promise(resolve => requestAnimationFrame(() => resolve({
       width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth,
@@ -141,6 +149,7 @@ try {
   assert.deepEqual(await evaluate(`({value:document.getElementById('demo-text').value,readonly:document.getElementById('demo-text').readOnly,label:document.getElementById('demo-text').labels[0].textContent})`),
     { value: sample, readonly: true, label: 'Text' }, 'Semantic, labelled static reduced-motion text field');
   const { nodes } = await send('Accessibility.getFullAXTree');
+  assert.equal(nodes.filter(node => node.role?.value === 'link' && node.name?.value === 'Download for Mac (Apple Silicon)').length, 1, 'Exactly one named, accessible hero download');
   assert.ok(nodes.some(node => node.role?.value === 'region' && node.name?.value === 'Talk through the work.'), 'Use cases form a named accessible section');
   for (const title of ['Think out loud with your coding assistant.', 'Messages & email', 'Notes & ideas', 'First drafts']) {
     assert.ok(nodes.some(node => node.role?.value === 'heading' && node.name?.value === title), `Accessible use-case heading: ${title}`);
@@ -154,6 +163,10 @@ try {
     await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: keyCode });
   }
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
+  for (const width of [320, 390, 768, 1280]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+    assert.equal(await evaluate(`new Promise(resolve => requestAnimationFrame(() => resolve(document.documentElement.scrollWidth === innerWidth && document.getElementById('primary-download').getBoundingClientRect().bottom < innerHeight)))`), true, `Normal motion: visible download and no overflow at ${width}px`);
+  }
   await delay(100);
   assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'listening', 'Motion change starts automatic loop without a play action');
   await activate(' ');
@@ -193,9 +206,13 @@ try {
     if (await evaluate(`document.readyState === 'complete'`)) break;
     await delay(50);
   }
-  assert.equal(await evaluate(`document.getElementById('primary-download').hasAttribute('href')`), false, 'No-JS CTA cannot point at a draft');
-  assert.equal(await evaluate(`document.querySelector('noscript').getClientRects().length>0 && document.getElementById('release-status').textContent.includes('No public Mac download')`), true, 'No-JS availability fallback is visible');
+  assert.equal(await evaluate(`document.getElementById('primary-download').getAttribute('href')`), dmgUrl, 'No-JS CTA directly downloads the published Mac beta');
+  assert.equal(await evaluate(`document.querySelector('noscript').getClientRects().length>0 && document.querySelectorAll('#primary-download svg.apple-logo[aria-hidden="true"] path').length===1`), true, 'No-JS requirements and Apple logo are visible');
   assert.equal(await evaluate(`!document.getElementById('demo-play') && document.getElementById('demo-pause').hidden && document.getElementById('demo-text').value === ${JSON.stringify(sample)}`), true, 'No-JS demo shows meaningful text and no inert control');
+  for (const width of [320, 390, 768, 1280]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+    assert.equal(await evaluate(`document.documentElement.scrollWidth === innerWidth && document.getElementById('primary-download').getBoundingClientRect().bottom < innerHeight`), true, `No JavaScript: visible download and no overflow at ${width}px`);
+  }
   console.log('Dark mobile, automatic demo loop/pause, visibility cancellation, reduced motion, keyboard, no-JS fallback, and JavaScript errors: passed');
 } finally {
   socket?.close();

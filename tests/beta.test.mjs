@@ -25,7 +25,7 @@ test('landing Beta is a small superscript, not a full-size wordmark or pill', ()
 });
 
 test('README, release notes, installer guide and filename disclose beta without renaming the app', () => {
-  assert.match(read('README.md'), /!\[Status: Beta\]\(https:\/\/img.shields.io\/badge\/Status-Beta-a64a45.svg\)/);
+  assert.match(read('README.md'), /!\[Mac beta: v0\.1\.0-beta\.1\]\(https:\/\/img.shields.io\/badge\/Mac_beta-v0\.1\.0--beta\.1-a64a45.svg\)/);
   assert.match(read('docs/releases/v0.1.0-beta.1.md'), /# HandsFree v0\.1\.0-beta\.1/);
   assert.match(read('docs/releases/v0.1.0-beta.1.md'), /Prerelease · Beta testing/);
   assert.match(read('docs/INSTALL.md'), /# Install HandsFree \(Mac beta\)/);

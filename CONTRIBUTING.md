@@ -8,4 +8,4 @@ Keep the warm light/red design, keyboard accessibility, explicit permissions, an
 
 Use `npm run build:local` for local app updates **only with your existing signing identity**; never automatically replace an identity. Ordinary CI does not need signing credentials. Do not install or launch a newly built app without the user's permission.
 
-Your contributions are provided under the project's [MIT license](LICENSE). Dependencies retain their own terms. Dependency changes require a notice/source and licensing review; the current [publication gate](docs/RELEASING.md) remains unresolved. A green build is not legal approval or a public release.
+Your contributions are provided under the project's [MIT license](LICENSE). Dependencies retain their own terms. Dependency changes require a notice/source and licensing review; see the [experimental beta distribution decision and upstream caveats](docs/RELEASING.md). A green build is not legal approval or authorization to publish a new release.

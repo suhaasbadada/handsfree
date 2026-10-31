@@ -33,7 +33,7 @@ for (const [label, mutate, message] of [
 
 const sizes = { [candidate]: 123, 'PROVENANCE.txt': 456, SHA256SUMS: 789 };
 test('draft audit requires the matching website manifest to remain unavailable', () => {
-  assert.doesNotThrow(() => validateAvailability(release));
+  assert.doesNotThrow(() => validateAvailability({ ...release, publicAvailable: false }));
   for (const change of [{ publicAvailable: true }, { version: '0.1.0' }, { dmgUrl: release.dmgUrl.replace('.dmg', '.zip') }]) {
     assert.throws(() => validateAvailability({ ...release, ...change }), /manifest disabled/);
   }

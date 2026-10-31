@@ -39,23 +39,26 @@ test('published manifest permits a direct DMG; unavailable manifests remain disa
     assert.equal(downloadState(platform, { ...release, publicAvailable: false }).url, null);
     assert.equal(downloadState(platform, release).url, release.dmgUrl);
     assert.equal(downloadState(platform, enabled).url, release.dmgUrl);
-    assert.equal(downloadState(platform, enabled).detail, 'Apple Silicon · macOS 14+ · English');
+    assert.equal(downloadState(platform, enabled).detail, 'For Apple Silicon Mac · macOS 14+ · English');
   }
   for (const os of ['windows', 'linux', 'mobile', 'unknown']) {
-    assert.equal(downloadState({ os, arch: 'arm64' }, enabled).url, null);
+    assert.equal(downloadState({ os, arch: 'arm64' }, enabled).url, enabled.dmgUrl);
+    assert.equal(downloadState({ os, arch: 'arm64' }, enabled).label, 'Get Mac beta');
   }
-  assert.match(downloadState({ os: 'mac', arch: 'intel' }, enabled).label, /not supported/);
-  assert.equal(downloadState({ os: 'mac', arch: 'intel' }, enabled).url, null);
+  assert.match(downloadState({ os: 'mac', arch: 'intel' }, enabled).note, /Intel Macs are not supported/);
+  assert.equal(downloadState({ os: 'mac', arch: 'intel' }, enabled).url, enabled.dmgUrl);
 });
 
 test('bad version, paths, schemas and truthy availability fail closed', () => {
-  const platform = { os: 'mac', arch: 'unknown' };
-  for (const manifest of [null, {}, { ...enabled, schemaVersion: 2 }, { ...enabled, publicAvailable: 'true' },
-    { ...enabled, version: '../escape' }, { ...enabled, dmgUrl: 'javascript:alert(1)' },
-    { ...enabled, dmgUrl: enabled.dmgUrl.replace('.dmg', '.zip') },
-    { ...enabled, dmgUrl: `${enabled.dmgUrl}?token=secret` },
-    { ...enabled, dmgUrl: enabled.dmgUrl.replace('github.com/', 'github.com.evil/') }]) {
-    assert.equal(downloadState(platform, manifest).url, null);
+  for (const os of ['mac', 'windows', 'linux', 'mobile', 'unknown']) {
+    const platform = { os, arch: 'unknown' };
+    for (const manifest of [null, {}, { ...enabled, publicAvailable: false }, { ...enabled, schemaVersion: 2 }, { ...enabled, publicAvailable: 'true' },
+      { ...enabled, version: '../escape' }, { ...enabled, dmgUrl: 'javascript:alert(1)' },
+      { ...enabled, dmgUrl: enabled.dmgUrl.replace('.dmg', '.zip') },
+      { ...enabled, dmgUrl: `${enabled.dmgUrl}?token=secret` },
+      { ...enabled, dmgUrl: enabled.dmgUrl.replace('github.com/', 'github.com.evil/') }]) {
+      assert.equal(downloadState(platform, manifest).url, null);
+    }
   }
 });
 
@@ -76,16 +79,19 @@ test('rendering transitions remove stale links and disabled state without click 
   const document = fixtureDocument();
   const cta = document.getElementById('primary-download');
   renderDownload(document, { os: 'mac', arch: 'unknown' }, { ...release, publicAvailable: false });
-  assert.equal(document.getElementById('download-requirements').textContent, 'Apple Silicon · macOS 14+ · English');
+  assert.equal(document.getElementById('download-requirements').textContent, 'For Apple Silicon Mac · macOS 14+ · English');
   assert.equal(cta.href, undefined);
   assert.equal(cta.getAttribute('aria-disabled'), 'true');
   renderDownload(document, { os: 'mac', arch: 'unknown' }, enabled);
   assert.equal(cta.href, enabled.dmgUrl);
   assert.equal(cta.getAttribute('aria-disabled'), undefined);
-  assert.equal(cta.textContent, 'Download for Mac');
+  assert.equal(document.getElementById('download-label').textContent, 'Download for Mac');
+  assert.equal(cta.textContent, '', 'Parent/icon subtree is never replaced');
+  assert.equal(cta.getAttribute('aria-label'), 'Download for Mac (Apple Silicon)');
   renderDownload(document, { os: 'windows', arch: 'unknown' }, enabled);
-  assert.equal(cta.href, undefined);
-  assert.match(cta.textContent, /Windows coming soon/);
+  assert.equal(cta.href, enabled.dmgUrl);
+  assert.equal(document.getElementById('download-label').textContent, 'Get Mac beta');
+  assert.match(document.getElementById('download-platform-note').textContent, /Windows planned/);
 });
 
 test('absent or rejected hints stay safe and initialization never requires GitHub API', async () => {
