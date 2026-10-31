@@ -4,6 +4,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homebrewCommand } from '../site/install.js';
+import { release } from '../site/release.js';
 
 const root = new URL('../', import.meta.url);
 const html = readFileSync(new URL('site/index.html', root), 'utf8');
@@ -31,7 +32,8 @@ test('Homebrew is recommended and visible in the hero, with safe setup across do
     assert.match(copy, /trust/i);
     assert.match(copy, /Apple (?:identity|approval)/);
     assert.match(copy, /notarization|not notarized/);
-    assert.doesNotMatch(copy, /--no-quarantine|--force|--zap|sudo|xattr|spctl|rm -|\bbrew trust (?!\x2d\x2dcask suhaasbadada\/handsfree\/handsfree)/);
+    // Permit the explicit data-safety prohibition, never a destructive command.
+    assert.doesNotMatch(copy.replace('Do not use `--zap`', ''), /--no-quarantine|--force|--zap|sudo|xattr|spctl|rm -|\bbrew trust (?!\x2d\x2dcask suhaasbadada\/handsfree\/handsfree)/);
     const tokens = [...copy.matchAll(/brew (?:install|upgrade|trust) --cask ([^\s<`]+)/g)].map(match => match[1]);
     assert.ok(tokens.every(token => token === 'suhaasbadada/handsfree/handsfree'));
   }
@@ -42,6 +44,7 @@ test('Homebrew is recommended and visible in the hero, with safe setup across do
   assert.match(install, /quit HandsFree and move the existing app copy to a safe backup/);
   assert.match(install, /do not delete your models, settings, statistics, or other user data/);
   assert.match(install, /Gatekeeper, quarantine/);
+  assert.match(install, /Do not use `--zap`, delete HandsFree's data folders, or reset totals to update/);
   assert.match(css, /\.homebrew-option>code\{[^}]*white-space:normal;overflow-wrap:anywhere/);
 });
 
@@ -152,7 +155,7 @@ test('website is dependency-free with accessible, honest platform copy', () => {
   assert.match(html, /download the English model \(~148 MB\)/);
   assert.match(html, /<noscript>/);
   assert.equal([...html.matchAll(/class="button primary"/g)].length, 2, 'Hero and platform card offer the same Mac download');
-  assert.match(html, /releases\/download\/v0\.1\.1-beta\.2\/HandsFree-0\.1\.1-beta\.2-macos-arm64\.dmg/);
+  assert.ok(html.includes(`href="${release.dmgUrl}"`));
   assert.match(html, /MIT license does not relicense dependencies/);
 });
 
@@ -161,7 +164,7 @@ test('Mac platform card has a primary Apple download, with technical details dis
   assert.ok(card);
   const cta = card.match(/<a class="button primary"[\s\S]*?<\/a>/)?.[0];
   assert.ok(cta);
-  assert.match(cta, /href="https:\/\/github.com\/suhaasbadada\/handsfree\/releases\/download\/v0\.1\.1-beta\.2\/HandsFree-0\.1\.1-beta\.2-macos-arm64\.dmg"/);
+  assert.ok(cta.includes(`href="${release.dmgUrl}"`));
   assert.match(cta, /aria-label="Download for Mac \(Apple Silicon\)"/);
   assert.match(cta, /<svg class="apple-logo"[^>]*aria-hidden="true"[^>]*focusable="false"><path d="[^"]+"\/><\/svg><span>Download for Mac<\/span>/);
   assert.match(card, /Apple Silicon · macOS 14\+ · English/);

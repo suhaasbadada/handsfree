@@ -7,7 +7,7 @@
 Say it while it’s clear. HandsFree turns your thoughts into text, without making typing the bottleneck.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-706b68.svg)](LICENSE)
-[![Mac beta: v0.1.1-beta.2](https://img.shields.io/badge/Mac_beta-v0.1.1--beta.2-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.2)
+[![Mac beta: v0.1.1-beta.3](https://img.shields.io/badge/Mac_beta-v0.1.1--beta.3-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.3)
 [![Platforms: Apple Silicon and Windows x64](https://img.shields.io/badge/Platforms-Apple_Silicon_%C2%B7_Windows_x64-706b68.svg)](#platforms)
 
 ## Download & install
@@ -24,7 +24,7 @@ Homebrew simplifies installation; macOS security prompts may still appear. This 
 
 Open **Applications → HandsFree**, allow Microphone, Accessibility, and Input Monitoring, then download the English model (~148 MB) in Settings → Overview. [Complete Mac setup, security prompts & existing-app guidance](docs/INSTALL.md).
 
-### [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.2/HandsFree-0.1.1-beta.2-macos-arm64.dmg)
+### [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.3/HandsFree-0.1.1-beta.3-macos-arm64.dmg)
 
 **DMG alternative:** drag HandsFree to Applications before opening it or granting permissions. Intel Macs are unsupported. See [Open Anyway and installation guidance](docs/INSTALL.md). No developer tools needed.
 
@@ -58,7 +58,7 @@ No special integration is required: insertion depends on the focused field, with
 
 | Platform | Status |
 | --- | --- |
-| macOS 14+, Apple Silicon | [Mac beta available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.2) · self-signed, not notarized |
+| macOS 14+, Apple Silicon | [Mac beta available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.3) · self-signed, not notarized |
 | Intel Macs | Unsupported |
 | Windows 10/11, x64 | [Experimental Windows beta 2 available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-windows-beta.2) · unsigned, not yet hardware-tested |
 | Linux | Planned; no build or download available |
@@ -80,7 +80,7 @@ Windows ARM and 32-bit Windows are unsupported. Linux has no release date.
 
 Focus a text field, briefly tap **Fn / 🌐**, speak, and tap again to finish. **Escape** cancels. Choose a different shortcut in Settings if Fn conflicts with macOS or your keyboard. If insertion is unavailable, paste the copied transcript yourself. **Review important text:** speech recognition can make mistakes.
 
-[Full installation and troubleshooting guide](docs/INSTALL.md) · [Beta release notes](docs/releases/v0.1.1-beta.2.md)
+[Full installation and troubleshooting guide](docs/INSTALL.md) · [Beta release notes](docs/releases/v0.1.1-beta.3.md)
 
 **Homebrew updates:** quit HandsFree, run the following in Terminal, then reopen from Applications:
 

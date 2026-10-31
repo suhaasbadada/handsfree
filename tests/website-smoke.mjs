@@ -260,10 +260,7 @@ try {
     if (await evaluate(`document.readyState === 'complete'`)) break;
     await delay(50);
   }
-  // Candidate preparation deliberately retains the live beta 2 static fallback
-  // until public beta 3 bytes are verified and availability is enabled.
-  const publicDmgUrl = publicAvailable ? dmgUrl : 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.2/HandsFree-0.1.1-beta.2-macos-arm64.dmg';
-  assert.equal(await evaluate(`document.getElementById('primary-download').getAttribute('href')`), publicDmgUrl, 'No-JS CTA directly downloads the currently published Mac beta, never a draft candidate');
+  assert.equal(await evaluate(`document.getElementById('primary-download').getAttribute('href')`), publicAvailable ? dmgUrl : null, 'No-JS CTA follows verified public availability, never a draft candidate');
   assert.equal(await evaluate(`document.querySelector('noscript').getClientRects().length>0 && document.querySelectorAll('#primary-download svg.apple-logo[aria-hidden="true"] path').length===1`), true, 'No-JS requirements and Apple logo are visible');
   assert.equal(await evaluate(`!document.getElementById('demo-play') && document.getElementById('demo-pause').hidden && document.getElementById('demo-text').value === ${JSON.stringify(sample)}`), true, 'No-JS demo shows meaningful text and no inert control');
   for (const width of [320, 390, 768, 1280]) {

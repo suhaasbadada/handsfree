@@ -35,11 +35,13 @@ brew update
 brew upgrade --cask suhaasbadada/handsfree/handsfree
 ```
 
-Reopen the Applications copy afterward. The tap currently distributes `0.1.1-beta.2`; beta updates are reviewed manually, not promised on a schedule. Its documented online-audit prerelease policy finding is intentional, not a claim that the beta meets Homebrew’s stable-release policy.
+Reopen the Applications copy afterward. The current Mac distribution is `0.1.1-beta.3` (the embedded app version remains `0.1.1`); Homebrew selects upgrades using the cask's distribution version. Beta updates are reviewed manually, not promised on a schedule. Its documented online-audit prerelease policy finding is intentional, not a claim that the beta meets Homebrew’s stable-release policy.
+
+Normal updates preserve your existing model, settings, and usage totals; they do not restart onboarding or reset permissions. Do not use `--zap`, delete HandsFree's data folders, or reset totals to update. Existing permissions may still need reauthorization if macOS requests it. No installed-app upgrade or clean-machine onboarding test is implied by the release's artifact checks.
 
 ## DMG alternative
 
-Download the [Mac DMG](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.2/HandsFree-0.1.1-beta.2-macos-arm64.dmg). Open it and drag **HandsFree.app** onto **Applications**. Keep the disk image: its `Licenses` folder (project license, dependency notices and corresponding sources) accompanies redistributions. No ZIP extraction or developer tools are needed. Eject the image after copying. Do not launch the copy inside the disk image.
+Download the [Mac DMG](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.3/HandsFree-0.1.1-beta.3-macos-arm64.dmg). Open it and drag **HandsFree.app** onto **Applications**. Keep the disk image: its `Licenses` folder (project license, dependency notices and corresponding sources) accompanies redistributions. No ZIP extraction or developer tools are needed. Eject the image after copying. Do not launch the copy inside the disk image.
 
 For DMG installs, updates are manual: quit HandsFree, replace the Applications copy, reopen. Permissions may need reauthorization.
 
@@ -48,7 +50,7 @@ For DMG installs, updates are manual: quit HandsFree, replace the Applications c
 1. Open **Applications → HandsFree** before granting permissions.
 2. This beta is **self-signed, not Apple Developer ID signed or notarized**. macOS cannot verify its publisher and may block it. Only if you trust the download, attempt to open it, then use System Settings → Privacy & Security → **Open Anyway** if offered. Do not disable Gatekeeper or bypass organizational policies. Signing is not Apple approval or malware screening. If Open Anyway is not offered or your Mac is managed, contact your administrator; do not weaken system security.
 3. In HandsFree Settings, explicitly allow **Microphone**, **Accessibility**, and **Input Monitoring**. Quit and reopen after permission changes if needed. HandsFree cannot grant access for you.
-4. In **Settings → Overview**, choose **Download** for the English Whisper model (~148 MB, from Hugging Face). It is checksum-verified and downloaded only on request. Dictation then works offline.
+4. On **Overview** or in **Settings → Setup**, choose **Download** for the English Whisper model (~148 MB, from Hugging Face) if it is not already present. It is checksum-verified and downloaded only on request. Dictation then works offline.
 
 Focus a text field, tap your shortcut to speak, and tap again to transcribe. Escape cancels. Review the result; if automatic insertion is unavailable, paste the copied text yourself. Fn may require macOS Keyboard → “Press 🌐 key to” → Do Nothing and disabling conflicting Dictation shortcuts. Alternatively choose another shortcut in HandsFree.
 
