@@ -75,6 +75,8 @@ export function renderDownload(document, platform, manifest, windowsManifest = w
   const macUrl = publishedUrl(manifest);
   const windowsUrl = publishedWindowsUrl(windowsManifest);
   const isWindows = state.target === 'windows';
+  const brew = document.getElementById('hero-homebrew');
+  if (brew) brew.hidden = platform.os !== 'mac' || platform.arch === 'intel' || !macUrl;
   setDownloadLink(document.getElementById('primary-download'), state.url,
     state.url ? (isWindows ? 'Download for Windows (x64 EXE)' : 'Download for Mac (Apple Silicon)') : state.label);
   document.getElementById('download-label').textContent = state.label;

@@ -3,30 +3,34 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { homebrewCommand } from '../site/install.js';
 
 const root = new URL('../', import.meta.url);
 const html = readFileSync(new URL('site/index.html', root), 'utf8');
 const css = readFileSync(new URL('site/styles.css', root), 'utf8');
 const workflow = readFileSync(new URL('.github/workflows/pages.yml', root), 'utf8');
 
-test('Homebrew is a scoped, safe secondary install option across website and docs', () => {
+test('Homebrew is recommended and visible in the hero, with safe setup across docs', () => {
   const readme = readFileSync(new URL('README.md', root), 'utf8');
   const install = readFileSync(new URL('docs/INSTALL.md', root), 'utf8');
-  const command = 'brew install --cask suhaasbadada/handsfree/handsfree';
-  const download = readme.match(/## Download\n([\s\S]*?)\n## Features/)?.[1];
-  assert.ok(download.indexOf('Download for Mac (.dmg)') < download.indexOf(command));
-  assert.equal([...download.matchAll(/```sh/g)].length, 1, 'One simple second-option command block');
+  const command = homebrewCommand;
+  const download = readme.match(/## Download & install\n([\s\S]*?)\n## Features/)?.[1];
+  assert.ok(download.indexOf(command) < download.indexOf('Download for Mac (.dmg)'));
+  assert.match(download, /Homebrew recommended/);
   const section = html.match(/<section class="getting-started[\s\S]*?<\/section>/)?.[0];
-  assert.ok(section.includes(`<code>${command}</code>`));
-  assert.match(section, /Prefer Homebrew\?/);
-  assert.match(section, /<details class="release-note"><summary>Homebrew trust &amp; setup<\/summary>/);
-  assert.doesNotMatch(html.match(/<section class="hero[\s\S]*?<\/section>/)[0], /Homebrew|brew install/);
+  assert.ok(section.includes(command));
+  assert.match(section, /Homebrew recommended/);
+  const hero = html.match(/<section class="hero[\s\S]*?<\/section>/)[0];
+  assert.ok(hero.indexOf(command) < hero.indexOf('id="primary-download"'));
+  assert.match(hero, /Recommended on Mac · Homebrew/);
+  assert.match(hero, /Homebrew simplifies installation; macOS security prompts may still appear\./);
+  assert.match(hero, /href="https:\/\/brew.sh\/"/);
   for (const copy of [download, section, install]) {
     assert.ok(copy.includes(command));
     assert.match(copy, /https:\/\/github.com\/suhaasbadada\/homebrew-handsfree#readme/);
     assert.match(copy, /trust/i);
-    assert.match(copy, /Apple identity/);
-    assert.match(copy, /notarization/);
+    assert.match(copy, /Apple (?:identity|approval)/);
+    assert.match(copy, /notarization|not notarized/);
     assert.doesNotMatch(copy, /--no-quarantine|--force|--zap|sudo|xattr|spctl|rm -|\bbrew trust (?!\x2d\x2dcask suhaasbadada\/handsfree\/handsfree)/);
     const tokens = [...copy.matchAll(/brew (?:install|upgrade|trust) --cask ([^\s<`]+)/g)].map(match => match[1]);
     assert.ok(tokens.every(token => token === 'suhaasbadada/handsfree/handsfree'));
@@ -53,7 +57,8 @@ test('hero has a direct, accessible Mac download with a real decorative Apple SV
   assert.match(html, /class="card-top"><span class="platform-symbol" aria-hidden="true">⌘<\/span>/);
   const readme = readFileSync(new URL('README.md', root), 'utf8');
   assert.ok(readme.indexOf('## Download') < readme.indexOf('## Features'));
-  assert.ok(readme.indexOf('### [Download for Mac (.dmg)]') < 1100, 'Download is in the first screen');
+  assert.ok(readme.indexOf('### Mac — Homebrew recommended') < 1100, 'Recommended Mac installation leads the README');
+  assert.ok(readme.indexOf('### [Download for Mac (.dmg)]') < readme.indexOf('## Features'), 'Direct DMG alternative remains in the download section');
   for (const link of ['CONTRIBUTING.md', 'SECURITY.md', 'LICENSE']) assert.ok(readme.includes(`](${link})`));
 });
 

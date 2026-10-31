@@ -10,23 +10,27 @@ Say it while it’s clear. HandsFree turns your thoughts into text, without maki
 [![Mac beta: v0.1.1-beta.2](https://img.shields.io/badge/Mac_beta-v0.1.1--beta.2-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.2)
 [![Platforms: Apple Silicon and Windows x64](https://img.shields.io/badge/Platforms-Apple_Silicon_%C2%B7_Windows_x64-706b68.svg)](#platforms)
 
-## Download
+## Download & install
 
-### [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.2/HandsFree-0.1.1-beta.2-macos-arm64.dmg)
+### Mac — Homebrew recommended
 
-**Apple Silicon Mac · macOS 14+ · English.** Intel Macs are unsupported. This beta is self-signed, not notarized: see [Open Anyway and installation guidance](docs/INSTALL.md). No developer tools needed.
-
-### [Download for Windows (.exe)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-windows-beta.1/HandsFree-0.1.1-windows-x64-setup.exe)
-
-**Experimental · Windows 10/11 x64 (Intel/AMD) · CPU · English.** Unsigned; not yet hardware-tested. Windows ARM and 32-bit Windows are unsupported. [Windows install guide & SmartScreen guidance](docs/WINDOWS.md). No developer tools or account needed.
-
-Prefer Homebrew on Mac? As a second option, with Homebrew already installed:
+**Apple Silicon Mac · macOS 14+ · English.** Open Terminal and paste (if needed, [install Homebrew first](https://brew.sh/)):
 
 ```sh
 brew install --cask suhaasbadada/handsfree/handsfree
 ```
 
-If Homebrew prompts for trust, review the [tap README](https://github.com/suhaasbadada/homebrew-handsfree#readme) first. Cask trust approves Homebrew code, not the app’s Apple identity or notarization. See [Homebrew setup and existing-app guidance](docs/INSTALL.md#homebrew-option).
+Homebrew simplifies installation; macOS security prompts may still appear. This beta is self-signed, not notarized. If Homebrew 7 reports an untrusted cask, review the [tap repository](https://github.com/suhaasbadada/homebrew-handsfree#readme). Only if you trust its code, run `brew trust --cask suhaasbadada/handsfree/handsfree`, then retry the install. Cask trust is not Apple approval.
+
+Open **Applications → HandsFree**, allow Microphone, Accessibility, and Input Monitoring, then download the English model (~148 MB) in Settings → Overview. [Complete Mac setup, security prompts & existing-app guidance](docs/INSTALL.md).
+
+### [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.2/HandsFree-0.1.1-beta.2-macos-arm64.dmg)
+
+**DMG alternative:** drag HandsFree to Applications before opening it or granting permissions. Intel Macs are unsupported. See [Open Anyway and installation guidance](docs/INSTALL.md). No developer tools needed.
+
+### [Download for Windows (.exe)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-windows-beta.1/HandsFree-0.1.1-windows-x64-setup.exe)
+
+**Experimental · Windows 10/11 x64 (Intel/AMD) · CPU · English.** Unsigned; not yet hardware-tested. Windows ARM and 32-bit Windows are unsupported. [Windows install guide & SmartScreen guidance](docs/WINDOWS.md). No developer tools or account needed.
 
 [Website](https://suhaasbadada.github.io/handsfree/) · [Releases](https://github.com/suhaasbadada/handsfree/releases) · [Report a bug](https://github.com/suhaasbadada/handsfree/issues)
 
@@ -59,7 +63,7 @@ No special integration is required: insertion depends on the focused field, with
 | Windows 10/11, x64 | [Experimental Windows beta available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-windows-beta.1) · unsigned, not yet hardware-tested |
 | Linux | Planned; no build or download available |
 
-Windows ARM and 32-bit Windows are unsupported. Linux has no release date. The published Mac beta and Homebrew remain unchanged.
+Windows ARM and 32-bit Windows are unsupported. Linux has no release date.
 
 ## Install
 
@@ -67,7 +71,7 @@ Windows ARM and 32-bit Windows are unsupported. Linux has no release date. The p
 
 ### Mac
 
-1. Open the DMG and drag **HandsFree.app to Applications**. Eject the disk image and launch the Applications copy before granting permissions.
+1. Install using the recommended Homebrew command above. Alternatively, open the DMG and drag **HandsFree.app to Applications**, then eject the disk image. Launch the Applications copy before granting permissions.
 2. If macOS blocks this unnotarized beta, only if you trust the download, use **System Settings → Privacy & Security → Open Anyway**. Respect your organization’s policies; a local signature is not Apple approval.
 3. In HandsFree Settings, allow **Microphone**, then enable **Accessibility** and **Input Monitoring** in System Settings. Quit and reopen after changing permissions.
 4. Click **Download** for the English Whisper model (~148 MB from Hugging Face, checksum verified). This explicit, one-time setup needs internet; dictation works offline afterward.
@@ -75,6 +79,13 @@ Windows ARM and 32-bit Windows are unsupported. Linux has no release date. The p
 Focus a text field, briefly tap **Fn / 🌐**, speak, and tap again to finish. **Escape** cancels. Choose a different shortcut in Settings if Fn conflicts with macOS or your keyboard. If insertion is unavailable, paste the copied transcript yourself. **Review important text:** speech recognition can make mistakes.
 
 [Full installation and troubleshooting guide](docs/INSTALL.md) · [Beta release notes](docs/releases/v0.1.1-beta.2.md)
+
+**Homebrew updates:** quit HandsFree, run the following in Terminal, then reopen from Applications:
+
+```sh
+brew update
+brew upgrade --cask suhaasbadada/handsfree/handsfree
+```
 
 ## Build from source
 

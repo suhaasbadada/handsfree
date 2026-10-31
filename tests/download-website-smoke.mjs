@@ -106,6 +106,7 @@ try {
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: motion }] });
   for (const [os, arch, winPrimary, bitness] of [['Windows', 'x86', true, '64'], ['Windows', '', true, '64'], ['Windows', 'arm', false, '64'], ['Windows', 'x86', false, '32'], ['macOS', 'arm', false, '64'], ['Linux', 'x86', false, '64']]) {
     await navigate('/', os, arch, bitness);
+    assert.equal(await evaluate(visible('hero-homebrew')), os === 'macOS');
     assert.equal(await evaluate(`document.getElementById('primary-download').getAttribute('href')`), winPrimary ? windowsRelease.installerUrl : release.dmgUrl);
     assert.equal(await evaluate(visible('primary-windows-icon')), winPrimary);
     assert.equal(await evaluate(visible('primary-apple-icon')), !winPrimary);
@@ -120,11 +121,26 @@ try {
     assert.ok(nodes.some(node => node.role?.value === 'link' && node.name?.value === 'Download for Mac (Apple Silicon)'));
     assert.ok(nodes.some(node => node.role?.value === 'link' && node.name?.value === 'Download for Windows (x64 EXE)'));
     for (const width of [320, 390, 768, 1280]) {
-      await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+      await send('Emulation.setDeviceMetricsOverride', { width, height: width <= 390 ? 844 : 800, deviceScaleFactor: 1, mobile: false });
       assert.equal(await evaluate(`document.documentElement.scrollWidth === document.documentElement.clientWidth`), true, `No overflow at ${width}px`);
       assert.equal(await evaluate(`document.getElementById('primary-download').getBoundingClientRect().bottom < innerHeight`), true, `Primary above fold at ${width}px (${motion})`);
+      if (os === 'macOS') assert.equal(await evaluate(`document.getElementById('hero-brew-command').getBoundingClientRect().bottom < innerHeight`), true, `Homebrew above fold at ${width}px`);
     }
   }
+  await navigate('/', 'macOS', 'arm');
+  await send('Page.bringToFront');
+  const command = 'brew install --cask suhaasbadada/handsfree/handsfree';
+  assert.equal(await evaluate(`document.getElementById('hero-brew-command').textContent`), command);
+  // Deterministic clipboard fixtures exercise success and browser-policy rejection without touching the user's clipboard.
+  await evaluate(`window.clipboardWrites=[]; Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.clipboardWrites.push(text)}}}); document.querySelector('[data-copy-brew]').focus()`);
+  assert.equal(await evaluate(`document.activeElement === document.querySelector('[data-copy-brew]')`), true, 'Copy button accepts keyboard focus');
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', windowsVirtualKeyCode: 13 });
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+  assert.deepEqual(await evaluate('window.clipboardWrites'), [command]);
+  assert.match(await evaluate(`document.querySelector('#hero-homebrew .copy-status').textContent`), /^Copied/);
+  await evaluate(`navigator.clipboard.writeText=async()=>{throw Error('denied')}; document.querySelector('[data-copy-brew]').click()`);
+  assert.match(await evaluate(`document.querySelector('#hero-homebrew .copy-status').textContent`), /Copy unavailable.*Select and copy/);
+  assert.equal(await evaluate(`document.getElementById('hero-brew-command').textContent`), command);
   }
   await navigate('/');
   await evaluate(`(async () => { const {renderDownload} = await import('./download.js'); const {release,windowsRelease} = await import('./release.js'); renderDownload(document,{os:'windows',arch:'unknown'},{...release,publicAvailable:false},{...windowsRelease,publicAvailable:false}); })()`);
@@ -136,6 +152,8 @@ try {
     await delay(30);
   }
   assert.equal(await evaluate(`document.getElementById('primary-download').getAttribute('href')`), release.dmgUrl, 'Static Mac download works without JS');
+  assert.equal(await evaluate(visible('hero-homebrew')), true, 'No-JS recommendation stays available and explicitly Mac-labeled');
+  assert.equal(await evaluate(`document.querySelector('[data-copy-brew]').hidden`), true, 'No-JS never shows a nonfunctional copy button');
   assert.equal(await evaluate(`document.getElementById('windows-card-download').getAttribute('href')`), windowsRelease.installerUrl, 'Static Windows x64 card offers the public EXE without JS');
   for (const motion of ['reduce', 'no-preference']) {
     await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: motion }] });
