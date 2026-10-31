@@ -15,6 +15,8 @@
 #demo-pause[hidden]{display:none}#demo-pause:hover{background:var(--tint)}
 #demo-pause:focus-visible,#demo-text:focus-visible{outline:3px solid var(--green);outline-offset:3px;border-radius:4px}
 .release-note summary{cursor:pointer;width:fit-content}.release-note p{margin-top:12px}
+.platform-card.available>p:not(.platform-spec){margin-bottom:26px}
+.platform-card.available .button{margin-top:auto;max-width:none;gap:10px}
 .dictation-demo figcaption{margin-top:15px;text-align:center;font-size:0.65rem;color:var(--muted)}
 .visually-hidden{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .usecases{border-bottom:1px solid var(--line)}

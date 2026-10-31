@@ -16,7 +16,7 @@ test('hero has a direct, accessible Mac download with a real decorative Apple SV
   assert.match(cta, /<svg class="apple-logo"[^>]*fill="currentColor"[^>]*aria-hidden="true"[^>]*focusable="false"><path d="[^"]+"\/><\/svg><span id="download-label">Download for Mac<\/span>/);
   assert.doesNotMatch(cta, /aria-disabled|tabindex/);
   assert.doesNotMatch(hero, /Explore (the )?source/);
-  assert.equal([...html.matchAll(/class="apple-logo"/g)].length, 2, 'Hero and Mac card use the same monochrome symbol');
+  assert.equal([...html.matchAll(/class="apple-logo"/g)].length, 3, 'Hero, Mac card header, and card download use the same monochrome symbol');
   const readme = readFileSync(new URL('README.md', root), 'utf8');
   assert.ok(readme.indexOf('## Download') < readme.indexOf('## Features'));
   assert.ok(readme.indexOf('### [Download for Mac (.dmg)]') < 1100, 'Download is in the first screen');
@@ -105,11 +105,30 @@ test('website is dependency-free with accessible, honest platform copy', () => {
   assert.match(css, /focus-visible/);
   assert.match(html, /Experimental Mac beta available/);
   assert.equal([...html.matchAll(/Not implemented or available to download/g)].length, 2);
-  assert.match(html, /href="https:\/\/github.com\/suhaasbadada\/handsfree\/releases\/download\/[^"]+">Download Mac beta/);
   assert.match(html, /<noscript>/);
-  assert.equal([...html.matchAll(/class="button primary"/g)].length, 1, 'One primary action, not competing downloads');
+  assert.equal([...html.matchAll(/class="button primary"/g)].length, 2, 'Hero and platform card offer the same Mac download');
   assert.match(html, /releases\/download\/v0\.1\.0-beta\.1\/HandsFree-0\.1\.0-beta\.1-macos-arm64\.dmg/);
   assert.match(html, /MIT license does not relicense dependencies/);
+});
+
+test('Mac platform card has a primary Apple download, with technical details disclosed below', () => {
+  const card = html.match(/<article class="platform-card available">[\s\S]*?<\/article>/)?.[0];
+  assert.ok(card);
+  const cta = card.match(/<a class="button primary"[\s\S]*?<\/a>/)?.[0];
+  assert.ok(cta);
+  assert.match(cta, /href="https:\/\/github.com\/suhaasbadada\/handsfree\/releases\/download\/v0\.1\.0-beta\.1\/HandsFree-0\.1\.0-beta\.1-macos-arm64\.dmg"/);
+  assert.match(cta, /aria-label="Download for Mac \(Apple Silicon\)"/);
+  assert.match(cta, /<svg class="apple-logo"[^>]*aria-hidden="true"[^>]*focusable="false"><path d="[^"]+"\/><\/svg><span>Download for Mac<\/span>/);
+  assert.match(card, /Apple Silicon · macOS 14\+ · English/);
+  assert.match(card, /Speak naturally\. Get text where you work\./);
+  assert.doesNotMatch(card, /card-footnote|text-link|notarized|self-signed|Intel|Open Anyway|drag HandsFree/i);
+  assert.match(css, /\.platform-card\.available \.button\{margin-top:auto;max-width:none;gap:10px\}/);
+  const details = html.match(/<details class="release-note">[\s\S]*?<\/details>/)?.[0];
+  assert.match(details, /Intel Macs and mobile devices are not supported/);
+  assert.match(details, /locally self-signed, not notarized/);
+  assert.match(details, /Open Anyway/);
+  assert.match(details, /Managed Macs may not allow this override/);
+  assert.match(details, /MIT license does not relicense dependencies/);
 });
 
 test('Pages deployment uses the static artifact, official actions and scoped permissions', () => {

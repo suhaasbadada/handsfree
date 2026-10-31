@@ -96,6 +96,31 @@ try {
     assert.equal(metrics.scroll, metrics.width, `No horizontal overflow at ${width}px`);
     assert.ok(metrics.images, 'Icons loaded');
     assert.equal(metrics.styles, 'grid', 'Stylesheet loaded');
+    const platforms = await evaluate(`(() => {
+      const cards = [...document.querySelectorAll('.platform-card')];
+      const card = cards[0];
+      const cta = card.querySelector('a.button.primary');
+      const box = cta.getBoundingClientRect();
+      const style = getComputedStyle(card);
+      const innerWidth = card.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      return {
+        href: cta.getAttribute('href'), label: cta.textContent.trim(),
+        icons: cta.querySelectorAll('svg.apple-logo[aria-hidden="true"] path').length,
+        fullWidth: Math.abs(box.width - innerWidth) < 1,
+        bottomAnchored: Math.abs(card.getBoundingClientRect().bottom - box.bottom - parseFloat(style.paddingBottom) - parseFloat(style.borderBottomWidth)) < 1,
+        heights: cards.map(c => c.getBoundingClientRect().height),
+        footnote: !!card.querySelector('.card-footnote'),
+        detailsClosed: !document.querySelector('details.release-note').open
+      };
+    })()`);
+    assert.equal(platforms.href, dmgUrl);
+    assert.equal(platforms.label, 'Download for Mac');
+    assert.equal(platforms.icons, 1);
+    assert.ok(platforms.fullWidth, `Full-width Mac button at ${width}px`);
+    assert.ok(platforms.bottomAnchored, `Bottom-anchored Mac button at ${width}px`);
+    assert.equal(platforms.footnote, false);
+    assert.ok(platforms.detailsClosed, 'Technical release details remain expandable');
+    if (width > 760) assert.ok(platforms.heights.every(height => Math.abs(height - platforms.heights[0]) < 1), 'Desktop platform cards have equal heights');
     const headline = await evaluate(`(() => {
       const title = document.getElementById('hero-title');
       return { text: title.textContent, lines: title.offsetHeight / parseFloat(getComputedStyle(title).lineHeight) };
@@ -149,7 +174,7 @@ try {
   assert.deepEqual(await evaluate(`({value:document.getElementById('demo-text').value,readonly:document.getElementById('demo-text').readOnly,label:document.getElementById('demo-text').labels[0].textContent})`),
     { value: sample, readonly: true, label: 'Text' }, 'Semantic, labelled static reduced-motion text field');
   const { nodes } = await send('Accessibility.getFullAXTree');
-  assert.equal(nodes.filter(node => node.role?.value === 'link' && node.name?.value === 'Download for Mac (Apple Silicon)').length, 1, 'Exactly one named, accessible hero download');
+  assert.equal(nodes.filter(node => node.role?.value === 'link' && node.name?.value === 'Download for Mac (Apple Silicon)').length, 2, 'Hero and platform card provide named, accessible Mac downloads');
   assert.ok(nodes.some(node => node.role?.value === 'region' && node.name?.value === 'Talk through the work.'), 'Use cases form a named accessible section');
   for (const title of ['Think out loud with your coding assistant.', 'Messages & email', 'Notes & ideas', 'First drafts']) {
     assert.ok(nodes.some(node => node.role?.value === 'heading' && node.name?.value === title), `Accessible use-case heading: ${title}`);
