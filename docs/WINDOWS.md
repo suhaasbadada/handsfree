@@ -91,9 +91,16 @@ For separate `cargo` commands, first dot-source `./scripts/windows-env.ps1` in
 the same PowerShell session. Changing these settings requires a clean native
 build, not reusing cached whisper objects from a different CPU configuration.
 
-After Tauri builds, `scripts/windows-pe-imports.py` inspects the actual
-`src-tauri/target/x86_64-pc-windows-msvc/release/handsfree.exe` before candidate
-copying. It requires AMD64 PE32+, validates file-backed PE bounds, and checks
+After Tauri builds, the packaging script extracts the NSIS installer with 7-Zip
+into a newly created GUID directory under `RUNNER_TEMP` (or the system temp
+directory for local builds), without executing anything. It requires exactly
+one extracted `handsfree.exe`; `scripts/windows-pe-imports.py` inspects that
+actual packaged payload before candidate copying. Tauri patches the bundled
+copy's metadata, so its hash may differ from the raw cargo output. The report
+hash identifies the extracted payload; provenance records both hashes with
+explicit labels. Only the invocation's owned extraction directory is removed
+in `finally`; cleanup failure rejects the candidate and reports its exact path.
+The gate requires AMD64 PE32+, validates file-backed PE bounds, and checks
 normal and delay imports against an explicit Windows 10/11 OS DLL allowlist and
 `api-ms-win-`/`ext-ms-win-` API-set contracts. Unknown DLLs and redistributable
 CRT imports (including MSVCP140, VCRUNTIME140, and CONCRT140 variants) fail the
@@ -109,8 +116,23 @@ bundled under the installed app's `licenses` directory. Generated data stays in
 ignored `src-tauri/target` and `release` directories, not Git. Existing candidate
 outputs are never overwritten; preserve/move them before rebuilding. The workflow
 does not sign, publish a release, launch the app, record audio, or install anything.
-`SHA256SUMS` covers all candidate files, including the dependency report and
-provenance (not itself). A passing import gate establishes only direct/delay
+`scripts/windows-artifact-checksums.py` creates two distinct manifests:
+
+- Public `SHA256SUMS` covers exactly the five assets
+  `HandsFree-0.1.1-windows-x64-setup.exe`, `APP-DEPENDENCIES.json`,
+  `PROVENANCE.txt`, `THIRD_PARTY_SOURCES.tar.gz`, and `LICENSE`. The planned
+  public release attaches those five files **plus `SHA256SUMS`**: six assets,
+  no installer ZIP and no hundreds of individual notice attachments.
+- Internal `BUILD-SHA256SUMS` covers every CI artifact file, including the public
+  manifest and hidden/nested notices, but excludes itself. It is not a public
+  release asset. Artifact upload includes hidden files only within the controlled
+  `release/windows-x64/` output so upstream files such as wry's `.license_template`
+  are retained. No user settings or arbitrary workspace directories are uploaded.
+
+Before publishing, verify the complete downloaded Actions artifact against
+`BUILD-SHA256SUMS`, then verify the six selected public assets using `SHA256SUMS`.
+The full notices and source remain inside the NSIS payload as well.
+A passing import gate establishes only direct/delay
 dependencies of that built app, not dynamic LoadLibrary behavior, installer
 operation, or clean-machine startup. Static C++ linkage is not verified until
 the real Windows build passes this gate; manual clean-PC acceptance remains

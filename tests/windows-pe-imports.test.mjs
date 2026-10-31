@@ -107,7 +107,22 @@ test('Windows-only build environment and candidate gate stay wired without chang
   assert.ok(pkg.indexOf("'restore', '--state'") < pkg.indexOf("'scripts/windows-pe-imports.py'"));
   assert.ok(pkg.indexOf("'scripts/windows-pe-imports.py'") < pkg.indexOf('Copy-Item $installers'));
   assert.match(pkg, /APP-DEPENDENCIES.json/);
-  assert.match(pkg, /Get-ChildItem \$output -File -Recurse/);
+  assert.match(pkg, /'scripts\/windows-artifact-checksums.py', \$output/);
+});
+
+test('report hashes the supplied packaged payload, not the differing raw cargo build', () => {
+  const raw = pe(['kernel32.dll']);
+  const payload = Buffer.concat([raw, Buffer.from('Tauri bundle metadata differs')]);
+  inspect(payload, (r, report) => {
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(report.sha256, createHash('sha256').update(payload).digest('hex'));
+    assert.notEqual(report.sha256, createHash('sha256').update(raw).digest('hex'));
+    assert.deepEqual(report.normal_imports, ['kernel32.dll']);
+  });
+  const pkg = readFileSync(new URL('../scripts/windows-package.ps1', import.meta.url), 'utf8');
+  assert.match(pkg, /'scripts\/windows-pe-imports.py', \$payloadApps\[0\].FullName/);
+  assert.doesNotMatch(pkg, /'scripts\/windows-pe-imports.py', 'src-tauri\/target/);
+  assert.ok(pkg.indexOf("Invoke-Checked 7z @('x'") < pkg.indexOf("'scripts/windows-pe-imports.py'"));
 });
 
 test('Windows environment preserves flags, is idempotent, and rejects conflicts', { skip: process.platform !== 'win32' }, () => {

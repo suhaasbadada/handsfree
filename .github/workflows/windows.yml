@@ -73,6 +73,8 @@ jobs:
         with:
           name: Windows-installer-x64-${{ github.sha }}
           path: release/windows-x64/
+          # Controlled candidate output only; registry notices include .license_template.
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
       # No release upload, secrets, code signing, app launch, or installed-app update.

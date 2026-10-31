@@ -16,6 +16,7 @@ test('Windows candidate workflow is isolated, x64, read-only and never publishes
   for (const check of ['npm ci', 'npm test', 'npm run build', './scripts/windows-package.ps1']) assert.ok(workflow.includes(check));
   assert.match(workflow, /actions\/upload-artifact@v7/);
   assert.match(workflow, /if-no-files-found: error/);
+  assert.match(workflow, /path: release\/windows-x64\/\s+# [^\n]+\n\s+include-hidden-files: true/);
   assert.doesNotMatch(workflow, /secrets\.|contents: write|gh release|tauri-action|build:local/);
   assert.match(workflow, /Verify actual CPU transcription without microphone access/);
   assert.match(workflow, /Get-FileHash \$model -Algorithm SHA256/);
@@ -32,7 +33,9 @@ test('Windows packaging prepares notices before native compilation and inspects 
   assert.match(script, /'--all-targets', '--', '-D', 'warnings'/);
   assert.match(script, /'--config', 'src-tauri\/tauri.windows.conf.json', '--bundles', 'nsis'/);
   assert.match(script, /Invoke-Checked 7z @\('t'/);
-  for (const file of ['THIRD_PARTY_SOURCES.tar.gz', 'inventory.json', 'COPYRIGHT-library.html', 'SHA256SUMS', 'PROVENANCE.txt']) assert.ok(script.includes(file));
+  for (const file of ['THIRD_PARTY_SOURCES.tar.gz', 'inventory.json', 'COPYRIGHT-library.html', 'PROVENANCE.txt']) assert.ok(script.includes(file));
+  assert.match(script, /'scripts\/windows-artifact-checksums.py', \$output/);
+  for (const file of ['SHA256SUMS', 'BUILD-SHA256SUMS']) assert.ok(read('scripts/windows-artifact-checksums.py').includes(file));
   assert.match(script, /Candidate output exists/);
   assert.match(script, /'scripts\/windows-source-state.py', 'snapshot'/);
   assert.match(script, /'scripts\/windows-source-state.py', 'restore'/);
@@ -44,7 +47,15 @@ test('Windows packaging prepares notices before native compilation and inspects 
   assert.match(env, /x86_64-pc-windows-msvc/);
   for (const flag of ['NATIVE', 'AVX', 'AVX2', 'AVX512', 'FMA', 'F16C']) assert.ok(env.includes(`'${flag}'`));
   assert.match(env, /SetEnvironmentVariable\("GGML_\$flag", 'OFF', 'Process'\)/);
-  assert.doesNotMatch(script, /Start-Process|Remove-Item|build:local|gh release|signtool/i);
+  assert.doesNotMatch(script, /Start-Process|build:local|gh release|signtool/i);
+  assert.deepEqual(script.match(/Remove-Item[^\r\n]+/g), ['Remove-Item -LiteralPath $extraction -Recurse -Force -ErrorAction Stop }']);
+  assert.match(script, /Join-Path \$tempRoot \("handsfree-nsis-audit-" \+ \[Guid\]::NewGuid\(\)/);
+  assert.match(script, /finally \{[\s\S]*Remove-Item -LiteralPath \$extraction/);
+  assert.match(script, /Cannot clean owned NSIS extraction directory \$extraction/);
+  assert.match(script, /Invoke-Checked 7z @\('x', \$installers\[0\].FullName, "-o\$extraction", '-y'\)/);
+  assert.match(script, /if \(\$payloadApps.Count -ne 1\)/);
+  assert.match(script, /'scripts\/windows-pe-imports.py', \$payloadApps\[0\].FullName/);
+  assert.match(script, /Copy-Item "\$notices\/\*" \$output -Recurse -Force/);
 });
 
 test('Windows resources and per-user installer do not alter the Mac bundle', () => {

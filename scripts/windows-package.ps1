@@ -39,10 +39,6 @@ try {
 } catch { $buildFailure = $_ }
 $normalization = Invoke-Checked python @('scripts/windows-source-state.py', 'restore', '--state', $snapshot)
 if ($null -ne $buildFailure) { throw $buildFailure }
-$dependencyReport = Join-Path $root 'src-tauri/target/windows-app-dependencies.json'
-# Inspect the actual native app, not the NSIS wrapper. Reject candidates before
-# copying any artifacts if a direct/delay DLL import needs an unbundled runtime.
-Invoke-Checked python @('scripts/windows-pe-imports.py', 'src-tauri/target/x86_64-pc-windows-msvc/release/handsfree.exe', '--output', $dependencyReport)
 $installers = @(Get-ChildItem $bundle -Filter '*.exe' -File)
 if ($installers.Count -ne 1) { throw 'Expected exactly one newly built NSIS installer.' }
 # Structural check only; this does not establish successful installation or runtime behavior.
@@ -52,10 +48,28 @@ if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect NSIS installer.' }
 foreach ($required in @('THIRD_PARTY_SOURCES.tar.gz', 'inventory.json', 'COPYRIGHT-library.html', 'LICENSE')) {
     if (-not ($listing -match [regex]::Escape($required))) { throw "Installer is missing $required." }
 }
+$dependencyReport = Join-Path $root 'src-tauri/target/windows-app-dependencies.json'
+$rawAppHash = (Get-FileHash 'src-tauri/target/x86_64-pc-windows-msvc/release/handsfree.exe' -Algorithm SHA256).Hash.ToLowerInvariant()
+# Tauri patches the bundled copy's metadata. Gate/hash the actual NSIS payload,
+# not the raw cargo output. Extraction only: never execute the installer/app.
+$tempRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Path]::GetTempPath() }
+$extraction = Join-Path $tempRoot ("handsfree-nsis-audit-" + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $extraction -ErrorAction Stop | Out-Null
+try {
+    Invoke-Checked 7z @('x', $installers[0].FullName, "-o$extraction", '-y')
+    $payloadApps = @(Get-ChildItem -LiteralPath $extraction -Filter 'handsfree.exe' -Recurse -File -Force)
+    if ($payloadApps.Count -ne 1) { throw 'Expected exactly one handsfree.exe in the NSIS payload.' }
+    Invoke-Checked python @('scripts/windows-pe-imports.py', $payloadApps[0].FullName, '--output', $dependencyReport)
+    $payloadAppHash = (Get-FileHash -LiteralPath $payloadApps[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+} finally {
+    # Only this invocation's newly created GUID directory may be removed.
+    try { Remove-Item -LiteralPath $extraction -Recurse -Force -ErrorAction Stop }
+    catch { throw "Cannot clean owned NSIS extraction directory $extraction (cleanup incomplete; inspect this path): $_" }
+}
 New-Item -ItemType Directory -Path $output | Out-Null
 $name = 'HandsFree-0.1.1-windows-x64-setup.exe'
 Copy-Item $installers[0].FullName (Join-Path $output $name)
-Copy-Item "$notices/*" $output -Recurse
+Copy-Item "$notices/*" $output -Recurse -Force
 Copy-Item $dependencyReport (Join-Path $output 'APP-DEPENDENCIES.json')
 $commit = & git rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot identify source commit.' }
@@ -75,7 +89,9 @@ Target: $env:CARGO_BUILD_TARGET
 Rust flags: $env:RUSTFLAGS
 CMake MSVC runtime: $env:CMAKE_MSVC_RUNTIME_LIBRARY
 CMake CMP0091: $env:CMAKE_POLICY_DEFAULT_CMP0091
-PE dependency gate: passed; AMD64 PE32+; direct/delay OS-only imports (APP-DEPENDENCIES.json)
+PE dependency gate: passed on extracted NSIS payload; AMD64 PE32+; direct/delay OS-only imports (APP-DEPENDENCIES.json)
+Packaged handsfree.exe SHA256 (matches APP-DEPENDENCIES.json): $payloadAppHash
+Raw cargo handsfree.exe SHA256 (before Tauri bundle metadata patching): $rawAppHash
 Build: $run
 UTC: $([DateTime]::UtcNow.ToString('o'))
 Node: $node
@@ -85,9 +101,5 @@ Unsigned. No Authenticode identity, automatic release, or updater.
 No speech model, recording, local app state, or signing material included.
 Automated checks are not a microphone, shortcut, paste, or installer acceptance test.
 "@ | Set-Content (Join-Path $output 'PROVENANCE.txt') -Encoding utf8NoBOM
-$checksums = Get-ChildItem $output -File -Recurse | Sort-Object FullName | ForEach-Object {
-    $relative = [System.IO.Path]::GetRelativePath($output, $_.FullName).Replace('\', '/')
-    "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $relative"
-}
-$checksums | Set-Content (Join-Path $output 'SHA256SUMS') -Encoding utf8NoBOM
+Invoke-Checked python @('scripts/windows-artifact-checksums.py', $output)
 Write-Host "Candidate ready in $output. Complete docs/WINDOWS.md acceptance checks before distribution."
