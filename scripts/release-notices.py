@@ -1,22 +1,27 @@
 #!/usr/bin/env python3
 """Create an offline, conservative dependency notice/source inventory."""
+import argparse
 import hashlib
 import json
 from pathlib import Path
 import shutil
 import subprocess
-import sys
 import tarfile
 import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
-OUTPUT = Path(sys.argv[1]).resolve()
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("output", type=Path)
+parser.add_argument("--target", choices=["aarch64-apple-darwin", "x86_64-pc-windows-msvc"],
+                    default="aarch64-apple-darwin")
+args = parser.parse_args()
+OUTPUT = args.output.resolve()
 NOTICES = OUTPUT / "THIRD_PARTY_NOTICES"
 NOTICES.mkdir(parents=True, exist_ok=False)
 
 
 def command(*args):
-    return subprocess.check_output(args, cwd=ROOT, text=True)
+    return subprocess.check_output(args, cwd=ROOT, text=True, encoding="utf-8")
 
 
 def copy_notice(source, destination):
@@ -26,11 +31,11 @@ def copy_notice(source, destination):
 
 metadata = json.loads(command(
     "cargo", "metadata", "--manifest-path", "src-tauri/Cargo.toml", "--locked",
-    "--offline", "--filter-platform", "aarch64-apple-darwin", "--format-version", "1",
+    "--offline", "--filter-platform", args.target, "--format-version", "1",
 ))
 inventory = []
 missing = []
-locked_packages = tomllib.loads((ROOT / "src-tauri/Cargo.lock").read_text())["package"]
+locked_packages = tomllib.loads((ROOT / "src-tauri/Cargo.lock").read_text(encoding="utf-8"))["package"]
 checksums = {(p["name"], p["version"], p.get("source")): p.get("checksum")
              for p in locked_packages}
 with tarfile.open(OUTPUT / "THIRD_PARTY_SOURCES.tar.gz", "w:gz") as archive:
@@ -98,9 +103,12 @@ shutil.copytree(supplements, NOTICES / "upstream-supplements")
 rustdoc = Path(command("rustc", "--print", "sysroot").strip()) / "share/doc/rust"
 copy_notice(rustdoc / "COPYRIGHT-library.html", NOTICES / "rust/COPYRIGHT-library.html")
 shutil.copytree(rustdoc / "licenses", NOTICES / "rust/licenses")
-(NOTICES / "rust/VERSION.txt").write_text(command("rustc", "--version", "--verbose"))
-(NOTICES / "inventory.json").write_text(json.dumps(inventory, indent=2) + "\n")
+(NOTICES / "rust/VERSION.txt").write_text(command("rustc", "--version", "--verbose"), encoding="utf-8")
+(NOTICES / "inventory.json").write_text(json.dumps(inventory, indent=2) + "\n", encoding="utf-8")
 copy_notice(ROOT / "docs/RELEASING.md", NOTICES / "LICENSING-AND-DISTRIBUTION.md")
+if args.target == "x86_64-pc-windows-msvc":
+    copy_notice(ROOT / "docs/WINDOWS.md", NOTICES / "WINDOWS-BETA.md")
+    shutil.copytree(ROOT / "scripts/windows-licenses", NOTICES / "windows-supplements")
 (NOTICES / "README.txt").write_text(
     "HandsFree third-party inventory\n\n"
     "This is an over-inclusive platform dependency set, including build tools.\n"
@@ -111,13 +119,15 @@ copy_notice(ROOT / "docs/RELEASING.md", NOTICES / "LICENSING-AND-DISTRIBUTION.md
     "MPL source is unmodified, available here under its original MPL-2.0 terms.\n"
     "HandsFree's own code is MIT licensed; see ../LICENSE.\n"
     "That grant does not relicense these dependencies. No model is included.\n\n"
-    "Experimental beta; self-signed, not Developer ID signed or notarized.\n"
+    + ("Experimental Windows beta; unsigned, not Microsoft approved.\n"
+       if args.target == "x86_64-pc-windows-msvc" else
+       "Experimental beta; self-signed, not Developer ID signed or notarized.\n") +
     "Upstream license texts and historical SDK-derived-bindings caveat are\n"
     "preserved. Notice completeness is not legally certified. See\n"
     "LICENSING-AND-DISTRIBUTION.md and upstream-supplements/README.md.\n\n"
     "Crates without standalone license files (source notices and/or supplements\n"
     "are provided; declarations alone do not resolve upstream uncertainty):\n"
-    + "\n".join(missing) + "\n"
+    + "\n".join(missing) + "\n", encoding="utf-8"
 )
 print(f"Inventoried {len(inventory)} third-party packages; full source copies included.")
 print("Experimental beta notices: see THIRD_PARTY_NOTICES/README.txt")

@@ -1,5 +1,50 @@
 use std::{env, path::PathBuf, process::Command};
 fn main() {
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+        build_macos();
+    }
+    build_tauri()
+}
+fn build_tauri() {
+    // tauri-build 2.7 checks only the common `tauri` dependency, ignoring
+    // Cargo's target feature union. Its build-time ACL/resource generation
+    // doesn't use macOSPrivateApi; suppress that *check* on macOS only.
+    // generate_context! still reads the unchanged real config and uses the
+    // actual target-specific feature. Never enable private Mac APIs on Windows.
+    let original = env::var_os("TAURI_CONFIG");
+    let manifest: toml::Value =
+        toml::from_str(&std::fs::read_to_string("Cargo.toml").expect("Cargo manifest"))
+            .expect("valid Cargo manifest");
+    let common_has_private_api = manifest
+        .get("dependencies")
+        .and_then(|dependencies| dependencies.get("tauri"))
+        .and_then(|tauri| tauri.get("features"))
+        .and_then(toml::Value::as_array)
+        .is_some_and(|features| {
+            features
+                .iter()
+                .any(|feature| feature.as_str() == Some("macos-private-api"))
+        });
+    // The Tauri CLI currently normalizes this feature into the common table.
+    // Direct Cargo checks retain the correct, target-only declaration instead.
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") && !common_has_private_api {
+        let mut config: serde_json::Value = original
+            .as_ref()
+            .map(|value| {
+                serde_json::from_str(&value.to_string_lossy()).expect("valid TAURI_CONFIG")
+            })
+            .unwrap_or_else(|| serde_json::json!({}));
+        config["app"]["macOSPrivateApi"] = false.into();
+        env::set_var("TAURI_CONFIG", config.to_string());
+    }
+    tauri_build::build();
+    if let Some(value) = original {
+        env::set_var("TAURI_CONFIG", value);
+    } else {
+        env::remove_var("TAURI_CONFIG");
+    }
+}
+fn build_macos() {
     println!("cargo:rerun-if-changed=native/Bridge.swift");
     println!("cargo:rerun-if-changed=native/PastePolicy.swift");
     println!("cargo:rerun-if-changed=native/AudioCapture.swift");
@@ -70,5 +115,4 @@ fn main() {
     ] {
         println!("cargo:rustc-link-lib=framework={framework}");
     }
-    tauri_build::build()
 }

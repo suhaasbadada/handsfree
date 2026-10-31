@@ -1,5 +1,28 @@
 use serde::{Deserialize, Serialize};
 
+/// Register before persisting; neither a collision nor a failed save may leave
+/// the live binding different from the user's saved preference.
+#[cfg(any(windows, test))]
+pub fn replace_checked(
+    old: &Shortcut,
+    new: &Shortcut,
+    mut apply: impl FnMut(&Shortcut) -> bool,
+    persist: impl FnOnce() -> Result<(), String>,
+) -> Result<(), String> {
+    let result = if apply(new) {
+        persist()
+    } else {
+        Err("Windows could not register that shortcut. Another app may already use it.".into())
+    };
+    if let Err(mut error) = result {
+        if !apply(old) {
+            error.push_str(" The previous shortcut could not be restored; choose another binding.");
+        }
+        return Err(error);
+    }
+    Ok(())
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(default)]
 pub struct Shortcut {
@@ -9,13 +32,31 @@ pub struct Shortcut {
 impl Default for Shortcut {
     fn default() -> Self {
         Self {
-            code: "Fn".into(),
-            modifiers: 0,
+            code: if cfg!(windows) { "Space" } else { "Fn" }.into(),
+            modifiers: if cfg!(windows) { 5 } else { 0 },
         }
     }
 }
 impl Shortcut {
     pub fn keycode(&self) -> Option<i32> {
+        #[cfg(windows)]
+        {
+            let code = self.code.as_bytes();
+            match self.code.as_str() {
+                "Space" => Some(0x20),
+                _ if code.len() == 4
+                    && code.starts_with(b"Key")
+                    && code[3].is_ascii_uppercase() =>
+                {
+                    Some(code[3] as i32)
+                }
+                _ if code.len() == 6 && code.starts_with(b"Digit") && code[5].is_ascii_digit() => {
+                    Some(code[5] as i32)
+                }
+                _ => None,
+            }
+        }
+        #[cfg(not(windows))]
         Some(match self.code.as_str() {
             "Fn" => 63,
             "Space" => 49,
@@ -59,39 +100,74 @@ impl Shortcut {
         })
     }
     pub fn validate(&self) -> Result<(), String> {
-        if self.code == "Fn" && self.modifiers == 0 {
-            return Ok(());
-        }
-        if self.code == "Fn"
-            || self.keycode().is_none()
-            || self.modifiers & !15 != 0
-            || self.modifiers & 11 == 0
+        #[cfg(windows)]
         {
-            return Err("Use Control, Option or Command with a letter, number or Space. Fn must be used alone.".into());
+            if self.keycode().is_none() || self.modifiers & !15 != 0 || self.modifiers & 11 == 0 {
+                return Err(
+                    "Use Control, Alt or Windows with a letter, number or Space. Fn is macOS-only."
+                        .into(),
+                );
+            }
+            // Plain Windows/Windows-Shift chords belong to the shell. Modified
+            // Windows chords are allowed except known shell/desktop actions.
+            let windows_reserved = self.modifiers & 8 != 0
+                && (self.modifiers & 3 == 0
+                    || ["Space", "KeyL", "KeyD", "KeyQ", "KeyB", "KeyR", "KeyK"]
+                        .contains(&self.code.as_str()));
+            if windows_reserved
+                || (self.code == "Space" && [1, 2].contains(&self.modifiers))
+                || (self.modifiers & 3 == 1
+                    && [
+                        "KeyA", "KeyC", "KeyV", "KeyX", "KeyZ", "KeyS", "KeyW", "KeyF", "KeyN",
+                        "KeyO", "KeyP",
+                    ]
+                    .contains(&self.code.as_str()))
+            {
+                return Err("That shortcut is reserved for Windows or common app actions. Try Control + Shift + Space.".into());
+            }
+            Ok(())
         }
-        // Avoid system shortcuts and common destructive/editing commands even
-        // with additional modifiers (e.g. Command-Shift-Q and Command-Option-V).
-        if (self.modifiers & 8 != 0
-            && [
-                "KeyA", "KeyC", "KeyV", "KeyX", "KeyZ", "KeyQ", "KeyW", "KeyH", "KeyM", "KeyN",
-                "KeyO", "KeyP", "KeyS", "KeyF", "KeyT", "Space",
-            ]
-            .contains(&self.code.as_str()))
-            || (self.code == "Space" && self.modifiers == 1)
-            || (self.modifiers & 8 != 0
-                && self.modifiers & 4 != 0
-                && self.code.starts_with("Digit"))
+        #[cfg(not(windows))]
         {
-            return Err("That shortcut is reserved for macOS or common app actions. Try Option + Space or Control + Shift + Space.".into());
+            if self.code == "Fn" && self.modifiers == 0 {
+                return Ok(());
+            }
+            if self.code == "Fn"
+                || self.keycode().is_none()
+                || self.modifiers & !15 != 0
+                || self.modifiers & 11 == 0
+            {
+                return Err("Use Control, Option or Command with a letter, number or Space. Fn must be used alone.".into());
+            }
+            // Avoid system shortcuts and common destructive/editing commands even
+            // with additional modifiers (e.g. Command-Shift-Q and Command-Option-V).
+            if (self.modifiers & 8 != 0
+                && [
+                    "KeyA", "KeyC", "KeyV", "KeyX", "KeyZ", "KeyQ", "KeyW", "KeyH", "KeyM", "KeyN",
+                    "KeyO", "KeyP", "KeyS", "KeyF", "KeyT", "Space",
+                ]
+                .contains(&self.code.as_str()))
+                || (self.code == "Space" && self.modifiers == 1)
+                || (self.modifiers & 8 != 0
+                    && self.modifiers & 4 != 0
+                    && self.code.starts_with("Digit"))
+            {
+                return Err("That shortcut is reserved for macOS or common app actions. Try Option + Space or Control + Shift + Space.".into());
+            }
+            Ok(())
         }
-        Ok(())
     }
     pub fn label(&self) -> String {
         if self.code == "Fn" {
             return "Fn".into();
         }
         let mut parts = Vec::new();
-        for (mask, name) in [(1, "Control"), (2, "Option"), (4, "Shift"), (8, "Command")] {
+        for (mask, name) in [
+            (1, "Control"),
+            (2, if cfg!(windows) { "Alt" } else { "Option" }),
+            (4, "Shift"),
+            (8, if cfg!(windows) { "Windows" } else { "Command" }),
+        ] {
             if self.modifiers & mask != 0 {
                 parts.push(name);
             }
@@ -108,6 +184,41 @@ impl Shortcut {
 mod tests {
     use super::*;
     #[test]
+    fn collisions_and_denied_saves_restore_the_old_binding() {
+        let old = Shortcut::default();
+        let new = Shortcut {
+            code: "KeyJ".into(),
+            modifiers: 2,
+        };
+        let mut attempted = Vec::new();
+        assert!(replace_checked(
+            &old,
+            &new,
+            |binding| {
+                attempted.push(binding.clone());
+                binding == &old
+            },
+            || panic!("collision must not persist")
+        )
+        .is_err());
+        assert_eq!(attempted, [new.clone(), old.clone()]);
+        attempted.clear();
+        assert_eq!(
+            replace_checked(
+                &old,
+                &new,
+                |binding| {
+                    attempted.push(binding.clone());
+                    true
+                },
+                || Err("denied".into())
+            ),
+            Err("denied".into())
+        );
+        assert_eq!(attempted, [new, old]);
+    }
+    #[test]
+    #[cfg(not(windows))]
     fn validates_physical_bindings() {
         assert!(Shortcut::default().validate().is_ok());
         for (code, modifiers, valid) in [
@@ -136,6 +247,41 @@ mod tests {
             }
             .label(),
             "Control + Shift + Space"
+        );
+    }
+    #[test]
+    #[cfg(windows)]
+    fn windows_defaults_mapping_and_reservations() {
+        assert_eq!(Shortcut::default().keycode(), Some(0x20));
+        assert_eq!(Shortcut::default().modifiers, 5);
+        assert!(Shortcut::default().validate().is_ok());
+        assert!(Shortcut {
+            code: "KeyJ".into(),
+            modifiers: 9
+        }
+        .validate()
+        .is_ok());
+        for (code, modifiers) in [
+            ("Fn", 0),
+            ("KeyL", 8),
+            ("Space", 2),
+            ("KeyV", 1),
+            ("KeyJ", 32),
+        ] {
+            assert!(Shortcut {
+                code: code.into(),
+                modifiers
+            }
+            .validate()
+            .is_err());
+        }
+        assert_eq!(
+            Shortcut {
+                code: "KeyJ".into(),
+                modifiers: 2
+            }
+            .keycode(),
+            Some(0x4a)
         );
     }
 }

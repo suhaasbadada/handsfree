@@ -50,7 +50,8 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: 980, height: 820, deviceScaleFactor: 1, mobile: false });
   await until(`Boolean(document.getElementById('nav-settings'))`);
   assert.equal(await evaluate(`document.querySelector('footer .beta-badge').textContent==='BETA' && document.querySelector('footer .beta-badge').getBoundingClientRect().width>0 && !document.querySelector('.brand .beta-badge') && !document.querySelector('main footer') && document.getElementById('app-version').textContent==='0.1.1'`), true, 'Version, beta and language metadata live in the actual footer');
-  assert.equal(await evaluate(`['change-shortcut','mic','permissions','download','reset','sounds','sound-volume'].every(id=>document.getElementById(id).disabled)`), true, 'Native controls are unavailable before the backend connects');
+   assert.equal(await evaluate(`['setup','change-shortcut','mic','permissions','download','reset','sounds','sound-volume'].every(id=>document.getElementById(id).disabled)`), true, 'Native controls are unavailable before the backend connects');
+   assert.equal(await evaluate(`document.getElementById('permissions-row').hidden && document.getElementById('saved-shortcut').textContent==='…' && !document.body.textContent.includes('this Mac')`), true, 'Unknown native platform has neutral, disabled setup');
   await evaluate(`window.calls = []; window.fixture = {phase:'idle',message:'Select a text field and press Fn.', progress:0,model_ready:true,microphone:true,accessibility:true,input_monitoring:true,hotkey:true,transcript:'',sounds:true,sound_volume:50,sound_style:'clean',shortcut:{code:'Fn',modifiers:0},shortcut_label:'Fn',stats:{words:0,transcriptions:0,speech_seconds:0,saved_seconds:0},persistence_error:''}; window.__TAURI_INTERNALS__ = { invoke: async (command,args) => { window.calls.push({command,args}); if(command==='status') return structuredClone(window.fixture); if(command==='set_sounds') window.fixture.sounds=args.enabled; if(command==='set_sound_style') window.fixture.sound_style=args.style; if(command==='set_shortcut'){if(window.rejectShortcut) throw 'Could not save shortcut'; window.fixture.shortcut=args.shortcut;window.fixture.shortcut_label=args.shortcut.code==='Fn'?'Fn':args.shortcut.code==='Space'?'Option + Space':'Control + Shift + J';} if(command==='reset_stats') window.fixture.stats={words:0,transcriptions:0,speech_seconds:0,saved_seconds:0}; } }; document.getElementById('feedback').hidden=true;`);
   await until(`document.getElementById('ready-title').textContent==='Ready'`);
   assert.deepEqual(await evaluate(`['words','saved','count'].map(id=>document.getElementById(id).textContent)`), ['0','0 sec','0'], 'First-launch totals are real zeros');
@@ -152,7 +153,12 @@ try {
   await evaluate(`window.releaseCapture()`);
   await until(stopped);
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='capture_shortcut').at(-1).args.active`), false, 'Delayed native start cannot outlive cancellation');
-  await evaluate(`window.__TAURI_INTERNALS__.invoke=captureInvoke`);
+   await evaluate(`window.__TAURI_INTERNALS__.invoke=captureInvoke`);
+   await evaluate(`const failedCaptureInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='capture_shortcut'&&args.active)throw 'Could not record shortcut';return failedCaptureInvoke(command,args);};document.getElementById('change-shortcut').click()`);
+   await until(`${stopped} && document.getElementById('shortcut-feedback').textContent.includes('Could not record shortcut')`);
+   await evaluate(`window.__TAURI_INTERNALS__.invoke=failedCaptureInvoke`);
+   await evaluate(`document.getElementById('change-shortcut').click()`);
+   await until(recording); await key('Escape'); await until(stopped);
   await evaluate(`window.rejectShortcut=false;window.fixture.sound_style='clean'`);
   assert.deepEqual(await evaluate(`Array.from(document.getElementById('sound-style').options,o=>[o.value,o.textContent])`), [['clean','Clean'],['warm','Warm']], 'Only approved profiles are offered');
   assert.equal(await evaluate(`document.getElementById('sound-style').getBoundingClientRect().height`), 36);
@@ -326,7 +332,71 @@ try {
        writeFileSync(join(process.env.UI_SCREENSHOT_DIR, `${tab}-first-run-320.png`), Buffer.from(shot.data,'base64'));
      }
    }
-   console.log('UI smoke passed: private payload never rendered, activity metrics, upper-right status, accessible navigation, uniform controls, preferences, 16 first-run combinations, download retry/progress, shortcuts, reset, light/dark responsive layout. No microphone capture.');
+   // Native platform, not browser UA: this Windows fixture runs in a Mac browser.
+   await evaluate(`Object.assign(window.fixture,{platform:'windows',phase:'idle',message:'',model_ready:true,microphone:true,accessibility:false,input_monitoring:false,hotkey:true,shortcut:{code:'Space',modifiers:5},shortcut_label:'Control + Shift + Space'});document.getElementById('feedback').hidden=true`);
+   await until(`document.getElementById('overview-shortcut').textContent==='Ctrl + Shift + Space' && document.getElementById('setup-state').textContent==='Ready'`);
+   assert.equal(await evaluate(`document.getElementById('shortcut-fn').hidden && document.getElementById('shortcut-fn').textContent==='Use default' && document.getElementById('permissions-row').hidden && document.getElementById('permissions').disabled && !document.body.innerText.includes('this Mac') && !document.body.innerText.includes('Fn')`), true, 'Windows has no Fn preset or Mac permission pane');
+   const windowsCallsStart = await evaluate(`window.calls.length`);
+   for (let mask = 0; mask < 32; mask++) {
+     const model = !!(mask & 1), mic = !!(mask & 2), ax = !!(mask & 4), input = !!(mask & 8), hook = !!(mask & 16);
+     await evaluate(`Object.assign(window.fixture,{model_ready:${model},microphone:${mic},accessibility:${ax},input_monitoring:${input},hotkey:${hook}})`);
+     await until(`document.getElementById('setup-state').textContent===${JSON.stringify(model && mic && hook ? 'Ready' : 'Needs attention')} && document.getElementById('mic-row').hidden===${mic} && document.getElementById('hotkey-row').hidden===${hook} && document.getElementById('overview-model').hidden===${model}`);
+     assert.equal(await evaluate(`document.getElementById('permissions-row').hidden && document.getElementById('permissions').disabled`), true, `No fake AX/Input Monitoring grants for Windows combination ${mask}`);
+     if (!model) assert.equal(await evaluate(`!document.getElementById('overview-download').disabled`), true, 'Model CTA survives every Windows capability combination');
+   }
+   await evaluate(`Object.assign(window.fixture,{model_ready:true,microphone:false,hotkey:false,accessibility:false,input_monitoring:false});document.getElementById('nav-settings').click()`);
+   await until(`!document.getElementById('mic').disabled && !document.getElementById('mic-row').hidden`);
+   assert.equal(await evaluate(`document.getElementById('mic').textContent`), 'Open settings', 'Device presence is not portrayed as microphone consent');
+   await evaluate(`document.getElementById('mic').click();document.getElementById('permissions').click()`);
+   await until(`window.calls.slice(${windowsCallsStart}).some(c=>c.command==='request_microphone')`);
+   assert.equal(await evaluate(`window.calls.slice(${windowsCallsStart}).some(c=>c.command==='request_permissions')`), false, 'Windows never requests Accessibility/Input Monitoring');
+   await evaluate(`window.fixture.microphone=true`);
+   await until(`document.getElementById('ready-detail').textContent.includes('Shortcut unavailable')`);
+   await evaluate(`document.getElementById('setup').click()`);
+   assert.equal(await evaluate(`document.activeElement.id`), 'change-shortcut', 'Unavailable registration points to changing the binding');
+   assert.match(await evaluate(`document.getElementById('hotkey-detail').textContent`), /Choose another.*Another app/);
+   await evaluate(`window.fixture.hotkey=true;document.getElementById('change-shortcut').click()`);
+   await until(recording);
+   const windowsSaves = await evaluate(`window.calls.filter(c=>c.command==='set_shortcut').length`);
+   for (const [code, mods] of [['Fn',''],['KeyL','metaKey:true,'],['KeyD','metaKey:true,'],['Delete','ctrlKey:true,altKey:true,'],['F4','altKey:true,'],['KeyC','ctrlKey:true,'],['KeyJ','shiftKey:true,']]) await key(code, mods);
+   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='set_shortcut').length`), windowsSaves, 'Windows reserved and unsupported keys never persist');
+   await key('KeyJ', 'ctrlKey:true,altKey:true,metaKey:true,');
+   await until(`${stopped} && document.getElementById('saved-shortcut').textContent==='Ctrl + Alt + Win + J'`);
+   assert.equal(await evaluate(`document.getElementById('shortcut-fn').textContent==='Use default' && !document.getElementById('shortcut-fn').hidden`), true);
+   await evaluate(`window.rejectShortcut=true;document.getElementById('change-shortcut').click()`);
+   await key('KeyJ', 'altKey:true,');
+   await until(`${stopped} && document.getElementById('shortcut-feedback').textContent.includes('Could not save')`);
+   assert.equal(await evaluate(`document.getElementById('saved-shortcut').textContent`), 'Ctrl + Alt + Win + J', 'Windows registration failure restores the previous binding');
+   await evaluate(`window.rejectShortcut=false;document.getElementById('shortcut-fn').click()`);
+   await until(`${stopped} && document.getElementById('saved-shortcut').textContent==='Ctrl + Shift + Space'`);
+   assert.deepEqual(await evaluate(`window.calls.filter(c=>c.command==='set_shortcut').at(-1).args.shortcut`), {code:'Space',modifiers:5}, 'Use default persists the Windows binding, never Fn');
+   await evaluate(`window.realTimeout=window.setTimeout;window.setTimeout=(fn,ms,...args)=>window.realTimeout(fn,ms===15000?30:ms,...args);document.getElementById('change-shortcut').click()`);
+   await until(`${stopped} && document.getElementById('shortcut-feedback').textContent.includes('timed out')`);
+   await evaluate(`window.setTimeout=window.realTimeout`);
+   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='capture_shortcut').at(-1).args.active`), false, 'Windows timeout releases native shortcut capture');
+   await evaluate(`const windowsCaptureInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='capture_shortcut'&&args.active)throw 'Could not record Windows shortcut';return windowsCaptureInvoke(command,args);};document.getElementById('change-shortcut').click()`);
+   await until(`${stopped} && document.getElementById('shortcut-feedback').textContent.includes('Could not record Windows shortcut')`);
+   assert.equal(await evaluate(`document.getElementById('saved-shortcut').textContent`), 'Ctrl + Shift + Space', 'Windows capture-start failure restores the saved binding');
+   await evaluate(`window.__TAURI_INTERNALS__.invoke=windowsCaptureInvoke`);
+   for (const seconds of [120,180,240,300]) {
+     await evaluate(`document.getElementById('recording-limit').value='${seconds}';document.getElementById('recording-limit').dispatchEvent(new Event('change'))`);
+     await until(`window.fixture.recording_limit===${seconds} && !document.getElementById('recording-limit').disabled`);
+   }
+   for (const width of [320,400,740,980,1280]) {
+     await send('Emulation.setDeviceMetricsOverride', {width,height:820,deviceScaleFactor:1,mobile:false});
+     for (const ready of [true,false]) {
+       await evaluate(`Object.assign(window.fixture,{model_ready:${ready},microphone:${ready},hotkey:${ready}});document.getElementById('shortcut-feedback').hidden=true`);
+       await until(`document.getElementById('setup-state').textContent==='${ready ? 'Ready' : 'Needs attention'}'`);
+       for (const tab of ['overview','settings']) {
+         await evaluate(`document.getElementById('nav-${tab}').click()`);
+         assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth`), true, `Windows ${ready ? 'ready' : 'setup'} ${tab} fits ${width}px`);
+         assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('button,select,input')).filter(e=>e.getClientRects().length && (e.getBoundingClientRect().right>innerWidth || e.getBoundingClientRect().left<0)).map(e=>e.id)`), [], 'Windows controls fit');
+         assert.equal(await evaluate(`document.getElementById('permissions-row').hidden && !document.body.innerText.includes('Use Fn') && !document.body.innerText.includes('Accessibility') && !document.body.innerText.includes('Input Monitoring')`), true);
+       }
+     }
+   }
+   assert.equal(await evaluate(`window.calls.slice(${windowsCallsStart}).some(c=>['request_permissions','start_recording','download_model','preview_sound'].includes(c.command))`), false, 'Windows setup never requests AX, starts recording, downloads or plays sound automatically');
+   console.log('UI smoke passed: Mac and Windows capability combinations, native-platform shortcuts/defaults/errors/timeouts, private payload, preferences, downloads, responsive layout at 320–1280px. No microphone capture.');
 } finally {
   socket?.close();
   browser.kill('SIGTERM');

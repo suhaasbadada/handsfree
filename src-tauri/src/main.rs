@@ -1,11 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod cancellation;
 mod logic;
+mod platform;
 mod shortcut;
 mod storage;
 mod streaming;
 mod transcript;
 use futures_util::StreamExt;
+use platform::*;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
@@ -31,48 +33,6 @@ const MODEL_SIZE: u64 = 147_964_211;
 const MODEL_HASH: &str = "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002";
 const MODEL_URL: &str =
     "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin";
-unsafe extern "C" {
-    fn hf_dashboard_visible(visible: bool) -> bool;
-    fn hf_activation_policy() -> i32;
-    fn hf_permissions() -> i32;
-    fn hf_microphone_status() -> i32;
-    fn hf_request_microphone();
-    fn hf_request_permissions();
-    fn hf_request_accessibility();
-    fn hf_keyboard();
-    fn hf_hook(callback: extern "C" fn(i32)) -> bool;
-    fn hf_hook_state() -> i32;
-    fn hf_hook_reason() -> i32;
-    fn hf_record(
-        generation: u64,
-        epoch: u64,
-        allowed: extern "C" fn(u64) -> bool,
-        sink: extern "C" fn(u64, u64, *const f32, i32),
-    ) -> bool;
-    fn hf_sounds(enabled: bool);
-    fn hf_sound_volume(volume: f32);
-    fn hf_preview_sound() -> bool;
-    fn hf_sound_style(style: i32);
-    fn hf_shortcut(code: i32, modifiers: u32);
-    fn hf_capture_shortcut(active: bool);
-    fn hf_stop();
-    fn hf_finish(epoch: u64, allowed: extern "C" fn(u64) -> bool);
-    fn hf_cancel_audio();
-    fn hf_discard_target();
-    fn hf_overlay(phase: i32);
-    fn hf_paste(
-        text: *const std::ffi::c_char,
-        epoch: u64,
-        allowed: extern "C" fn(u64) -> bool,
-    ) -> i32;
-    fn hf_copy(text: *const std::ffi::c_char);
-    fn hf_copy_fallback(
-        text: *const std::ffi::c_char,
-        epoch: u64,
-        allowed: extern "C" fn(u64) -> bool,
-    ) -> i32;
-    fn hf_cleanup();
-}
 static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
 static GESTURE: Mutex<logic::FnGesture> = Mutex::new(logic::FnGesture::new());
 static CANCELLATION: cancellation::CancellationEpoch = cancellation::CancellationEpoch::new();
@@ -127,6 +87,7 @@ fn enqueue_at(control: Control, epoch: u64) {
 
 #[derive(Clone, Serialize)]
 struct Status {
+    platform: &'static str,
     phase: String,
     message: String,
     progress: f32,
@@ -276,7 +237,7 @@ fn write_diagnostic(
         "hook_attempted": hook_reason != 0,
         "hook_connected": status.hotkey,
         "hook_state_bits": hook_state,
-        "hook_reason": match hook_reason { 1 => "connected", 2 => "input_monitoring_preflight_denied", 3 => "event_tap_creation_failed", 4 => "run_loop_source_creation_failed", 5 => "event_tap_disabled", _ => "not_attempted" },
+        "hook_reason": match hook_reason { 1 => "connected", 2 => "input_monitoring_preflight_denied", 3 => "event_tap_creation_failed", 4 => "run_loop_source_creation_failed", 5 => "event_tap_disabled", 101 => "windows_hotkey_registration_failed", 102 => "windows_escape_hook_failed", 103 => "windows_message_loop_failed", _ => "not_attempted" },
         "model_ready": status.model_ready,
         "model_path": model_path(s),
         "model_file_bytes": fs::metadata(model_path(s)).ok().map(|m| m.len()),
@@ -288,17 +249,12 @@ fn write_diagnostic(
     });
     let _writer = DIAGNOSTIC_WRITE.lock().unwrap();
     use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
     let result = (|| -> std::io::Result<()> {
         let temporary = s.directory.join("diagnostics.json.tmp");
-        let mut file = fs::OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .mode(0o600)
-            .open(&temporary)?;
+        let mut file = storage::private_file(&temporary)?;
         file.write_all(serde_json::to_string_pretty(&diagnostic)?.as_bytes())?;
-        fs::rename(temporary, s.directory.join("diagnostics.json"))
+        drop(file);
+        storage::replace_file(&temporary, &s.directory.join("diagnostics.json"))
     })();
     if let Err(error) = result {
         eprintln!("Cannot write local diagnostics: {error}");
@@ -393,6 +349,14 @@ async fn set_shortcut(shortcut: shortcut::Shortcut) -> Result<(), String> {
         }
         let mut updated = inner.store.clone();
         updated.shortcut = shortcut.clone();
+        #[cfg(windows)]
+        shortcut::replace_checked(
+            &inner.store.shortcut,
+            &shortcut,
+            |binding| unsafe { hf_try_shortcut(binding.keycode().unwrap(), binding.modifiers) },
+            || storage::save(&s.directory.join("usage.json"), &updated),
+        )?;
+        #[cfg(not(windows))]
         storage::save(&s.directory.join("usage.json"), &updated)?;
         inner.store = updated;
         inner.status.shortcut = shortcut.clone();
@@ -404,6 +368,7 @@ async fn set_shortcut(shortcut: shortcut::Shortcut) -> Result<(), String> {
             .lock()
             .unwrap()
             .event_with_epoch(6, Instant::now(), CANCELLATION.current());
+        #[cfg(not(windows))]
         unsafe {
             hf_shortcut(shortcut.keycode().unwrap(), shortcut.modifiers);
         }
@@ -590,6 +555,13 @@ async fn copy_transcript() -> Result<(), String> {
     if text.is_empty() {
         return Err("No transcript to copy yet.".into());
     }
+    #[cfg(windows)]
+    if unsafe { hf_copy_checked(cstring(&text)?.as_ptr()) } != 0 {
+        return Err(
+            "Windows could not copy the transcript. The clipboard may be busy; try again.".into(),
+        );
+    }
+    #[cfg(not(windows))]
     unsafe {
         hf_copy(cstring(&text)?.as_ptr());
     }
@@ -652,7 +624,9 @@ fn toggle_recording(finish: Option<Option<u64>>, epoch: u64) {
         return;
     }
     let permissions = unsafe { hf_permissions() };
-    if !inner.status.model_ready || permissions & 7 != 7 {
+    if !inner.status.model_ready
+        || permissions & platform::REQUIRED_PERMISSIONS != platform::REQUIRED_PERMISSIONS
+    {
         inner.status.phase = "setup_required".into();
         inner.status.message =
             logic::setup_message(permissions, inner.status.model_ready, inner.status.hotkey)
@@ -849,7 +823,7 @@ fn infer(session: &Arc<streaming::Session>, model: &Path) -> Result<String, Stri
         session,
         || {
             let mut context_params = WhisperContextParameters::default();
-            context_params.use_gpu(true);
+            context_params.use_gpu(cfg!(target_os = "macos"));
             WhisperContext::new_with_params(model, context_params)
                 .map_err(|e| format!("Cannot load model: {e}"))
         },
@@ -1008,9 +982,7 @@ async fn download() -> Result<(), String> {
         if total != MODEL_SIZE || format!("{:x}", hash.finalize()) != MODEL_HASH {
             return Err("Model checksum mismatch".into());
         }
-        tokio::fs::rename(&partial, model_path(&s))
-            .await
-            .map_err(|e| e.to_string())?;
+        storage::replace_file(&partial, &model_path(&s)).map_err(|e| e.to_string())?;
         Ok(())
     }
     .await;
@@ -1077,8 +1049,7 @@ fn main() {
             unsafe { hf_dashboard_visible(true) };
             let directory = app.path().app_local_data_dir()?;
             fs::create_dir_all(&directory)?;
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&directory, fs::Permissions::from_mode(0o700))?;
+            storage::private_directory(&directory)?;
             let _ = fs::remove_file(directory.join("recording.wav"));
             let _ = fs::remove_file(directory.join("model.download"));
             let ready = verified_model(&directory.join("ggml-base.en.bin"));
@@ -1101,6 +1072,7 @@ fn main() {
                     generation: 0,
                     session_epoch: CANCELLATION.current(),
                     status: Status {
+                        platform: std::env::consts::OS,
                         phase: "idle".into(),
                         message: if ready {
                             format!("Select a text field and press {}.", store.shortcut.label())

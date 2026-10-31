@@ -5,6 +5,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 
+// These exercise the macOS shell packager; static contract checks below run everywhere.
+const posixTest = process.platform === 'win32' ? test.skip : test;
+
 function sandbox(callback) {
   const root = mkdtempSync(join(tmpdir(), 'handsfree-package-test-'));
   try {
@@ -22,14 +25,14 @@ function sandbox(callback) {
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
-test('packaging rejects arguments before creating output or invoking build', () => sandbox(({ root, run }) => {
+posixTest('packaging rejects arguments before creating output or invoking build', () => sandbox(({ root, run }) => {
   const result = run('--publish');
   assert.equal(result.status, 1);
   assert.match(result.stderr, /Usage:/);
   assert.ok(!readdirSync(root).includes('release'));
 }));
 
-test('packaging rejects unsupported hosts before build', () => sandbox(({ root, stub, run }) => {
+posixTest('packaging rejects unsupported hosts before build', () => sandbox(({ root, stub, run }) => {
   stub('uname', 'echo Linux');
   const result = run();
   assert.equal(result.status, 1);
@@ -38,7 +41,7 @@ test('packaging rejects unsupported hosts before build', () => sandbox(({ root, 
 }));
 
 for (const existing of ['HandsFree-0.1.1-beta.2-macos-arm64.dmg', 'SHA256SUMS', 'PROVENANCE.txt']) {
-  test(`packaging refuses to overwrite ${existing}`, () => sandbox(({ root, run }) => {
+  posixTest(`packaging refuses to overwrite ${existing}`, () => sandbox(({ root, run }) => {
     mkdirSync(join(root, 'release'));
     writeFileSync(join(root, 'release', existing), 'preserve me');
     const result = run();
@@ -49,7 +52,7 @@ for (const existing of ['HandsFree-0.1.1-beta.2-macos-arm64.dmg', 'SHA256SUMS', 
   }));
 }
 
-test('build failure propagates its status and cleans only the run staging directory', () => sandbox(({ root, run }) => {
+posixTest('build failure propagates its status and cleans only the run staging directory', () => sandbox(({ root, run }) => {
   mkdirSync(join(root, 'release'));
   writeFileSync(join(root, 'release', 'unrelated.txt'), 'keep');
   const result = run();

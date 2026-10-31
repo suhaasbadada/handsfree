@@ -51,10 +51,10 @@ No special integration is required: insertion depends on the focused field, with
 | --- | --- |
 | macOS 14+, Apple Silicon | [Mac beta available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.2) · self-signed, not notarized |
 | Intel Macs | Unsupported |
-| Windows | Planned; no build or download available |
+| Windows 10/11, x64 | Experimental support in development; [test installer pending verification](docs/WINDOWS.md). No public Windows download yet. |
 | Linux | Planned; no build or download available |
 
-No Windows or Linux release dates are promised.
+Windows ARM is unsupported. No Windows or Linux release dates are promised. The published Mac beta remains unchanged.
 
 ## Install
 
@@ -69,7 +69,7 @@ Focus a text field, briefly tap **Fn / 🌐**, speak, and tap again to finish. *
 
 ## Build from source
 
-Requires Apple Silicon, macOS 14+, Node 22.18+ (24 recommended), Rust stable, CMake, and Xcode Command Line Tools with Swift and a macOS SDK.
+For the Mac build: requires Apple Silicon, macOS 14+, Node 22.18+ (24 recommended), Rust stable, CMake, and Xcode Command Line Tools with Swift and a macOS SDK. For experimental Windows x64 builds and tester acceptance checks, see [Windows beta](docs/WINDOWS.md).
 
 ```sh
 git clone https://github.com/suhaasbadada/handsfree.git

@@ -1,0 +1,69 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+
+const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+
+test('Windows candidate workflow is isolated, x64, read-only and never publishes', () => {
+  const workflow = read('.github/workflows/windows.yml');
+  assert.match(workflow, /branches: \[main, 'agent\/windows-beta'\]/);
+  assert.match(workflow, /pull_request:/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /runs-on: windows-2022/);
+  assert.match(workflow, /permissions:\n  contents: read/);
+  assert.match(workflow, /stable-x86_64-pc-windows-msvc/);
+  for (const check of ['npm ci', 'npm test', 'npm run build', './scripts/windows-package.ps1']) assert.ok(workflow.includes(check));
+  assert.match(workflow, /actions\/upload-artifact@v7/);
+  assert.match(workflow, /if-no-files-found: error/);
+  assert.doesNotMatch(workflow, /secrets\.|contents: write|gh release|tauri-action|build:local/);
+});
+
+test('Windows packaging prepares notices before native compilation and inspects the NSIS payload', () => {
+  const script = read('scripts/windows-package.ps1');
+  const env = read('scripts/windows-env.ps1');
+  assert.ok(script.indexOf("'scripts/release-notices.py'") < script.indexOf("@('test'"));
+  for (const command of ['fmt', 'test', 'clippy', 'fetch']) assert.ok(script.includes(`@('${command}'`));
+  assert.match(script, /'--locked'/);
+  assert.match(script, /'--all-targets', '--', '-D', 'warnings'/);
+  assert.match(script, /'--config', 'src-tauri\/tauri.windows.conf.json', '--bundles', 'nsis'/);
+  assert.match(script, /Invoke-Checked 7z @\('t'/);
+  for (const file of ['THIRD_PARTY_SOURCES.tar.gz', 'inventory.json', 'COPYRIGHT-library.html', 'SHA256SUMS', 'PROVENANCE.txt']) assert.ok(script.includes(file));
+  assert.match(script, /Candidate output exists/);
+  assert.match(env, /x86_64-pc-windows-msvc/);
+  for (const flag of ['NATIVE', 'AVX', 'AVX2', 'AVX512', 'FMA', 'F16C']) assert.ok(env.includes(`'${flag}'`));
+  assert.match(env, /SetEnvironmentVariable\("GGML_\$flag", 'OFF', 'Process'\)/);
+  assert.doesNotMatch(script, /Start-Process|Remove-Item|build:local|gh release|signtool/i);
+});
+
+test('Windows resources and per-user installer do not alter the Mac bundle', () => {
+  const config = JSON.parse(read('src-tauri/tauri.windows.conf.json'));
+  const base = JSON.parse(read('src-tauri/tauri.conf.json'));
+  assert.deepEqual(config.bundle.targets, ['nsis']);
+  assert.deepEqual(config.bundle.icon, ['icons/icon.ico']);
+  assert.deepEqual(config.bundle.resources, { 'target/windows-notices/': 'licenses/' });
+  assert.equal(config.bundle.licenseFile, '../LICENSE');
+  assert.equal(config.bundle.windows.nsis.installMode, 'currentUser');
+  assert.equal(config.bundle.windows.webviewInstallMode.type, 'downloadBootstrapper');
+  assert.equal(config.app.macOSPrivateApi, false);
+  assert.equal(base.app.macOSPrivateApi, true);
+  assert.deepEqual(base.bundle.targets, ['app', 'dmg']);
+  assert.equal(base.bundle.macOS.signingIdentity, '-');
+});
+
+test('notice generation retains Mac default and explicitly inventories Windows dependencies', () => {
+  const script = read('scripts/release-notices.py');
+  assert.match(script, /default="aarch64-apple-darwin"/);
+  assert.match(script, /"--filter-platform", args.target/);
+  assert.match(script, /x86_64-pc-windows-msvc/);
+  assert.match(script, /hashlib.sha256\(crate.read_bytes\(\)\).hexdigest\(\) != checksum/);
+  assert.match(script, /Experimental Windows beta; unsigned/);
+  assert.match(script, /encoding="utf-8"/);
+  assert.match(script, /NOTICES \/ "windows-supplements"/);
+  for (const [file, hash] of Object.entries({
+    'webview2-rs-LICENSE': '0dcf41516e608bbcb6cdc5229feb7b86fe4a643b85e7df251133c93408fdac73',
+    'dasp_sample-LICENSE-MIT': 'b1d6df41ed3aa96806e74c729444d7c121d90e6660a6aed01d298e03fde475a0',
+  })) {
+    assert.equal(createHash('sha256').update(readFileSync(new URL(`../scripts/windows-licenses/${file}`, import.meta.url))).digest('hex'), hash);
+  }
+});

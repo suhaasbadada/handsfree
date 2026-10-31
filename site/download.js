@@ -1,4 +1,4 @@
-import { release } from './release.js';
+import { release, windowsRelease } from './release.js';
 
 // MacIntel and an "Intel Mac OS X" UA also occur on Apple Silicon.
 // Only explicit UA Client Hints may establish desktop architecture.
@@ -22,7 +22,7 @@ export function detectPlatform({ userAgent = '', platform = '', maxTouchPoints =
 export function downloadState(platform, manifest) {
   const url = publishedUrl(manifest);
   const note = platform.os === 'mac' && platform.arch === 'intel' ? 'Intel Macs are not supported. Download only for another, Apple Silicon Mac.'
-    : platform.os === 'windows' ? 'Windows planned. This download is for an Apple Silicon Mac.'
+    : platform.os === 'windows' ? `${windowsRelease.status} ${platform.arch === 'arm64' ? 'Windows ARM is unsupported. ' : ''}Target: Windows 10/11 x64. This download is for an Apple Silicon Mac.`
     : platform.os === 'linux' ? 'Linux planned. This download is for an Apple Silicon Mac.' : '';
   return { label: url ? (platform.os === 'mac' ? 'Download for Mac' : 'Get Mac beta') : 'Mac beta coming soon',
     detail: 'For Apple Silicon Mac · macOS 14+ · English', note, url };

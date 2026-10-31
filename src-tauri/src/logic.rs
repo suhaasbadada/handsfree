@@ -21,17 +21,31 @@ pub fn permission_requests(args: &[String]) -> PermissionRequests {
 }
 pub fn setup_message(permissions: i32, model_ready: bool, hotkey: bool) -> Option<String> {
     let mut missing = Vec::new();
-    if permissions & 1 == 0 {
-        missing.push("Microphone: click Allow in HandsFree Settings, then Allow in the macOS dialog (if previously denied, enable HandsFree in Privacy & Security → Microphone)");
+    #[cfg(windows)]
+    {
+        if permissions & 1 == 0 {
+            missing.push("Microphone: connect an input device and enable desktop microphone access in Windows Settings");
+        }
+        if !hotkey {
+            missing.push(
+                "Global shortcut: the binding is unavailable; choose another shortcut in Settings",
+            );
+        }
     }
-    if permissions & 2 == 0 {
-        missing.push("Accessibility: enable /Applications/HandsFree.app in Privacy & Security → Accessibility");
-    }
-    if permissions & 4 == 0 {
-        missing.push("Input Monitoring: enable /Applications/HandsFree.app in Privacy & Security → Input Monitoring");
-    }
-    if permissions & 4 != 0 && !hotkey {
-        missing.push("Fn event connection: reopen /Applications/HandsFree.app");
+    #[cfg(not(windows))]
+    {
+        if permissions & 1 == 0 {
+            missing.push("Microphone: click Allow in HandsFree Settings, then Allow in the macOS dialog (if previously denied, enable HandsFree in Privacy & Security → Microphone)");
+        }
+        if permissions & 2 == 0 {
+            missing.push("Accessibility: enable /Applications/HandsFree.app in Privacy & Security → Accessibility");
+        }
+        if permissions & 4 == 0 {
+            missing.push("Input Monitoring: enable /Applications/HandsFree.app in Privacy & Security → Input Monitoring");
+        }
+        if permissions & 4 != 0 && !hotkey {
+            missing.push("Fn event connection: reopen /Applications/HandsFree.app");
+        }
     }
     if !model_ready {
         missing.push("Local model: click Download in HandsFree Settings");
@@ -79,6 +93,17 @@ mod permission_tests {
         );
     }
     #[test]
+    #[cfg(windows)]
+    fn windows_setup_never_requests_mac_consent() {
+        assert_eq!(setup_message(1, true, true), None);
+        let missing = setup_message(0, false, false).unwrap();
+        assert!(missing.contains("Windows Settings"));
+        assert!(missing.contains("Global shortcut"));
+        assert!(!missing.contains("Accessibility"));
+        assert!(!missing.contains("Input Monitoring"));
+    }
+    #[test]
+    #[cfg(not(windows))]
     fn setup_lists_only_current_missing_steps() {
         let missing = setup_message(4, false, true).unwrap();
         assert!(missing.contains("Microphone: click Allow"));
@@ -166,9 +191,13 @@ pub fn copied_message(paste_code: i32) -> String {
     format!("Copied. Automatic paste skipped: {reason}].")
 }
 
+#[cfg(not(windows))]
 pub fn paste_message(code: i32) -> String {
     if code == 0 {
         return "Paste shortcut sent to your original field (insertion not confirmed).".into();
+    }
+    if code == 17 {
+        return "Paste submission uncertain [finish:partial-input]. Check the original field before copying or trying again; no automatic retry was made.".into();
     }
     let (reason, action) = match code {
         1 => ("accessibility-denied", "Accessibility access is unavailable. Enable HandsFree in Privacy & Security → Accessibility, then restart the same app copy."),
@@ -188,6 +217,37 @@ pub fn paste_message(code: i32) -> String {
     let stage = match code {
         2 | 3 | 12..=15 => "start",
         _ => "finish",
+    };
+    format!("Not pasted [{stage}:{reason}]. {action}")
+}
+
+#[cfg(windows)]
+pub fn paste_message(code: i32) -> String {
+    if code == 0 {
+        return "Paste shortcut sent to your original field (insertion not confirmed).".into();
+    }
+    if code == 17 {
+        return "Paste submission uncertain [finish:partial-input]. Check the original field before copying or trying again; no automatic retry was made.".into();
+    }
+    let (reason, action) = match code {
+        1 => ("accessibility-denied", "Windows UI Automation is unavailable. Automatic paste is disabled; the transcript can still be copied."),
+        2 => ("no-original-app", "Select a text field in another app before using the dictation shortcut."),
+        3 => ("no-original-focus", "The editor did not expose a focused editable field through Windows UI Automation."),
+        4 => ("app-changed", "The foreground window changed. Stay in the original editor until transcription finishes."),
+        5 => ("no-current-focus", "The original editor no longer exposes a focused field."),
+        6 => ("field-changed", "The focused field changed or was recreated. Keep the same field focused."),
+        7 | 12 => ("secure-field", "Password fields cannot receive automatic dictation."),
+        8 | 13 => ("unsupported-field", "The editor does not expose safe editing through Windows UI Automation."),
+        9 | 14 => ("read-only-field", "The field is disabled or read-only."),
+        10 => ("clipboard-write-failed", "The clipboard was busy, changed, or contained formats that cannot safely be restored."),
+        11 => ("paste-event-failed", "Windows could not submit Paste. Release modifier keys; elevated apps may reject input."),
+        15 => ("handsfree-focused", "Close HandsFree settings and select a text field in another app before starting."),
+        _ => ("invalid-paste-result", "The paste request could not be completed."),
+    };
+    let stage = if matches!(code, 2 | 3 | 12..=15) {
+        "start"
+    } else {
+        "finish"
     };
     format!("Not pasted [{stage}:{reason}]. {action}")
 }

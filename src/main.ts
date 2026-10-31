@@ -2,10 +2,10 @@ import { invoke } from '@tauri-apps/api/core';
 import { getVersion } from '@tauri-apps/api/app';
 import './style.css';
 import './typography.css';
-import { shortcutFromEvent, type Shortcut } from './shortcut';
+import { defaultShortcut, shortcutFromEvent, shortcutLabel, type Shortcut } from './shortcut';
 import { phaseLabel, canCancel, formatTime, readiness, readinessDetail } from './presentation';
 
-type Status = { phase: string; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: 'clean' | 'warm'; recording_limit: number; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
+type Status = { platform?: 'windows' | 'macos'; phase: string; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: 'clean' | 'warm'; recording_limit: number; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
 const logo = new URL('../src-tauri/icons/icon.png', import.meta.url).href;
 document.querySelector('#app')!.innerHTML = `
 <div class="shell">
@@ -13,15 +13,15 @@ document.querySelector('#app')!.innerHTML = `
   <div class="header-right"><nav aria-label="Main navigation"><button id="nav-overview" class="nav active" aria-label="Overview" title="Overview" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-6v-6h-4v6H4Z"/></svg></button><button id="nav-settings" class="nav" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg></button></nav><section class="status" aria-label="App status"><span id="dot" aria-hidden="true"></span><strong id="phase" aria-live="polite">Connecting…</strong><button id="cancel" hidden aria-label="Cancel dictation" title="Cancel dictation">×</button></section></div></aside>
  <main>
  <section id="overview" aria-labelledby="overview-title">
-   <div class="hero"><h1 id="overview-title">Your activity</h1><p>Press <kbd id="overview-shortcut">Fn</kbd> to dictate</p></div>
-   <section class="card readiness"><div><h2 id="ready-title">Finish setting up</h2><p id="ready-detail">Checking permissions and model…</p></div><button id="setup" class="primary">Open settings</button></section>
+    <div class="hero"><h1 id="overview-title">Your activity</h1><p>Press <kbd id="overview-shortcut">…</kbd> to dictate</p></div>
+    <section class="card readiness"><div><h2 id="ready-title">Finish setting up</h2><p id="ready-detail">Connecting to HandsFree…</p></div><button id="setup" class="primary" disabled>Open settings</button></section>
    <section id="overview-model" class="card readiness" hidden aria-label="English model"><div><h2>English model</h2><p id="overview-model-state">One-time download · Works offline afterward</p></div><button id="overview-download" class="primary" disabled>Download English model (~148 MB)</button></section>
    <div class="metrics" aria-label="Local usage since tracking began"><article><strong id="words">0</strong><span>Words</span></article><article><strong id="saved">0 sec</strong><span tabindex="0" title="Estimate per dictation: typing at 40 words/minute, minus recording time, never below zero. Not a productivity measurement.">Time saved<small>Estimated</small></span></article><article><strong id="count">0</strong><span>Dictations</span></article></div>
  </section>
  <section id="settings" hidden aria-labelledby="settings-title">
   <div class="settings-intro"><h1 id="settings-title">Settings</h1></div>
    <section class="card preferences" aria-labelledby="preferences-title"><h2 id="preferences-title">Preferences</h2>
-    <div class="setting-row shortcut-row"><div><h3>Shortcut</h3></div><div class="shortcut-value"><button id="change-shortcut" aria-label="Record shortcut" title="Record shortcut" aria-pressed="false" aria-describedby="shortcut-feedback"><span id="saved-shortcut">Fn</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/></svg></button><button id="stop-shortcut" hidden>Cancel</button><button id="shortcut-fn" class="text-action" hidden>Use Fn</button></div><p id="shortcut-feedback" role="status" hidden></p></div>
+     <div class="setting-row shortcut-row"><div><h3>Shortcut</h3></div><div class="shortcut-value"><button id="change-shortcut" aria-label="Record shortcut" title="Record shortcut" aria-pressed="false" aria-describedby="shortcut-feedback"><span id="saved-shortcut">…</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/></svg></button><button id="stop-shortcut" hidden>Cancel</button><button id="shortcut-fn" class="text-action" hidden>Use default</button></div><p id="shortcut-feedback" role="status" hidden></p></div>
     <div class="setting-row"><div><h3><label for="recording-limit">Recording limit</label></h3></div><select id="recording-limit" title="Applies to the next recording"><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="240">4 minutes</option><option value="300">5 minutes</option></select></div>
     <div class="setting-row listening-row"><div><h3>Sound</h3></div><select id="sound-style" aria-label="Sound"><option value="clean">Clean</option><option value="warm">Warm</option></select><span id="sound-state" class="state">Off</span><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Recording sounds"><span aria-hidden="true"></span></label></div>
     <div class="setting-row volume-row"><h3><label for="sound-volume">Volume</label></h3><div class="sound-controls"><input id="sound-volume" type="range" min="0" max="100" step="1" value="50" aria-describedby="volume-percent"><output id="volume-percent" for="sound-volume">50%</output></div><button id="preview-sound" title="Preview sound" disabled>Preview</button></div>
@@ -29,12 +29,12 @@ document.querySelector('#app')!.innerHTML = `
   <section class="card setup-card" aria-labelledby="setup-title"><div class="card-heading"><h2 id="setup-title">Setup</h2><span id="setup-state" class="subtle" role="status">Checking…</span></div>
    <div id="setup-missing">
      <div id="mic-row" class="setting-row"><div><h3>Microphone</h3><p id="mic-state">Allow access to record your voice.</p></div><button id="mic">Allow</button></div>
-    <div id="permissions-row" class="setting-row"><div><h3>Shortcuts & paste</h3><p id="permission-state">Checking…</p></div><button id="permissions">Open settings</button></div>
-    <div id="hotkey-row" class="setting-row" hidden><div><h3>Shortcut disconnected</h3><p>Quit and reopen HandsFree to reconnect.</p></div></div>
+     <div id="permissions-row" class="setting-row" hidden><div><h3>Shortcuts & paste</h3><p id="permission-state">Checking…</p></div><button id="permissions">Open settings</button></div>
+     <div id="hotkey-row" class="setting-row" hidden><div><h3 id="hotkey-title">Shortcut disconnected</h3><p id="hotkey-detail">Checking shortcut…</p></div></div>
     </div>
      <div id="model-row" class="setting-row" tabindex="-1"><div><h3>English model <span id="model-ready" class="subtle" hidden>· Ready</span></h3><p id="model-state">148 MB · One-time download</p><progress id="progress" max="100" value="0" hidden aria-label="Model download progress"></progress></div><button id="download">Download</button></div>
   </section>
-   <section class="local-data" aria-labelledby="data-title"><div class="setting-row"><div><h2 id="data-title">Usage totals</h2></div><button id="reset" class="danger" aria-haspopup="dialog">Reset totals</button></div><p class="subtle">Audio and transcription stay on this Mac.</p></section>
+    <section class="local-data" aria-labelledby="data-title"><div class="setting-row"><div><h2 id="data-title">Usage totals</h2></div><button id="reset" class="danger" aria-haspopup="dialog">Reset totals</button></div><p id="privacy-detail" class="subtle">Audio and transcription stay on this device.</p></section>
  </section>
  <p id="message" class="status-detail" aria-live="polite" hidden></p>
  <p id="feedback" class="feedback" role="status" hidden></p><p id="storage-error" class="feedback" role="status" hidden></p>
@@ -49,6 +49,7 @@ for (const id of ['change-shortcut', 'mic', 'permissions', 'download', 'reset', 
   (el(id) as HTMLInputElement | HTMLButtonElement).disabled = true;
 }
 let current: Status | undefined;
+const displayShortcut = (status: Status) => status.platform === 'windows' ? shortcutLabel(status.shortcut, 'windows') : status.shortcut_label;
 let refreshTask: Promise<void> | undefined;
 let soundsPending = false;
 let stylePending = false;
@@ -86,13 +87,14 @@ el('nav-overview').onclick = () => navigate('overview');
 el('nav-settings').onclick = () => navigate('settings');
 document.querySelector('.brand')!.addEventListener('click', e => { e.preventDefault(); navigate('overview'); });
 el('setup').onclick = () => {
+  if (!current) return;
   navigate('settings');
-  const target = el(!current?.model_ready ? 'model-row' : !current.microphone ? 'mic-row' : !current.accessibility || !current.input_monitoring ? 'permissions-row' : 'hotkey-row');
+  const target = el(!current.model_ready ? 'model-row' : !current.microphone ? 'mic-row' : current.platform === 'windows' ? 'change-shortcut' : !current.accessibility || !current.input_monitoring ? 'permissions-row' : 'hotkey-row');
   target.scrollIntoView({ block: 'center' });
   target.setAttribute('tabindex', '-1'); target.focus();
 };
 el('mic').onclick = () => void action('request_microphone');
-el('permissions').onclick = () => void action('request_permissions');
+el('permissions').onclick = () => { if (current && current.platform !== 'windows') void action('request_permissions'); };
 const recorder = button('change-shortcut');
 function shortcutFeedback(message: string) {
   el('shortcut-feedback').hidden = !message; el('shortcut-feedback').textContent = message;
@@ -100,10 +102,12 @@ function shortcutFeedback(message: string) {
 function renderShortcut() {
   recorder.setAttribute('aria-pressed', String(capturing));
   recorder.disabled = shortcutPending || captureStopping || !canEditShortcut();
-  if (!shortcutPending) el('saved-shortcut').textContent = capturing ? 'Press shortcut…' : current?.shortcut_label ?? 'Fn';
+  if (!shortcutPending) el('saved-shortcut').textContent = capturing ? 'Press shortcut…' : current ? displayShortcut(current) : '…';
   el('stop-shortcut').hidden = !capturing;
   button('stop-shortcut').disabled = shortcutPending;
-  el('shortcut-fn').hidden = capturing || !current || current.shortcut.code === 'Fn';
+  const fallback = defaultShortcut(current?.platform);
+  el('shortcut-fn').hidden = capturing || !current || (current.shortcut.code === fallback.code && current.shortcut.modifiers === fallback.modifiers);
+  el('shortcut-fn').textContent = current?.platform === 'windows' ? 'Use default' : 'Use Fn';
   button('shortcut-fn').disabled = shortcutPending || captureStopping || !canEditShortcut();
 }
 async function stopCapture() {
@@ -128,7 +132,7 @@ async function saveShortcut(shortcut: Shortcut) {
     if (restoreFocus) restoreRecorderFocus();
   }
 }
-el('shortcut-fn').onclick = () => void saveShortcut({code: 'Fn', modifiers: 0});
+el('shortcut-fn').onclick = () => { if (current) void saveShortcut(defaultShortcut(current.platform)); };
 el('stop-shortcut').onclick = () => void stopCapture();
 recorder.onclick = async e => {
   if (!canEditShortcut() || shortcutPending || capturing || captureStopping) return;
@@ -149,7 +153,7 @@ recorder.onkeydown = e => {
   if (activationHeld && (e.code === 'Enter' || (e.code === 'Space' && !e.ctrlKey && !e.altKey && !e.metaKey))) return;
   if (captureStart && captureStopping) return;
   if (/^(Control|Alt|Shift|Meta)/.test(e.code)) return;
-  try { const shortcut = shortcutFromEvent(e); void captureStart?.then(() => { if (capturing) void saveShortcut(shortcut); }).catch(error => shortcutFeedback(String(error))); }
+   try { const shortcut = shortcutFromEvent(e, current?.platform); void captureStart?.then(() => { if (capturing) void saveShortcut(shortcut); }).catch(error => shortcutFeedback(String(error))); }
   catch (error) { shortcutFeedback(String(error)); }
 };
 recorder.onkeyup = () => { activationHeld = false; };
@@ -223,7 +227,9 @@ function refresh(): Promise<void> {
 }
 async function refreshStatus() {
   try {
-    current = await invoke<Status>('status');
+     current = await invoke<Status>('status');
+     const windows = current.platform === 'windows';
+     button('setup').disabled = false;
     button('reset').disabled = false;
     if (!soundsPending) sounds.disabled = false;
     if (!volumePending) volume.disabled = false;
@@ -237,14 +243,17 @@ async function refreshStatus() {
     el('message').hidden = !el('message').textContent;
     el('dot').className = current.phase;
     button('mic').disabled = current.microphone;
-    el('mic').textContent = current.microphone ? 'Allowed' : 'Allow';
-    el('mic-state').textContent = 'Allow access to record your voice.';
+     el('mic').textContent = windows ? 'Open settings' : current.microphone ? 'Allowed' : 'Allow';
+     el('mic-state').textContent = windows ? 'Connect a microphone and enable microphone access.' : 'Allow access to record your voice.';
+     el('privacy-detail').textContent = windows ? 'Audio and transcription stay on this device.' : 'Audio and transcription stay on this Mac.';
     el('permission-state').textContent = !current.accessibility ? 'Allow Accessibility for automatic paste.' : 'Allow Input Monitoring for the shortcut.';
     el('mic-row').hidden = current.microphone;
-    el('permissions-row').hidden = current.accessibility && current.input_monitoring;
-    el('hotkey-row').hidden = current.hotkey;
+     el('permissions-row').hidden = windows || (current.accessibility && current.input_monitoring);
+     el('hotkey-row').hidden = current.hotkey;
+     el('hotkey-title').textContent = windows ? 'Shortcut unavailable' : 'Shortcut disconnected';
+     el('hotkey-detail').textContent = windows ? 'Choose another shortcut above. Another app may already use it.' : 'Quit and reopen HandsFree to reconnect.';
     el('model-ready').hidden = !current.model_ready;
-    button('permissions').disabled = current.accessibility && current.input_monitoring;
+     button('permissions').disabled = windows || (current.accessibility && current.input_monitoring);
     el('permissions').textContent = current.accessibility && current.input_monitoring ? 'Allowed' : 'Open settings';
     const downloading = current.phase === 'downloading';
     const modelDetail = downloading ? `Downloading… ${Math.round(current.progress)}%` : '148 MB · One-time download · English only';
@@ -264,7 +273,7 @@ async function refreshStatus() {
       sounds.checked = current.sounds;
       el('sound-state').textContent = current.sounds ? 'On' : 'Off';
     }
-    el('overview-shortcut').textContent = current.shortcut_label;
+     el('overview-shortcut').textContent = displayShortcut(current);
     if (capturing && !canEditShortcut() && !shortcutPending) void stopCapture();
     renderShortcut();
     if (!volumePending && !volumeEditing) { volume.value = String(current.sound_volume); showVolume(); }

@@ -29,6 +29,19 @@ test('Fn readiness explains actual missing access and stale hooks separately', (
   assert.match(readinessDetail({ ...ready, model_ready: false }), /Download the English model/);
   assert.equal(readinessDetail(ready), 'Ready to dictate.');
 });
+test('Windows readiness ignores macOS grants across every capability combination', () => {
+  const keys = ['model_ready', 'microphone', 'accessibility', 'input_monitoring', 'hotkey'];
+  for (let mask = 0; mask < 32; mask++) {
+    const status = { platform: 'windows', ...Object.fromEntries(keys.map((key, i) => [key, !!(mask & (1 << i))])) };
+    assert.equal(readiness(status), status.model_ready && status.microphone && status.hotkey, `mask ${mask}`);
+    assert.doesNotMatch(readinessDetail(status), /Accessibility|Input Monitoring|Allow Microphone|reopen/);
+  }
+  const ready = { platform: 'windows', model_ready: true, microphone: true, accessibility: false, input_monitoring: false, hotkey: true };
+  assert.equal(readinessDetail(ready), 'Ready to dictate.');
+  assert.match(readinessDetail({ ...ready, microphone: false }), /Connect a microphone/);
+  assert.match(readinessDetail({ ...ready, hotkey: false }), /Shortcut unavailable.*Choose another/);
+  assert.equal(readiness({ ...ready, platform: 'unknown' }), false);
+});
 test('all states have user-facing labels and unknown state is safe', () => {
   assert.equal(phaseLabel('idle'), 'Ready');
   assert.equal(phaseLabel('recording'), 'Listening');

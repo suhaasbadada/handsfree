@@ -1,5 +1,56 @@
 use serde::{Deserialize, Serialize};
-use std::{fs, io::Write, os::unix::fs::OpenOptionsExt, path::Path};
+use std::{fs, io::Write, path::Path};
+
+pub fn private_directory(path: &Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700))?;
+    }
+    // Windows app-local data inherits the user's profile ACL; chmod is not an ACL.
+    #[cfg(windows)]
+    let _ = path;
+    Ok(())
+}
+pub fn private_file(path: &Path) -> std::io::Result<fs::File> {
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let file = options.open(path)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        file.set_permissions(fs::Permissions::from_mode(0o600))?;
+    }
+    Ok(file)
+}
+pub fn replace_file(source: &Path, destination: &Path) -> std::io::Result<()> {
+    #[cfg(not(windows))]
+    return fs::rename(source, destination);
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        use windows::{core::PCWSTR, Win32::Storage::FileSystem::*};
+        let source: Vec<u16> = source.as_os_str().encode_wide().chain(Some(0)).collect();
+        let destination: Vec<u16> = destination
+            .as_os_str()
+            .encode_wide()
+            .chain(Some(0))
+            .collect();
+        unsafe {
+            MoveFileExW(
+                PCWSTR(source.as_ptr()),
+                PCWSTR(destination.as_ptr()),
+                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+            )
+        }
+        .map_err(std::io::Error::other)
+    }
+}
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(default)]
@@ -111,23 +162,17 @@ pub fn load(path: &Path) -> Result<Store, String> {
 pub fn save(path: &Path, store: &Store) -> Result<(), String> {
     let temporary = path.with_extension("json.tmp");
     let write = || -> Result<(), String> {
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(&temporary)
-            .map_err(|e| e.to_string())?;
-        use std::os::unix::fs::PermissionsExt;
-        file.set_permissions(fs::Permissions::from_mode(0o600))
-            .map_err(|e| e.to_string())?;
+        let mut file = private_file(&temporary).map_err(|e| e.to_string())?;
         file.write_all(&serde_json::to_vec(store).map_err(|e| e.to_string())?)
             .map_err(|e| e.to_string())?;
         file.sync_all().map_err(|e| e.to_string())?;
-        fs::rename(&temporary, path).map_err(|e| e.to_string())?;
+        drop(file);
+        replace_file(&temporary, path).map_err(|e| e.to_string())?;
+        #[cfg(unix)]
         fs::File::open(path.parent().ok_or("Missing storage directory")?)
             .and_then(|f| f.sync_all())
-            .map_err(|e| e.to_string())
+            .map_err(|e| e.to_string())?;
+        Ok(())
     };
     let result = write();
     if result.is_err() {
@@ -152,6 +197,31 @@ pub fn validate_recording_limit(seconds: u32) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[cfg(windows)]
+    fn denied_replacement_preserves_old_settings_and_cleans_temporary() {
+        let dir =
+            std::env::temp_dir().join(format!("handsfree-store-denied-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("usage.json");
+        let old = Store::default();
+        save(&path, &old).unwrap();
+        let mut permissions = fs::metadata(&path).unwrap().permissions();
+        permissions.set_readonly(true);
+        fs::set_permissions(&path, permissions).unwrap();
+        let changed = Store {
+            sounds: true,
+            ..old.clone()
+        };
+        assert!(save(&path, &changed).is_err());
+        assert_eq!(load(&path).unwrap(), old);
+        assert!(!path.with_extension("json.tmp").exists());
+        let mut permissions = fs::metadata(&path).unwrap().permissions();
+        #[allow(clippy::permissions_set_readonly_false)] // This test is Windows-only.
+        permissions.set_readonly(false); // Windows read-only attribute, not Unix chmod.
+        fs::set_permissions(&path, permissions).unwrap();
+        fs::remove_dir_all(dir).unwrap();
+    }
     #[test]
     fn profiles_migrate_without_resetting_other_preferences() {
         for style in ["tap", "bell", "unknown", "clean", "warm"] {
@@ -307,6 +377,7 @@ mod tests {
     }
     #[test]
     fn private_atomic_round_trip_and_reset() {
+        #[cfg(unix)]
         use std::os::unix::fs::PermissionsExt;
         let dir = std::env::temp_dir().join(format!("handsfree-store-{}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
@@ -326,6 +397,7 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert!(value.get("transcript").is_none());
         assert_eq!(value["stats"].as_object().unwrap().len(), 4);
+        #[cfg(unix)]
         assert_eq!(
             fs::metadata(&path).unwrap().permissions().mode() & 0o777,
             0o600

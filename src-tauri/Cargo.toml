@@ -6,19 +6,29 @@ license = "MIT"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+serde_json = "1"
+toml = "1"
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "macos-private-api", "image-png"] }
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-whisper-rs = { version = "0.16", features = ["metal"] }
 hound = "3.5"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
 sha2 = "0.10"
 futures-util = "0.3"
 unicode-segmentation = "1.13"
 tokio = { version = "1", features = ["fs", "io-util", "time"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+tauri = { version = "2", features = ["macos-private-api"] }
+whisper-rs = { version = "0.16", features = ["metal"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+whisper-rs = { version = "0.16", default-features = false }
+cpal = "0.16"
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_Ole", "Win32_System_Variant", "Win32_System_Memory", "Win32_System_DataExchange", "Win32_System_Threading", "Win32_System_LibraryLoader", "Win32_UI_Accessibility", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell", "Win32_Graphics_Gdi", "Win32_Storage_FileSystem", "Win32_Media_Audio"] }
 
 [profile.release]
 lto = "thin"

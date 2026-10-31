@@ -1,0 +1,62 @@
+name: Windows beta candidate
+
+on:
+  push:
+    branches: [main, 'agent/windows-beta']
+    paths: ['src/**', 'src-tauri/**', 'tests/**', 'scripts/**', 'docs/**', 'site/**', 'package*.json', 'tsconfig.json', 'vite.config.ts', 'index.html', '.cargo/**', '.github/workflows/windows.yml', 'LICENSE']
+  pull_request:
+    paths: ['src/**', 'src-tauri/**', 'tests/**', 'scripts/**', 'docs/**', 'site/**', 'package*.json', 'tsconfig.json', 'vite.config.ts', 'index.html', '.cargo/**', '.github/workflows/windows.yml', 'LICENSE']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-beta-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-x64:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      CARGO_BUILD_JOBS: 3
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install stable x64 Rust and verification tools
+        run: |
+          rustup toolchain install stable-x86_64-pc-windows-msvc --profile minimal --component rustfmt --component clippy --component rust-docs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustup default stable-x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          . ./scripts/windows-env.ps1
+          cmake --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          7z i
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Native tests, lint, notices and NSIS candidate
+        run: ./scripts/windows-package.ps1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Windows-installer-x64-${{ github.sha }}
+          path: release/windows-x64/
+          if-no-files-found: error
+          retention-days: 14
+      # No release upload, secrets, code signing, app launch, or installed-app update.

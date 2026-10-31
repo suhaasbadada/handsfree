@@ -137,7 +137,11 @@ test('website is dependency-free with accessible, honest platform copy', () => {
   assert.doesNotMatch(css, /prefers-color-scheme/);
   assert.match(css, /focus-visible/);
   assert.match(html, /Experimental Mac beta available/);
-  assert.equal([...html.matchAll(/Not implemented or available to download/g)].length, 2);
+  assert.equal([...html.matchAll(/Not implemented or available to download/g)].length, 1);
+  assert.match(html, /Experimental · Windows 10\/11 x64/);
+  assert.match(html, /Test installer pending verification; no public Windows download yet/);
+  assert.match(html, /Windows ARM is unsupported/);
+  assert.doesNotMatch(html, /href="[^"]+\.exe"/);
   assert.match(html, /<noscript>/);
   assert.equal([...html.matchAll(/class="button primary"/g)].length, 2, 'Hero and platform card offer the same Mac download');
   assert.match(html, /releases\/download\/v0\.1\.1-beta\.2\/HandsFree-0\.1\.1-beta\.2-macos-arm64\.dmg/);

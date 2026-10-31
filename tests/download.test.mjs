@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { detectPlatform, downloadState, renderDownload, initializeDownload } from '../site/download.js';
-import { release } from '../site/release.js';
+import { release, windowsRelease } from '../site/release.js';
 
 const mac = { platform: 'MacIntel', userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', maxTouchPoints: 0 };
 const enabled = { ...release, publicAvailable: true };
@@ -91,7 +91,24 @@ test('rendering transitions remove stale links and disabled state without click 
   renderDownload(document, { os: 'windows', arch: 'unknown' }, enabled);
   assert.equal(cta.href, enabled.dmgUrl);
   assert.equal(document.getElementById('download-label').textContent, 'Get Mac beta');
-  assert.match(document.getElementById('download-platform-note').textContent, /Windows planned/);
+  assert.match(document.getElementById('download-platform-note').textContent, /Windows beta in testing/);
+});
+
+test('unverified Windows installers are never offered and public Mac stays available', () => {
+  assert.equal(windowsRelease.publicAvailable, false);
+  assert.equal(windowsRelease.version, null);
+  assert.equal(windowsRelease.installerUrl, null);
+  assert.equal(release.publicAvailable, true);
+  assert.equal(release.dmgUrl, 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.2/HandsFree-0.1.1-beta.2-macos-arm64.dmg');
+  for (const arch of ['unknown', 'intel', 'arm64']) {
+    const state = downloadState({ os: 'windows', arch }, release);
+    assert.equal(state.url, release.dmgUrl);
+    assert.equal(state.label, 'Get Mac beta');
+    assert.match(state.note, /No verified installer available yet/);
+    assert.match(state.note, /Windows 10\/11 x64/);
+    assert.match(state.note, /This download is for an Apple Silicon Mac/);
+    if (arch === 'arm64') assert.match(state.note, /Windows ARM is unsupported/);
+  }
 });
 
 test('absent or rejected hints stay safe and initialization never requires GitHub API', async () => {

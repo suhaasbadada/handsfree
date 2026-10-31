@@ -31,7 +31,7 @@ unlinkSync(mount+'/mount-marker');\n`);
 
 for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143]]) {
   for (const fail of [false, true]) {
-    test(`${signal}: ${fail ? 'failed detach preserves and diagnoses exact scope' : 'detaches and cleans only its own scope'}; exits ${code}`, { timeout: 10000 }, async () => {
+    test(`${signal}: ${fail ? 'failed detach preserves and diagnoses exact scope' : 'detaches and cleans only its own scope'}; exits ${code}`, { timeout: 10000, skip: process.platform === 'win32' }, async () => {
       const f = fixture();
       let child;
       try {
