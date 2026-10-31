@@ -84,8 +84,8 @@ enum CapsuleGeometry {
 }
 enum StartCue {
     static let rate = 48000
-    static let duration = 0.320
-    // Approved double-tap with a short chime trail; original reproducible synthesis.
+    static let duration = 0.300
+    // Approved Bright glass double-tap; identical grains at equal gain.
     // Exact generated PCM, not a different native random implementation.
     static func data(resourceRoot: URL? = Bundle.main.resourceURL) -> Data? {
         guard let url = resourceRoot?.appendingPathComponent("sounds/listening.wav") else { return nil }

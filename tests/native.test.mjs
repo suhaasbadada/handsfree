@@ -18,7 +18,7 @@ test('memory capture converter drains hardware-rate stereo and bounds producer b
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
-test('compact capsule, native shortcuts and double-tap chime cue signal with idle-only preview guards', { skip: process.platform !== 'darwin' }, () => {
+test('compact capsule, native shortcuts and Bright glass cue signal with idle-only preview guards', { skip: process.platform !== 'darwin' }, () => {
   const directory = mkdtempSync(join(tmpdir(), 'handsfree-capsule-'));
   const root = fileURLToPath(new URL('../', import.meta.url));
   try {
@@ -28,7 +28,7 @@ test('compact capsule, native shortcuts and double-tap chime cue signal with idl
     execFileSync('swiftc', ['-O', '-sdk', sdk, '-Xcc', `-I${sdk}/usr/include`, '-swift-version', '5',
       join(root, 'src-tauri/native/Bridge.swift'), join(root, 'src-tauri/native/PastePolicy.swift'), join(root, 'src-tauri/native/AudioCapture.swift'),
       join(root, 'tests/native-capsule/main.swift'), '-o', binary]);
-    assert.match(execFileSync(binary, { encoding: 'utf8', timeout: 10000 }), /Native capsule geometry, state layout, nonactivation, shortcut matching and double-tap chime cue passed without capture/);
+    assert.match(execFileSync(binary, { encoding: 'utf8', timeout: 10000 }), /Native capsule geometry, state layout, nonactivation, shortcut matching and Bright glass cue passed without capture/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

@@ -1,5 +1,6 @@
 import AppKit
 import AVFoundation
+import CryptoKit
 
 let app = NSApplication.shared
 app.setActivationPolicy(.prohibited)
@@ -18,7 +19,8 @@ do {
     precondition(abs(player.duration - StartCue.duration) < 0.000001)
     precondition(player.format.sampleRate == Double(StartCue.rate) && player.numberOfChannels == 1)
     precondition(samples.count == Int(StartCue.duration * Double(StartCue.rate)))
-    precondition(StartCue.duration == 0.320)
+    precondition(StartCue.duration == 0.300)
+    precondition(SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() == "909f8fe9f672f201f9040321a319e5a4351a105a70ead33a57b107a5cfe81462", "Exact user-approved Bright glass audition bytes")
     precondition(data == StartCue.data(resourceRoot: resourceRoot), "Exact deterministic bundled PCM")
     for legacyStyle: Int32 in [0, 1] {
         soundStyle(legacyStyle)
@@ -26,9 +28,9 @@ do {
     }
     precondition(samples.first == 0 && samples.last == 0)
     let peak = samples.map { abs(Int($0)) }.max()!
-    precondition(peak > 14000 && peak < 15000, "Gentle double-tap with over 6.8 dB full-volume headroom")
+    precondition(peak == 13045, "Approved -8 dBFS peak; no gain changes")
     let steps = zip(samples, samples.dropFirst()).map { abs(Int($0) - Int($1)) }
-    precondition(steps.max()! < 3000, "Smooth percussive transient, no harsh one-sample spike")
+    precondition(steps.max()! < 4200, "Bounded original synthetic tap transient")
     func rms(_ from: Double, _ to: Double) -> Double {
         let window = samples[Int(from * Double(StartCue.rate))..<Int(to * Double(StartCue.rate))]
         return sqrt(window.reduce(0) { $0 + pow(Double($1) / 32768, 2) } / Double(window.count))
@@ -50,31 +52,28 @@ do {
         let range = Int(from * Double(StartCue.rate))..<Int(to * Double(StartCue.rate))
         return range.max { abs(Int(samples[$0])) < abs(Int(samples[$1])) }!
     }
-    let firstPeak = peakIndex(0.020, 0.085), secondPeak = peakIndex(0.085, 0.150)
-    precondition(secondPeak - firstPeak == 3120, "Two tactile impacts exactly 65 ms apart")
+    let firstPeak = peakIndex(0.020, 0.120), secondPeak = peakIndex(0.120, 0.220)
+    precondition(secondPeak - firstPeak == 4800, "Identical grain onsets exactly 100 ms apart")
     precondition((0.022...0.025).contains(Double(firstPeak) / Double(StartCue.rate)))
-    let accent = rms(0.085, 0.150) / rms(0.020, 0.085)
-    precondition((1.40...1.80).contains(accent), "Approved accented second impact with a moderate harmonic bloom")
-    precondition(rms(0, 0.020) == 0 && rms(0.300, 0.320) == 0, "At least 20 ms exact silence at each endpoint")
-    for start in [0.020, 0.085] {
+    let attackDelta = 20 * log10(Double(abs(Int(samples[secondPeak]))) / Double(abs(Int(samples[firstPeak]))))
+    precondition(abs(attackDelta) < 1, "Equal-gain grains; only the approved natural overlap affects attack peaks")
+    precondition((0.94...1.02).contains(rms(0.120, 0.180) / rms(0.020, 0.080)), "Uniform strikes, no stronger second accent")
+    precondition(rms(0, 0.020) == 0 && rms(0.280, 0.300) == 0, "At least 20 ms exact silence at each endpoint")
+    for start in [0.020, 0.120] {
         precondition(rms(start, start + 0.001) < rms(start + 0.002, start + 0.006) * 0.4, "Soft attack")
         precondition(rms(start + 0.002, start + 0.015) * 0.5 > 0.05, "Clear at unchanged default 50% volume")
     }
-    precondition(rms(0.050, 0.070) < rms(0.022, 0.035) * 0.02, "First tap retains approved short decay")
-    precondition((0.012...0.045).contains(rms(0.150, 0.230)), "Deliberately audible short chime after the second impact, not an invisible addition")
-    precondition(rms(0.230, 0.280) < rms(0.150, 0.200) * 0.5, "Chime decays rather than becoming a notification ring")
-    precondition(rms(0.290, 0.300) < 0.0005, "Smooth fade before final silence")
-    precondition(magnitude(1174.659, 0.150, 0.250) > magnitude(1450, 0.150, 0.250) * 8, "Intentional clean D6 harmonic energy in the tail")
-    precondition(rms(0.070, 0.085) < 0.001, "Distinct quiet gap, not a fuzzy sustained click")
+    precondition(rms(0.230, 0.280) < rms(0.150, 0.200) * 0.2, "Each glass grain decays, with no separate chime layer")
+    precondition(rms(0.270, 0.280) < 0.001, "Smooth fade before final silence")
+    precondition(magnitude(1174.659, 0.150, 0.250) > magnitude(1450, 0.150, 0.250) * 8, "Approved glass fundamental in both grains")
     // Full-window DFT bins give an approximate power spectrum without audio I/O.
     let powers = (1...Int(Double(StartCue.rate) * StartCue.duration / 2)).map { bin in pow(magnitude(Double(bin) / StartCue.duration, 0, StartCue.duration), 2) }
     let total = powers.reduce(0, +)
     func power(_ low: Double, _ high: Double) -> Double {
         powers.enumerated().filter { (low..<high).contains(Double($0.offset + 1) / StartCue.duration) }.reduce(0) { $0 + $1.element }
     }
-    // A short pitched trail is intentional; the former no-pitch rule no longer applies.
-    precondition(power(300, 4000) / total > 0.95, "Preserve approved tactile body, not unrelated high-passed fuzz")
-    precondition(power(8000, 24000) / total < 0.001, "No harsh high-frequency hiss")
+    precondition(power(300, 4000) / total > 0.95, "Preserve approved glass grain spectrum")
+    precondition(power(8000, 24000) / total < 0.01, "Bounded dry-tap high-frequency energy")
     precondition(power(0, 300) / total < 0.015, "No heavy bass thump")
     precondition(powers.max()! > powers.min()! * 100, "Filtered, nonconstant spectrum")
     print("Cue: \(samples.count) samples / \(StartCue.duration)s, peak \(peak), RMS \(level), max step \(steps.max()!), strongest bin \(powers.max()! / total)")
@@ -181,4 +180,4 @@ precondition(activationPolicy() == Int32(NSApplication.ActivationPolicy.accessor
 precondition(!app.windows.first { $0 is NSPanel }!.isKeyWindow)
 overlay(0)
 app.setActivationPolicy(.prohibited)
-print("Native capsule geometry, state layout, nonactivation, shortcut matching and double-tap chime cue passed without capture")
+print("Native capsule geometry, state layout, nonactivation, shortcut matching and Bright glass cue passed without capture")
