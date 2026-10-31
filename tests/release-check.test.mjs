@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { candidate, tag, validateMetadata, validateDraft, validateAvailability } from '../scripts/check-release.mjs';
+import { candidate, tag, validateMetadata, validateDraft, validatePublic, validateAvailability, auditOptions } from '../scripts/check-release.mjs';
 import { release } from '../site/release.js';
 
 const commit = 'a'.repeat(40), tree = 'b'.repeat(40);
@@ -39,6 +39,18 @@ test('draft audit requires the matching website manifest to remain unavailable',
   }
 });
 function draft() { return { draft: true, prerelease: true, tag_name: tag, target_commitish: commit, assets: Object.entries(sizes).map(([name, size]) => ({ name, size, state: 'uploaded' })) }; }
+test('public mode is explicit, mutually exclusive and keeps identity checks', () => {
+  assert.deepEqual(auditOptions([]), { local: false, publicMode: false, directory: undefined });
+  assert.deepEqual(auditOptions(['--public', 'release']), { local: false, publicMode: true, directory: 'release' });
+  for (const args of [['--public', '--local'], ['--local', '--public'], ['--unknown']]) assert.throws(() => auditOptions(args), /Usage/);
+  assert.doesNotThrow(() => validateAvailability(release, true));
+  assert.doesNotThrow(() => validateAvailability({ ...release, publicAvailable: true }, true));
+  assert.throws(() => validateAvailability({ ...release, version: '0.2.0' }, true));
+  const published = { ...draft(), draft: false };
+  assert.doesNotThrow(() => validatePublic(published, commit, sizes));
+  assert.throws(() => validatePublic(draft(), commit, sizes), /public prerelease/);
+  for (const change of [{ prerelease: false }, { tag_name: 'other' }, { target_commitish: 'main' }, { assets: [] }]) assert.throws(() => validatePublic({ ...published, ...change }, commit, sizes));
+});
 test('draft is versioned, unpublished, exact full-SHA target and uploaded asset set', () => {
   assert.doesNotThrow(() => validateDraft(draft(), commit, sizes));
 });

@@ -94,7 +94,7 @@ test('website is dependency-free with accessible, honest platform copy', () => {
   assert.match(html, /<noscript>/);
   assert.equal([...html.matchAll(/class="button primary"/g)].length, 1, 'One primary action, not competing downloads');
   assert.doesNotMatch(html, /releases\/download\//);
-  assert.match(html, /MIT license does not relicense dependencies or clear the publication gate/);
+  assert.match(html, /MIT license does not relicense dependencies/);
 });
 
 test('Pages deployment uses the static artifact, official actions and scoped permissions', () => {

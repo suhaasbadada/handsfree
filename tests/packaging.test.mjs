@@ -76,7 +76,7 @@ test('disk-image root is install-focused while complete notices and source remai
   assert.match(script, /cp LICENSE "\$PAYLOAD\/Licenses\/LICENSE"/);
   assert.match(script, /release-notices.py "\$PAYLOAD\/Licenses"/);
   assert.match(script, /Licenses\/THIRD_PARTY_SOURCES.tar.gz/);
-  assert.match(script, /Licenses\/PUBLICATION-BLOCKED.txt/);
+  assert.match(script, /Licenses\/PUBLICATION-NOTES.txt/);
   assert.match(script, /Source tree: %s/);
   assert.match(script, /HEAD changed during packaging/);
   assert.match(script, /Working tree status after packaging/);

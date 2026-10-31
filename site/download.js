@@ -53,7 +53,7 @@ export function renderDownload(document, platform, manifest) {
   document.getElementById('download-requirements').textContent = state.detail;
   document.getElementById('release-status').textContent = publishedUrl(manifest)
     ? `Mac beta v${manifest.version} · DMG · Self-signed, not notarized.`
-    : 'No public Mac download yet. Publication pending dependency licensing review.';
+    : 'No public Mac download yet. Experimental beta assets are awaiting public verification.';
   return state;
 }
 

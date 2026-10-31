@@ -56,7 +56,7 @@ cp README.md CONTRIBUTING.md SECURITY.md "$PAYLOAD/Licenses/Documentation/"
 cp docs/DEVELOPMENT.md docs/RELEASING.md docs/WEBSITE.md docs/INSTALL.md docs/release-readiness.md "$PAYLOAD/Licenses/Documentation/"
 cp docs/releases/v0.1.0-beta.1.md "$PAYLOAD/Licenses/Documentation/releases/"
 python3 scripts/release-notices.py "$PAYLOAD/Licenses"
-printf '%s\n' 'CANDIDATE ONLY — PUBLICATION BLOCKED: see THIRD_PARTY_NOTICES/README.txt and Documentation/RELEASING.md.' > "$PAYLOAD/Licenses/PUBLICATION-BLOCKED.txt"
+printf '%s\n' 'Experimental Mac beta — self-signed, not Developer ID signed or notarized.' 'No Apple approval or legal certification. Separate-Mac QA remains unverified.' 'Upstream notices, license texts and historical SDK caveat are preserved.' 'See THIRD_PARTY_NOTICES/README.txt and Documentation/release-readiness.md.' > "$PAYLOAD/Licenses/PUBLICATION-NOTES.txt"
 # No Finder/AppleScript automation or new dependencies. The named volume and
 # Applications shortcut provide drag-to-install without Automation permission.
 python3 - "$PAYLOAD" <<'PY'
@@ -86,7 +86,7 @@ MOUNTED=true
 /usr/bin/hdiutil attach -readonly -nobrowse -noautoopen -mountpoint "$MOUNT" "$STAGE/$NAME.dmg"
 verify_app "$MOUNT/HandsFree.app"
 [[ -L "$MOUNT/Applications" && $(readlink "$MOUNT/Applications") == /Applications ]]
-for required in 'Install HandsFree.txt' Licenses/LICENSE Licenses/Documentation/README.md Licenses/Documentation/RELEASING.md Licenses/THIRD_PARTY_NOTICES/inventory.json Licenses/THIRD_PARTY_SOURCES.tar.gz Licenses/PUBLICATION-BLOCKED.txt; do
+for required in 'Install HandsFree.txt' Licenses/LICENSE Licenses/Documentation/README.md Licenses/Documentation/RELEASING.md Licenses/THIRD_PARTY_NOTICES/inventory.json Licenses/THIRD_PARTY_SOURCES.tar.gz Licenses/PUBLICATION-NOTES.txt; do
   [[ -s "$MOUNT/$required" ]] || fail "Missing disk-image payload: $required"
 done
 /usr/bin/hdiutil detach "$MOUNT"
@@ -102,9 +102,9 @@ MOUNTED=false
   printf 'Architecture: '; uname -m
   printf 'Rust: '; rustc --version
   printf 'Node: '; node --version
-  printf '\nSelf-signed; not Developer ID or notarized. PUBLICATION BLOCKED.\n'
+  printf '\nExperimental beta candidate. Self-signed; not Developer ID or notarized.\n'
 } > "$STAGE/PROVENANCE.txt"
 (cd "$STAGE" && /usr/bin/shasum -a 256 "$NAME.dmg" PROVENANCE.txt > SHA256SUMS && /usr/bin/shasum -a 256 -c SHA256SUMS)
 mv "$STAGE/$NAME.dmg" "$STAGE/SHA256SUMS" "$STAGE/PROVENANCE.txt" "$OUT/"
 printf '\nCandidate: %s/%s.dmg\n' "$OUT" "$NAME"
-echo 'PUBLICATION BLOCKED pending licensing clarification; no upload or installation performed.'
+echo 'Beta candidate packaged; no upload or installation performed. See included publication notes.'

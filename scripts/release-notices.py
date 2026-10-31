@@ -100,7 +100,7 @@ copy_notice(rustdoc / "COPYRIGHT-library.html", NOTICES / "rust/COPYRIGHT-librar
 shutil.copytree(rustdoc / "licenses", NOTICES / "rust/licenses")
 (NOTICES / "rust/VERSION.txt").write_text(command("rustc", "--version", "--verbose"))
 (NOTICES / "inventory.json").write_text(json.dumps(inventory, indent=2) + "\n")
-copy_notice(ROOT / "docs/RELEASING.md", NOTICES / "LICENSING-AND-PUBLICATION-GATE.md")
+copy_notice(ROOT / "docs/RELEASING.md", NOTICES / "LICENSING-AND-DISTRIBUTION.md")
 (NOTICES / "README.txt").write_text(
     "HandsFree third-party inventory\n\n"
     "This is an over-inclusive platform dependency set, including build tools.\n"
@@ -111,12 +111,13 @@ copy_notice(ROOT / "docs/RELEASING.md", NOTICES / "LICENSING-AND-PUBLICATION-GAT
     "MPL source is unmodified, available here under its original MPL-2.0 terms.\n"
     "HandsFree's own code is MIT licensed; see ../LICENSE.\n"
     "That grant does not relicense these dependencies. No model is included.\n\n"
-    "PUBLICATION BLOCKED pending clarification/decision on objc2's explicit\n"
-    "upstream Apple-SDK-derived bindings licensing caveat and missing original\n"
-    "copyright-bearing MIT texts. See LICENSING-AND-PUBLICATION-GATE.md.\n\n"
+    "Experimental beta; self-signed, not Developer ID signed or notarized.\n"
+    "Upstream license texts and historical SDK-derived-bindings caveat are\n"
+    "preserved. Notice completeness is not legally certified. See\n"
+    "LICENSING-AND-DISTRIBUTION.md and upstream-supplements/README.md.\n\n"
     "Crates without standalone license files (source notices and/or supplements\n"
     "are provided; declarations alone do not resolve upstream uncertainty):\n"
     + "\n".join(missing) + "\n"
 )
 print(f"Inventoried {len(inventory)} third-party packages; full source copies included.")
-print("PUBLICATION BLOCKED: see THIRD_PARTY_NOTICES/README.txt")
+print("Experimental beta notices: see THIRD_PARTY_NOTICES/README.txt")

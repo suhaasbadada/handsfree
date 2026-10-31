@@ -31,6 +31,15 @@ export function validateMetadata({ provenance, checksums, hashes, commit, tree, 
 
 export function validateDraft(draft, commit, sizes) {
   requireThat(draft.draft === true && draft.prerelease === true && draft.tag_name === tag, 'Expected the versioned draft prerelease, not a public release');
+  validateAssets(draft, commit, sizes);
+}
+
+export function validatePublic(release, commit, sizes) {
+  requireThat(release.draft === false && release.prerelease === true && release.tag_name === tag, 'Expected the versioned public prerelease');
+  validateAssets(release, commit, sizes);
+}
+
+function validateAssets(draft, commit, sizes) {
   requireThat(draft.target_commitish === commit, 'Draft target must be the exact full provenance commit SHA (not a branch or older commit)');
   const assets = draft.assets ?? [];
   for (const name of names) {
@@ -40,8 +49,15 @@ export function validateDraft(draft, commit, sizes) {
   requireThat(!assets.some(asset => /\.(dmg|zip)$/i.test(asset.name) && asset.name !== candidate), 'Remove superseded installer assets from the draft');
 }
 
-export function validateAvailability(release) {
-  requireThat(release.publicAvailable === false && release.version === tag.slice(1) && release.dmgUrl === `https://github.com/${repo}/releases/download/${tag}/${candidate}`, 'Keep the matching website manifest disabled until a public asset is actually verified');
+export function validateAvailability(release, publicMode = false) {
+  requireThat((publicMode || release.publicAvailable === false) && release.version === tag.slice(1) && release.dmgUrl === `https://github.com/${repo}/releases/download/${tag}/${candidate}`, 'Keep the matching website manifest disabled until a public asset is actually verified');
+}
+
+export function auditOptions(args) {
+  const mode = ['--local', '--public'].includes(args[0]) ? args[0] : '--draft';
+  if (mode !== '--draft') args = args.slice(1);
+  requireThat(args.length <= 1 && !args.some(arg => arg.startsWith('-')), 'Usage: node scripts/check-release.mjs [--local | --public] [candidate-directory]');
+  return { local: mode === '--local', publicMode: mode === '--public', directory: args[0] };
 }
 
 async function hash(path) {
@@ -108,13 +124,11 @@ export function createAuditScope(temporary, { detach = mount => run('/usr/bin/hd
 }
 
 export async function main(args = process.argv.slice(2), { onInterrupt } = {}) {
-  const local = args[0] === '--local';
-  if (local) args = args.slice(1);
-  requireThat(args.length <= 1 && !args.some(arg => arg.startsWith('-')), 'Usage: node scripts/check-release.mjs [--local] [candidate-directory]');
+  const { local, publicMode, directory: inputDirectory } = auditOptions(args);
   requireThat(process.platform === 'darwin' && process.arch === 'arm64', 'Apple Silicon macOS required for signature/payload audit');
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-  const directory = resolve(args[0] ?? join(root, 'release'));
-  validateAvailability((await import(pathToFileURL(join(root, 'site/release.js')).href)).release);
+  const directory = resolve(inputDirectory ?? join(root, 'release'));
+  validateAvailability((await import(pathToFileURL(join(root, 'site/release.js')).href)).release, publicMode);
   const git = (...args) => run('git', args, { cwd: root });
   const commit = git('rev-parse', 'HEAD');
   const hashes = Object.fromEntries(await Promise.all(names.map(async name => [name, await hash(join(directory, name))])));
@@ -141,10 +155,10 @@ export async function main(args = process.argv.slice(2), { onInterrupt } = {}) {
     requireThat(readlinkSync(join(mount, 'Applications')) === '/Applications', 'Applications shortcut missing');
     const visible = readdirSync(mount).filter(name => !name.startsWith('.')).sort();
     requireThat(JSON.stringify(visible) === JSON.stringify(['Applications', 'HandsFree.app', 'Install HandsFree.txt', 'Licenses']), 'Unexpected visible disk-image root');
-    for (const name of ['LICENSE', 'PUBLICATION-BLOCKED.txt', 'THIRD_PARTY_NOTICES/inventory.json', 'THIRD_PARTY_SOURCES.tar.gz', 'Documentation/README.md', 'Documentation/RELEASING.md', 'Documentation/release-readiness.md']) {
+    for (const name of ['LICENSE', 'PUBLICATION-NOTES.txt', 'THIRD_PARTY_NOTICES/inventory.json', 'THIRD_PARTY_SOURCES.tar.gz', 'Documentation/README.md', 'Documentation/RELEASING.md', 'Documentation/release-readiness.md']) {
       requireThat(statSync(join(mount, 'Licenses', name)).size > 0, `Missing license/documentation: ${name}`);
     }
-    requireThat(readFileSync(join(mount, 'Install HandsFree.txt'), 'utf8').includes('not approved for public distribution'), 'Install guide must disclose candidate status');
+    requireThat(readFileSync(join(mount, 'Install HandsFree.txt'), 'utf8').includes('Experimental beta — self-signed and not notarized'), 'Install guide must disclose experimental signing status');
     scope.detach();
     if (!local) {
       const api = path => JSON.parse(run('gh', ['api', `repos/${repo}/${path}`]));
@@ -152,24 +166,30 @@ export async function main(args = process.argv.slice(2), { onInterrupt } = {}) {
       // instead, including later pages, then pin the exact release ID.
       const releases = JSON.parse(run('gh', ['api', '--paginate', '--slurp', `repos/${repo}/releases`])).flat();
       const matches = releases.filter(release => release.tag_name === tag);
-      requireThat(matches.length === 1, 'Expected exactly one accessible versioned draft release');
+      requireThat(matches.length === 1, 'Expected exactly one accessible versioned release');
       const draft = matches[0];
       const sizes = Object.fromEntries(names.map(name => [name, statSync(join(directory, name)).size]));
-      validateDraft(draft, commit, sizes);
+      const validateRelease = publicMode ? validatePublic : validateDraft;
+      validateRelease(draft, commit, sizes);
       const refs = api(`git/matching-refs/tags/${tag}`).filter(ref => ref.ref === `refs/tags/${tag}`);
       requireThat(refs.length <= 1, 'Ambiguous release tag');
+      if (publicMode) requireThat(refs.length === 1, 'Public release requires an existing remote source tag');
       if (refs.length) {
         let object = refs[0].object;
         for (let depth = 0; object.type === 'tag' && depth < 5; depth++) object = api(`git/tags/${object.sha}`).object;
         requireThat(object.type === 'commit' && object.sha === commit, 'Existing remote tag points at different source code');
       }
       // Size/metadata alone cannot prove bytes: download all three draft assets.
-      run('gh', ['release', 'download', tag, '--repo', repo, '--dir', temporary, ...names.flatMap(name => ['--pattern', name])]);
+      if (publicMode) {
+        // No gh/token/header/cookie credentials: independently prove anonymous
+        // public GET access and compare all downloaded bytes, not only HEAD/size.
+        for (const name of names) run('/usr/bin/curl', ['--disable', '--fail', '--location', '--silent', '--show-error', '--proto', '=https', '--proto-redir', '=https', '--output', join(temporary, name), `https://github.com/${repo}/releases/download/${tag}/${name}`]);
+      } else run('gh', ['release', 'download', tag, '--repo', repo, '--dir', temporary, ...names.flatMap(name => ['--pattern', name])]);
       for (const name of names) requireThat(await hash(join(temporary, name)) === hashes[name], `Draft bytes differ from local candidate: ${name}`);
-      validateDraft(api(`releases/${draft.id}`), commit, sizes);
+      validateRelease(api(`releases/${draft.id}`), commit, sizes);
     }
     scope.assertActive();
-    console.log(`PASS: ${commit} — checksums, clean provenance, stable signatures, arm64/macOS 14 bundle and DMG contents.${local ? '\nLOCAL ONLY: draft target/tag/assets were NOT checked.' : '\nDraft target/tag and downloaded asset bytes match exactly.'}\nCandidate audit only: licensing decision, separate-Mac QA and publication approval remain manual gates.`);
+    console.log(`PASS: ${commit} — checksums, clean provenance, stable signatures, arm64/macOS 14 bundle and DMG contents.${local ? '\nLOCAL ONLY: release target/tag/assets were NOT checked.' : publicMode ? '\nPublic prerelease target/tag and anonymous GET asset bytes match exactly.' : '\nDraft target/tag and downloaded asset bytes match exactly.'}\nArtifact audit only: no legal certification, Apple approval, or separate-Mac QA is implied.`);
   } finally {
     scope.cleanup();
   }
