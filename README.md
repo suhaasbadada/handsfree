@@ -3,7 +3,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-38765b.svg)](LICENSE)
 [![Status: Beta](https://img.shields.io/badge/Status-Beta-a64a45.svg)](docs/releases/v0.1.0-beta.1.md)
 
-**Local-first desktop dictation. A little less typing. A little more flow.**
+**Don’t lose your train of thought.**
+
+Say it while it’s clear. HandsFree turns your thoughts into text, without making typing the bottleneck.
 
 HandsFree is a local-first desktop dictation project: turn speech into text without sending it to a cloud transcription service. The goal is a simple, private dictation companion across macOS, Windows, and Linux. **Today, only the macOS Apple Silicon beta is implemented and prepared; it is not yet publicly downloadable.** Windows and Linux are planned, not available.
 
@@ -11,7 +13,7 @@ HandsFree is a local-first desktop dictation project: turn speech into text with
 
 ## Use cases
 
-- **AI coding prompts:** explain your goal and context for Claude Code or Codex instead of typing long instructions.
+- **Think out loud with your coding assistant:** give Claude Code or Codex the goal, context, and details in your own words.
 - **Messages & email:** dictate a quick reply or a thoughtful update, then review and send.
 - **Notes & ideas:** capture a train of thought while it’s fresh; organize it afterward.
 - **First drafts:** talk through an opening, outline, or tricky paragraph, then edit.

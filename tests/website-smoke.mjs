@@ -88,6 +88,12 @@ try {
     assert.equal(metrics.scroll, metrics.width, `No horizontal overflow at ${width}px`);
     assert.ok(metrics.images, 'Icons loaded');
     assert.equal(metrics.styles, 'grid', 'Stylesheet loaded');
+    const headline = await evaluate(`(() => {
+      const title = document.getElementById('hero-title');
+      return { text: title.textContent, lines: title.offsetHeight / parseFloat(getComputedStyle(title).lineHeight) };
+    })()`);
+    assert.equal(headline.text, 'Don’t lose your train of thought.');
+    assert.ok(Math.abs(headline.lines - 2) < 0.1, `Intentional two-line headline at ${width}px`);
     const usecases = await evaluate(`({
       count: document.querySelectorAll('#usecases li').length,
       columns: getComputedStyle(document.querySelector('.usecase-list')).gridTemplateColumns.split(' ').length,
@@ -104,6 +110,20 @@ try {
     console.log(`Light ${width}px: layout and assets passed`);
     if (width === 1280) await screenshot('desktop');
   }
+  await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 844, deviceScaleFactor: 1, mobile: true });
+  await send('Emulation.setTouchEmulationEnabled', { enabled: true });
+  const playBox = await evaluate(`(() => {
+    const button = document.getElementById('demo-play');
+    button.scrollIntoView({block:'center'});
+    const r = button.getBoundingClientRect();
+    return {x:r.x+r.width/2,y:r.y+r.height/2};
+  })()`);
+  await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [playBox] });
+  await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  assert.equal(await evaluate(`document.getElementById('demo-status').textContent.startsWith('Done.')`), true, 'Touch plays reduced-motion demo at 320px');
+  assert.equal(await evaluate(`document.documentElement.scrollWidth === innerWidth`), true, 'No overflow on a 320px touch viewport');
+  await send('Emulation.setTouchEmulationEnabled', { enabled: false });
+  await evaluate(`window.scrollTo(0,0); document.body.tabIndex=-1; document.body.focus(); document.body.removeAttribute('tabindex')`);
   await send('Emulation.setEmulatedMedia', { features: [
     { name: 'prefers-reduced-motion', value: 'reduce' },
     { name: 'prefers-color-scheme', value: 'dark' },
@@ -130,7 +150,7 @@ try {
     { value: sample, readonly: true, label: 'Text', hidden: false }, 'Semantic, labelled text field and working demo button');
   const { nodes } = await send('Accessibility.getFullAXTree');
   assert.ok(nodes.some(node => node.role?.value === 'region' && node.name?.value === 'Talk through the work.'), 'Use cases form a named accessible section');
-  for (const title of ['AI coding prompts', 'Messages & email', 'Notes & ideas', 'First drafts']) {
+  for (const title of ['Think out loud with your coding assistant.', 'Messages & email', 'Notes & ideas', 'First drafts']) {
     assert.ok(nodes.some(node => node.role?.value === 'heading' && node.name?.value === title), `Accessible use-case heading: ${title}`);
   }
   assert.ok(nodes.some(node => node.role?.value === 'textbox' && node.name?.value === 'Text' && node.value?.value === sample), 'Transcript is a named textbox in the accessibility tree');

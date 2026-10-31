@@ -16,14 +16,29 @@ test('open-source section uses an accessible GitHub icon without decorative arro
   assert.doesNotMatch(section, /↗|open-mark|Meet the project|Explore source/i);
 });
 
+test('hero and README lead with the same grounded thought-first positioning', () => {
+  const readme = readFileSync(new URL('README.md', root), 'utf8');
+  const headline = html.match(/<h1 id="hero-title">([\s\S]*?)<\/h1>/)?.[1].replace(/<[^>]+>/g, '');
+  assert.equal(headline, 'Don’t lose your train of thought.');
+  assert.ok(readme.includes(`**${headline}**`));
+  const support = 'Say it while it’s clear. HandsFree turns your thoughts into text, without making typing the bottleneck.';
+  assert.ok(html.includes(support));
+  assert.ok(readme.includes(support));
+  assert.match(css, /\.hero h1 em\{font-style:normal\}/);
+});
+
 test('use cases are concise, semantic, and honest about coding-tool support', () => {
   const section = html.match(/<section[^>]*id="usecases"[\s\S]*?<\/section>/)?.[0];
   assert.ok(section);
   assert.match(section, /aria-labelledby="usecases-title"/);
   assert.match(section, /<h2 id="usecases-title">Talk through the work\.<\/h2>/);
   assert.match(section, /<ul class="usecase-list" role="list">/);
-  assert.equal([...section.matchAll(/<li>/g)].length, 4);
-  for (const title of ['AI coding prompts', 'Messages &amp; email', 'Notes &amp; ideas', 'First drafts']) {
+  assert.equal([...section.matchAll(/<li\b/g)].length, 4);
+  assert.equal([...section.matchAll(/<svg class="usecase-icon"[^>]*aria-hidden="true"[^>]*focusable="false"/g)].length, 4);
+  assert.match(section, /<li class="usecase-featured">/);
+  assert.match(section, /<blockquote>/);
+  assert.doesNotMatch(section, /usecase-number/);
+  for (const title of ['Think out loud with your coding assistant.', 'Messages &amp; email', 'Notes &amp; ideas', 'First drafts']) {
     assert.ok(section.includes(`<h3>${title}</h3>`));
   }
   const readme = readFileSync(new URL('README.md', root), 'utf8');
@@ -37,7 +52,7 @@ test('use cases are concise, semantic, and honest about coding-tool support', ()
     assert.match(copy, /clipboard/);
     assert.match(copy, /HandsFree doesn’t run commands/);
     assert.doesNotMatch(copy, /official|plugin|seamless integration|guaranteed/i);
-    assert.ok(copy.split(/\s+/).length < 180, 'Keep use cases scannable');
+    assert.ok(copy.replace(/<[^>]+>/g, ' ').split(/\s+/).length < 180, 'Keep use cases scannable');
   }
 });
 
