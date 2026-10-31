@@ -37,7 +37,7 @@ test('packaging rejects unsupported hosts before build', () => sandbox(({ root, 
   assert.ok(!readdirSync(root).includes('release'));
 }));
 
-for (const existing of ['HandsFree-0.1.0-beta.1-macos-arm64.dmg', 'SHA256SUMS', 'PROVENANCE.txt']) {
+for (const existing of ['HandsFree-0.1.1-beta.2-macos-arm64.dmg', 'SHA256SUMS', 'PROVENANCE.txt']) {
   test(`packaging refuses to overwrite ${existing}`, () => sandbox(({ root, run }) => {
     mkdirSync(join(root, 'release'));
     writeFileSync(join(root, 'release', existing), 'preserve me');

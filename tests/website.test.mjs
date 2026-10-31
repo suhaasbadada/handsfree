@@ -140,7 +140,7 @@ test('website is dependency-free with accessible, honest platform copy', () => {
   assert.equal([...html.matchAll(/Not implemented or available to download/g)].length, 2);
   assert.match(html, /<noscript>/);
   assert.equal([...html.matchAll(/class="button primary"/g)].length, 2, 'Hero and platform card offer the same Mac download');
-  assert.match(html, /releases\/download\/v0\.1\.0-beta\.1\/HandsFree-0\.1\.0-beta\.1-macos-arm64\.dmg/);
+  assert.match(html, /releases\/download\/v0\.1\.1-beta\.2\/HandsFree-0\.1\.1-beta\.2-macos-arm64\.dmg/);
   assert.match(html, /MIT license does not relicense dependencies/);
 });
 
@@ -149,7 +149,7 @@ test('Mac platform card has a primary Apple download, with technical details dis
   assert.ok(card);
   const cta = card.match(/<a class="button primary"[\s\S]*?<\/a>/)?.[0];
   assert.ok(cta);
-  assert.match(cta, /href="https:\/\/github.com\/suhaasbadada\/handsfree\/releases\/download\/v0\.1\.0-beta\.1\/HandsFree-0\.1\.0-beta\.1-macos-arm64\.dmg"/);
+  assert.match(cta, /href="https:\/\/github.com\/suhaasbadada\/handsfree\/releases\/download\/v0\.1\.1-beta\.2\/HandsFree-0\.1\.1-beta\.2-macos-arm64\.dmg"/);
   assert.match(cta, /aria-label="Download for Mac \(Apple Silicon\)"/);
   assert.match(cta, /<svg class="apple-logo"[^>]*aria-hidden="true"[^>]*focusable="false"><path d="[^"]+"\/><\/svg><span>Download for Mac<\/span>/);
   assert.match(card, /Apple Silicon · macOS 14\+ · English/);

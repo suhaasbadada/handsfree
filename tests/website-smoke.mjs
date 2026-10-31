@@ -68,7 +68,7 @@ try {
     if (await evaluate(`document.readyState === 'complete' && !!document.querySelector('h1')`)) break;
     await delay(50);
   }
-  const dmgUrl = 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.0-beta.1/HandsFree-0.1.0-beta.1-macos-arm64.dmg';
+  const dmgUrl = 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.2/HandsFree-0.1.1-beta.2-macos-arm64.dmg';
   assert.deepEqual(await evaluate(`({disabled:document.getElementById('primary-download').getAttribute('aria-disabled'), href:document.getElementById('primary-download').getAttribute('href')})`), {disabled:null,href:dmgUrl}, 'Published manifest offers a working direct download');
   await evaluate(`(async () => { window.downloadModule=await import('./download.js'); window.releaseModule=await import('./release.js'); })()`);
   for (const os of ['mac','windows','linux','mobile','unknown']) {

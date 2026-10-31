@@ -7,7 +7,7 @@ cd "$ROOT"
 fail() { printf '%s\n' "$*" >&2; exit 1; }
 [[ $# == 0 ]] || fail 'Usage: bash scripts/package-release.sh (no arguments)'
 [[ $(uname -s) == Darwin && $(uname -m) == arm64 ]] || fail 'Apple Silicon macOS required.'
-NAME=HandsFree-0.1.0-beta.1-macos-arm64
+NAME=HandsFree-0.1.1-beta.2-macos-arm64
 OUT="$ROOT/release"
 mkdir -p "$OUT"
 [[ ! -e "$OUT/$NAME.dmg" && ! -e "$OUT/SHA256SUMS" && ! -e "$OUT/PROVENANCE.txt" ]] || fail 'Candidate output exists; move it aside explicitly first.'
@@ -38,7 +38,7 @@ verify_app() {
   local app="$1" plist="$1/Contents/Info.plist"
   /usr/bin/codesign --verify --deep --strict "$app"
   [[ $(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist") == com.handsfree.local ]]
-  [[ $(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist") == 0.1.0 ]]
+  [[ $(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist") == 0.1.1 ]]
   [[ $(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$plist") == 14.0 ]]
   local executable
   executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$plist")
@@ -54,7 +54,7 @@ mkdir -p "$PAYLOAD/Licenses/Documentation/releases"
 cp LICENSE "$PAYLOAD/Licenses/LICENSE"
 cp README.md CONTRIBUTING.md SECURITY.md "$PAYLOAD/Licenses/Documentation/"
 cp docs/DEVELOPMENT.md docs/RELEASING.md docs/WEBSITE.md docs/INSTALL.md docs/release-readiness.md "$PAYLOAD/Licenses/Documentation/"
-cp docs/releases/v0.1.0-beta.1.md "$PAYLOAD/Licenses/Documentation/releases/"
+cp docs/releases/v0.1.1-beta.2.md "$PAYLOAD/Licenses/Documentation/releases/"
 python3 scripts/release-notices.py "$PAYLOAD/Licenses"
 printf '%s\n' 'Experimental Mac beta — self-signed, not Developer ID signed or notarized.' 'No Apple approval or legal certification. Separate-Mac QA remains unverified.' 'Upstream notices, license texts and historical SDK caveat are preserved.' 'See THIRD_PARTY_NOTICES/README.txt and Documentation/release-readiness.md.' > "$PAYLOAD/Licenses/PUBLICATION-NOTES.txt"
 # No Finder/AppleScript automation or new dependencies. The named volume and

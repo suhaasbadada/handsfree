@@ -6,8 +6,8 @@ import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-export const candidate = 'HandsFree-0.1.0-beta.1-macos-arm64.dmg';
-export const tag = 'v0.1.0-beta.1';
+export const candidate = 'HandsFree-0.1.1-beta.2-macos-arm64.dmg';
+export const tag = 'v0.1.1-beta.2';
 const names = [candidate, 'PROVENANCE.txt', 'SHA256SUMS'];
 const repo = 'suhaasbadada/handsfree';
 function requireThat(condition, message) { if (!condition) throw new Error(message); }
@@ -67,10 +67,10 @@ async function hash(path) {
 }
 const run = (command, args, options = {}) => execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...options }).trim();
 
-function verifyApp(app, fingerprint) {
+function verifyApp(app, fingerprint, expectedVersion = '0.1.1') {
   run('/usr/bin/codesign', ['--verify', '--deep', '--strict', `-R=identifier "com.handsfree.local" and certificate leaf = H"${fingerprint}"`, app]);
   const plist = key => run('/usr/libexec/PlistBuddy', ['-c', `Print :${key}`, join(app, 'Contents/Info.plist')]);
-  requireThat(plist('CFBundleIdentifier') === 'com.handsfree.local' && plist('CFBundleShortVersionString') === '0.1.0' && plist('LSMinimumSystemVersion') === '14.0', 'Unexpected bundle ID/version/minimum macOS');
+  requireThat(plist('CFBundleIdentifier') === 'com.handsfree.local' && (!expectedVersion || plist('CFBundleShortVersionString') === expectedVersion) && plist('LSMinimumSystemVersion') === '14.0', 'Unexpected bundle ID/version/minimum macOS');
   requireThat(run('/usr/bin/lipo', ['-archs', join(app, 'Contents/MacOS', plist('CFBundleExecutable'))]) === 'arm64', 'Expected Apple Silicon executable');
 }
 
@@ -141,8 +141,10 @@ export async function main(args = process.argv.slice(2), { onInterrupt } = {}) {
     const fingerprint = run('/usr/bin/openssl', ['x509', '-in', cert, '-noout', '-fingerprint', '-sha1']).split('=').at(-1).replaceAll(':', '');
     requireThat(/^[A-Fa-f0-9]{40}$/.test(fingerprint), 'Existing signing certificate fingerprint unavailable');
     if (existsSync('/Applications/HandsFree.app')) {
-      verifyApp('/Applications/HandsFree.app', fingerprint);
-      console.log('Existing Applications copy: signature, version and minimum OS verified (not installed or replaced by this audit).');
+      // An installed older release need not have the candidate's version.
+      // Still pin its identity, architecture and minimum OS; never replace it.
+      verifyApp('/Applications/HandsFree.app', fingerprint, null);
+      console.log('Existing Applications copy: signature, architecture and minimum OS verified (not installed or replaced by this audit).');
     }
     const dmg = join(directory, candidate);
     run('/usr/bin/codesign', ['--verify', '--strict', `-R=identifier "com.handsfree.local.disk-image" and certificate leaf = H"${fingerprint}"`, dmg]);

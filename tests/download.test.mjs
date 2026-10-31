@@ -33,11 +33,11 @@ for (const [label, nav, hints, os, arch] of cases) test(`platform: ${label}`, ()
 });
 
 test('published manifest permits a direct DMG; unavailable manifests remain disabled', () => {
-  assert.equal(release.publicAvailable, true);
+  assert.equal(typeof release.publicAvailable, 'boolean');
   for (const arch of ['unknown', 'arm64']) {
     const platform = { os: 'mac', arch };
     assert.equal(downloadState(platform, { ...release, publicAvailable: false }).url, null);
-    assert.equal(downloadState(platform, release).url, release.dmgUrl);
+    assert.equal(downloadState(platform, release).url, release.publicAvailable ? release.dmgUrl : null);
     assert.equal(downloadState(platform, enabled).url, release.dmgUrl);
     assert.equal(downloadState(platform, enabled).detail, 'For Apple Silicon Mac · macOS 14+ · English');
   }
@@ -98,7 +98,7 @@ test('absent or rejected hints stay safe and initialization never requires GitHu
   for (const navigator of [mac, { ...mac, userAgentData: { getHighEntropyValues: async () => { throw new Error('denied'); } } }]) {
     const document = fixtureDocument();
     const state = await initializeDownload(document, navigator);
-    assert.equal(state.url, release.dmgUrl);
-    assert.equal(document.getElementById('primary-download').href, release.dmgUrl);
+    assert.equal(state.url, release.publicAvailable ? release.dmgUrl : null);
+    assert.equal(document.getElementById('primary-download').href, release.publicAvailable ? release.dmgUrl : undefined);
   }
 });

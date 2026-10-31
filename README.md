@@ -7,12 +7,12 @@
 Say it while it’s clear. HandsFree turns your thoughts into text, without making typing the bottleneck.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-706b68.svg)](LICENSE)
-[![Mac beta: v0.1.0-beta.1](https://img.shields.io/badge/Mac_beta-v0.1.0--beta.1-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.0-beta.1)
+[![Mac beta: v0.1.1-beta.2](https://img.shields.io/badge/Mac_beta-v0.1.1--beta.2-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.2)
 [![Platform: Apple Silicon](https://img.shields.io/badge/Platform-Apple_Silicon-706b68.svg)](#platforms)
 
 ## Download
 
-### [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.0-beta.1/HandsFree-0.1.0-beta.1-macos-arm64.dmg)
+### [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.2/HandsFree-0.1.1-beta.2-macos-arm64.dmg)
 
 **Apple Silicon Mac · macOS 14+ · English.** Intel Macs are unsupported. This beta is self-signed, not notarized: see [Open Anyway and installation guidance](docs/INSTALL.md). No developer tools needed.
 
@@ -49,7 +49,7 @@ No special integration is required: insertion depends on the focused field, with
 
 | Platform | Status |
 | --- | --- |
-| macOS 14+, Apple Silicon | [Mac beta available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.0-beta.1) · self-signed, not notarized |
+| macOS 14+, Apple Silicon | [Mac beta available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.2) · self-signed, not notarized |
 | Intel Macs | Unsupported |
 | Windows | Planned; no build or download available |
 | Linux | Planned; no build or download available |
@@ -65,7 +65,7 @@ No Windows or Linux release dates are promised.
 
 Focus a text field, briefly tap **Fn / 🌐**, speak, and tap again to finish. **Escape** cancels. Choose a different shortcut in Settings if Fn conflicts with macOS or your keyboard. If insertion is unavailable, paste the copied transcript yourself. **Review important text:** speech recognition can make mistakes.
 
-[Full installation and troubleshooting guide](docs/INSTALL.md) · [Beta release notes](docs/releases/v0.1.0-beta.1.md)
+[Full installation and troubleshooting guide](docs/INSTALL.md) · [Beta release notes](docs/releases/v0.1.1-beta.2.md)
 
 ## Build from source
 

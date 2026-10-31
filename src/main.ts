@@ -41,7 +41,7 @@ document.querySelector('#app')!.innerHTML = `
  </section>
  <section class="status" aria-label="App status"><span id="dot" aria-hidden="true"></span><div><strong id="phase">Connecting…</strong><p id="message" aria-live="polite"></p></div><button id="cancel" hidden>Cancel</button></section>
  <p id="feedback" class="feedback" role="status" hidden></p><p id="storage-error" class="feedback" role="status" hidden></p>
-   <footer><span>HandsFree · 0.1.0 beta</span><span>English · On-device transcription</span></footer>
+   <footer><span>HandsFree · 0.1.1 beta</span><span>English · On-device transcription</span></footer>
  </main>
 </div>
 <dialog id="shortcut-dialog" aria-labelledby="shortcut-title"><h2 id="shortcut-title">Choose a shortcut</h2><div class="shortcut-options"><button id="shortcut-fn" autofocus>Fn</button><button id="shortcut-option">Option + Space</button><button id="shortcut-control">Control + Shift + Space</button><button id="record-shortcut">Custom shortcut…</button></div><input id="shortcut-recorder" readonly hidden aria-label="Record shortcut" placeholder="Press a shortcut. Escape cancels." aria-describedby="shortcut-help"><p id="shortcut-feedback" role="status" hidden></p><details><summary>More about shortcuts</summary><p id="shortcut-help">Use Control, Option or Command with a letter, number or Space. Uses physical US key positions. Shortcuts also reach the foreground app; avoid ones it uses. System and common editing shortcuts are blocked.</p><p>For Fn, set the Globe key to Do Nothing and disable macOS Dictation’s Fn shortcut.</p><button id="keyboard">Keyboard settings</button></details><div class="dialog-actions"><button id="close-shortcut">Done</button></div></dialog>
