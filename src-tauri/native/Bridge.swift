@@ -70,28 +70,46 @@ enum CapsuleGeometry {
 enum StartCue {
     static let rate = 44100
     static var style = 0
-    static var duration: Double { style == 1 ? 0.15 : 0.09 }
+    static func duration(style: Int) -> Double { style == 1 ? 0.44 : 0.38 }
+    static var duration: Double { duration(style: style) }
     static var samples: [Int16] { samples(style: style) }
+    // Raised-cosine attack and release keep both value and slope continuous.
+    // The long exponential body rings naturally; the final taper is already quiet.
+    static func envelope(time: Double, length: Double) -> Double {
+        guard time > 0 && time < length else { return 0 }
+        let attack = 0.020
+        let release = 0.100
+        let rise = 0.5 - 0.5 * cos(.pi * min(time / attack, 1))
+        let fall = 0.5 - 0.5 * cos(.pi * min((length - time) / release, 1))
+        return rise * fall * exp(-4.5 * time / length)
+    }
     static func samples(style: Int) -> [Int16] {
-      let duration = style == 1 ? 0.15 : 0.09
-      return (0..<Int(Double(rate) * duration)).map { i in
-        let t = Double(i) / Double(rate)
-        // Original single-tone profiles, with zero-slope endpoints. Tap is a
-        // short, warm downward pulse; bell has a faint inharmonic overtone.
-        let window = pow(sin(.pi * t / duration), 2) * exp(-t * (style == 1 ? 14 : 24))
-        let phase = style == 1 ? 2 * .pi * 620 * t : 2 * .pi * (370 * t - 650 * t * t)
-        let tone = sin(phase) + (style == 1 ? 0.15 * sin(2 * .pi * 1430 * t) : 0)
-        return Int16(window * tone * 12000)
-      }
+        let length = duration(style: style)
+        func note(_ time: Double, _ duration: Double, _ frequency: Double) -> Double {
+            let phase = 2 * Double.pi * frequency * time
+            // Sine-led, with just a little rounded octave and soft bell shimmer.
+            let body = sin(phase) + 0.10 * sin(phase * 2) * exp(-12 * max(time, 0))
+                + 0.035 * sin(phase * 3.002) * exp(-20 * max(time, 0))
+            return envelope(time: time, length: duration) * body
+        }
+        return (0..<Int(Double(rate) * length)).map { i in
+            let t = Double(i) / Double(rate)
+            // Persisted tap = Soft chime; bell = Gentle notes. No preference migration.
+            let tone = style == 1
+                ? 0.78 * note(t, 0.32, 440) + note(t - 0.115, length - 0.115, 554.365)
+                : note(t, length, 523.251)
+            return Int16((tone * 11500).rounded())
+        }
     }
 }
 @_cdecl("hf_sound_style") public func soundStyle(_ style: Int32) {
     main { StartCue.style = style == 1 ? 1 : 0; cue?.stop(); cue = nil }
 }
-// Original short cues, synthesized locally (no borrowed audio).
+// Original soft cues, synthesized locally (no borrowed audio).
 private func makeCue() -> AVAudioPlayer? {
     let rate = StartCue.rate
-    let count = StartCue.samples.count
+    let samples = StartCue.samples
+    let count = samples.count
     var data = Data()
     func tag(_ value: String) { data.append(contentsOf: value.utf8) }
     func number<T: FixedWidthInteger>(_ value: T) {
@@ -102,7 +120,7 @@ private func makeCue() -> AVAudioPlayer? {
     number(UInt32(16)); number(UInt16(1)); number(UInt16(1)); number(UInt32(rate))
     number(UInt32(rate * 2)); number(UInt16(2)); number(UInt16(16))
     tag("data"); number(UInt32(count * 2))
-    for sample in StartCue.samples { number(sample) }
+    for sample in samples { number(sample) }
     let player = try? AVAudioPlayer(data: data)
     player?.volume = cueVolume
     player?.prepareToPlay()
@@ -437,16 +455,31 @@ private func validateTarget() -> PasteResult {
                 if cue == nil { cue = makeCue() }
                 cue?.currentTime = 0; cue?.play()
             }
-            // Never block AppKit. The tail accommodates common Bluetooth output
-            // buffering; unusually high-latency routes may need sound disabled.
-            let delay = soundsEnabled ? StartCue.duration + 0.18 : (previewWasPlaying ? 0.18 : 0)
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            let startPlayer = soundsEnabled ? cue : nil
+            let cueLength = soundsEnabled ? (startPlayer?.duration ?? StartCue.duration) : 0
+            let quietTail = soundsEnabled || previewWasPlaying ? 0.18 : 0
+            func captureAllowed() -> Bool {
                 guard CuePolicy.canCapture(current: recorder === r, allowed: allowed(epoch)) else {
                     if recorder === r { r.stop(); recorder = nil; audioBusy = false; cue?.stop(); clearTarget() }
+                    return false
+                }
+                return true
+            }
+            // Never block AppKit. Check actual player completion as well as PCM
+            // duration: route startup/prebuffering must not eat into the quiet tail.
+            // 180 ms covers common output buffering, not every Bluetooth route.
+            func awaitCueCompletion() {
+                guard captureAllowed() else { return }
+                if startPlayer?.isPlaying == true {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.01, execute: awaitCueCompletion)
                     return
                 }
-                if !r.record() { recorder = nil; audioBusy = false; clearTarget(); callback?(4) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + quietTail) {
+                    guard captureAllowed() else { return }
+                    if !r.record() { recorder = nil; audioBusy = false; clearTarget(); callback?(4) }
+                }
             }
+            DispatchQueue.main.asyncAfter(deadline: .now() + cueLength, execute: awaitCueCompletion)
             return true
         } catch { clearTarget(); return false }
     }

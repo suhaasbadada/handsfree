@@ -10,12 +10,42 @@ for style in [0, 1] {
     StartCue.style = style
     let samples = StartCue.samples
     precondition(samples.count == Int(StartCue.duration * Double(StartCue.rate)))
-    precondition((0.08...0.16).contains(StartCue.duration))
+    precondition(StartCue.duration == (style == 1 ? 0.44 : 0.38))
     precondition(samples.first == 0 && samples.last == 0)
     let peak = samples.map { abs(Int($0)) }.max()!
     precondition(peak > 3000 && peak < 14000, "Gentle audible headroom, never clipped")
     let steps = zip(samples, samples.dropFirst()).map { abs(Int($0) - Int($1)) }
     precondition(steps.max()! < 2000, "Smooth sample transitions, no clicks")
+    func rms(_ from: Double, _ to: Double) -> Double {
+        let window = samples[Int(from * Double(StartCue.rate))..<Int(to * Double(StartCue.rate))]
+        return sqrt(window.reduce(0) { $0 + pow(Double($1) / 32768, 2) } / Double(window.count))
+    }
+    let level = rms(0, StartCue.duration)
+    func magnitude(_ frequency: Double, _ from: Double, _ to: Double) -> Double {
+        let start = Int(from * Double(StartCue.rate))
+        let end = Int(to * Double(StartCue.rate))
+        var real = 0.0, imaginary = 0.0
+        for i in start..<end {
+            let phase = 2 * Double.pi * frequency * Double(i) / Double(StartCue.rate)
+            real += Double(samples[i]) * cos(phase)
+            imaginary += Double(samples[i]) * sin(phase)
+        }
+        return hypot(real, imaginary) / Double(end - start)
+    }
+    let fundamental = style == 1 ? 440.0 : 523.251
+    precondition(magnitude(fundamental, 0.025, 0.09) > magnitude(2 * fundamental, 0.025, 0.09) * 5, "Warm fundamental dominates subtle harmonics")
+    precondition((0.035...0.10).contains(level), "Moderate RMS, not a nearly silent or over-loud impulse")
+    precondition(rms(0, 0.005) < rms(0.015, 0.030) * 0.15, "20 ms soft attack")
+    precondition(rms(0.20, 0.25) > 0.005, "Audible body lasts beyond the old short cues")
+    precondition(rms(StartCue.duration - 0.10, StartCue.duration - 0.05) > rms(StartCue.duration - 0.05, StartCue.duration), "Natural decaying tail")
+    precondition(rms(StartCue.duration - 0.01, StartCue.duration) < 0.0001, "No truncated ringing at the endpoint")
+    precondition(StartCue.envelope(time: 0, length: 0.32) == 0)
+    precondition(StartCue.envelope(time: 0.32, length: 0.32) == 0)
+    if style == 1 {
+        precondition(rms(0.13, 0.16) > rms(0.09, 0.11), "Second note rises gently over the first note’s decay")
+        precondition(magnitude(554.365, 0.15, 0.22) > magnitude(440, 0.15, 0.22) * 3, "Consonant upper note emerges over the overlapping first note")
+    }
+    print("Cue \(style): \(samples.count) samples / \(StartCue.duration)s, peak \(peak), RMS \(level), max step \(steps.max()!)")
 }
 precondition(StartCue.samples(style: 0) != StartCue.samples(style: 1))
 for mods: UInt32 in 0...15 {
