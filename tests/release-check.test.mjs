@@ -68,11 +68,12 @@ for (const [label, mutate, message] of [
   ['old DMG', d => { d.assets.push({ name: 'HandsFree-old.dmg' }); }, /superseded/],
 ]) test(`draft audit rejects ${label}`, () => { const d = draft(); mutate(d); assert.throws(() => validateDraft(d, commit, sizes), message); });
 
-test('first-install guidance is concise, accessible, offline-aware and not an automatic consent bypass', () => {
+test('first-install actions stay visible, offline-aware and explicitly initiated', () => {
   const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
-  assert.match(source, /<summary>First dictation & setup help<\/summary><ol>/);
-  assert.match(source, /Use the copy in Applications before allowing permissions/);
-  assert.match(source, /~148 MB.*dictation works offline/);
-  assert.match(source, /aria-describedby="recording-limit-help"/);
-  assert.match(source, /· Next recording/);
+  assert.doesNotMatch(source, /<details\b|<summary\b/);
+  assert.match(source, /Download English model \(~148 MB\)/);
+  assert.match(source, /Works offline afterward/);
+  assert.match(source, /title="Applies to the next recording"/);
+  assert.match(source, /el\('mic'\)\.onclick = \(\) => void action\('request_microphone'\)/);
+  assert.match(source, /el\('overview-download'\)\.onclick = \(\) => void downloadModel\(\)/);
 });

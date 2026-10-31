@@ -14,10 +14,9 @@ export function readiness(status: { model_ready: boolean; microphone: boolean; a
   return status.model_ready && status.microphone && status.accessibility && status.input_monitoring && status.hotkey;
 }
 export function readinessDetail(status: Parameters<typeof readiness>[0]): string {
-  if (!status.input_monitoring) return 'Your shortcut is unavailable: allow this copy of HandsFree in System Settings → Privacy & Security → Input Monitoring, then quit and reopen it. After an update, remove and re-add /Applications/HandsFree.app if an old enabled entry no longer works.';
-  if (!status.hotkey) return 'Your shortcut is disconnected despite Input Monitoring access. Quit and reopen /Applications/HandsFree.app. If it persists, remove and re-add that app in Input Monitoring.';
-  if (!status.accessibility) return 'Accessibility access is unavailable. Enable this copy of HandsFree in Privacy & Security → Accessibility, then quit and reopen it. If already enabled after an update, remove and re-add /Applications/HandsFree.app.';
-  if (!status.microphone) return 'Microphone access is unavailable. Click Allow in HandsFree Settings to request the macOS dialog. If previously denied, enable HandsFree in Privacy & Security → Microphone.';
-  if (!status.model_ready) return 'Download the local English model in Settings before using your shortcut.';
-  return 'Select a text field in another app. Your shortcut starts and finishes; Escape cancels.';
+  const missing = [!status.microphone && 'Microphone', !status.accessibility && 'Accessibility', !status.input_monitoring && 'Input Monitoring'].filter(Boolean);
+  if (missing.length) return `Allow ${missing.join(', ')} in Settings.`;
+  if (!status.hotkey) return 'Quit and reopen HandsFree to reconnect your shortcut.';
+  if (!status.model_ready) return 'Download the English model to dictate offline.';
+  return 'Ready to dictate.';
 }

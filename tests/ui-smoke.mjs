@@ -2,7 +2,7 @@
 // BROWSER_BINARY='/path/to/Chromium' node tests/ui-smoke.mjs
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -52,14 +52,22 @@ try {
   assert.equal(await evaluate(`document.querySelector('.brand .beta-badge').textContent==='BETA' && document.querySelector('.brand .beta-badge').getBoundingClientRect().width>0`), true, 'App brand visibly identifies uppercase beta status');
   assert.equal(await evaluate(`['change-shortcut','mic','permissions','download','reset','sounds','sound-volume'].every(id=>document.getElementById(id).disabled)`), true, 'Native controls are unavailable before the backend connects');
   await evaluate(`window.calls = []; window.fixture = {phase:'idle',message:'Select a text field and press Fn.', progress:0,model_ready:true,microphone:true,accessibility:true,input_monitoring:true,hotkey:true,transcript:'',sounds:true,sound_volume:50,sound_style:'tap',shortcut:{code:'Fn',modifiers:0},shortcut_label:'Fn',stats:{words:0,transcriptions:0,speech_seconds:0,saved_seconds:0},persistence_error:''}; window.__TAURI_INTERNALS__ = { invoke: async (command,args) => { window.calls.push({command,args}); if(command==='status') return structuredClone(window.fixture); if(command==='set_sounds') window.fixture.sounds=args.enabled; if(command==='set_sound_style') window.fixture.sound_style=args.style; if(command==='set_shortcut'){if(window.rejectShortcut) throw 'Could not save shortcut'; window.fixture.shortcut=args.shortcut;window.fixture.shortcut_label=args.shortcut.code==='Fn'?'Fn':args.shortcut.code==='Space'?'Option + Space':'Control + Shift + J';} if(command==='reset_stats') window.fixture.stats={words:0,transcriptions:0,speech_seconds:0,saved_seconds:0}; } }; document.getElementById('feedback').hidden=true;`);
-  await until(`document.getElementById('ready-title').textContent.includes('You’re ready')`);
+  await until(`document.getElementById('ready-title').textContent==='Ready'`);
+  assert.equal(await evaluate(`document.querySelectorAll('details').length`), 0, 'No disclosure maze in the app or its dialogs');
+  assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('nav button'),b=>({name:b.getAttribute('aria-label'),title:b.title,text:b.textContent.trim(),icon:!!b.querySelector('svg')}))`), [{name:'Overview',title:'Overview',text:'',icon:true},{name:'Settings',title:'Settings',text:'',icon:true}], 'Icon navigation retains accessible button names and tooltips');
+  const accessibility = await send('Accessibility.getFullAXTree');
+  for (const name of ['Overview','Settings']) assert.ok(accessibility.nodes.some(node=>node.role?.value==='button' && node.name?.value===name), `${name} is an accessible button`);
   assert.equal(await evaluate(`document.getElementById('overview-model').hidden`), true, 'Existing users do not see another download CTA');
   // Clean first launch: download remains discoverable for every permissions /
   // hook combination, without a poll initiating any network operation.
   for (let mask = 0; mask < 16; mask++) {
     await evaluate(`Object.assign(window.fixture,{model_ready:false,microphone:${!!(mask & 1)},accessibility:${!!(mask & 2)},input_monitoring:${!!(mask & 4)},hotkey:${!!(mask & 8)}})`);
     await until(`!document.getElementById('overview-model').hidden && !document.getElementById('overview-download').disabled`);
+    await until(`document.getElementById('mic-row').hidden===${!!(mask&1)} && document.getElementById('permissions-row').hidden===${!!((mask&2)&&(mask&4))} && document.getElementById('hotkey-row').hidden===${!!(mask&8)}`);
     assert.equal(await evaluate(`document.getElementById('overview-download').getBoundingClientRect().width>0 && document.getElementById('overview-download').textContent.includes('Download English model')`), true);
+    await evaluate(`document.getElementById('nav-settings').click()`);
+    assert.equal(await evaluate(`['mic','permissions','download'].every(id=>{const b=document.getElementById(id);return !b.getClientRects().length || b.getBoundingClientRect().height===36})`), true, `Uniform setup action heights in readiness combination ${mask}`);
+    await evaluate(`document.getElementById('nav-overview').click()`);
   }
   assert.equal(await evaluate(`window.calls.some(c=>c.command==='download_model')`), false, 'Never downloads automatically');
   await evaluate(`document.getElementById('setup').click()`);
@@ -90,7 +98,9 @@ try {
   await evaluate(`window.rejectLimit=false;window.fixture.recording_limit=240`);
   await until(`document.getElementById('recording-limit').value==='240'`);
   assert.equal(await evaluate(`document.getElementById('setup-state').textContent==='Ready' && document.getElementById('setup-missing').hidden`), true, 'Ready setup is a single row, details optional');
-  assert.equal(await evaluate(`document.getElementById('shortcut-dialog').open || document.querySelector('.sound-options').open`), false, 'Advanced controls are out of the way');
+  assert.equal(await evaluate(`document.getElementById('shortcut-dialog').open`), false);
+  assert.equal(await evaluate(`['change-shortcut','recording-limit','sounds','sound-volume','preview-sound','reset'].every(id=>document.getElementById(id).getBoundingClientRect().height>0)`), true, 'Every essential preference is visible without expansion');
+  assert.deepEqual(await evaluate(`['change-shortcut','recording-limit','preview-sound','reset'].map(id=>document.getElementById(id).getBoundingClientRect().height)`), [36,36,36,36], 'Settings actions and select share one control height');
   await evaluate(`document.getElementById('change-shortcut').click()`);
   assert.equal(await evaluate(`document.getElementById('shortcut-dialog').open && document.activeElement.id==='shortcut-fn'`), true, 'Shortcut dialog focuses its first choice');
   for (let tab = 0; tab < 12; tab++) {
@@ -129,21 +139,33 @@ try {
   await until(`document.getElementById('shortcut-feedback').textContent.includes('timed out')`);
   assert.equal(await evaluate(`document.getElementById('shortcut-dialog').open && document.getElementById('shortcut-recorder').hidden && window.calls.filter(c=>c.command==='capture_shortcut').at(-1).args.active===false`), true, 'Recording timeout releases native capture and keeps dialog usable');
   await evaluate(`window.setTimeout=window.realTimeout;document.getElementById('close-shortcut').click()`);
-  await evaluate(`document.querySelector('.sound-options').open=true`);
   await evaluate(`window.rejectShortcut=false;window.fixture.sound_style='bell'`);
   assert.equal(await evaluate(`document.getElementById('sound-style')===null`), true, 'One cue, no style selector even with a legacy preference');
-  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='preview_sound').length`), 0, 'Opening sound options never autoplays');
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='preview_sound').length`), 0, 'Visible sound controls never autoplay');
   await evaluate(`document.getElementById('sounds').click()`);
   await until(`window.fixture.sounds===false && !document.getElementById('sounds').disabled`);
   await until(`document.getElementById('sound-state').textContent==='Off'`);
+  // Keep IPC unresolved across a real status poll: the pending user choice
+  // must neither be overwritten nor re-enabled by the backend's old value.
+  await evaluate(`const pendingInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(['set_sounds','set_sound_volume','set_recording_limit'].includes(command))await new Promise(resolve=>window.releasePreference=resolve);return pendingInvoke(command,args);}`);
+  for (const [control, command, value] of [['sounds','set_sounds',true],['sound-volume','set_sound_volume','62'],['recording-limit','set_recording_limit','180']]) {
+    await evaluate(`{window.preferencePolls=window.calls.filter(c=>c.command==='status').length;const control=document.getElementById('${control}');${control==='sounds' ? 'control.click()' : `control.value='${value}';control.dispatchEvent(new Event('change'))`}}`);
+    await until(`window.calls.filter(c=>c.command==='status').length>window.preferencePolls`);
+    assert.equal(await evaluate(`document.getElementById('${control}').disabled`), true, `${command} stays disabled during a poll`);
+    assert.equal(await evaluate(`document.getElementById('${control}').${control==='sounds'?'checked':'value'}`), value, `${command} retains the user's pending choice`);
+    await evaluate(`window.releasePreference()`);
+    await until(`!document.getElementById('${control}').disabled`);
+  }
+  await evaluate(`window.__TAURI_INTERNALS__.invoke=pendingInvoke;window.fixture.sounds=false`);
   await evaluate(`window.fixture.sound_volume=50; const oldInvoke=window.__TAURI_INTERNALS__.invoke; window.__TAURI_INTERNALS__.invoke=async(command,args)=>{ if(command==='set_sound_volume') window.fixture.sound_volume=args.volume; return oldInvoke(command,args); };`);
   await until(`document.getElementById('volume-percent').textContent==='50%'`);
+  const volumeCommits = await evaluate(`window.calls.filter(c=>c.command==='set_sound_volume').length`);
   await evaluate(`const slider=document.getElementById('sound-volume'); for(let n=51;n<=70;n++){slider.value=String(n); slider.dispatchEvent(new Event('input'));}`);
-  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='set_sound_volume').length`), 0, 'Dragging never sends IPC');
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='set_sound_volume').length`), volumeCommits, 'Dragging never sends IPC');
   assert.equal(await evaluate(`document.getElementById('volume-percent').textContent`), '70%');
   await evaluate(`document.getElementById('sound-volume').dispatchEvent(new Event('change'))`);
   await until(`window.fixture.sound_volume===70 && !document.getElementById('sound-volume').disabled`);
-  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='set_sound_volume').length`), 1, 'One commit on release');
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='set_sound_volume').length`), volumeCommits + 1, 'One commit on release');
   await until(`!document.getElementById('preview-sound').disabled`);
   await evaluate(`document.getElementById('preview-sound').click(); document.getElementById('preview-sound').click();`);
   await until(`window.calls.some(c=>c.command==='preview_sound')`);
@@ -156,6 +178,10 @@ try {
   }
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='preview_sound').length`), 1, 'No preview while busy');
   await evaluate(`window.fixture.phase='idle'`);
+  for (const message of ['No speech detected. Try again.', 'Cancelled.']) {
+    await evaluate(`window.fixture.message=${JSON.stringify(message)}`);
+    await until(`document.getElementById('message').textContent===${JSON.stringify(message)}`);
+  }
   await until(`!document.getElementById('preview-sound').disabled`);
   for (const field of ['microphone','accessibility','input_monitoring','hotkey','model_ready']) {
     await evaluate(`window.fixture[${JSON.stringify(field)}]=false`);
@@ -170,9 +196,7 @@ try {
   assert.equal(await evaluate(`!document.getElementById('progress').hidden && document.getElementById('progress').value===42 && !document.getElementById('setup-missing').hidden`), true, 'Model download progress remains visible');
   await evaluate(`window.fixture.model_ready=true;window.fixture.phase='idle'`);
   await until(`document.getElementById('setup-state').textContent==='Ready'`);
-  await evaluate(`document.querySelector('.setup-details').open=true`);
-  assert.equal(await evaluate(`document.querySelectorAll('.setup-details ol li').length`), 4, 'First-dictation helper is a short ordered checklist');
-  await evaluate(`document.querySelector('.setup-details').open=false;window.fixture.phase='processing';window.fixture.message='Loading local model… Escape cancels.'`);
+  await evaluate(`window.fixture.phase='processing';window.fixture.message='Loading local model… Escape cancels.'`);
   await until(`!document.getElementById('cancel').hidden && document.getElementById('message').textContent.includes('Loading local model')`);
   await evaluate(`document.getElementById('cancel').click()`);
   assert.equal(await evaluate(`window.calls.some(c=>c.command==='cancel')`), true, 'Model loading remains cancellable');
@@ -199,7 +223,7 @@ try {
   assert.equal(await evaluate(`document.getElementById('cancel').hidden && !document.getElementById('copy').disabled && !document.getElementById('preview-sound').disabled && !document.getElementById('record-shortcut').disabled`), true, 'Copied fallback is ready, not an error or busy state');
   assert.equal(await evaluate(`getComputedStyle(document.getElementById('dot')).backgroundColor`), 'rgb(112, 107, 104)', 'Normal fallback is graphite; muted red is reserved for recording/active controls');
   assert.match(await evaluate(`document.getElementById('message').textContent`), /start:no-original-focus/);
-  await evaluate(`document.getElementById('nav-settings').click();document.querySelector('.sound-options').open=false;document.getElementById('feedback').hidden=true;window.fixture.message='Select a text field and press Fn.'`);
+  await evaluate(`document.getElementById('nav-settings').click();document.getElementById('feedback').hidden=true;window.fixture.message='Select a text field and press Fn.'`);
   await until(`document.getElementById('message').textContent==='Select a text field and press Fn.'`);
   assert.equal(await evaluate(`document.querySelector('footer').getBoundingClientRect().bottom<=innerHeight`), true, `Ready settings fit the normal window: ${JSON.stringify(await evaluate(`Array.from(document.querySelectorAll('aside,header,.settings-intro,#settings .card,.local-data,.status,footer')).map(e=>({name:e.className||e.tagName,height:e.getBoundingClientRect().height,bottom:e.getBoundingClientRect().bottom}))`))}`);
   await evaluate(`window.fixture.phase='idle'`);
@@ -214,13 +238,24 @@ try {
     for (const width of [320, 390, 400, 560, 740, 980, 1280]) {
       await send('Emulation.setDeviceMetricsOverride', { width, height: 820, deviceScaleFactor: 1, mobile: false });
       for (const tab of ['overview','settings']) {
-        await evaluate(`document.getElementById('nav-${tab}').click();document.querySelector('.setup-details').open=${tab === 'settings'}`);
+        await evaluate(`document.getElementById('nav-${tab}').click()`);
+        const nav = await evaluate(`(() => { const a=document.getElementById('nav-overview').getBoundingClientRect(), b=document.getElementById('nav-settings').getBoundingClientRect(),brand=document.querySelector('.brand').getBoundingClientRect();return {same:a.y===b.y&&a.width===b.width&&a.height===b.height,width:a.width,height:a.height,centered:Math.abs((brand.y+brand.height/2)-(a.y+a.height/2))<1,active:document.querySelector('nav [aria-current="page"]').id};})()`);
+        assert.deepEqual(nav, {same:true,width:40,height:40,centered:true,active:`nav-${tab}`}, `Header aligned at ${width}px`);
         assert.equal(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth`), true, `No horizontal overflow at ${width}px, ${theme}, ${tab}`);
         assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('button, select, input')).filter(e=>e.getClientRects().length && (e.getBoundingClientRect().right>innerWidth || e.getBoundingClientRect().left<0)).map(e=>e.id)`), [], 'All controls fit');
       }
-      await evaluate(`document.getElementById('change-shortcut').click();document.querySelector('#shortcut-dialog details').open=true`);
+      await evaluate(`document.getElementById('change-shortcut').click()`);
       assert.equal(await evaluate(`document.getElementById('shortcut-dialog').scrollWidth<=document.getElementById('shortcut-dialog').clientWidth`), true, `Shortcut dialog fits ${width}px, ${theme}`);
       await evaluate(`document.getElementById('close-shortcut').click()`);
+      await evaluate(`Object.assign(window.fixture,{microphone:false,accessibility:false,input_monitoring:false,hotkey:false,model_ready:false})`);
+      await until(`document.getElementById('setup-state').textContent==='Needs attention'`);
+      for (const tab of ['settings','overview']) {
+        await evaluate(`document.getElementById('nav-${tab}').click()`);
+        assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth`), true, `First-run ${tab} fits ${width}px`);
+        assert.equal(await evaluate(`['mic','permissions','download','overview-download'].every(id=>{const b=document.getElementById(id),r=b.getBoundingClientRect();return !r.width || (r.left>=0&&r.right<=innerWidth&&r.height>=36)})`), true, 'First-run actions fit without clipping');
+      }
+      await evaluate(`Object.assign(window.fixture,{microphone:true,accessibility:true,input_monitoring:true,hotkey:true,model_ready:true})`);
+      await until(`document.getElementById('setup-state').textContent==='Ready'`);
     }
   }
   // Status text shares space with a dot and (while busy) Cancel. Exercise real
@@ -245,7 +280,27 @@ try {
       if (phase==='idle') assert.equal(geometry.label,'Ready');
     }
   }
-  console.log('UI smoke passed: recording limit save/rollback/refresh, compact ready settings, missing setup/download progress, shortcut dialog focus/Escape/timeout/presets/validation/save failure, single cue without selector/autoplay, toggle/volume/idle-only preview, reset, counts, safe transcript/copy, light/dark responsive layout. No microphone capture or screenshots.');
+   if (process.env.UI_SCREENSHOT_DIR) {
+     await send('Emulation.setDeviceMetricsOverride', {width:740,height:820,deviceScaleFactor:1,mobile:false});
+     await evaluate(`window.fixture.phase='idle';window.fixture.message='';document.getElementById('feedback').hidden=true`);
+     await until(`document.getElementById('phase').textContent==='Ready'`);
+     for (const width of [740,400,320]) {
+       await send('Emulation.setDeviceMetricsOverride', {width,height:820,deviceScaleFactor:1,mobile:false});
+       for (const tab of ['overview','settings']) {
+         await evaluate(`document.getElementById('nav-${tab}').click()`);
+         const shot = await send('Page.captureScreenshot', {format:'png',captureBeyondViewport:true});
+         writeFileSync(join(process.env.UI_SCREENSHOT_DIR, `${tab}-${width}.png`), Buffer.from(shot.data,'base64'));
+       }
+     }
+     await evaluate(`Object.assign(window.fixture,{model_ready:false,microphone:false,accessibility:false,input_monitoring:false,hotkey:false})`);
+     await until(`document.getElementById('setup-state').textContent==='Needs attention'`);
+     for (const tab of ['overview','settings']) {
+       await evaluate(`document.getElementById('nav-${tab}').click()`);
+       const shot = await send('Page.captureScreenshot', {format:'png',captureBeyondViewport:true});
+       writeFileSync(join(process.env.UI_SCREENSHOT_DIR, `${tab}-first-run-320.png`), Buffer.from(shot.data,'base64'));
+     }
+   }
+   console.log('UI smoke passed: visible essentials, no details, accessible icon navigation and aligned 40px geometry, uniform controls, recording limit save/rollback/refresh, 16 first-run combinations, download retry/progress, shortcut focus/Escape/timeout/validation/save failure, volume/idle-only preview, reset confirmation, safe transcript/copy, light/dark responsive layout. No microphone capture.');
 } finally {
   socket?.close();
   browser.kill('SIGTERM');

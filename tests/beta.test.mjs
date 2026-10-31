@@ -12,7 +12,7 @@ test('app and landing brands show a semantic, visible Beta badge', () => {
     assert.equal([...source.matchAll(/class="beta-badge"/g)].length, 1, 'One unobtrusive badge per surface');
   }
   for (const path of ['src/style.css', 'site/styles.css']) {
-    assert.match(read(path), /\.beta-badge\{[^}]*color:#873c38;[^}]*font-size:(?:10|11)px/);
+    assert.match(read(path), /\.beta-badge\s*\{[^}]*color:\s*#873c38;[^}]*font-size:\s*(?:10|11)px/);
   }
 });
 

@@ -22,12 +22,12 @@ test('readiness requires model, all permissions, and a connected shortcut', () =
 test('Fn readiness explains actual missing access and stale hooks separately', () => {
   const ready = { model_ready: true, microphone: true, accessibility: true, input_monitoring: true, hotkey: true };
   assert.match(readinessDetail({ ...ready, input_monitoring: false }), /Input Monitoring/);
-  assert.match(readinessDetail({ ...ready, hotkey: false }), /disconnected despite Input Monitoring access/);
-  assert.match(readinessDetail({ ...ready, accessibility: false }), /Accessibility access is unavailable/);
-  assert.match(readinessDetail({ ...ready, microphone: false }), /Microphone access is unavailable/);
-  assert.match(readinessDetail({ ...ready, microphone: false }), /Click Allow in HandsFree Settings to request the macOS dialog/);
-  assert.match(readinessDetail({ ...ready, model_ready: false }), /Download the local English model/);
-  assert.match(readinessDetail(ready), /Select a text field/);
+  assert.match(readinessDetail({ ...ready, hotkey: false }), /Quit and reopen.*reconnect/);
+  assert.match(readinessDetail({ ...ready, accessibility: false }), /Allow Accessibility in Settings/);
+  assert.match(readinessDetail({ ...ready, microphone: false }), /Allow Microphone in Settings/);
+  assert.equal(readinessDetail({ ...ready, microphone: false, accessibility: false, input_monitoring: false }), 'Allow Microphone, Accessibility, Input Monitoring in Settings.');
+  assert.match(readinessDetail({ ...ready, model_ready: false }), /Download the English model/);
+  assert.equal(readinessDetail(ready), 'Ready to dictate.');
 });
 test('all states have user-facing labels and unknown state is safe', () => {
   assert.equal(phaseLabel('idle'), 'Ready');
