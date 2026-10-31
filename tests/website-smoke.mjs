@@ -67,6 +67,16 @@ try {
     if (await evaluate(`document.readyState === 'complete' && !!document.querySelector('h1')`)) break;
     await delay(50);
   }
+  assert.deepEqual(await evaluate(`({disabled:document.getElementById('primary-download').getAttribute('aria-disabled'), href:document.getElementById('primary-download').getAttribute('href')})`), {disabled:'true',href:null}, 'Draft manifest cannot produce a dead download');
+  await evaluate(`(async () => { window.downloadModule=await import('./download.js'); window.releaseModule=await import('./release.js'); })()`);
+  for (const os of ['mac','windows','linux','mobile','unknown']) {
+    await evaluate(`window.downloadModule.renderDownload(document,{os:${JSON.stringify(os)},arch:'unknown'},{...window.releaseModule.release,publicAvailable:true})`);
+    const href = await evaluate(`document.getElementById('primary-download').getAttribute('href')`);
+    assert.equal(href, os === 'mac' ? 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.0-beta.1/HandsFree-0.1.0-beta.1-macos-arm64.dmg' : null, `${os}: only Mac gets a direct DMG`);
+  }
+  await evaluate(`window.downloadModule.renderDownload(document,{os:'mac',arch:'intel'},{...window.releaseModule.release,publicAvailable:true})`);
+  assert.equal(await evaluate(`document.getElementById('primary-download').hasAttribute('href')`), false, 'Known Intel never gets ARM build');
+  await evaluate(`window.downloadModule.renderDownload(document,{os:'mac',arch:'unknown'},window.releaseModule.release)`);
   for (const width of [320, 390, 768, 1280]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
     const metrics = await evaluate(`new Promise(resolve => requestAnimationFrame(() => resolve({
@@ -77,6 +87,8 @@ try {
     assert.equal(metrics.scroll, metrics.width, `No horizontal overflow at ${width}px`);
     assert.ok(metrics.images, 'Icons loaded');
     assert.equal(metrics.styles, 'grid', 'Stylesheet loaded');
+    assert.equal(await evaluate(`document.querySelector('.site-header .beta-badge').textContent==='Beta' && document.querySelector('.site-header .beta-badge').getBoundingClientRect().width>0`), true, 'Visible beta identity at every width');
+    assert.equal(await evaluate(`document.getElementById('primary-download').getBoundingClientRect().bottom < innerHeight`), true, `Primary action above fold at ${width}px`);
     console.log(`Light ${width}px: layout and assets passed`);
     if (width === 1280) await screenshot('desktop');
   }
@@ -102,6 +114,14 @@ try {
   assert.equal(await evaluate('document.activeElement.textContent'), 'Skip to content');
   await screenshot('mobile-dark');
   assert.deepEqual(errors, []);
+  await send('Emulation.setScriptExecutionDisabled', { value: true });
+  await send('Page.reload');
+  for (let attempt = 0; attempt < 100; attempt++) {
+    if (await evaluate(`document.readyState === 'complete'`)) break;
+    await delay(50);
+  }
+  assert.equal(await evaluate(`document.getElementById('primary-download').hasAttribute('href')`), false, 'No-JS CTA cannot point at a draft');
+  assert.equal(await evaluate(`document.querySelector('noscript').getClientRects().length>0 && document.getElementById('release-status').textContent.includes('No public Mac download')`), true, 'No-JS availability fallback is visible');
   console.log('Dark mobile, reduced motion, keyboard skip link, and JavaScript errors: passed');
 } finally {
   socket?.close();

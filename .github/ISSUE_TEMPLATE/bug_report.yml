@@ -1,0 +1,33 @@
+name: Bug report
+description: Something is not working in the current Mac beta
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not attach recordings, transcripts, credentials, or personal settings. Redact diagnostics before sharing. For a security issue, read SECURITY.md instead of opening a public report.
+  - type: input
+    id: version
+    attributes:
+      label: HandsFree version and source
+      placeholder: 0.1.0 beta, release tag or source commit
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: macOS version, Apple chip, affected app/version, microphone type
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps, expected result, and actual result
+      description: Use invented text. Include permission/shortcut status if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Redacted diagnostics (optional)
+      description: Review every line first. Do not upload recordings or transcripts.

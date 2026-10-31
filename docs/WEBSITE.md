@@ -2,7 +2,7 @@
 
 Canonical URL: **https://suhaasbadada.github.io/handsfree/**
 
-The landing page lives in `site/`. It is plain HTML and CSS with no build step, JavaScript, tracking, external fonts, CDN assets, or paid services. The icon in `site/assets/handsfree.png` is a copy of the existing app icon (`src-tauri/icons/icon.png`); update both if the brand changes. The original liked logo is retained. The waveform is an illustration, not a product screenshot. Warm whites, graphite text, and muted-red accents match the app and remain light regardless of system appearance; motion respects reduced-motion settings.
+The landing page lives in `site/`. It is plain HTML/CSS plus small local JavaScript modules, with no build step, dependencies, tracking, external fonts, CDN assets, or paid services. `release.js` is the versioned release manifest; `download.js` detects OS and renders the single above-fold primary CTA. There are no release API calls or automatic downloads. Without JavaScript (or if a module fails), static copy honestly says there is no public Mac download and links to release status. Update that fallback copy when publishing. The icon in `site/assets/handsfree.png` is a copy of the existing app icon (`src-tauri/icons/icon.png`); update both if the brand changes. The original logo and warm light/red design remain. The waveform is an illustration, not a product screenshot. Motion respects reduced-motion settings.
 
 ## Preview and validate
 
@@ -31,7 +31,8 @@ The workflow uses official version-pinned Pages actions, uploads **only `site/`*
 ## Editing guidelines
 
 - Keep all local asset/navigation URLs project-relative (`./assets/…`, `./styles.css`, `./`, or `#section`) so GitHub Pages' `/handsfree/` subpath works.
-- The Mac beta is **prepared, not public**. Keep the CTA as **View beta status**, pointing to the releases index, until a verified public release exists. Do not link to an unpublished asset.
+- The Mac beta is **prepared, not public**. Keep `release.js` `publicAvailable: false` and the primary CTA **Mac beta coming soon**, with no href. After licensing/release gates, verify the published DMG anonymously before enabling it. The exact canonical versioned DMG URL is validated; invalid manifests fail closed. Do not link to unpublished assets.
+- OS detection uses Client Hints with UA/platform fallback. Android and iPadOS (including MacIntel + touch) are excluded. Safari generally supplies no architecture hint: **MacIntel is not proof of Intel hardware**, and an Apple Silicon Mac may report an Intel UA. Mac unknown-architecture gets the one-click DMG only when publicly available, next to explicit Apple Silicon/macOS 14+ requirements and About This Mac guidance. Reliable explicit x86 hints disable download. No architecture or OS guess is persisted or sent anywhere. Unknown/mobile platforms get availability information, never a wrong build.
 - Windows and Linux are planned, not implemented or downloadable. Do not imply present cross-platform support or invent dates, metrics, testimonials, or performance guarantees.
 - The project's MIT grant covers its own code, not dependency/model licenses. The upstream objc2 publication caveat remains unresolved; the website must not suggest that changing the project license clears it.
 - When a public Mac beta is approved, update the README, page, and release notes together with the actual release details and limitations. Review third-party and privacy disclosures when changing feature copy.

@@ -1,16 +1,34 @@
 #!/bin/bash
-# Produces a candidate only; see docs/RELEASING.md for publication gates.
+# Candidate only. Never installs, publishes, or initializes signing identities.
 set -euo pipefail
 umask 022
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
-[[ $(uname -s) == Darwin && $(uname -m) == arm64 ]] || { echo 'Apple Silicon macOS required.' >&2; exit 1; }
+fail() { printf '%s\n' "$*" >&2; exit 1; }
+[[ $# == 0 ]] || fail 'Usage: bash scripts/package-release.sh (no arguments)'
+[[ $(uname -s) == Darwin && $(uname -m) == arm64 ]] || fail 'Apple Silicon macOS required.'
 NAME=HandsFree-0.1.0-beta.1-macos-arm64
 OUT="$ROOT/release"
 mkdir -p "$OUT"
-[[ ! -e "$OUT/$NAME.zip" ]] || { echo 'Candidate ZIP already exists; move it aside explicitly first.' >&2; exit 1; }
+[[ ! -e "$OUT/$NAME.dmg" && ! -e "$OUT/SHA256SUMS" && ! -e "$OUT/PROVENANCE.txt" ]] || fail 'Candidate output exists; move it aside explicitly first.'
 STAGE=$(mktemp -d "$OUT/.package.XXXXXX")
-trap 'rm -rf -- "$STAGE"' EXIT
+MOUNT="$STAGE/mounted"
+MOUNTED=false
+cleanup() {
+  local result=$?
+  trap - EXIT
+  if $MOUNTED; then
+    if ! /usr/bin/hdiutil detach "$MOUNT"; then
+      echo "Detach failed; preserving staging directory for recovery: $STAGE" >&2
+      exit 1
+    fi
+  fi
+  rm -rf -- "$STAGE"
+  exit "$result"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 APP="$ROOT/src-tauri/target/release/bundle/macos/HandsFree.app"
 npm run build:local
 verify_app() {
@@ -24,24 +42,28 @@ verify_app() {
   [[ $(/usr/bin/lipo -archs "$app/Contents/MacOS/$executable") == arm64 ]]
 }
 verify_app "$APP"
-mkdir "$STAGE/$NAME"
-/usr/bin/ditto "$APP" "$STAGE/$NAME/HandsFree.app"
-cp README.md "$STAGE/$NAME/INSTALL.md"
-# INSTALL.md links are repository-relative, so include their exact targets.
-mkdir -p "$STAGE/$NAME/docs/releases"
-cp docs/DEVELOPMENT.md docs/RELEASING.md "$STAGE/$NAME/docs/"
-cp docs/releases/v0.1.0-beta.1.md "$STAGE/$NAME/docs/releases/"
-cp README.md "$STAGE/$NAME/README.md"
-cp LICENSE "$STAGE/$NAME/LICENSE"
-cp docs/WEBSITE.md "$STAGE/$NAME/docs/"
-python3 scripts/release-notices.py "$STAGE/$NAME"
-printf '%s\n' 'CANDIDATE ONLY — PUBLICATION BLOCKED: see THIRD_PARTY_NOTICES/README.txt and docs/RELEASING.md.' > "$STAGE/$NAME/PUBLICATION-BLOCKED.txt"
-# Reject unexpected bundle payloads; do not silently omit signed resources.
-python3 - "$STAGE/$NAME" <<'PY'
+PAYLOAD="$STAGE/payload"
+mkdir "$PAYLOAD"
+/usr/bin/ditto "$APP" "$PAYLOAD/HandsFree.app"
+ln -s /Applications "$PAYLOAD/Applications"
+cp LICENSE "$PAYLOAD/LICENSE"
+cp README.md "$PAYLOAD/README.md"
+cp CONTRIBUTING.md SECURITY.md "$PAYLOAD/"
+cp docs/INSTALL.md "$PAYLOAD/INSTALL.md"
+mkdir -p "$PAYLOAD/docs/releases"
+cp docs/DEVELOPMENT.md docs/RELEASING.md docs/WEBSITE.md docs/INSTALL.md "$PAYLOAD/docs/"
+cp docs/releases/v0.1.0-beta.1.md "$PAYLOAD/docs/releases/"
+python3 scripts/release-notices.py "$PAYLOAD"
+printf '%s\n' 'CANDIDATE ONLY — PUBLICATION BLOCKED: see THIRD_PARTY_NOTICES/README.txt and docs/RELEASING.md.' > "$PAYLOAD/PUBLICATION-BLOCKED.txt"
+# No Finder/AppleScript automation or new dependencies. The named volume and
+# Applications shortcut provide drag-to-install without Automation permission.
+python3 - "$PAYLOAD" <<'PY'
 import pathlib, sys
 root = pathlib.Path(sys.argv[1])
 for file in root.rglob('*'):
     if file.is_symlink():
+        if file == root / 'Applications' and file.readlink() == pathlib.Path('/Applications'):
+            continue
         if not file.resolve().is_relative_to(root):
             raise SystemExit(f'External symlink: {file}')
     if file.is_file():
@@ -52,11 +74,32 @@ for file in root.rglob('*'):
         if file.stat().st_size < 5_000_000 and b'-----BEGIN PRIVATE KEY-----' in file.read_bytes():
             raise SystemExit(f'Private key content: {file}')
 PY
-/usr/bin/ditto -c -k --sequesterRsrc --keepParent "$STAGE/$NAME" "$STAGE/$NAME.zip"
-mkdir "$STAGE/extracted"
-/usr/bin/ditto -x -k "$STAGE/$NAME.zip" "$STAGE/extracted"
-verify_app "$STAGE/extracted/$NAME/HandsFree.app"
-mv "$STAGE/$NAME.zip" "$OUT/$NAME.zip"
-(cd "$OUT" && /usr/bin/shasum -a 256 "$NAME.zip" > SHA256SUMS && /usr/bin/shasum -a 256 -c SHA256SUMS)
-printf '\nCandidate: %s/%s.zip\n' "$OUT" "$NAME"
+/usr/bin/hdiutil create -quiet -volname 'HandsFree Beta — drag to Applications' -srcfolder "$PAYLOAD" \
+  -format UDZO -fs HFS+ "$STAGE/$NAME.dmg"
+bash scripts/local-signing.sh --sign-dmg "$STAGE/$NAME.dmg"
+/usr/bin/hdiutil verify "$STAGE/$NAME.dmg"
+mkdir "$MOUNT"
+# Set before attach: a signal/partial attach still triggers scoped detach cleanup.
+MOUNTED=true
+/usr/bin/hdiutil attach -readonly -nobrowse -noautoopen -mountpoint "$MOUNT" "$STAGE/$NAME.dmg"
+verify_app "$MOUNT/HandsFree.app"
+[[ -L "$MOUNT/Applications" && $(readlink "$MOUNT/Applications") == /Applications ]]
+for required in LICENSE INSTALL.md README.md CONTRIBUTING.md SECURITY.md docs/INSTALL.md THIRD_PARTY_NOTICES/inventory.json THIRD_PARTY_SOURCES.tar.gz PUBLICATION-BLOCKED.txt; do
+  [[ -s "$MOUNT/$required" ]] || fail "Missing disk-image payload: $required"
+done
+/usr/bin/hdiutil detach "$MOUNT"
+MOUNTED=false
+{
+  printf 'Candidate: %s.dmg\nSource commit: %s\n' "$NAME" "$(git rev-parse HEAD)"
+  printf 'Working tree status at packaging (empty means clean):\n'
+  git status --short --untracked-files=normal
+  printf '\nBuilt on: '; sw_vers -productVersion
+  printf 'Architecture: '; uname -m
+  printf 'Rust: '; rustc --version
+  printf 'Node: '; node --version
+  printf '\nSelf-signed; not Developer ID or notarized. PUBLICATION BLOCKED.\n'
+} > "$STAGE/PROVENANCE.txt"
+(cd "$STAGE" && /usr/bin/shasum -a 256 "$NAME.dmg" > SHA256SUMS && /usr/bin/shasum -a 256 -c SHA256SUMS)
+mv "$STAGE/$NAME.dmg" "$STAGE/SHA256SUMS" "$STAGE/PROVENANCE.txt" "$OUT/"
+printf '\nCandidate: %s/%s.dmg\n' "$OUT" "$NAME"
 echo 'PUBLICATION BLOCKED pending licensing clarification; no upload or installation performed.'

@@ -8,7 +8,7 @@ type Status = { phase: string; message: string; progress: number; model_ready: b
 const logo = new URL('../src-tauri/icons/icon.png', import.meta.url).href;
 document.querySelector('#app')!.innerHTML = `
 <div class="shell">
- <aside><a class="brand" href="#overview" aria-label="HandsFree overview"><img src="${logo}" alt="" width="36" height="36"><span>HandsFree</span></a>
+ <aside><a class="brand" href="#overview" aria-label="HandsFree beta overview"><img src="${logo}" alt="" width="36" height="36"><span>HandsFree</span><span class="beta-badge">Beta</span></a>
  <nav aria-label="Main navigation"><button id="nav-overview" class="nav active" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-6v-6h-4v6H4Z"/></svg>Overview</button><button id="nav-settings" class="nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg>Settings</button></nav></aside>
  <main>
  <header><span id="page-label">Overview</span><span class="badge"><i></i> On this Mac</span></header>
@@ -35,17 +35,21 @@ document.querySelector('#app')!.innerHTML = `
    </div>
    <details class="setup-details"><summary>Setup details</summary><p id="setup-detail" class="subtle">Checking…</p><p class="subtle">Enable HandsFree in System Settings → Privacy & Security for missing permissions. If the shortcut is disconnected, quit and reopen the app.</p><p class="subtle">Whisper base.en · Verified download from Hugging Face. Transcription works offline after setup.</p></details>
   </section>
-  <section class="local-data" aria-labelledby="data-title"><h2 id="data-title">Local data</h2><div class="setting-row"><div><h3>Usage totals</h3><p>Counts and estimates, saved on this Mac.</p></div><button id="reset" class="danger">Reset totals…</button></div><details><summary>Privacy</summary><p class="subtle">Audio stays on this Mac and is deleted after each attempt. The last transcript stays in memory until you quit. No telemetry or transcript history. Paste briefly uses the clipboard; clipboard managers may see it.</p></details></section>
+   <section class="local-data" aria-labelledby="data-title"><h2 id="data-title">Local data</h2><div class="setting-row"><div><h3>Usage totals</h3><p>Counts and estimates, saved on this Mac.</p></div><button id="reset" class="danger">Reset totals…</button></div><details><summary>Privacy</summary><p class="subtle">Audio stays on this Mac and is deleted after completion, cancellation, or normal quit. A crash can leave temporary audio until the next launch. The last transcript stays in memory until you quit. No telemetry or transcript history. Paste briefly uses the clipboard; clipboard managers may retain it.</p></details></section>
  </section>
  <section class="status" aria-label="App status"><span id="dot"></span><div><strong id="phase">Connecting…</strong><p id="message" aria-live="polite"></p></div><button id="cancel" hidden>Cancel</button></section>
  <p id="feedback" class="feedback" role="status" hidden></p><p id="storage-error" class="feedback" role="status" hidden></p>
-  <footer><span>HandsFree · 0.1</span><span>English · On-device transcription</span></footer>
+   <footer><span>HandsFree · 0.1.0 beta</span><span>English · On-device transcription</span></footer>
  </main>
 </div>
 <dialog id="shortcut-dialog" aria-labelledby="shortcut-title"><h2 id="shortcut-title">Choose a shortcut</h2><div class="shortcut-options"><button id="shortcut-fn" autofocus>Fn</button><button id="shortcut-option">Option + Space</button><button id="shortcut-control">Control + Shift + Space</button><button id="record-shortcut">Custom shortcut…</button></div><input id="shortcut-recorder" readonly hidden aria-label="Record shortcut" placeholder="Press a shortcut. Escape cancels." aria-describedby="shortcut-help"><p id="shortcut-feedback" role="status" hidden></p><details><summary>More about shortcuts</summary><p id="shortcut-help">Use Control, Option or Command with a letter, number or Space. Uses physical US key positions. Shortcuts also reach the foreground app; avoid ones it uses. System and common editing shortcuts are blocked.</p><p>For Fn, set the Globe key to Do Nothing and disable macOS Dictation’s Fn shortcut.</p><button id="keyboard">Keyboard settings</button></details><div class="dialog-actions"><button id="close-shortcut">Done</button></div></dialog>
 <dialog id="reset-dialog" aria-labelledby="reset-title"><h2 id="reset-title">Reset usage totals?</h2><p>Totals will return to zero. Your preferences and language model won’t change.</p><div class="dialog-actions"><button id="keep-stats" autofocus>Keep totals</button><button id="confirm-reset" class="danger">Reset totals</button></div></dialog>`;
 const el = (id: string) => document.getElementById(id)!;
 const button = (id: string) => el(id) as HTMLButtonElement;
+// Avoid presenting native actions as ready before the first backend response.
+for (const id of ['change-shortcut', 'mic', 'permissions', 'download', 'reset', 'sounds', 'sound-volume']) {
+  (el(id) as HTMLInputElement | HTMLButtonElement).disabled = true;
+}
 let current: Status | undefined;
 let refreshing = false;
 let soundsPending = false;
@@ -172,6 +176,9 @@ async function refresh() {
   refreshing = true;
   try {
     current = await invoke<Status>('status');
+    button('reset').disabled = false;
+    if (!soundsPending) sounds.disabled = false;
+    if (!volumePending) volume.disabled = false;
     const requests = (current as Status & { permission_requests?: number }).permission_requests ?? 0;
     if (requests !== seenPermissionRequests) { seenPermissionRequests = requests; navigate('settings'); }
     el('phase').textContent = current.phase === 'idle' && !readiness(current) ? 'Setup needed' : phaseLabel(current.phase);

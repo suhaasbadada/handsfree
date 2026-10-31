@@ -1,8 +1,9 @@
 # HandsFree
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-38765b.svg)](LICENSE)
+[![Status: Beta](https://img.shields.io/badge/Status-Beta-a64a45.svg)](docs/releases/v0.1.0-beta.1.md)
 
-**Speak naturally. Keep your hands on your work.**
+**Local-first desktop dictation. A little less typing. A little more flow.**
 
 HandsFree is a local-first desktop dictation project: turn speech into text without sending it to a cloud transcription service. The goal is a simple, private dictation companion across macOS, Windows, and Linux. **Today, only the macOS Apple Silicon beta is implemented and prepared; it is not yet publicly downloadable.** Windows and Linux are planned, not available.
 
@@ -34,7 +35,7 @@ No Windows/Linux release dates are promised. The current Mac implementation live
 
 ### Install (once the beta is published)
 
-1. Download and unzip the archive. Inside its `HandsFree-0.1.0-beta.1-macos-arm64` folder, move **HandsFree.app to Applications before launching or granting permissions**. Keep the included third-party notices/source archive with your download.
+1. Open **HandsFree-0.1.0-beta.1-macos-arm64.dmg** and drag **HandsFree.app onto Applications before launching or granting permissions**. Eject the disk image, then open the Applications copy. No ZIP extraction is needed. Keep the disk image with its included license, third-party notices, and dependency source archive.
 2. Open `/Applications/HandsFree.app`. This beta is **not notarized** and is signed with a **local self-signed certificate, not Apple Developer ID**. macOS cannot verify its publisher and may block it. Only if you trust this download, use the normal **System Settings → Privacy & Security → Open Anyway** flow after attempting to open it. Wording and availability vary; if your organization's policy blocks it, **do not bypass that policy**. A local signature is not Apple approval or malware screening.
 3. In HandsFree's Settings, explicitly allow **Microphone**, then enable **Accessibility** and **Input Monitoring** in System Settings → Privacy & Security. If needed, add the installed app with **+**. Quit and reopen after changing permissions. HandsFree never grants access for you.
 4. Click **Download** for the English Whisper model (about **148 MB**, once, from Hugging Face). The app verifies its checksum. Internet is needed for this explicit setup download; dictation works offline afterward. No model is downloaded on launch.
@@ -43,9 +44,9 @@ No Windows/Linux release dates are promised. The current Mac implementation live
 
 Select a text field in another app. Briefly tap **Fn / 🌐**, speak after the optional listening cue, then tap again to finish. **Escape** cancels. At two minutes, recording stops and transcribes automatically.
 
-For Fn, set macOS Keyboard → **“Press 🌐 key to” → Do Nothing**, and disable conflicting Fn/double-Fn macOS Dictation shortcuts. Some external keyboards do not expose Fn; choose a combination instead. Shortcuts are observed, not swallowed, so avoid conflicts with the foreground app. Secure Input can block them.
+For Fn, set macOS Keyboard → **“Press 🌐 key to” → Do Nothing** and disable conflicting Fn/double-Fn Dictation shortcuts. Some external keyboards do not expose Fn; choose another shortcut instead. Avoid conflicts with the foreground app.
 
-If focus changes or a field is unsupported/secure/read-only, HandsFree does not automatically paste there. A successful transcript is copied instead: **Copied**. You can also copy the last transcript from Overview. Fallback copy replaces your clipboard and leaves the transcript there; clipboard managers and Universal Clipboard may retain it. For a submitted Paste, the previous clipboard is restored after one second only if unchanged. Paste submission is **not confirmation** that the target accepted it; verify your text before retrying.
+If automatic insertion is unavailable, the transcript is **Copied** for manual paste. Clipboard managers and Universal Clipboard may retain that text. Submitted Paste is not confirmation the target accepted it: review your text before retrying. [Detailed installation guide](docs/INSTALL.md).
 
 ## Beta limitations & privacy
 
@@ -59,6 +60,7 @@ Audio is temporarily stored locally and deleted after completion/cancel/normal q
 - [Beta release notes](docs/releases/v0.1.0-beta.1.md)
 - [Release packaging and third-party licensing](docs/RELEASING.md)
 - [Website and GitHub Pages setup](docs/WEBSITE.md)
+- [Contributing](CONTRIBUTING.md) · [Security reporting](SECURITY.md)
 - [Report an issue](https://github.com/suhaasbadada/handsfree/issues) — include macOS version, Mac model, affected app, and diagnostics; do not post private recordings or transcripts.
 
 ## License

@@ -63,11 +63,20 @@ CONFIG
     /usr/bin/codesign --verify --strict -R="identifier \"com.handsfree.local\" and certificate leaf = H\"$HASH\"" "$APP"
     /usr/bin/codesign -d -r- "$APP"
     ;;
+  --sign-dmg)
+    [[ $# == 2 && -f "$2" && "$2" == *.dmg && -f "$CERT" ]] || fail "Usage: $0 --sign-dmg /path/to/HandsFree.dmg (existing identity required)"
+    /usr/bin/hdiutil imageinfo "$2" >/dev/null
+    HASH=$(fingerprint)
+    [[ "$HASH" =~ ^[[:xdigit:]]{40}$ ]] || fail 'Invalid certificate fingerprint.'
+    /usr/bin/codesign --force --sign "$HASH" --keychain "$KEYCHAIN" --timestamp=none \
+      --identifier com.handsfree.local.disk-image "$2"
+    /usr/bin/codesign --verify --strict -R="identifier \"com.handsfree.local.disk-image\" and certificate leaf = H\"$HASH\"" "$2"
+    ;;
   --build)
     [[ $# == 1 && -f "$CERT" ]] || fail 'Run --init explicitly before a locally signed build.'
     cd "$ROOT"
     npm run tauri build -- --bundles app
     exec /bin/bash "$0" --sign "$ROOT/src-tauri/target/release/bundle/macos/HandsFree.app"
     ;;
-  *) fail "Usage: $0 --init | --build | --sign /path/to/HandsFree.app" ;;
+  *) fail "Usage: $0 --init | --build | --sign /path/to/HandsFree.app | --sign-dmg /path/to/HandsFree.dmg" ;;
 esac

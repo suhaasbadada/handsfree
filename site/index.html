@@ -5,15 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f7f6f3">
     <meta name="description" content="HandsFree is a local-first desktop dictation project. A Mac beta is prepared; Windows and Linux are planned. Open source under MIT.">
+    <meta property="og:title" content="HandsFree — Local-first desktop dictation">
+    <meta property="og:description" content="A little less typing. A little more flow. Apple Silicon Mac beta in preparation; Windows and Linux planned.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://suhaasbadada.github.io/handsfree/">
     <link rel="canonical" href="https://suhaasbadada.github.io/handsfree/">
     <link rel="icon" type="image/png" href="./assets/handsfree.png">
     <link rel="stylesheet" href="./styles.css">
+    <script type="module" src="./download.js"></script>
     <title>HandsFree — A little less typing. A little more flow.</title>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-header wrap">
-      <a class="brand" href="./" aria-label="HandsFree home"><img src="./assets/handsfree.png" width="40" height="40" alt="">HandsFree<span class="wordmark-dot" aria-hidden="true">.</span></a>
+      <a class="brand" href="./" aria-label="HandsFree beta home"><img src="./assets/handsfree.png" width="40" height="40" alt="">HandsFree<span class="wordmark-dot" aria-hidden="true">.</span><span class="beta-badge">Beta</span></a>
       <nav aria-label="Main navigation">
         <a href="#why">Why HandsFree</a>
         <a href="#platforms">Platforms</a>
@@ -28,10 +33,12 @@
           <h1 id="hero-title">A little less typing.<br>A little more <em>flow.</em></h1>
           <p class="intro">Thoughts move faster when you can just say them. HandsFree is a local-first dictation companion for your desktop, built to keep your words close.</p>
           <div class="hero-actions">
-            <a class="button primary" href="#platforms">Find your platform <span aria-hidden="true">↓</span></a>
+            <a id="primary-download" class="button primary" aria-disabled="true" tabindex="-1" aria-describedby="download-requirements release-status">Mac beta coming soon</a>
             <a class="text-link" href="https://github.com/suhaasbadada/handsfree">Explore the source <span aria-hidden="true">↗</span></a>
           </div>
-          <p class="availability">Mac beta prepared, not yet published.<br>Windows &amp; Linux are on the roadmap.</p>
+          <p id="download-requirements" class="availability">Apple Silicon (M-series) · macOS 14+ · English. Windows &amp; Linux are planned.</p>
+          <p id="release-status" class="availability" role="status">No public Mac download yet. Publication pending dependency licensing review.</p>
+          <noscript><p class="availability">JavaScript is off. Check <a href="https://github.com/suhaasbadada/handsfree/releases">published releases</a> for availability. Choose only the Apple Silicon Mac DMG; Intel Macs and mobile are unsupported.</p></noscript>
         </div>
         <div class="voice-garden" role="img" aria-label="An illustrative sound wave surrounded by the words speak, pause, and carry on. Not an app screenshot.">
           <span class="orbit orbit-one" aria-hidden="true"></span><span class="orbit orbit-two" aria-hidden="true"></span>
@@ -58,7 +65,7 @@
         <div class="wrap section-space">
           <div class="platform-heading"><div><p class="eyebrow">One idea. More desktops, in time.</p><h2 id="platform-title">Where we are today.</h2></div><p>Cross-platform is the direction.<br>Here is what actually exists.</p></div>
           <div class="platform-grid">
-            <article class="platform-card available"><div class="card-top"><span class="platform-symbol" aria-hidden="true">⌘</span><span class="pill">Beta prepared</span></div><h3>macOS</h3><p class="platform-spec">Apple Silicon · macOS 14+ · English</p><p>The first beta is packaged, but no public binary is available yet. Publication is pending an upstream dependency licensing review.</p><a class="button primary" href="https://github.com/suhaasbadada/handsfree/releases">View beta status <span aria-hidden="true">↗</span></a><p class="card-footnote">Not notarized. Local self-signed build.<br>Read the release notes before installing when published.</p></article>
+            <article class="platform-card available"><div class="card-top"><span class="platform-symbol" aria-hidden="true">⌘</span><span class="pill">Mac beta</span></div><h3>macOS</h3><p class="platform-spec">Apple Silicon · macOS 14+ · English</p><p>DMG installation: open the disk image and drag HandsFree to Applications before first launch. Check the download availability above.</p><a class="text-link" href="https://github.com/suhaasbadada/handsfree/releases">Release notes &amp; status <span aria-hidden="true">↗</span></a><p class="card-footnote">Not notarized. Local self-signed build.<br>Intel Macs are not supported.</p></article>
             <article class="platform-card planned"><div class="card-top"><span class="platform-symbol" aria-hidden="true">⊞</span><span class="pill">Planned</span></div><h3>Windows</h3><p class="platform-spec">A future home for HandsFree</p><p>Not implemented or available to download. System requirements and release timing have not been set.</p><span class="planned-label">Still ahead <span aria-hidden="true">↗</span></span></article>
             <article class="platform-card planned"><div class="card-top"><span class="platform-symbol" aria-hidden="true">&gt;_</span><span class="pill">Planned</span></div><h3>Linux</h3><p class="platform-spec">More choice, same intention</p><p>Not implemented or available to download. Distribution support and release timing have not been set.</p><span class="planned-label">Still ahead <span aria-hidden="true">↗</span></span></article>
           </div>
