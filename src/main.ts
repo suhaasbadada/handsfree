@@ -14,7 +14,8 @@ document.querySelector('#app')!.innerHTML = `
  <header><span id="page-label">Overview</span><span class="badge"><i></i> On this Mac</span></header>
  <section id="overview" aria-labelledby="overview-title">
   <div class="hero"><h1 id="overview-title">Dictation</h1><p>Choose a text field, press <kbd id="overview-shortcut">Fn</kbd> and speak.<br>Press again to finish. Escape cancels.</p></div>
-  <section class="card readiness"><div><h2 id="ready-title">Finish setting up</h2><p id="ready-detail">Checking permissions and model…</p></div><button id="setup" class="primary">Open settings</button></section>
+   <section class="card readiness"><div><h2 id="ready-title">Finish setting up</h2><p id="ready-detail">Checking permissions and model…</p></div><button id="setup" class="primary">Open settings</button></section>
+   <section id="overview-model" class="card readiness" hidden aria-label="English model"><div><h2>English model</h2><p id="overview-model-state">One-time download · Works offline afterward</p></div><button id="overview-download" class="primary" disabled>Download English model (~148 MB)</button></section>
   <div class="metrics" aria-label="Local usage since tracking began"><article><strong id="words">0</strong><span>Words dictated</span></article><article><strong id="saved">0 min</strong><span>Estimated time saved</span></article><article><strong id="count">0</strong><span>Dictations</span><small id="duration">0 sec recorded</small></article></div>
   <details class="metric-note"><summary title="Time saved is an estimate, not a productivity measurement.">About the estimate</summary><p>Assumes typing at 40 words/min, minus recording time: max(0, words ÷ 40 × 60 − recording seconds), per dictation. Totals stay on this Mac.</p></details>
   <section class="card transcript-card"><div class="card-heading"><h2>Last transcript</h2><span class="subtle">This session</span></div><p id="transcript" class="transcript empty">No transcript yet. Your next dictation will appear here.</p><div class="transcript-footer"><span class="subtle">Only held in memory until you quit.</span><button id="copy" disabled>Copy text</button></div></section>
@@ -32,8 +33,8 @@ document.querySelector('#app')!.innerHTML = `
     <div id="mic-row" class="setting-row"><div><h3>Microphone</h3><p id="mic-state">Allow access to record your voice.</p></div><button id="mic">Allow</button></div>
     <div id="permissions-row" class="setting-row"><div><h3>Shortcuts & paste</h3><p id="permission-state">Checking…</p></div><button id="permissions">Open settings</button></div>
     <div id="hotkey-row" class="setting-row" hidden><div><h3>Shortcut disconnected</h3><p>Quit and reopen HandsFree to reconnect.</p></div></div>
-    <div id="model-row" class="setting-row"><div><h3>English model</h3><p id="model-state">148 MB · One-time download</p><progress id="progress" max="100" value="0" hidden aria-label="Model download progress"></progress></div><button id="download">Download</button></div>
-   </div>
+    </div>
+     <div id="model-row" class="setting-row" tabindex="-1"><div><h3>English model <span id="model-ready" class="subtle" hidden>· Ready</span></h3><p id="model-state">148 MB · One-time download</p><progress id="progress" max="100" value="0" hidden aria-label="Model download progress"></progress></div><button id="download">Download</button></div>
    <details class="setup-details"><summary>First dictation & setup help</summary><ol><li>Use the copy in Applications before allowing permissions.</li><li>Allow Microphone, Accessibility and Input Monitoring above; quit and reopen if needed.</li><li>Download the English model once (~148 MB); then dictation works offline.</li><li>Focus a text field in another app. Press your shortcut to start and again to finish. Escape cancels. If paste fails, use Copy text.</li></ol><p id="setup-detail" class="subtle">Checking…</p><p class="subtle">Whisper base.en · Checksum-verified download from Hugging Face. No Apple Developer membership or certificate installation needed.</p></details>
   </section>
     <section class="local-data" aria-labelledby="data-title"><h2 id="data-title">Local data</h2><div class="setting-row"><div><h3>Usage totals</h3><p>Counts and estimates, saved on this Mac.</p></div><button id="reset" class="danger">Reset totals…</button></div><details><summary>Privacy</summary><p class="subtle">Audio is processed in memory on this Mac, not saved as recordings. The last transcript stays in memory until you quit. No telemetry or transcript history. Paste briefly uses the clipboard; clipboard managers may retain it.</p></details></section>
@@ -59,6 +60,7 @@ let limitPending = false;
 let volumeEditing = false;
 let previewPending = false;
 let shortcutPending = false;
+let downloadPending = false;
 let capturing = false;
 let captureTimer: ReturnType<typeof setTimeout> | undefined;
 const canEditShortcut = () => ['idle', 'copied', 'setup_required', 'not_pasted', 'error'].includes(current?.phase ?? '');
@@ -84,7 +86,12 @@ async function action(command: string, args?: Record<string, unknown>): Promise<
 el('nav-overview').onclick = () => navigate('overview');
 el('nav-settings').onclick = () => navigate('settings');
 document.querySelector('.brand')!.addEventListener('click', e => { e.preventDefault(); navigate('overview'); });
-el('setup').onclick = () => navigate('settings');
+el('setup').onclick = () => {
+  navigate('settings');
+  const target = el(!current?.model_ready ? 'model-row' : !current.microphone ? 'mic-row' : !current.accessibility || !current.input_monitoring ? 'permissions-row' : 'hotkey-row');
+  target.scrollIntoView({ block: 'center' });
+  target.setAttribute('tabindex', '-1'); target.focus();
+};
 el('mic').onclick = () => void action('request_microphone');
 el('permissions').onclick = () => void action('request_permissions');
 el('keyboard').onclick = () => void action('open_keyboard');
@@ -136,7 +143,16 @@ recorder.onkeydown = e => {
 };
 recorder.onblur = () => { if (capturing && !shortcutPending) void stopCapture(); };
 window.addEventListener('blur', () => { if (capturing) void stopCapture(); });
-el('download').onclick = () => void action('download_model');
+async function downloadModel() {
+  if (!current || current.model_ready || downloadPending || !canEditShortcut()) return;
+  downloadPending = true;
+  button('download').disabled = true; button('overview-download').disabled = true;
+  await action('download_model');
+  downloadPending = false;
+  await refresh();
+}
+el('download').onclick = () => void downloadModel();
+el('overview-download').onclick = () => void downloadModel();
 el('cancel').onclick = () => void action('cancel');
 el('copy').onclick = async () => { if (await action('copy_transcript')) feedback('Copied. Paste it wherever you need it.'); };
 const sounds = el('sounds') as HTMLInputElement;
@@ -203,11 +219,19 @@ async function refresh() {
     el('mic-row').hidden = current.microphone;
     el('permissions-row').hidden = current.accessibility && current.input_monitoring;
     el('hotkey-row').hidden = current.hotkey;
-    el('model-row').hidden = current.model_ready && current.phase !== 'downloading';
+    el('model-ready').hidden = !current.model_ready;
     button('permissions').disabled = current.accessibility && current.input_monitoring;
     el('permissions').textContent = !current.accessibility ? 'Allow Accessibility ↗' : !current.input_monitoring ? 'Allow Input Monitoring ↗' : 'Allowed';
-    el('model-state').textContent = current.phase === 'downloading' ? 'Downloading…' : '148 MB · One-time download';
-    button('download').disabled = current.model_ready || current.phase === 'downloading';
+    const downloading = current.phase === 'downloading';
+    const modelDetail = downloading ? `Downloading… ${Math.round(current.progress)}%` : '148 MB · One-time download · English only';
+    el('model-state').textContent = modelDetail;
+    el('model-state').hidden = current.model_ready;
+    el('download').hidden = current.model_ready;
+    button('download').disabled = current.model_ready || downloadPending || !canEditShortcut();
+    el('overview-model').hidden = current.model_ready;
+    el('overview-model-state').textContent = downloading ? modelDetail : 'One-time download · English only · Works offline afterward';
+    button('overview-download').disabled = button('download').disabled;
+    el('overview-download').textContent = downloading ? `Downloading… ${Math.round(current.progress)}%` : 'Download English model (~148 MB)';
     el('download').textContent = current.model_ready ? 'Ready offline' : current.phase === 'downloading' ? `${Math.round(current.progress)}%` : 'Download';
     el('progress').hidden = current.phase !== 'downloading';
     (el('progress') as HTMLProgressElement).value = current.progress;

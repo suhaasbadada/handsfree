@@ -765,6 +765,14 @@ fn complete_transcription(session: Arc<streaming::Session>, result: Result<Strin
         }
     }
 }
+// whisper-rs 0.16.0's safe abort trampoline casts Box<Box<dyn FnMut()>>
+// to the concrete closure type (and leaks it). Use a typed, borrowed session
+// instead; whisper_full invokes this synchronously, and only atomics are read.
+unsafe extern "C" fn inference_aborted(data: *mut std::ffi::c_void) -> bool {
+    let session = unsafe { &*data.cast::<streaming::Session>() };
+    !CANCELLATION.allows(session.epoch) || session.cancelled.load(Ordering::Acquire)
+}
+
 fn infer(session: &Arc<streaming::Session>, model: &Path) -> Result<String, String> {
     streaming::run(
         session,
@@ -786,15 +794,25 @@ fn infer(session: &Arc<streaming::Session>, model: &Path) -> Result<String, Stri
             params.set_print_timestamps(false);
             params.set_no_context(true);
             params.set_suppress_blank(true);
-            let active = session.clone();
-            params.set_abort_callback_safe(move || {
-                !CANCELLATION.allows(active.epoch) || active.cancelled.load(Ordering::Acquire)
-            });
+            // SAFETY: session's Arc outlives this synchronous full() call.
+            // The callback never mutates the pointee or retains its pointer.
+            unsafe {
+                params.set_abort_callback(Some(inference_aborted));
+                params.set_abort_callback_user_data(Arc::as_ptr(session).cast_mut().cast());
+            }
             // No rewriting, punctuation pass, or filler removal. Whisper can still omit disfluencies.
             params.set_initial_prompt("Um, uh, well, you know, I mean, like, hmm. This is a verbatim transcript, including hesitations and repeated words.");
             state
                 .full(params, samples)
-                .map_err(|e| format!("Transcription failed: {e}"))?;
+                .map_err(|e| {
+                    if !CANCELLATION.allows(session.epoch)
+                        || session.cancelled.load(Ordering::Acquire)
+                    {
+                        "Cancelled.".into()
+                    } else {
+                        format!("Transcription failed: {e}. Try again; if it continues, quit and reopen HandsFree.")
+                    }
+                })?;
             let mut output = String::new();
             for segment in state.as_iter() {
                 if segment.no_speech_probability() > 0.6 {
@@ -805,6 +823,47 @@ fn infer(session: &Arc<streaming::Session>, model: &Path) -> Result<String, Stri
             Ok(logic::insertion_text(&output))
         },
     )
+}
+
+#[cfg(test)]
+#[test]
+fn abort_callback_reads_the_actual_session() {
+    let session = Arc::new(streaming::Session::new(1, CANCELLATION.current(), 120));
+    let data = Arc::as_ptr(&session).cast_mut().cast();
+    assert!(!unsafe { inference_aborted(data) });
+    session.cancel();
+    assert!(unsafe { inference_aborted(data) });
+    let stale = streaming::Session::new(2, CANCELLATION.current().wrapping_sub(1), 120);
+    assert!(unsafe { inference_aborted((&stale as *const streaming::Session).cast_mut().cast()) });
+}
+
+#[cfg(test)]
+#[test]
+#[ignore = "requires HANDSFREE_TEST_MODEL pointing at an existing model; no download or microphone"]
+fn real_model_pipeline_smoke() {
+    let model = std::env::var_os("HANDSFREE_TEST_MODEL").expect("existing local model path");
+    let session = Arc::new(streaming::Session::new(1, CANCELLATION.current(), 300));
+    // Synthetic signal only: tests backend execution, not recognition accuracy.
+    let mut audio: Vec<f32> = (0..8 * streaming::RATE)
+        .map(|i| (i as f32 * 0.0864).sin() * 0.02)
+        .collect();
+    audio.extend(vec![0.; streaming::RATE]);
+    audio.extend(vec![0.02; 960]);
+    let worker_session = session.clone();
+    let worker = std::thread::spawn(move || infer(&worker_session, &PathBuf::from(model)));
+    session.push(&audio);
+    // The first pause chunk is available before Finish; the short tail is
+    // delivered afterward using the same context and a fresh inference state.
+    std::thread::sleep(std::time::Duration::from_secs(2));
+    assert!(
+        !worker.is_finished(),
+        "worker waits for Finish after its early chunk"
+    );
+    session.finish(None);
+    worker
+        .join()
+        .unwrap()
+        .expect("real backend accepts pause chunk and short tail");
 }
 
 #[tauri::command]

@@ -53,6 +53,26 @@ try {
   assert.equal(await evaluate(`['change-shortcut','mic','permissions','download','reset','sounds','sound-volume'].every(id=>document.getElementById(id).disabled)`), true, 'Native controls are unavailable before the backend connects');
   await evaluate(`window.calls = []; window.fixture = {phase:'idle',message:'Select a text field and press Fn.', progress:0,model_ready:true,microphone:true,accessibility:true,input_monitoring:true,hotkey:true,transcript:'',sounds:true,sound_volume:50,sound_style:'tap',shortcut:{code:'Fn',modifiers:0},shortcut_label:'Fn',stats:{words:0,transcriptions:0,speech_seconds:0,saved_seconds:0},persistence_error:''}; window.__TAURI_INTERNALS__ = { invoke: async (command,args) => { window.calls.push({command,args}); if(command==='status') return structuredClone(window.fixture); if(command==='set_sounds') window.fixture.sounds=args.enabled; if(command==='set_sound_style') window.fixture.sound_style=args.style; if(command==='set_shortcut'){if(window.rejectShortcut) throw 'Could not save shortcut'; window.fixture.shortcut=args.shortcut;window.fixture.shortcut_label=args.shortcut.code==='Fn'?'Fn':args.shortcut.code==='Space'?'Option + Space':'Control + Shift + J';} if(command==='reset_stats') window.fixture.stats={words:0,transcriptions:0,speech_seconds:0,saved_seconds:0}; } }; document.getElementById('feedback').hidden=true;`);
   await until(`document.getElementById('ready-title').textContent.includes('You’re ready')`);
+  assert.equal(await evaluate(`document.getElementById('overview-model').hidden`), true, 'Existing users do not see another download CTA');
+  // Clean first launch: download remains discoverable for every permissions /
+  // hook combination, without a poll initiating any network operation.
+  for (let mask = 0; mask < 16; mask++) {
+    await evaluate(`Object.assign(window.fixture,{model_ready:false,microphone:${!!(mask & 1)},accessibility:${!!(mask & 2)},input_monitoring:${!!(mask & 4)},hotkey:${!!(mask & 8)}})`);
+    await until(`!document.getElementById('overview-model').hidden && !document.getElementById('overview-download').disabled`);
+    assert.equal(await evaluate(`document.getElementById('overview-download').getBoundingClientRect().width>0 && document.getElementById('overview-download').textContent.includes('Download English model')`), true);
+  }
+  assert.equal(await evaluate(`window.calls.some(c=>c.command==='download_model')`), false, 'Never downloads automatically');
+  await evaluate(`document.getElementById('setup').click()`);
+  assert.equal(await evaluate(`!document.getElementById('settings').hidden && document.activeElement.id==='model-row'`), true, 'Setup points directly to missing model');
+  await evaluate(`window.downloadAttempts=0;const downloadInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='download_model'){window.downloadAttempts++;if(window.failDownload)throw 'Download failed. You can retry.';window.fixture.phase='downloading';window.fixture.progress=42;await new Promise(resolve=>window.finishDownload=resolve);window.fixture.model_ready=true;window.fixture.phase='idle';}return downloadInvoke(command,args);};window.failDownload=true;document.getElementById('download').click()`);
+  await until(`document.getElementById('feedback').textContent.includes('Download failed') && !document.getElementById('download').disabled`);
+  await evaluate(`window.failDownload=false;document.getElementById('nav-overview').click();document.getElementById('overview-download').click();document.getElementById('overview-download').click()`);
+  await until(`document.getElementById('overview-download').textContent.includes('42%') && document.getElementById('overview-download').disabled`);
+  assert.equal(await evaluate(`window.downloadAttempts`), 2, 'Failed request plus one retry; duplicate click does not dispatch twice');
+  await evaluate(`window.finishDownload()`);
+  await until(`document.getElementById('overview-model').hidden && document.getElementById('model-ready').textContent.includes('Ready')`);
+  await evaluate(`Object.assign(window.fixture,{microphone:true,accessibility:true,input_monitoring:true,hotkey:true});document.getElementById('feedback').hidden=true`);
+  await until(`document.getElementById('setup-state').textContent==='Ready'`);
   // Duration saves independently of sound/shortcut, rolls back failed writes,
   // and reflects refreshed persisted values without starting capture.
   await evaluate(`window.fixture.recording_limit=120; const limitInvoke=window.__TAURI_INTERNALS__.invoke; window.__TAURI_INTERNALS__.invoke=async(command,args)=>{ if(command==='set_recording_limit'){if(window.rejectLimit)throw 'Could not save recording limit';window.fixture.recording_limit=args.seconds;} return limitInvoke(command,args); };`);
