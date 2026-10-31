@@ -115,10 +115,10 @@ test('changed source revision is rejected without restoring the manifest', () =>
   assert.equal(readFileSync(manifest, 'utf8'), normalized());
 }));
 
-const macNormalized = () => original.toString().replace('"tray-icon", "image-png"', '"tray-icon", "image-png", "macos-private-api"');
-test('Mac CLI common-feature addition is byte-restored while original Mac target feature remains', () => fixture(({ manifest, git, run }) => {
+const macNormalized = () => original.toString().replace('"tray-icon", "image-png"', '"macos-private-api", "tray-icon", "image-png"');
+for (const position of ['prepended', 'appended']) test(`Mac CLI ${position} common-feature addition is byte-restored while original Mac target feature remains`, () => fixture(({ manifest, git, run }) => {
   assert.equal(run('snapshot').status, 0);
-  writeFileSync(manifest, macNormalized());
+  writeFileSync(manifest, position === 'prepended' ? macNormalized() : original.toString().replace('"tray-icon", "image-png"', '"tray-icon", "image-png", "macos-private-api"'));
   const result = run('restore');
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Mac-resolved dependencies unchanged/);
@@ -129,7 +129,8 @@ test('Mac CLI common-feature addition is byte-restored while original Mac target
 for (const [name, mutate] of [
   ['Mac target feature removed', text => text.replace('features = ["macos-private-api"]', 'features = []')],
   ['Windows version changed', text => text.replace('cpal = "0.16"', 'cpal = "0.17"')],
-  ['another common feature added', text => text.replace('"image-png",', '"image-png", "test",')],
+  ['another common feature added', text => text.replace('"image-png"', '"image-png", "test"')],
+  ['duplicate common private feature', text => text.replace('"tray-icon"', '"macos-private-api", "tray-icon"')],
 ]) test(`Mac guard rejects ${name} without overwriting source`, () => fixture(({ manifest, run }) => {
   assert.equal(run('snapshot').status, 0);
   const changed = mutate(macNormalized());

@@ -73,8 +73,10 @@ def restore(root, state, platform="windows"):
         after = tomllib.loads(current.decode("utf-8"))
         if platform == "macos":
             common = before["dependencies"]["tauri"]["features"]
+            rewritten = after["dependencies"]["tauri"]["features"]
             if (mac_features(after) != ["macos-private-api"]
-                    or after["dependencies"]["tauri"]["features"] != common + ["macos-private-api"]):
+                    or rewritten.count("macos-private-api") != 1
+                    or [feature for feature in rewritten if feature != "macos-private-api"] != common):
                 raise ValueError("Unrecognized Tauri feature rewrite; preserving changed manifest.")
             after["dependencies"]["tauri"]["features"] = common
         else:
