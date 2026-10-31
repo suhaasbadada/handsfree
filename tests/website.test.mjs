@@ -8,6 +8,14 @@ const html = readFileSync(new URL('site/index.html', root), 'utf8');
 const css = readFileSync(new URL('site/styles.css', root), 'utf8');
 const workflow = readFileSync(new URL('.github/workflows/pages.yml', root), 'utf8');
 
+test('open-source section uses an accessible GitHub icon without decorative arrows', () => {
+  const section = html.match(/<section class="open-note[\s\S]*?<\/section>/)?.[0];
+  assert.ok(section);
+  assert.match(section, /class="github-link"[^>]*href="https:\/\/github.com\/suhaasbadada\/handsfree"[^>]*aria-label="View HandsFree on GitHub"/);
+  assert.match(section, /<svg[^>]*aria-hidden="true"/);
+  assert.doesNotMatch(section, /↗|open-mark|Meet the project|Explore source/i);
+});
+
 test('website local links and assets resolve within the Pages artifact', () => {
   const site = new URL('site/', root).pathname;
   const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
