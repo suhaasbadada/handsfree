@@ -3,7 +3,7 @@
 export const release = Object.freeze({
   schemaVersion: 1,
   version: '0.1.1-beta.2',
-  publicAvailable: false,
-  status: 'Mac beta update being verified. Not notarized.',
+  publicAvailable: true,
+  status: 'Experimental Mac beta available. Not notarized.',
   dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.2/HandsFree-0.1.1-beta.2-macos-arm64.dmg',
 });
