@@ -17,6 +17,10 @@ test('Windows candidate workflow is isolated, x64, read-only and never publishes
   assert.match(workflow, /actions\/upload-artifact@v7/);
   assert.match(workflow, /if-no-files-found: error/);
   assert.doesNotMatch(workflow, /secrets\.|contents: write|gh release|tauri-action|build:local/);
+  assert.match(workflow, /Verify actual CPU transcription without microphone access/);
+  assert.match(workflow, /Get-FileHash \$model -Algorithm SHA256/);
+  assert.match(workflow, /real_model_pipeline_smoke -- --ignored --nocapture/);
+  assert.ok(workflow.indexOf('real_model_pipeline_smoke') < workflow.indexOf('actions/upload-artifact@v7'));
 });
 
 test('Windows packaging prepares notices before native compilation and inspects the NSIS payload', () => {

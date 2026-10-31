@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const root = new URL('../', import.meta.url);
 const html = readFileSync(new URL('site/index.html', root), 'utf8');
@@ -105,7 +106,7 @@ test('use cases are concise, semantic, and honest about coding-tool support', ()
 });
 
 test('website local links and assets resolve within the Pages artifact', () => {
-  const site = new URL('site/', root).pathname;
+  const site = fileURLToPath(new URL('site/', root));
   const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
   assert.equal(new Set(ids).size, ids.length, 'IDs must be unique');
   for (const [, attribute, url] of html.matchAll(/\b(href|src)="([^"]+)"/g)) {

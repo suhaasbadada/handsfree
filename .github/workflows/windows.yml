@@ -53,6 +53,17 @@ jobs:
       - run: npm run build
       - name: Native tests, lint, notices and NSIS candidate
         run: ./scripts/windows-package.ps1
+      - name: Verify actual CPU transcription without microphone access
+        run: |
+          . ./scripts/windows-env.ps1
+          $model = Join-Path $env:RUNNER_TEMP 'handsfree-test-base.en.bin'
+          Invoke-WebRequest -Uri 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin' -OutFile $model
+          $expected = 'a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002'
+          if ((Get-FileHash $model -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected) { throw 'Test model checksum mismatch.' }
+          $env:HANDSFREE_TEST_MODEL = $model
+          cargo test --manifest-path src-tauri/Cargo.toml --locked --target $env:CARGO_BUILD_TARGET real_model_pipeline_smoke -- --ignored --nocapture
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Remove-Item -LiteralPath $model
       - uses: actions/upload-artifact@v7
         with:
           name: Windows-installer-x64-${{ github.sha }}
