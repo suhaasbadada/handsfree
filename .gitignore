@@ -10,3 +10,5 @@ src-tauri/gen/
 *.pem
 .env
 .env.*
+__pycache__/
+release/
