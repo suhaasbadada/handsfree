@@ -13,6 +13,7 @@ function sandbox(callback) {
     copyFileSync(new URL('../scripts/package-release.sh', import.meta.url), join(root, 'scripts/package-release.sh'));
     const stub = (name, body) => writeFileSync(join(root, 'bin', name), `#!/bin/bash\n${body}\n`, { mode: 0o755 });
     stub('uname', 'if [[ "$1" == -s ]]; then echo Darwin; else echo arm64; fi');
+    stub('git', 'if [[ "$1" == rev-parse ]]; then printf "%040d\\n" 1; fi');
     stub('npm', 'echo "mock build failed" >&2; exit 42');
     const run = (...args) => spawnSync('/bin/bash', [join(root, 'scripts/package-release.sh'), ...args], {
       encoding: 'utf8', env: { ...process.env, PATH: `${root}/bin:${process.env.PATH}` },
@@ -67,4 +68,17 @@ test('DMG script uses stable signing, read-only validation, scoped cleanup and n
   assert.match(script, /trap cleanup EXIT/);
   assert.match(script, /preserving staging directory/);
   assert.doesNotMatch(script, /--init|\.zip|osascript|\/Applications\/HandsFree\.app/);
+});
+
+test('disk-image root is install-focused while complete notices and source remain included', () => {
+  const script = readFileSync(new URL('../scripts/package-release.sh', import.meta.url), 'utf8');
+  assert.match(script, /cp docs\/INSTALL.md "\$PAYLOAD\/Install HandsFree.txt"/);
+  assert.match(script, /cp LICENSE "\$PAYLOAD\/Licenses\/LICENSE"/);
+  assert.match(script, /release-notices.py "\$PAYLOAD\/Licenses"/);
+  assert.match(script, /Licenses\/THIRD_PARTY_SOURCES.tar.gz/);
+  assert.match(script, /Licenses\/PUBLICATION-BLOCKED.txt/);
+  assert.match(script, /Source tree: %s/);
+  assert.match(script, /HEAD changed during packaging/);
+  assert.match(script, /Working tree status after packaging/);
+  assert.match(script, /shasum -a 256 "\$NAME.dmg" PROVENANCE.txt/);
 });

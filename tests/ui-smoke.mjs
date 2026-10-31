@@ -150,6 +150,16 @@ try {
   assert.equal(await evaluate(`!document.getElementById('progress').hidden && document.getElementById('progress').value===42 && !document.getElementById('setup-missing').hidden`), true, 'Model download progress remains visible');
   await evaluate(`window.fixture.model_ready=true;window.fixture.phase='idle'`);
   await until(`document.getElementById('setup-state').textContent==='Ready'`);
+  await evaluate(`document.querySelector('.setup-details').open=true`);
+  assert.equal(await evaluate(`document.querySelectorAll('.setup-details ol li').length`), 4, 'First-dictation helper is a short ordered checklist');
+  await evaluate(`document.querySelector('.setup-details').open=false;window.fixture.phase='processing';window.fixture.message='Loading local model… Escape cancels.'`);
+  await until(`!document.getElementById('cancel').hidden && document.getElementById('message').textContent.includes('Loading local model')`);
+  await evaluate(`document.getElementById('cancel').click()`);
+  assert.equal(await evaluate(`window.calls.some(c=>c.command==='cancel')`), true, 'Model loading remains cancellable');
+  await evaluate(`window.fixture.phase='error';window.fixture.message='Microphone capture failed. Please check your input device.'`);
+  await until(`document.getElementById('phase').textContent==='Needs attention'`);
+  assert.equal(await evaluate(`document.getElementById('message').textContent`), 'Microphone capture failed. Please check your input device.', 'Capture failure retains actionable backend detail');
+  await evaluate(`window.fixture.phase='idle'`);
   await evaluate(`document.getElementById('reset').click()`);
   assert.equal(await evaluate(`document.getElementById('reset-dialog').open`), true);
   assert.equal(await evaluate(`window.calls.some(c=>c.command==='reset_stats')`), false);
@@ -184,7 +194,7 @@ try {
     for (const width of [320, 390, 400, 560, 740, 980, 1280]) {
       await send('Emulation.setDeviceMetricsOverride', { width, height: 820, deviceScaleFactor: 1, mobile: false });
       for (const tab of ['overview','settings']) {
-        await evaluate(`document.getElementById('nav-${tab}').click()`);
+        await evaluate(`document.getElementById('nav-${tab}').click();document.querySelector('.setup-details').open=${tab === 'settings'}`);
         assert.equal(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth`), true, `No horizontal overflow at ${width}px, ${theme}, ${tab}`);
         assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('button, select, input')).filter(e=>e.getClientRects().length && (e.getBoundingClientRect().right>innerWidth || e.getBoundingClientRect().left<0)).map(e=>e.id)`), [], 'All controls fit');
       }

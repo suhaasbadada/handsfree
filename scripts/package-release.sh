@@ -30,6 +30,9 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 APP="$ROOT/src-tauri/target/release/bundle/macos/HandsFree.app"
+SOURCE_COMMIT=$(git rev-parse HEAD)
+SOURCE_TREE=$(git rev-parse 'HEAD^{tree}')
+SOURCE_STATUS=$(git status --short --untracked-files=normal)
 npm run build:local
 verify_app() {
   local app="$1" plist="$1/Contents/Info.plist"
@@ -46,15 +49,14 @@ PAYLOAD="$STAGE/payload"
 mkdir "$PAYLOAD"
 /usr/bin/ditto "$APP" "$PAYLOAD/HandsFree.app"
 ln -s /Applications "$PAYLOAD/Applications"
-cp LICENSE "$PAYLOAD/LICENSE"
-cp README.md "$PAYLOAD/README.md"
-cp CONTRIBUTING.md SECURITY.md "$PAYLOAD/"
-cp docs/INSTALL.md "$PAYLOAD/INSTALL.md"
-mkdir -p "$PAYLOAD/docs/releases"
-cp docs/DEVELOPMENT.md docs/RELEASING.md docs/WEBSITE.md docs/INSTALL.md "$PAYLOAD/docs/"
-cp docs/releases/v0.1.0-beta.1.md "$PAYLOAD/docs/releases/"
-python3 scripts/release-notices.py "$PAYLOAD"
-printf '%s\n' 'CANDIDATE ONLY — PUBLICATION BLOCKED: see THIRD_PARTY_NOTICES/README.txt and docs/RELEASING.md.' > "$PAYLOAD/PUBLICATION-BLOCKED.txt"
+cp docs/INSTALL.md "$PAYLOAD/Install HandsFree.txt"
+mkdir -p "$PAYLOAD/Licenses/Documentation/releases"
+cp LICENSE "$PAYLOAD/Licenses/LICENSE"
+cp README.md CONTRIBUTING.md SECURITY.md "$PAYLOAD/Licenses/Documentation/"
+cp docs/DEVELOPMENT.md docs/RELEASING.md docs/WEBSITE.md docs/INSTALL.md docs/release-readiness.md "$PAYLOAD/Licenses/Documentation/"
+cp docs/releases/v0.1.0-beta.1.md "$PAYLOAD/Licenses/Documentation/releases/"
+python3 scripts/release-notices.py "$PAYLOAD/Licenses"
+printf '%s\n' 'CANDIDATE ONLY — PUBLICATION BLOCKED: see THIRD_PARTY_NOTICES/README.txt and Documentation/RELEASING.md.' > "$PAYLOAD/Licenses/PUBLICATION-BLOCKED.txt"
 # No Finder/AppleScript automation or new dependencies. The named volume and
 # Applications shortcut provide drag-to-install without Automation permission.
 python3 - "$PAYLOAD" <<'PY'
@@ -84,14 +86,17 @@ MOUNTED=true
 /usr/bin/hdiutil attach -readonly -nobrowse -noautoopen -mountpoint "$MOUNT" "$STAGE/$NAME.dmg"
 verify_app "$MOUNT/HandsFree.app"
 [[ -L "$MOUNT/Applications" && $(readlink "$MOUNT/Applications") == /Applications ]]
-for required in LICENSE INSTALL.md README.md CONTRIBUTING.md SECURITY.md docs/INSTALL.md THIRD_PARTY_NOTICES/inventory.json THIRD_PARTY_SOURCES.tar.gz PUBLICATION-BLOCKED.txt; do
+for required in 'Install HandsFree.txt' Licenses/LICENSE Licenses/Documentation/README.md Licenses/Documentation/RELEASING.md Licenses/THIRD_PARTY_NOTICES/inventory.json Licenses/THIRD_PARTY_SOURCES.tar.gz Licenses/PUBLICATION-BLOCKED.txt; do
   [[ -s "$MOUNT/$required" ]] || fail "Missing disk-image payload: $required"
 done
 /usr/bin/hdiutil detach "$MOUNT"
 MOUNTED=false
 {
-  printf 'Candidate: %s.dmg\nSource commit: %s\n' "$NAME" "$(git rev-parse HEAD)"
+  [[ $(git rev-parse HEAD) == "$SOURCE_COMMIT" ]] || fail 'HEAD changed during packaging; rebuild from a stable commit.'
+  printf 'Candidate: %s.dmg\nSource commit: %s\nSource tree: %s\n' "$NAME" "$SOURCE_COMMIT" "$SOURCE_TREE"
   printf 'Working tree status at packaging (empty means clean):\n'
+  [[ -z "$SOURCE_STATUS" ]] || printf '%s\n' "$SOURCE_STATUS"
+  printf '\nWorking tree status after packaging (empty means clean):\n'
   git status --short --untracked-files=normal
   printf '\nBuilt on: '; sw_vers -productVersion
   printf 'Architecture: '; uname -m
@@ -99,7 +104,7 @@ MOUNTED=false
   printf 'Node: '; node --version
   printf '\nSelf-signed; not Developer ID or notarized. PUBLICATION BLOCKED.\n'
 } > "$STAGE/PROVENANCE.txt"
-(cd "$STAGE" && /usr/bin/shasum -a 256 "$NAME.dmg" > SHA256SUMS && /usr/bin/shasum -a 256 -c SHA256SUMS)
+(cd "$STAGE" && /usr/bin/shasum -a 256 "$NAME.dmg" PROVENANCE.txt > SHA256SUMS && /usr/bin/shasum -a 256 -c SHA256SUMS)
 mv "$STAGE/$NAME.dmg" "$STAGE/SHA256SUMS" "$STAGE/PROVENANCE.txt" "$OUT/"
 printf '\nCandidate: %s/%s.dmg\n' "$OUT" "$NAME"
 echo 'PUBLICATION BLOCKED pending licensing clarification; no upload or installation performed.'

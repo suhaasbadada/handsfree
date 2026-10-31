@@ -42,7 +42,7 @@ No Windows/Linux release dates are promised. The current Mac implementation live
 
 [Published releases](https://github.com/suhaasbadada/handsfree/releases) · [Beta release notes](docs/releases/v0.1.0-beta.1.md)
 
-**Requires macOS 14+ and Apple Silicon (M-series). English only.** Intel Macs are not supported; Windows and Linux are planned but unavailable. The prebuilt app needs **no Node.js, Rust, or developer tools**. Release label: `v0.1.0-beta.1`; internal app version: `0.1.0`.
+**Requires macOS 14+ and Apple Silicon (M-series). English only.** Intel Macs are not supported; Windows and Linux are planned but unavailable. The prebuilt app needs **no Node.js, Rust, or developer tools**. The self-signed route is free: no paid Apple Developer membership or certificate installation required. Release label: `v0.1.0-beta.1`; internal app version: `0.1.0`.
 
 ### Install (once the beta is published)
 
@@ -72,6 +72,7 @@ Audio is processed in memory on this Mac, not saved as recordings. The last tran
 - [Build, stable local signing, diagnostics, tests, and manual checklist](docs/DEVELOPMENT.md)
 - [Beta release notes](docs/releases/v0.1.0-beta.1.md)
 - [Release packaging and third-party licensing](docs/RELEASING.md)
+- [Candidate readiness and remaining human gates](docs/release-readiness.md)
 - [Website and GitHub Pages setup](docs/WEBSITE.md)
 - [Contributing](CONTRIBUTING.md) · [Security reporting](SECURITY.md)
 - [Report an issue](https://github.com/suhaasbadada/handsfree/issues) — include macOS version, Mac model, affected app, and diagnostics; do not post private recordings or transcripts.
