@@ -76,9 +76,9 @@ final class CapturePipeline {
         }
     }
     func close() { producer.lock(); accepting = false; producer.unlock() }
-    func drain() {
+    @discardableResult func drain() -> Bool {
         close()
-        queue.sync { self.convert(nil, final: true) }
+        return queue.sync { self.convert(nil, final: true); return !self.failed }
     }
     func captureFailed() {
         producer.lock(); defer { producer.unlock() }
@@ -107,11 +107,22 @@ final class AudioCapture {
         // A format/route reset cannot silently turn into an endless recording.
         routeObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil) { _ in pipeline.captureFailed() }
     }
-    func stop() {
+    @discardableResult func stop() -> Bool {
+        let wasStarted = started
         if let observer = routeObserver { NotificationCenter.default.removeObserver(observer); routeObserver = nil }
         pipeline.close()
         if started { engine.inputNode.removeTap(onBus: 0); engine.stop(); started = false }
-        pipeline.drain()
+        let healthy = pipeline.drain()
+        return wasStarted && healthy
     }
     func level() -> Float { pipeline.level() }
+}
+
+// Shared production/test barrier: producer closed, engine stopped, tap removed,
+// converter drained BEFORE playback. Cancellation is rechecked after draining.
+enum CaptureEnd {
+    static func finish(stop: () -> Bool, allowed: () -> Bool, play: () -> Void) {
+        let captured = stop()
+        if captured && allowed() { play() }
+    }
 }

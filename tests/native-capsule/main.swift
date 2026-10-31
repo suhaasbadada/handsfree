@@ -19,8 +19,16 @@ do {
     precondition(abs(player.duration - StartCue.duration) < 0.000001)
     precondition(player.format.sampleRate == Double(StartCue.rate) && player.numberOfChannels == 1)
     precondition(samples.count == Int(StartCue.duration * Double(StartCue.rate)))
-    precondition(StartCue.duration == 0.300)
-    precondition(SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() == "909f8fe9f672f201f9040321a319e5a4351a105a70ead33a57b107a5cfe81462", "Exact user-approved Bright glass audition bytes")
+    precondition(StartCue.duration == 0.240)
+    precondition(SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() == "a1eb8aeadfc425a5a217e3d35732762571c16d7e03969a5f3b0bfe41dbde6856", "Exact user-approved Clean pair audition bytes")
+    let endData = EndCue.data(resourceRoot: resourceRoot)!
+    let endPlayer = try! AVAudioPlayer(data: endData) // Decode only, never play.
+    precondition(abs(endPlayer.duration - EndCue.duration) < 0.000001)
+    precondition(EndCue.data(resourceRoot: nil) == nil)
+    precondition(endData[44 + 1920..<44 + 9600] == data[44 + 1920..<44 + 9600], "Finish uses identical first grain PCM")
+    precondition(endData.suffix(1920).allSatisfy { $0 == 0 })
+    precondition(samples[960..<4800] == samples[5760..<9600])
+    precondition(samples[4800..<5760].allSatisfy { $0 == 0 }, "No overlap")
     precondition(data == StartCue.data(resourceRoot: resourceRoot), "Exact deterministic bundled PCM")
     for legacyStyle: Int32 in [0, 1] {
         soundStyle(legacyStyle)
@@ -28,7 +36,7 @@ do {
     }
     precondition(samples.first == 0 && samples.last == 0)
     let peak = samples.map { abs(Int($0)) }.max()!
-    precondition(peak == 13045, "Approved -8 dBFS peak; no gain changes")
+    precondition(peak == 10362, "Approved -10 dBFS peak; no gain changes")
     let steps = zip(samples, samples.dropFirst()).map { abs(Int($0) - Int($1)) }
     precondition(steps.max()! < 4200, "Bounded original synthetic tap transient")
     func rms(_ from: Double, _ to: Double) -> Double {
@@ -54,18 +62,17 @@ do {
     }
     let firstPeak = peakIndex(0.020, 0.120), secondPeak = peakIndex(0.120, 0.220)
     precondition(secondPeak - firstPeak == 4800, "Identical grain onsets exactly 100 ms apart")
-    precondition((0.022...0.025).contains(Double(firstPeak) / Double(StartCue.rate)))
+    precondition((0.025...0.035).contains(Double(firstPeak) / Double(StartCue.rate)))
     let attackDelta = 20 * log10(Double(abs(Int(samples[secondPeak]))) / Double(abs(Int(samples[firstPeak]))))
     precondition(abs(attackDelta) < 1, "Equal-gain grains; only the approved natural overlap affects attack peaks")
     precondition((0.94...1.02).contains(rms(0.120, 0.180) / rms(0.020, 0.080)), "Uniform strikes, no stronger second accent")
-    precondition(rms(0, 0.020) == 0 && rms(0.280, 0.300) == 0, "At least 20 ms exact silence at each endpoint")
+    precondition(rms(0, 0.020) == 0 && rms(0.200, 0.240) == 0, "Exact silent endpoints")
     for start in [0.020, 0.120] {
         precondition(rms(start, start + 0.001) < rms(start + 0.002, start + 0.006) * 0.4, "Soft attack")
-        precondition(rms(start + 0.002, start + 0.015) * 0.5 > 0.05, "Clear at unchanged default 50% volume")
+        precondition(rms(start + 0.002, start + 0.015) * 0.5 > 0.04, "Short body at unchanged default 50% volume")
     }
-    precondition(rms(0.230, 0.280) < rms(0.150, 0.200) * 0.2, "Each glass grain decays, with no separate chime layer")
-    precondition(rms(0.270, 0.280) < 0.001, "Smooth fade before final silence")
-    precondition(magnitude(1174.659, 0.150, 0.250) > magnitude(1450, 0.150, 0.250) * 8, "Approved glass fundamental in both grains")
+    precondition(rms(0.180, 0.200) < 0.001, "Smooth short decay before final silence")
+    precondition(magnitude(820, 0.120, 0.200) > magnitude(1450, 0.120, 0.200) * 8, "Approved Clean fundamental")
     // Full-window DFT bins give an approximate power spectrum without audio I/O.
     let powers = (1...Int(Double(StartCue.rate) * StartCue.duration / 2)).map { bin in pow(magnitude(Double(bin) / StartCue.duration, 0, StartCue.duration), 2) }
     let total = powers.reduce(0, +)
@@ -180,4 +187,4 @@ precondition(activationPolicy() == Int32(NSApplication.ActivationPolicy.accessor
 precondition(!app.windows.first { $0 is NSPanel }!.isKeyWindow)
 overlay(0)
 app.setActivationPolicy(.prohibited)
-print("Native capsule geometry, state layout, nonactivation, shortcut matching and Bright glass cue passed without capture")
+print("Native capsule geometry, state layout, nonactivation, shortcut matching and Clean cues passed without capture")

@@ -55,6 +55,8 @@ unsafe extern "C" {
     fn hf_shortcut(code: i32, modifiers: u32);
     fn hf_capture_shortcut(active: bool);
     fn hf_stop();
+    fn hf_finish(epoch: u64, allowed: extern "C" fn(u64) -> bool);
+    fn hf_cancel_audio();
     fn hf_discard_target();
     fn hf_overlay(phase: i32);
     fn hf_paste(
@@ -184,23 +186,31 @@ fn verified_model(path: &Path) -> bool {
     format!("{:x}", hash.finalize()) == MODEL_HASH
 }
 extern "C" fn native_event(event: i32) {
+    route_native_event(event, &GESTURE, &CANCELLATION, enqueue_at);
+}
+fn route_native_event(
+    event: i32,
+    gesture: &Mutex<logic::FnGesture>,
+    cancellation: &cancellation::CancellationEpoch,
+    mut send: impl FnMut(Control, u64),
+) {
     if event == 7 {
-        enqueue(Control::Toggle);
+        send(Control::Toggle, cancellation.current());
         return;
     }
-    let receipt_epoch = CANCELLATION.current();
+    let receipt_epoch = cancellation.current();
     if event == 4 {
-        enqueue(Control::Cancel);
+        send(Control::Cancel, cancellation.cancel());
     }
-    let toggle = GESTURE
+    let toggle = gesture
         .lock()
         .unwrap()
         .event_with_epoch(event, Instant::now(), receipt_epoch);
     if let Some(epoch) = toggle {
-        enqueue_at(Control::Toggle, epoch);
+        send(Control::Toggle, epoch);
     }
     if event == 5 {
-        enqueue(Control::Finish(None));
+        send(Control::Finish(None), cancellation.current());
     }
 }
 
@@ -477,6 +487,61 @@ async fn preview_sound() -> Result<(), String> {
 #[cfg(test)]
 mod sound_tests {
     #[test]
+    fn native_finish_inputs_share_fifo_and_cancel_revokes_pending_finish() {
+        use super::*;
+        // Actual native-event routing, with a mock worker instead of AppKit,
+        // microphone, global app state or audio playback.
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let cancellation = cancellation::CancellationEpoch::new();
+        let gesture = Mutex::new(logic::FnGesture::new());
+        let event = |value| {
+            route_native_event(value, &gesture, &cancellation, |control, epoch| {
+                sender.send((control, epoch)).unwrap();
+            });
+        };
+        for events in [&[1, 2][..], &[5][..], &[7][..]] {
+            event(6);
+            for value in events {
+                event(*value);
+            }
+            let (control, epoch) = receiver.try_recv().unwrap();
+            assert!(cancellation.allows(epoch));
+            let request = match control {
+                Control::Toggle => None,
+                Control::Finish(generation) => Some(generation),
+                _ => panic!("Not a recording command"),
+            };
+            assert!(request.is_none_or(|generation| logic::can_finish("recording", 1, generation)));
+            // A mock worker changes phase before calling native Finish; a
+            // repeated tick/limit cannot trigger the native stop/cue twice.
+            assert!(!logic::can_finish("processing", 1, request.flatten()));
+            assert!(receiver.try_recv().is_err());
+        }
+        sender
+            .send((Control::Finish(Some(1)), cancellation.current()))
+            .unwrap(); // Duration limit.
+        event(4); // Receipt-time cancellation, before FIFO execution.
+        let (finish, old_epoch) = receiver.try_recv().unwrap();
+        assert!(matches!(finish, Control::Finish(Some(1))));
+        assert!(!cancellation.allows(old_epoch));
+        let (cancel, new_epoch) = receiver.try_recv().unwrap();
+        assert!(matches!(cancel, Control::Cancel));
+        assert!(cancellation.allows(new_epoch));
+        // Finish while the start cue is pending uses the same request, but
+        // native CaptureEnd suppresses playback when stop reports not started.
+        event(1);
+        event(5);
+        event(2);
+        assert!(matches!(
+            receiver.try_recv().unwrap().0,
+            Control::Finish(None)
+        ));
+        assert!(
+            receiver.try_recv().is_err(),
+            "Tick suppresses held Fn release"
+        );
+    }
+    #[test]
     fn shortcut_setup_does_not_require_a_working_old_shortcut() {
         for phase in ["idle", "setup_required", "not_pasted", "copied", "error"] {
             assert!(super::shortcut_edit_allowed(phase));
@@ -546,7 +611,7 @@ fn cancel_inner() {
     inner.status.message = "Cancelling…".into();
     drop(inner);
     unsafe {
-        hf_stop();
+        hf_cancel_audio();
         hf_discard_target();
         hf_overlay(0);
     }
@@ -573,7 +638,7 @@ fn toggle_recording(finish: Option<Option<u64>>, epoch: u64) {
         inner.status.message = "Transcribing locally…".into();
         drop(inner);
         unsafe {
-            hf_stop();
+            hf_finish(epoch, delivery_allowed);
             hf_overlay(2);
         }
         if let Some(session) = INGRESS.lock().unwrap().current() {
@@ -650,7 +715,11 @@ fn complete_transcription(session: Arc<streaming::Session>, result: Result<Strin
     // Even early inference failure/cancellation must drain the native producer
     // before acknowledging teardown and allowing a new session.
     unsafe {
-        hf_stop();
+        if CANCELLATION.allows(epoch) {
+            hf_stop(); // Preserve an already-playing normal finish cue.
+        } else {
+            hf_cancel_audio();
+        }
     }
     session.finish(None);
     let result = session.check().and(result);

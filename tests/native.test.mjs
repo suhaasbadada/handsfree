@@ -14,11 +14,13 @@ test('memory capture converter drains hardware-rate stereo and bounds producer b
     const binary = join(directory, 'capture-tests');
     execFileSync('swiftc', ['-O', '-sdk', sdk, '-Xcc', `-I${sdk}/usr/include`, '-swift-version', '5',
       join(root, 'src-tauri/native/AudioCapture.swift'), join(root, 'tests/native-capture/main.swift'), '-o', binary]);
-    assert.match(execFileSync(binary, { encoding: 'utf8', timeout: 10000 }), /bounded overload passed without microphone/);
+    const output = execFileSync(binary, { encoding: 'utf8', timeout: 10000 });
+    assert.match(output, /bounded overload passed without microphone/);
+    assert.match(output, /Finish once after drain; cancel\/error\/quit\/pending-start\/mute suppressed without playback/);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
-test('compact capsule, native shortcuts and Bright glass cue signal with idle-only preview guards', { skip: process.platform !== 'darwin' }, () => {
+test('compact capsule, native shortcuts and Clean cue signals with idle-only preview guards', { skip: process.platform !== 'darwin' }, () => {
   const directory = mkdtempSync(join(tmpdir(), 'handsfree-capsule-'));
   const root = fileURLToPath(new URL('../', import.meta.url));
   try {
@@ -28,7 +30,7 @@ test('compact capsule, native shortcuts and Bright glass cue signal with idle-on
     execFileSync('swiftc', ['-O', '-sdk', sdk, '-Xcc', `-I${sdk}/usr/include`, '-swift-version', '5',
       join(root, 'src-tauri/native/Bridge.swift'), join(root, 'src-tauri/native/PastePolicy.swift'), join(root, 'src-tauri/native/AudioCapture.swift'),
       join(root, 'tests/native-capsule/main.swift'), '-o', binary]);
-    assert.match(execFileSync(binary, { encoding: 'utf8', timeout: 10000 }), /Native capsule geometry, state layout, nonactivation, shortcut matching and Bright glass cue passed without capture/);
+    assert.match(execFileSync(binary, { encoding: 'utf8', timeout: 10000 }), /Native capsule geometry, state layout, nonactivation, shortcut matching and Clean cues passed without capture/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

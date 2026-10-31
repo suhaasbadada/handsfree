@@ -62,3 +62,42 @@ for _ in 0..<200 { pipeline.enqueue(buffer) }
 release.signal(); pipeline.drain()
 precondition(errors == 1, "overload must fail explicitly exactly once")
 print("Synthetic 16/44.1/48 kHz stereo left-only/right-only/mixed RMS, owned buffers, EOS duration, stop barrier and bounded overload passed without microphone")
+
+// Exercise the production finish barrier with synthetic PCM and a mock player.
+// No engine, microphone, AVAudioPlayer.play, or AppKit is involved.
+for reason in ["Fn", "tick", "custom", "limit", "cancel", "error", "quit", "pending-start", "cancel-during-drain", "muted"] {
+    var events = [String]()
+    let pipe = try CapturePipeline(input: format) { _, count in
+        events.append(count < 0 ? "error" : "chunk")
+    }
+    var started = reason != "pending-start"
+    var allowed = reason != "muted"
+    if started { pipe.enqueue(buffer) }
+    if reason == "error" { pipe.captureFailed() }
+    func stopped() -> Bool {
+        let wasStarted = started
+        started = false
+        pipe.close()
+        let healthy = pipe.drain()
+        events.append("stopped")
+        if reason == "cancel-during-drain" { allowed = false }
+        return wasStarted && healthy
+    }
+    if ["cancel", "quit"].contains(reason) {
+        _ = stopped() // Generic teardown never invokes finish.
+    } else {
+        for _ in 0..<2 { // Duplicate queued finishes cannot ring twice.
+            CaptureEnd.finish(stop: stopped, allowed: { allowed }, play: { events.append("cue") })
+        }
+    }
+    let expected = ["Fn", "tick", "custom", "limit"].contains(reason) ? 1 : 0
+    precondition(events.filter { $0 == "cue" }.count == expected, "\(reason): \(events)")
+    if let cue = events.firstIndex(of: "cue") {
+        precondition(events[cue - 1] == "stopped")
+        precondition(!events.suffix(from: cue).contains("chunk"), "No future chunks after cue")
+    }
+    let before = events.count
+    pipe.enqueue(buffer); pipe.drain()
+    precondition(events.count == before, "Late tap escaped finish barrier")
+}
+print("Finish once after drain; cancel/error/quit/pending-start/mute suppressed without playback")

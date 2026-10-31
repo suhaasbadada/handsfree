@@ -40,6 +40,7 @@ private var clipboardGeneration = 0
 private var restoreClipboard: (() -> Void)?
 private var soundsEnabled = false
 private var cue: AVAudioPlayer?
+private var endCue: AVAudioPlayer?
 private var cueVolume: Float = 0.5
 private var audioBusy = false
 private var shortcutCode: Int64 = 63
@@ -84,11 +85,18 @@ enum CapsuleGeometry {
 }
 enum StartCue {
     static let rate = 48000
-    static let duration = 0.300
-    // Approved Bright glass double-tap; identical grains at equal gain.
+    static let duration = 0.240
+    // Approved Clean pair; identical nonoverlapping grains at equal gain.
     // Exact generated PCM, not a different native random implementation.
     static func data(resourceRoot: URL? = Bundle.main.resourceURL) -> Data? {
         guard let url = resourceRoot?.appendingPathComponent("sounds/listening.wav") else { return nil }
+        return try? Data(contentsOf: url)
+    }
+}
+enum EndCue {
+    static let duration = 0.120
+    static func data(resourceRoot: URL? = Bundle.main.resourceURL) -> Data? {
+        guard let url = resourceRoot?.appendingPathComponent("sounds/ending.wav") else { return nil }
         return try? Data(contentsOf: url)
     }
 }
@@ -97,15 +105,15 @@ enum StartCue {
     // Deliberately no player mutation, playback, or capture side effects.
 }
 // Preview and dictation share this one original, bundled cue (no borrowed audio).
-private func makeCue() -> AVAudioPlayer? {
-    guard let data = StartCue.data() else { return nil }
+private func makeCue(ending: Bool = false) -> AVAudioPlayer? {
+    guard let data = ending ? EndCue.data() : StartCue.data() else { return nil }
     let player = try? AVAudioPlayer(data: data)
     player?.volume = cueVolume
     player?.prepareToPlay()
     return player
 }
 @_cdecl("hf_sound_volume") public func soundVolume(_ volume: Float) {
-    main { cueVolume = volume.isFinite ? min(1, max(0, volume)) : 0.5; cue?.volume = cueVolume }
+    main { cueVolume = volume.isFinite ? min(1, max(0, volume)) : 0.5; cue?.volume = cueVolume; endCue?.volume = cueVolume }
 }
 enum CuePolicy {
     static func canPreview(idle: Bool, busy: Bool, recording: Bool, playing: Bool) -> Bool {
@@ -115,14 +123,18 @@ enum CuePolicy {
 }
 @_cdecl("hf_preview_sound") public func previewSound() -> Bool {
     main {
-        guard CuePolicy.canPreview(idle: true, busy: audioBusy, recording: recorder != nil, playing: cue?.isPlaying == true) else { return false }
+        guard CuePolicy.canPreview(idle: true, busy: audioBusy, recording: recorder != nil, playing: cue?.isPlaying == true || endCue?.isPlaying == true) else { return false }
         if cue == nil { cue = makeCue() }
         cue?.currentTime = 0
         return cue?.play() ?? false
     }
 }
 @_cdecl("hf_sounds") public func sounds(_ enabled: Bool) {
-    main { soundsEnabled = enabled; if enabled && cue == nil { cue = makeCue() } }
+    main {
+        soundsEnabled = enabled
+        if enabled && cue == nil { cue = makeCue() }
+        if !enabled { cue?.stop(); endCue?.stop() }
+    }
 }
 
 private class OverlayPanel: NSPanel {
@@ -422,8 +434,8 @@ private func validateTarget() -> PasteResult {
         do {
             let r = try AudioCapture(generation: generation, epoch: epoch, sink: sink)
             guard allowed(epoch) else { clearTarget(); return false }
-            let previewWasPlaying = cue?.isPlaying == true
-            cue?.stop()
+            let previewWasPlaying = cue?.isPlaying == true || endCue?.isPlaying == true
+            cue?.stop(); endCue?.stop()
             recorder = r
             audioBusy = true
             if soundsEnabled {
@@ -464,6 +476,22 @@ private func validateTarget() -> PasteResult {
     // Stopping capture is not cancellation: inference still needs the original
     // target. Discard explicitly only on cancel, failure, empty result, or paste.
     main { recorder?.stop(); recorder = nil; cue?.stop() }
+}
+// Only explicit normal Finish/toggle/limit calls this, never generic teardown.
+@_cdecl("hf_finish") public func finish(_ epoch: UInt64, _ allowed: @convention(c) (UInt64) -> Bool) {
+    main {
+        CaptureEnd.finish(stop: {
+            let captured = recorder?.stop() ?? false
+            recorder = nil; cue?.stop()
+            return captured
+        }, allowed: { soundsEnabled && allowed(epoch) }, play: {
+            if endCue == nil { endCue = makeCue(ending: true) }
+            endCue?.currentTime = 0; endCue?.play()
+        })
+    }
+}
+@_cdecl("hf_cancel_audio") public func cancelAudio() {
+    main { stop(); endCue?.stop() }
 }
 @_cdecl("hf_overlay") public func overlay(_ phase: Int32) {
     main {
@@ -617,6 +645,7 @@ func publishCopy(_ value: String, board: NSPasteboard, allowed: () -> Bool) -> I
     main {
         restoreClipboard?(); restoreClipboard = nil
         recorder?.stop(); recorder = nil; clearTarget()
+        cue?.stop(); endCue?.stop()
         meter?.invalidate(); meter = nil; panel?.orderOut(nil)
         if let t = tap { CGEvent.tapEnable(tap: t, enable: false); CFMachPortInvalidate(t) }
         if let s = source { CFRunLoopRemoveSource(CFRunLoopGetMain(), s, .commonModes) }

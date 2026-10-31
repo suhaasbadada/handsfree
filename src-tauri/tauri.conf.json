@@ -12,5 +12,5 @@
       "devCsp": "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost ws://127.0.0.1:5173; img-src 'self' asset: http://asset.localhost"
     }
   },
-  "bundle": { "active": true, "targets": ["app", "dmg"], "resources": { "native/assets/sounds/listening.wav": "sounds/listening.wav" }, "macOS": { "minimumSystemVersion": "14.0", "infoPlist": "Info.plist", "entitlements": "Entitlements.plist", "signingIdentity": "-" }, "icon": ["icons/icon.png", "icons/icon.icns"] }
+  "bundle": { "active": true, "targets": ["app", "dmg"], "resources": { "native/assets/sounds/listening.wav": "sounds/listening.wav", "native/assets/sounds/ending.wav": "sounds/ending.wav" }, "macOS": { "minimumSystemVersion": "14.0", "infoPlist": "Info.plist", "entitlements": "Entitlements.plist", "signingIdentity": "-" }, "icon": ["icons/icon.png", "icons/icon.icns"] }
 }
