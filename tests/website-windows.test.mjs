@@ -34,6 +34,13 @@ test('Windows packaging prepares notices before native compilation and inspects 
   assert.match(script, /Invoke-Checked 7z @\('t'/);
   for (const file of ['THIRD_PARTY_SOURCES.tar.gz', 'inventory.json', 'COPYRIGHT-library.html', 'SHA256SUMS', 'PROVENANCE.txt']) assert.ok(script.includes(file));
   assert.match(script, /Candidate output exists/);
+  assert.match(script, /'scripts\/windows-source-state.py', 'snapshot'/);
+  assert.match(script, /'scripts\/windows-source-state.py', 'restore'/);
+  assert.ok(script.indexOf("'snapshot'") < script.indexOf("@('fmt'"));
+  assert.ok(script.indexOf("'restore'") > script.indexOf("@('run', 'tauri', 'build'"));
+  assert.match(script, /if \(\$dirty -or \$commit -ne \$sourceCommit\)/);
+  assert.match(script, /Build normalization: \$normalization/);
+  assert.match(script, /Source Cargo.toml SHA256 \(original bytes, restored\)/);
   assert.match(env, /x86_64-pc-windows-msvc/);
   for (const flag of ['NATIVE', 'AVX', 'AVX2', 'AVX512', 'FMA', 'F16C']) assert.ok(env.includes(`'${flag}'`));
   assert.match(env, /SetEnvironmentVariable\("GGML_\$flag", 'OFF', 'Process'\)/);

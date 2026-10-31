@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { detectPlatform, downloadState, renderDownload, initializeDownload } from '../site/download.js';
+import { detectPlatform, downloadState, renderDownload, initializeDownload, publishedWindowsUrl } from '../site/download.js';
 import { release, windowsRelease } from '../site/release.js';
 
 const mac = { platform: 'MacIntel', userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', maxTouchPoints: 0 };
@@ -96,8 +96,9 @@ test('rendering transitions remove stale links and disabled state without click 
 
 test('unverified Windows installers are never offered and public Mac stays available', () => {
   assert.equal(windowsRelease.publicAvailable, false);
-  assert.equal(windowsRelease.version, null);
-  assert.equal(windowsRelease.installerUrl, null);
+  assert.equal(windowsRelease.version, '0.1.1-windows-beta.1');
+  assert.equal(windowsRelease.appVersion, '0.1.1');
+  assert.equal(publishedWindowsUrl(windowsRelease), null);
   assert.equal(release.publicAvailable, true);
   assert.equal(release.dmgUrl, 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.2/HandsFree-0.1.1-beta.2-macos-arm64.dmg');
   for (const arch of ['unknown', 'intel', 'arm64']) {
@@ -108,6 +109,88 @@ test('unverified Windows installers are never offered and public Mac stays avail
     assert.match(state.note, /Windows 10\/11 x64/);
     assert.match(state.note, /This download is for an Apple Silicon Mac/);
     if (arch === 'arm64') assert.match(state.note, /Windows ARM is unsupported/);
+  }
+});
+
+test('independent Mac/Windows availability matrix with explicit cross-platform fallbacks', () => {
+  for (const macAvailable of [false, true]) for (const winAvailable of [false, true]) {
+    const macManifest = { ...release, publicAvailable: macAvailable };
+    const winManifest = { ...windowsRelease, publicAvailable: winAvailable };
+    for (const os of ['mac', 'windows', 'linux', 'mobile', 'unknown']) for (const arch of ['intel', 'arm64', 'unknown']) {
+      const winPrimary = os === 'windows' && arch !== 'arm64' && winAvailable;
+      const state = downloadState({ os, arch }, macManifest, winManifest);
+      assert.equal(state.target, winPrimary ? 'windows' : 'mac');
+      assert.equal(state.url, winPrimary ? winManifest.installerUrl : macAvailable ? release.dmgUrl : null);
+      if (winPrimary) {
+        assert.equal(state.label, 'Download for Windows');
+        assert.match(state.detail, /Windows 10\/11 x64 · CPU · English/);
+      }
+      if (os === 'windows' && arch === 'arm64') assert.match(state.note, /Windows ARM is unsupported/);
+      const document = fixtureDocument();
+      renderDownload(document, { os, arch }, macManifest, winManifest);
+      assert.equal(document.getElementById('mac-card-download').href, macAvailable ? release.dmgUrl : undefined);
+      assert.equal(document.getElementById('windows-card-download').href, winAvailable ? windowsRelease.installerUrl : undefined);
+      assert.equal(document.getElementById('secondary-mac-download').hidden, !winPrimary);
+      assert.equal(document.getElementById('primary-apple-icon').getAttribute('hidden'), winPrimary ? '' : undefined);
+      assert.equal(document.getElementById('primary-windows-icon').getAttribute('hidden'), winPrimary ? undefined : '');
+    }
+  }
+});
+
+test('Windows canonical URL validation fails closed for drafts, paths, extension and type confusion', () => {
+  const candidate = { ...windowsRelease, publicAvailable: true };
+  assert.equal(publishedWindowsUrl(candidate), windowsRelease.installerUrl);
+  for (const manifest of [null, {}, windowsRelease, { ...candidate, schemaVersion: 2 },
+    { ...candidate, publicAvailable: 'true' }, { ...candidate, version: '../draft' },
+    { ...candidate, version: ['0.1.1-windows-beta.1'] }, { ...candidate, version: Symbol('invalid') },
+    { ...candidate, appVersion: ['0.1.1'] }, { ...candidate, appVersion: null },
+    { ...candidate, version: '0.1.1-windows-beta.1?draft=true' }, { ...candidate, version: '0.1.1' },
+    { ...candidate, appVersion: '0.1.2' }, { ...candidate, appVersion: '0.1.1-beta.1' },
+    ...['?download=1', '#asset'].map(suffix => ({ ...candidate, installerUrl: candidate.installerUrl + suffix })),
+    ...['http://github.com', 'https://github.com.evil', 'https://user@github.com', 'https://api.github.com']
+      .map(host => ({ ...candidate, installerUrl: candidate.installerUrl.replace('https://github.com', host) })),
+    ...['.zip', '.dmg', '.EXE'].map(ext => ({ ...candidate, installerUrl: candidate.installerUrl.replace('.exe', ext) })),
+    { ...candidate, installerUrl: candidate.installerUrl.replace('/download/', '/latest/download/') },
+    { ...candidate, installerUrl: candidate.installerUrl.replace('/download/', '/draft/') },
+    { ...candidate, installerUrl: 'javascript:alert(1)' }]) {
+    assert.equal(publishedWindowsUrl(manifest), null);
+    assert.equal(downloadState({ os: 'windows', arch: 'unknown' }, release, manifest).url, release.dmgUrl);
+  }
+});
+
+test('Windows architecture hints and explicit ARM UA never choose x64 automatically', () => {
+  for (const [nav, hints] of [
+    [{ userAgentData: { platform: 'Windows' } }, { architecture: 'arm', bitness: '64' }],
+    [{ userAgentData: { platform: 'Windows' } }, { architecture: 'arm' }],
+    [{ userAgent: 'Mozilla/5.0 (Windows NT 10.0; ARM64)' }, {}],
+  ]) {
+    const platform = detectPlatform(nav, hints);
+    assert.deepEqual(platform, { os: 'windows', arch: 'arm64' });
+    assert.equal(downloadState(platform, release, { ...windowsRelease, publicAvailable: true }).target, 'mac');
+  }
+});
+
+test('explicit 32-bit Windows hints do not promote an unsupported installer', () => {
+  const platform = detectPlatform({ userAgentData: { platform: 'Windows' } }, { architecture: 'x86', bitness: '32' });
+  assert.equal(platform.arch, 'x86_32');
+  const state = downloadState(platform, release, { ...windowsRelease, publicAvailable: true });
+  assert.equal(state.target, 'mac');
+  assert.match(state.note, /32-bit Windows is unsupported/);
+});
+
+test('availability revocation strips stale Windows and Mac hrefs from every control', () => {
+  const document = fixtureDocument();
+  const platform = { os: 'windows', arch: 'unknown' };
+  renderDownload(document, platform, release, { ...windowsRelease, publicAvailable: true });
+  assert.equal(document.getElementById('primary-download').href, windowsRelease.installerUrl);
+  assert.equal(document.getElementById('primary-download').getAttribute('aria-label'), 'Download for Windows (x64 EXE)');
+  renderDownload(document, platform, { ...release, publicAvailable: false }, windowsRelease);
+  for (const id of ['primary-download', 'mac-card-download', 'secondary-mac-download', 'windows-card-download']) {
+    const cta = document.getElementById(id);
+    assert.equal(cta.href, undefined, id);
+    assert.equal(cta.getAttribute('aria-disabled'), 'true', id);
+    assert.equal(cta.getAttribute('tabindex'), '-1', id);
+    assert.equal(cta.onclick, undefined);
   }
 });
 

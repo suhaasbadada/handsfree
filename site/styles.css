@@ -44,7 +44,9 @@
 .dictation-demo{margin:24px auto 0}.principles{flex-wrap:wrap;justify-content:center;gap:10px 24px;font-size:0.68rem}.section-space{padding-block:65px}.features,.getting-started{grid-template-columns:1fr;gap:38px}.section-heading>p:last-child{max-width:440px}.scope-note{grid-column:1;margin-top:-20px}.platform-section{border-radius:32px 32px 0 0}.platform-heading{display:block}.platform-heading>p{margin-top:20px}.platform-grid{grid-template-columns:1fr}.platform-card{padding:28px}.card-top{margin-bottom:22px}.platform-card .button{max-width:330px}.planned-label{margin-top:0}.platform-card .platform-spec{margin-bottom:16px}.open-note{flex-direction:column;align-items:start;padding-block:35px}.open-note .button{margin-top:4px}footer{gap:16px}footer p{margin-left:auto}footer nav{flex-basis:100%;margin-left:0;flex-wrap:wrap}footer small{margin-top:4px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.button{transition:none}}
 /* A release that is not public must never look like a working download link. */
+[hidden]{display:none!important}
 .button[aria-disabled="true"]{background:#e7e3df;color:#5e5551;cursor:not-allowed;box-shadow:none}
+.button .windows-logo{flex:none;order:-1}.windows-card .button{gap:10px}.windows-card .text-link{margin-top:14px}
 .button[aria-disabled="true"]:hover{background:#e7e3df;transform:none}
 .hero-copy .availability{max-width:58ch;overflow-wrap:anywhere}
 .beta-badge{display:inline-block;flex:none;align-self:center;position:relative;top:-0.55em;margin-left:-4px;color:#873c38;font-size:10px;font-weight:600;line-height:1;letter-spacing:0.04em}

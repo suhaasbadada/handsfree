@@ -16,6 +16,11 @@ if ((Test-Path $output) -or (Test-Path $notices)) {
 # This path must match the configured target; never pick an old host build.
 $bundle = Join-Path $root 'src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis'
 if (Test-Path $bundle) { throw 'NSIS output already exists; preserve or move it before rebuilding.' }
+$snapshot = Join-Path $root 'src-tauri/target/windows-source-state.json'
+if (Test-Path $snapshot) { throw 'Source snapshot exists; preserve or move src-tauri/target/windows-source-state.json before rebuilding.' }
+$sourceManifestHash = Invoke-Checked python @('scripts/windows-source-state.py', 'snapshot', '--state', $snapshot)
+$sourceCommit = & git rev-parse HEAD
+if ($LASTEXITCODE -ne 0) { throw 'Cannot identify clean source commit.' }
 Invoke-Checked cargo @('fmt', '--manifest-path', 'src-tauri/Cargo.toml', '--', '--check')
 # tauri-build also loads the Windows overlay during cargo test; resources must
 # exist before any compilation, not only before the final bundle command.
@@ -25,7 +30,15 @@ Invoke-Checked python @('scripts/release-notices.py', $notices, '--target', $env
 Copy-Item 'LICENSE' $notices
 Invoke-Checked cargo @('test', '--manifest-path', 'src-tauri/Cargo.toml', '--locked', '--target', $env:CARGO_BUILD_TARGET)
 Invoke-Checked cargo @('clippy', '--manifest-path', 'src-tauri/Cargo.toml', '--locked', '--target', $env:CARGO_BUILD_TARGET, '--all-targets', '--', '-D', 'warnings')
-Invoke-Checked npm @('run', 'tauri', 'build', '--', '--target', $env:CARGO_BUILD_TARGET, '--config', 'src-tauri/tauri.windows.conf.json', '--bundles', 'nsis')
+# The CLI rewrites even inactive target dependencies to match the Windows config.
+# Preserve evidence on unknown changes; restore only its validated Mac-only edit,
+# including when the build itself fails. Never broadly reset the worktree.
+$buildFailure = $null
+try {
+    Invoke-Checked npm @('run', 'tauri', 'build', '--', '--target', $env:CARGO_BUILD_TARGET, '--config', 'src-tauri/tauri.windows.conf.json', '--bundles', 'nsis')
+} catch { $buildFailure = $_ }
+$normalization = Invoke-Checked python @('scripts/windows-source-state.py', 'restore', '--state', $snapshot)
+if ($null -ne $buildFailure) { throw $buildFailure }
 $installers = @(Get-ChildItem $bundle -Filter '*.exe' -File)
 if ($installers.Count -ne 1) { throw 'Expected exactly one newly built NSIS installer.' }
 # Structural check only; this does not establish successful installation or runtime behavior.
@@ -45,6 +58,7 @@ $commit = & git rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot identify source commit.' }
 $dirty = & git status --porcelain --untracked-files=normal
 if ($LASTEXITCODE -ne 0) { throw 'Cannot identify worktree state.' }
+if ($dirty -or $commit -ne $sourceCommit) { throw 'Source changed after validation; candidate rejected.' }
 $rust = & rustc --version --verbose
 $node = & node --version
 $run = if ($env:GITHUB_ACTIONS -eq 'true') { "https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID" } else { 'local build' }
@@ -52,6 +66,8 @@ $run = if ($env:GITHUB_ACTIONS -eq 'true') { "https://github.com/$env:GITHUB_REP
 HandsFree experimental Windows candidate (NOT runtime verified)
 Source commit: $commit
 Worktree dirty: $([bool]$dirty)
+Source Cargo.toml SHA256 (original bytes, restored): $sourceManifestHash
+Build normalization: $normalization
 Target: $env:CARGO_BUILD_TARGET
 Build: $run
 UTC: $([DateTime]::UtcNow.ToString('o'))

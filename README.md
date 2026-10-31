@@ -16,6 +16,10 @@ Say it while it’s clear. HandsFree turns your thoughts into text, without maki
 
 **Apple Silicon Mac · macOS 14+ · English.** Intel Macs are unsupported. This beta is self-signed, not notarized: see [Open Anyway and installation guidance](docs/INSTALL.md). No developer tools needed.
 
+**Windows beta in testing:** build verification pending; no public Windows download yet.
+Target: Windows 10/11 x64 (Intel/AMD), CPU-only, English. Windows ARM is unsupported.
+See the [Windows installation and tester guide](docs/WINDOWS.md). The Mac download is independent and remains available.
+
 Prefer Homebrew? As a second option, with Homebrew already installed:
 
 ```sh

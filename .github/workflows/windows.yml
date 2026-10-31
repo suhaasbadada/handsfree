@@ -64,6 +64,11 @@ jobs:
           cargo test --manifest-path src-tauri/Cargo.toml --locked --target $env:CARGO_BUILD_TARGET real_model_pipeline_smoke -- --ignored --nocapture
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Remove-Item -LiteralPath $model
+      - name: Require clean candidate source after all checks
+        run: |
+          $dirty = git status --porcelain --untracked-files=all
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($dirty) { throw "Unexpected post-build source changes: $dirty" }
       - uses: actions/upload-artifact@v7
         with:
           name: Windows-installer-x64-${{ github.sha }}

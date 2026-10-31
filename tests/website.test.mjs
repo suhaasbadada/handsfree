@@ -49,7 +49,7 @@ test('hero has a direct, accessible Mac download with a real decorative Apple SV
   assert.match(cta, /<svg class="apple-logo"[^>]*fill="currentColor"[^>]*aria-hidden="true"[^>]*focusable="false"><path d="[^"]+"\/><\/svg><span id="download-label">Download for Mac<\/span>/);
   assert.doesNotMatch(cta, /aria-disabled|tabindex/);
   assert.doesNotMatch(hero, /Explore (the )?source/);
-  assert.equal([...html.matchAll(/class="apple-logo"/g)].length, 2, 'Both download buttons use the monochrome Apple symbol');
+  assert.equal([...html.matchAll(/class="apple-logo"/g)].length, 3, 'Mac controls retain the monochrome Apple symbol, including the Windows-primary secondary action');
   assert.match(html, /class="card-top"><span class="platform-symbol" aria-hidden="true">⌘<\/span>/);
   const readme = readFileSync(new URL('README.md', root), 'utf8');
   assert.ok(readme.indexOf('## Download') < readme.indexOf('## Features'));

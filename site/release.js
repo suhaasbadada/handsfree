@@ -9,10 +9,13 @@ export const release = Object.freeze({
 });
 
 // Independent from the published Mac beta. A CI candidate is not a public release.
-// Set a real version/installer URL only after Windows build and runtime acceptance.
+// Candidate coordinates only: never enable until this exact EXE is publicly verified.
+// Distribution tag differs from the embedded application/installer version (0.1.1).
 export const windowsRelease = Object.freeze({
+  schemaVersion: 1,
   publicAvailable: false,
-  version: null,
-  installerUrl: null,
+  version: '0.1.1-windows-beta.1',
+  appVersion: '0.1.1',
+  installerUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-windows-beta.1/HandsFree-0.1.1-windows-x64-setup.exe',
   status: 'Windows beta in testing. No verified installer available yet.',
 });

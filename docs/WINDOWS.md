@@ -9,6 +9,8 @@ real PC. The published Apple Silicon Mac beta is unchanged.
 
 Target: **Windows 10/11 x64**, an Intel/AMD 64-bit PC, a microphone, and Microsoft
 Edge WebView2 Runtime. Windows ARM, 32-bit Windows, and Linux are unsupported.
+Transcription is English-only. Not yet hardware-tested; do not assume CI success
+establishes installation or dictation reliability.
 Use a supported, security-updated Windows installation (Windows 10 may require
 ESU). CPU-only transcription may be substantially slower than Mac Metal.
 
@@ -121,3 +123,34 @@ unchecked items as passed. Automated CI does **not** perform these tests.
 Public release is a separate maintainer decision after build, notice review, and
 runtime acceptance. Keep Windows availability false on the website until then;
 never replace or hide the working Mac download to announce a Windows candidate.
+
+## Website publication checklist (maintainers)
+
+The candidate distribution label is `v0.1.1-windows-beta.1`; the embedded app and
+installer version is `0.1.1`. `site/release.js` holds the candidate coordinates,
+but `windowsRelease.publicAvailable` stays **false**. A candidate URL in source
+is not evidence of a public release. Never use GitHub's `latest` endpoint for
+this prerelease.
+
+After the release decision, verify the exact public, non-draft GitHub release
+asset `HandsFree-0.1.1-windows-x64-setup.exe` (not an Actions ZIP), checksum, and
+provenance while logged out. Only then flip the Windows availability flag.
+The website accepts only the canonical GitHub repository URL, versioned Windows
+beta tag, and matching versioned x64 EXE name, without query strings or fragments.
+
+Update the static fallback in `site/index.html` at `windows-card-download`
+(direct EXE href; remove `aria-disabled` and `tabindex`; update label),
+`windows-release-badge` (Experimental · x64), and `windows-release-status`
+(version, unsigned, not yet hardware-tested). Update its metadata descriptions
+and `noscript` copy, and the Windows status in this guide and README. Keep any
+untested hardware limitations explicit. Leave the static hero and Mac card URLs
+on **v0.1.1-beta.2**, and leave Mac availability untouched. Without JavaScript,
+visitors use the explicit platform cards; no automatic download occurs.
+
+Run `npm test`, `npm run build`, and `node tests/website-smoke.mjs` plus
+`node tests/download-website-smoke.mjs`. JavaScript promotes Windows only for
+Windows visitors with x64/unknown architecture. Known Windows ARM visitors see
+an unsupported note and the Mac fallback, while the explicitly x64-labeled card
+remains a deliberate download for another PC. Mac download controls remain
+visible independently of Windows availability. Gatekeeper/Open Anyway guidance
+applies only to Mac; SmartScreen/unsigned guidance applies only to Windows.
