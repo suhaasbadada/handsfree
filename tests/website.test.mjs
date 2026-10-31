@@ -118,11 +118,20 @@ test('hero demonstrates dictation honestly with an accessible static fallback', 
   assert.match(html, /Illustrative demo — no microphone access/);
   assert.match(html, /<label[^>]+for="demo-text">Text<\/label>/);
   assert.match(html, /<textarea id="demo-text" readonly[^>]*>Let’s move our meeting to tomorrow morning\.<\/textarea>/);
-  assert.match(html, /<button id="demo-play"[^>]* hidden>Play demo/);
-  assert.match(html, /id="demo-status"[^>]*role="status"[^>]*aria-atomic="true"/);
+  assert.match(html, /<button id="demo-pause"[^>]*aria-label="Pause animation"[^>]* hidden>/);
+  assert.doesNotMatch(html, /Play demo|Reset demo|demo-play|demo-status/);
+  const demo = html.match(/<figure class="dictation-demo"[\s\S]*?<\/figure>/)[0];
+  assert.doesNotMatch(demo, /aria-live|role="status"/);
   assert.doesNotMatch(html + css, /voice-garden|wave-seed|garden-label|\borbit\b|infinite/);
   const js = readFileSync(new URL('site/demo.js', root), 'utf8');
   assert.doesNotMatch(js, /getUserMedia|SpeechRecognition|AudioContext|fetch\(/);
+});
+
+test('hero is concise; architecture guidance and publication details are disclosed below', () => {
+  const hero = html.match(/<section class="hero[\s\S]*?<\/section>/)[0];
+  assert.match(hero, /id="download-requirements"[^>]*>Apple Silicon · macOS 14\+ · English<\/p>/);
+  assert.doesNotMatch(hero, /About This Mac|licensing review|No public Mac download|id="release-status"/);
+  assert.match(html, /<details class="release-note">[\s\S]*About This Mac[\s\S]*id="release-status"/);
 });
 
 test('project license metadata and grant agree without relicensing dependencies', () => {

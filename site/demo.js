@@ -1,64 +1,70 @@
 export const sampleText = 'Let’s move our meeting to tomorrow morning.';
 
-// Inject the clock so cancellation and the entire sequence can be tested without waits.
-export function createDemo({ render, schedule = setTimeout, cancel = clearTimeout, reducedMotion = () => false }) {
+// One clock, including the result hold. Changes invalidate already queued callbacks.
+export function createDemo({ render, schedule = setTimeout, cancel = clearTimeout,
+  reducedMotion = () => false, visible = () => true }) {
   let timer;
   let generation = 0;
-  let state = 'done';
+  let paused = false;
   let disposed = false;
   function clear() {
     generation++;
-    cancel(timer);
+    if (timer !== undefined) cancel(timer);
     timer = undefined;
   }
-  function show(next) {
-    state = next;
-    render({ state, text: state === 'done' ? sampleText : '', active: state !== 'done' });
+  function show(state) {
+    render({ state, text: state === 'done' ? sampleText : '', paused });
   }
-  function later(next, delay, complete) {
+  function running() { return !disposed && !paused && visible() && !reducedMotion(); }
+  function step(state) {
+    show(state);
     const current = generation;
+    const next = { listening: 'processing', processing: 'done', done: 'listening' }[state];
     timer = schedule(() => {
-      if (disposed || current !== generation) return;
+      if (current !== generation || !running()) return;
       timer = undefined;
-      show(next);
-      complete?.();
-    }, delay);
+      step(next);
+    }, { listening: 1600, processing: 700, done: 2600 }[state]);
   }
-  show('done');
+  function sync() {
+    if (disposed) return;
+    clear();
+    if (running()) step('listening');
+    else show('done');
+  }
+  sync();
   return {
-    play() {
-      if (disposed) return;
-      clear();
-      // A second click is a reset, not another overlapping playback.
-      if (state !== 'done' || reducedMotion()) return show('done');
-      show('listening');
-      later('processing', 1600, () => later('done', 700));
-    },
+    sync,
+    togglePause() { if (!disposed) { paused = !paused; sync(); } },
     dispose() { clear(); disposed = true; },
   };
 }
 
 if (typeof document !== 'undefined') {
-  const button = document.getElementById('demo-play');
+  const button = document.getElementById('demo-pause');
   const figure = document.querySelector('.dictation-demo');
   if (button && figure) {
     const text = document.getElementById('demo-text');
     const phase = document.getElementById('demo-phase');
-    const status = document.getElementById('demo-status');
-    let started = false;
+    const motion = matchMedia('(prefers-reduced-motion: reduce)');
+    let pageActive = true;
     const demo = createDemo({
-      reducedMotion: () => matchMedia('(prefers-reduced-motion: reduce)').matches,
-      render({ state, text: value, active }) {
+      reducedMotion: () => motion.matches,
+      visible: () => pageActive && !document.hidden,
+      render({ state, text: value, paused }) {
         figure.dataset.state = state;
         text.value = value;
         phase.textContent = { listening: 'Listening', processing: 'Processing', done: 'Done' }[state];
-        button.firstChild.textContent = active ? 'Reset demo ' : 'Play demo ';
-        status.textContent = !started ? '' : state === 'done' ? `Done. ${value}` : `${phase.textContent}. Illustrative demo.`;
+        button.hidden = motion.matches;
+        button.setAttribute('aria-label', paused ? 'Resume animation' : 'Pause animation');
+        button.title = paused ? 'Resume animation' : 'Pause animation';
+        button.textContent = paused ? '▶' : 'Ⅱ';
       },
     });
-    button.hidden = false;
-    button.addEventListener('click', () => { started = true; demo.play(); });
-    // Also covers bfcache navigation: leave a static, replayable result behind.
-    window.addEventListener('pagehide', () => { if (figure.dataset.state !== 'done') demo.play(); });
+    button.addEventListener('click', () => demo.togglePause());
+    document.addEventListener('visibilitychange', demo.sync);
+    motion.addEventListener('change', demo.sync);
+    window.addEventListener('pagehide', () => { pageActive = false; demo.sync(); });
+    window.addEventListener('pageshow', () => { pageActive = true; demo.sync(); });
   }
 }

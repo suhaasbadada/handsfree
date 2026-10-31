@@ -34,11 +34,10 @@
           <h1 id="hero-title"><span>Don’t lose your</span> <em>train of thought.</em></h1>
           <p class="intro">Say it while it’s clear. HandsFree turns your thoughts into text, without making typing the bottleneck.</p>
           <div class="hero-actions">
-            <a id="primary-download" class="button primary" aria-disabled="true" tabindex="-1" aria-describedby="download-requirements release-status">Mac beta coming soon</a>
+            <a id="primary-download" class="button primary" aria-disabled="true" tabindex="-1" aria-describedby="download-requirements">Mac beta coming soon</a>
             <a class="text-link" href="https://github.com/suhaasbadada/handsfree">Explore the source <span aria-hidden="true">↗</span></a>
           </div>
-          <p id="download-requirements" class="availability">Apple Silicon (M-series) · macOS 14+ · English. Windows &amp; Linux are planned.</p>
-          <p id="release-status" class="availability" role="status">No public Mac download yet. Publication pending dependency licensing review.</p>
+          <p id="download-requirements" class="availability">Apple Silicon · macOS 14+ · English</p>
           <noscript><p class="availability">JavaScript is off. Check <a href="https://github.com/suhaasbadada/handsfree/releases">published releases</a> for availability. Choose only the Apple Silicon Mac DMG; Intel Macs and mobile are unsupported.</p></noscript>
         </div>
         <figure class="dictation-demo" aria-label="Speech-to-text example" aria-describedby="demo-caption" data-state="done">
@@ -50,8 +49,7 @@
             </div>
             <label class="demo-label" for="demo-text">Text</label>
             <textarea id="demo-text" readonly rows="3" spellcheck="false">Let’s move our meeting to tomorrow morning.</textarea>
-            <button id="demo-play" type="button" aria-controls="demo-text" hidden>Play demo <span aria-hidden="true">↻</span></button>
-            <p id="demo-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
+            <button id="demo-pause" type="button" aria-label="Pause animation" title="Pause animation" hidden>Ⅱ</button>
           </div>
           <figcaption id="demo-caption">Illustrative demo — no microphone access</figcaption>
         </figure>
@@ -92,7 +90,7 @@
             <article class="platform-card planned"><div class="card-top"><span class="platform-symbol" aria-hidden="true">⊞</span><span class="pill">Planned</span></div><h3>Windows</h3><p class="platform-spec">A future home for HandsFree</p><p>Not implemented or available to download. System requirements and release timing have not been set.</p><span class="planned-label">Still ahead <span aria-hidden="true">↗</span></span></article>
             <article class="platform-card planned"><div class="card-top"><span class="platform-symbol" aria-hidden="true">&gt;_</span><span class="pill">Planned</span></div><h3>Linux</h3><p class="platform-spec">More choice, same intention</p><p>Not implemented or available to download. Distribution support and release timing have not been set.</p><span class="planned-label">Still ahead <span aria-hidden="true">↗</span></span></article>
           </div>
-          <p class="release-note">The project’s MIT license does not relicense dependencies or clear the publication gate. <a href="https://github.com/suhaasbadada/handsfree/blob/main/docs/RELEASING.md">Read the release preparation notes <span aria-hidden="true">↗</span></a></p>
+          <details class="release-note"><summary>Mac requirements &amp; release details</summary><p>Apple Silicon means an M-series chip. In Apple menu → About This Mac, look for “Chip”, not “Processor: Intel”. Mobile devices are not supported.</p><p id="release-status">No public Mac download yet. Publication pending dependency licensing review.</p><p>The project’s MIT license does not relicense dependencies or clear the publication gate. <a href="https://github.com/suhaasbadada/handsfree/blob/main/docs/RELEASING.md">Read the release preparation notes <span aria-hidden="true">↗</span></a></p></details>
         </div>
       </section>
 

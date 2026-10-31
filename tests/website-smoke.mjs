@@ -78,7 +78,7 @@ try {
   await evaluate(`window.downloadModule.renderDownload(document,{os:'mac',arch:'intel'},{...window.releaseModule.release,publicAvailable:true})`);
   assert.equal(await evaluate(`document.getElementById('primary-download').hasAttribute('href')`), false, 'Known Intel never gets ARM build');
   await evaluate(`window.downloadModule.renderDownload(document,{os:'mac',arch:'unknown'},window.releaseModule.release)`);
-  for (const width of [320, 390, 768, 1280]) {
+  for (const width of [320, 390, 400, 560, 740, 980, 1280]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
     const metrics = await evaluate(`new Promise(resolve => requestAnimationFrame(() => resolve({
       width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth,
@@ -112,15 +112,7 @@ try {
   }
   await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 844, deviceScaleFactor: 1, mobile: true });
   await send('Emulation.setTouchEmulationEnabled', { enabled: true });
-  const playBox = await evaluate(`(() => {
-    const button = document.getElementById('demo-play');
-    button.scrollIntoView({block:'center'});
-    const r = button.getBoundingClientRect();
-    return {x:r.x+r.width/2,y:r.y+r.height/2};
-  })()`);
-  await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [playBox] });
-  await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  assert.equal(await evaluate(`document.getElementById('demo-status').textContent.startsWith('Done.')`), true, 'Touch plays reduced-motion demo at 320px');
+  assert.equal(await evaluate(`document.getElementById('demo-pause').hidden && !document.getElementById('demo-play')`), true, 'Reduced motion has no animation or play control');
   assert.equal(await evaluate(`document.documentElement.scrollWidth === innerWidth`), true, 'No overflow on a 320px touch viewport');
   await send('Emulation.setTouchEmulationEnabled', { enabled: false });
   await evaluate(`window.scrollTo(0,0); document.body.tabIndex=-1; document.body.focus(); document.body.removeAttribute('tabindex')`);
@@ -146,8 +138,8 @@ try {
   assert.equal(await evaluate('document.activeElement.textContent'), 'Skip to content');
   await screenshot('mobile-dark');
   const sample = 'Let’s move our meeting to tomorrow morning.';
-  assert.deepEqual(await evaluate(`({value:document.getElementById('demo-text').value,readonly:document.getElementById('demo-text').readOnly,label:document.getElementById('demo-text').labels[0].textContent,hidden:document.getElementById('demo-play').hidden})`),
-    { value: sample, readonly: true, label: 'Text', hidden: false }, 'Semantic, labelled text field and working demo button');
+  assert.deepEqual(await evaluate(`({value:document.getElementById('demo-text').value,readonly:document.getElementById('demo-text').readOnly,label:document.getElementById('demo-text').labels[0].textContent})`),
+    { value: sample, readonly: true, label: 'Text' }, 'Semantic, labelled static reduced-motion text field');
   const { nodes } = await send('Accessibility.getFullAXTree');
   assert.ok(nodes.some(node => node.role?.value === 'region' && node.name?.value === 'Talk through the work.'), 'Use cases form a named accessible section');
   for (const title of ['Think out loud with your coding assistant.', 'Messages & email', 'Notes & ideas', 'First drafts']) {
@@ -155,24 +147,21 @@ try {
   }
   assert.ok(nodes.some(node => node.role?.value === 'textbox' && node.name?.value === 'Text' && node.value?.value === sample), 'Transcript is a named textbox in the accessibility tree');
   async function activate(key = 'Enter') {
-    await evaluate(`document.getElementById('demo-play').focus()`);
+    await evaluate(`document.getElementById('demo-pause').focus()`);
     const code = key === ' ' ? 'Space' : 'Enter';
     const keyCode = key === ' ' ? 32 : 13;
     await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: keyCode, text: key === ' ' ? ' ' : '\r' });
     await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: keyCode });
   }
-  await activate();
-  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'done', 'Reduced motion finishes immediately');
-  assert.equal(await evaluate(`document.getElementById('demo-status').textContent`), `Done. ${sample}`, 'One complete transcript announcement');
-  assert.equal(await evaluate(`getComputedStyle(document.getElementById('demo-play')).outlineStyle`), 'solid', 'Visible keyboard focus');
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
+  await delay(100);
+  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'listening', 'Motion change starts automatic loop without a play action');
   await activate(' ');
-  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'listening', 'Space plays demo');
-  assert.equal(await evaluate(`document.getElementById('demo-text').value`), '');
-  await activate();
-  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'done', 'Enter resets active demo');
-  await delay(2400);
-  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'done', 'Reset has no stale transitions');
+  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'done', 'Space pauses animation on a meaningful static result');
+  assert.equal(await evaluate(`document.getElementById('demo-pause').getAttribute('aria-label')`), 'Resume animation');
+  assert.equal(await evaluate(`getComputedStyle(document.getElementById('demo-pause')).outlineStyle`), 'solid', 'Visible keyboard focus');
+  await delay(2500);
+  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'done', 'Paused animation has no stale transitions');
   await activate();
   await delay(1700);
   assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'processing');
@@ -180,9 +169,23 @@ try {
   await delay(800);
   assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'done');
   assert.equal(await evaluate(`document.getElementById('demo-text').value`), sample, 'Complete transcript appears');
-  await activate();
+  await delay(2500);
+  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'listening', 'Result hold resets into the next automatic loop');
+  assert.equal(await evaluate(`document.activeElement.id==='demo-pause' && !document.querySelector('.dictation-demo [aria-live],.dictation-demo [role="status"]')`), true, 'Loops preserve focus without live announcement spam');
   await evaluate(`window.dispatchEvent(new PageTransitionEvent('pagehide'))`);
-  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'done', 'Leaving page cancels playback');
+  await delay(1800);
+  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'done', 'Leaving page cancels all playback timers');
+  await evaluate(`window.dispatchEvent(new PageTransitionEvent('pageshow'))`);
+  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'listening', 'Returning resumes automatically');
+  // Simulate the browser visibility signal without depending on headless focus policy.
+  await evaluate(`Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'))`);
+  await delay(1800);
+  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'done', 'Hidden page has no advancing loop');
+  await evaluate(`delete document.hidden;document.dispatchEvent(new Event('visibilitychange'))`);
+  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'listening');
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+  await delay(100);
+  assert.equal(await evaluate(`document.getElementById('demo-text').value`), sample, 'Changing to reduced motion cancels the loop');
   assert.deepEqual(errors, []);
   await send('Emulation.setScriptExecutionDisabled', { value: true });
   await send('Page.reload');
@@ -192,8 +195,8 @@ try {
   }
   assert.equal(await evaluate(`document.getElementById('primary-download').hasAttribute('href')`), false, 'No-JS CTA cannot point at a draft');
   assert.equal(await evaluate(`document.querySelector('noscript').getClientRects().length>0 && document.getElementById('release-status').textContent.includes('No public Mac download')`), true, 'No-JS availability fallback is visible');
-  assert.equal(await evaluate(`document.getElementById('demo-play').hidden && document.getElementById('demo-text').value === ${JSON.stringify(sample)}`), true, 'No-JS demo shows meaningful text and no inert play button');
-  console.log('Dark mobile, demo playback/reset, reduced motion, keyboard, no-JS fallback, and JavaScript errors: passed');
+  assert.equal(await evaluate(`!document.getElementById('demo-play') && document.getElementById('demo-pause').hidden && document.getElementById('demo-text').value === ${JSON.stringify(sample)}`), true, 'No-JS demo shows meaningful text and no inert control');
+  console.log('Dark mobile, automatic demo loop/pause, visibility cancellation, reduced motion, keyboard, no-JS fallback, and JavaScript errors: passed');
 } finally {
   socket?.close();
   browser.kill();

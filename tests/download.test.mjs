@@ -38,7 +38,7 @@ test('current manifest is explicitly unavailable; only a verified manifest permi
     const platform = { os: 'mac', arch };
     assert.equal(downloadState(platform, release).url, null);
     assert.equal(downloadState(platform, enabled).url, release.dmgUrl);
-    assert.match(downloadState(platform, enabled).detail, /macOS 14\+.*About This Mac/);
+    assert.equal(downloadState(platform, enabled).detail, 'Apple Silicon · macOS 14+ · English');
   }
   for (const os of ['windows', 'linux', 'mobile', 'unknown']) {
     assert.equal(downloadState({ os, arch: 'arm64' }, enabled).url, null);
@@ -75,6 +75,7 @@ test('rendering transitions remove stale links and disabled state without click 
   const document = fixtureDocument();
   const cta = document.getElementById('primary-download');
   renderDownload(document, { os: 'mac', arch: 'unknown' }, release);
+  assert.equal(document.getElementById('download-requirements').textContent, 'Apple Silicon · macOS 14+ · English');
   assert.equal(cta.href, undefined);
   assert.equal(cta.getAttribute('aria-disabled'), 'true');
   renderDownload(document, { os: 'mac', arch: 'unknown' }, enabled);

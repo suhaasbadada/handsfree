@@ -30,6 +30,7 @@ test('Fn readiness explains actual missing access and stale hooks separately', (
   assert.match(readinessDetail(ready), /Select a text field/);
 });
 test('all states have user-facing labels and unknown state is safe', () => {
+  assert.equal(phaseLabel('idle'), 'Ready');
   assert.equal(phaseLabel('recording'), 'Listening');
   assert.equal(phaseLabel('processing'), 'Finding your words');
   assert.equal(phaseLabel('error'), 'Needs attention');

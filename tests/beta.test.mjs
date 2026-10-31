@@ -8,7 +8,7 @@ test('app and landing brands show a semantic, visible Beta badge', () => {
   for (const path of ['src/main.ts', 'site/index.html']) {
     const source = read(path);
     assert.match(source, /aria-label="HandsFree beta (?:overview|home)"/);
-    assert.match(source, /<(?:span|sup) class="beta-badge">(?:Beta|BETA)<\/(?:span|sup)>/);
+    assert.match(source, /<sup class="beta-badge">BETA<\/sup>/);
     assert.equal([...source.matchAll(/class="beta-badge"/g)].length, 1, 'One unobtrusive badge per surface');
   }
   for (const path of ['src/style.css', 'site/styles.css']) {

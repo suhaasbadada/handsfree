@@ -20,10 +20,10 @@ export function detectPlatform({ userAgent = '', platform = '', maxTouchPoints =
 }
 
 export function downloadState(platform, manifest) {
-  const requirement = 'Apple Silicon (M-series) · macOS 14+ · English. In Apple menu → About This Mac, look for “Chip”, not “Processor: Intel”.';
+  const requirement = 'Apple Silicon · macOS 14+ · English';
   if (platform.os === 'mac' && platform.arch === 'intel') return { label: 'Intel Macs not supported', detail: requirement, url: null };
-  if (platform.os === 'windows' || platform.os === 'linux') return { label: `${platform.os === 'windows' ? 'Windows' : 'Linux'} coming soon`, detail: 'Not implemented yet. The Mac beta requires Apple Silicon and macOS 14+.', url: null };
-  if (platform.os !== 'mac') return { label: publishedUrl(manifest) ? 'Available on Apple Silicon Mac' : 'Mac beta coming soon', detail: 'Current beta: Apple Silicon Mac only (macOS 14+, English). Windows and Linux are planned; mobile is not supported.', url: null };
+  if (platform.os === 'windows' || platform.os === 'linux') return { label: `${platform.os === 'windows' ? 'Windows' : 'Linux'} coming soon`, detail: 'Mac beta only · Windows & Linux planned', url: null };
+  if (platform.os !== 'mac') return { label: publishedUrl(manifest) ? 'Available on Apple Silicon Mac' : 'Mac beta coming soon', detail: requirement, url: null };
   const url = publishedUrl(manifest);
   return { label: url ? 'Download for Mac' : 'Mac beta coming soon', detail: requirement, url };
 }

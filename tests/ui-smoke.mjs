@@ -49,7 +49,7 @@ try {
   };
   await send('Emulation.setDeviceMetricsOverride', { width: 980, height: 820, deviceScaleFactor: 1, mobile: false });
   await until(`Boolean(document.getElementById('nav-settings'))`);
-  assert.equal(await evaluate(`document.querySelector('.brand .beta-badge').textContent==='Beta' && document.querySelector('.brand .beta-badge').getBoundingClientRect().width>0`), true, 'App brand visibly identifies beta status');
+  assert.equal(await evaluate(`document.querySelector('.brand .beta-badge').textContent==='BETA' && document.querySelector('.brand .beta-badge').getBoundingClientRect().width>0`), true, 'App brand visibly identifies uppercase beta status');
   assert.equal(await evaluate(`['change-shortcut','mic','permissions','download','reset','sounds','sound-volume'].every(id=>document.getElementById(id).disabled)`), true, 'Native controls are unavailable before the backend connects');
   await evaluate(`window.calls = []; window.fixture = {phase:'idle',message:'Select a text field and press Fn.', progress:0,model_ready:true,microphone:true,accessibility:true,input_monitoring:true,hotkey:true,transcript:'',sounds:true,sound_volume:50,sound_style:'tap',shortcut:{code:'Fn',modifiers:0},shortcut_label:'Fn',stats:{words:0,transcriptions:0,speech_seconds:0,saved_seconds:0},persistence_error:''}; window.__TAURI_INTERNALS__ = { invoke: async (command,args) => { window.calls.push({command,args}); if(command==='status') return structuredClone(window.fixture); if(command==='set_sounds') window.fixture.sounds=args.enabled; if(command==='set_sound_style') window.fixture.sound_style=args.style; if(command==='set_shortcut'){if(window.rejectShortcut) throw 'Could not save shortcut'; window.fixture.shortcut=args.shortcut;window.fixture.shortcut_label=args.shortcut.code==='Fn'?'Fn':args.shortcut.code==='Space'?'Option + Space':'Control + Shift + J';} if(command==='reset_stats') window.fixture.stats={words:0,transcriptions:0,speech_seconds:0,saved_seconds:0}; } }; document.getElementById('feedback').hidden=true;`);
   await until(`document.getElementById('ready-title').textContent.includes('You’re ready')`);
@@ -181,7 +181,7 @@ try {
     await evaluate(`document.getElementById('feedback').hidden=false;document.getElementById('feedback').textContent='Could not save. Try again.'`);
     assert.deepEqual(await evaluate(`({bg:getComputedStyle(document.getElementById('feedback')).backgroundColor,text:getComputedStyle(document.getElementById('feedback')).color})`), {bg:'rgb(250, 240, 223)',text:'rgb(48, 46, 45)'}, 'Warning feedback has dark readable text in either system mode');
     await evaluate(`document.getElementById('feedback').hidden=true`);
-    for (const width of [400, 560, 740, 980]) {
+    for (const width of [320, 390, 400, 560, 740, 980, 1280]) {
       await send('Emulation.setDeviceMetricsOverride', { width, height: 820, deviceScaleFactor: 1, mobile: false });
       for (const tab of ['overview','settings']) {
         await evaluate(`document.getElementById('nav-${tab}').click()`);
@@ -191,6 +191,28 @@ try {
       await evaluate(`document.getElementById('change-shortcut').click();document.querySelector('#shortcut-dialog details').open=true`);
       assert.equal(await evaluate(`document.getElementById('shortcut-dialog').scrollWidth<=document.getElementById('shortcut-dialog').clientWidth`), true, `Shortcut dialog fits ${width}px, ${theme}`);
       await evaluate(`document.getElementById('close-shortcut').click()`);
+    }
+  }
+  // Status text shares space with a dot and (while busy) Cancel. Exercise real
+  // wrapping and geometry, not just the document width, including unbroken errors.
+  for (const phase of ['idle','recording','processing','downloading','error']) {
+    await evaluate(`window.fixture.phase=${JSON.stringify(phase)};window.fixture.message=${JSON.stringify('Long local status: ' + 'diagnostic-path/'.repeat(30))}`);
+    await until(`document.getElementById('dot').className===${JSON.stringify(phase)}`);
+    for (const width of [320,390,400,560,740,980,1280]) {
+      await send('Emulation.setDeviceMetricsOverride', {width,height:820,deviceScaleFactor:1,mobile:false});
+      const geometry = await evaluate(`(() => {
+        const dot=document.getElementById('dot').getBoundingClientRect();
+        const title=document.getElementById('phase').getBoundingClientRect();
+        const text=document.querySelector('.status>div').getBoundingClientRect();
+        const cancel=document.getElementById('cancel').getBoundingClientRect();
+        return {fits:document.documentElement.scrollWidth<=innerWidth,
+          aligned:dot.top>=title.top && dot.bottom<=title.bottom,
+          wraps:document.getElementById('message').scrollWidth<=text.width+1,
+          separated:!cancel.width || cancel.top>=text.bottom || cancel.left>=text.right,
+          label:document.getElementById('phase').textContent};
+      })()`);
+      assert.ok(geometry.fits && geometry.aligned && geometry.wraps && geometry.separated, `${phase} status fits and aligns at ${width}px: ${JSON.stringify(geometry)}`);
+      if (phase==='idle') assert.equal(geometry.label,'Ready');
     }
   }
   console.log('UI smoke passed: recording limit save/rollback/refresh, compact ready settings, missing setup/download progress, shortcut dialog focus/Escape/timeout/presets/validation/save failure, single cue without selector/autoplay, toggle/volume/idle-only preview, reset, counts, safe transcript/copy, light/dark responsive layout. No microphone capture or screenshots.');

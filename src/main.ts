@@ -8,7 +8,7 @@ type Status = { phase: string; message: string; progress: number; model_ready: b
 const logo = new URL('../src-tauri/icons/icon.png', import.meta.url).href;
 document.querySelector('#app')!.innerHTML = `
 <div class="shell">
- <aside><a class="brand" href="#overview" aria-label="HandsFree beta overview"><img src="${logo}" alt="" width="36" height="36"><span>HandsFree</span><span class="beta-badge">Beta</span></a>
+ <aside><a class="brand" href="#overview" aria-label="HandsFree beta overview"><img src="${logo}" alt="" width="36" height="36"><span>HandsFree</span><sup class="beta-badge">BETA</sup></a>
  <nav aria-label="Main navigation"><button id="nav-overview" class="nav active" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-6v-6h-4v6H4Z"/></svg>Overview</button><button id="nav-settings" class="nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg>Settings</button></nav></aside>
  <main>
  <header><span id="page-label">Overview</span><span class="badge"><i></i> On this Mac</span></header>
@@ -38,7 +38,7 @@ document.querySelector('#app')!.innerHTML = `
   </section>
     <section class="local-data" aria-labelledby="data-title"><h2 id="data-title">Local data</h2><div class="setting-row"><div><h3>Usage totals</h3><p>Counts and estimates, saved on this Mac.</p></div><button id="reset" class="danger">Reset totals…</button></div><details><summary>Privacy</summary><p class="subtle">Audio is processed in memory on this Mac, not saved as recordings. The last transcript stays in memory until you quit. No telemetry or transcript history. Paste briefly uses the clipboard; clipboard managers may retain it.</p></details></section>
  </section>
- <section class="status" aria-label="App status"><span id="dot"></span><div><strong id="phase">Connecting…</strong><p id="message" aria-live="polite"></p></div><button id="cancel" hidden>Cancel</button></section>
+ <section class="status" aria-label="App status"><span id="dot" aria-hidden="true"></span><div><strong id="phase">Connecting…</strong><p id="message" aria-live="polite"></p></div><button id="cancel" hidden>Cancel</button></section>
  <p id="feedback" class="feedback" role="status" hidden></p><p id="storage-error" class="feedback" role="status" hidden></p>
    <footer><span>HandsFree · 0.1.0 beta</span><span>English · On-device transcription</span></footer>
  </main>
