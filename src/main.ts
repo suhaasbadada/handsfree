@@ -23,7 +23,7 @@ document.querySelector('#app')!.innerHTML = `
   <div class="settings-intro"><h1 id="settings-title">Settings</h1></div>
   <section class="card preferences" aria-labelledby="preferences-title"><h2 id="preferences-title">Preferences</h2>
    <div class="setting-row"><div><h3>Shortcut</h3></div><kbd id="saved-shortcut">Fn</kbd><button id="change-shortcut" aria-haspopup="dialog">Change…</button></div>
-    <div class="setting-row listening-row"><div><h3>Listening sound</h3></div><div class="sound-selection"><button id="preview-sound" disabled>Preview</button></div><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Listening sound"><span aria-hidden="true"></span></label></div>
+    <div class="setting-row listening-row"><div><h3>Listening sound <span id="sound-state" class="state">Off</span></h3></div><div class="sound-selection"><button id="preview-sound" disabled>Preview</button></div><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Listening sound"><span aria-hidden="true"></span></label></div>
    <details class="sound-options"><summary>Sound options</summary><div class="sound-controls"><label for="sound-volume">Volume</label><input id="sound-volume" type="range" min="0" max="100" step="1" value="50" aria-describedby="volume-percent"><output id="volume-percent" for="sound-volume">50%</output></div><p class="subtle">If Bluetooth delays listening, turn the cue off.</p></details>
   </section>
   <section class="card setup-card" aria-labelledby="setup-title"><div class="card-heading"><h2 id="setup-title">Setup</h2><span id="setup-state" class="subtle" role="status">Checking…</span></div>
@@ -156,7 +156,7 @@ el('preview-sound').onclick = async () => {
 sounds.onchange = async () => {
   soundsPending = true; sounds.disabled = true;
   const success = await action('set_sounds', { enabled: sounds.checked });
-  if (!success) sounds.checked = current?.sounds ?? true;
+  if (!success) sounds.checked = current?.sounds ?? false;
   soundsPending = false; sounds.disabled = false;
 };
 const resetDialog = el('reset-dialog') as HTMLDialogElement;
@@ -197,7 +197,10 @@ async function refresh() {
     button('copy').disabled = !current.transcript;
     el('transcript').textContent = current.transcript || `No transcript yet. Choose a text field in another app and press ${current.shortcut_label} to begin.`;
     el('transcript').classList.toggle('empty', !current.transcript);
-    if (!soundsPending) sounds.checked = current.sounds;
+    if (!soundsPending) {
+      sounds.checked = current.sounds;
+      el('sound-state').textContent = current.sounds ? 'On' : 'Off';
+    }
     el('overview-shortcut').textContent = current.shortcut_label;
     el('saved-shortcut').textContent = current.shortcut_label;
     for (const id of ['shortcut-fn', 'shortcut-option', 'shortcut-control', 'record-shortcut']) button(id).disabled = shortcutPending || !canEditShortcut() || capturing;

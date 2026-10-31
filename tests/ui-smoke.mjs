@@ -101,6 +101,7 @@ try {
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='preview_sound').length`), 0, 'Opening sound options never autoplays');
   await evaluate(`document.getElementById('sounds').click()`);
   await until(`window.fixture.sounds===false && !document.getElementById('sounds').disabled`);
+  await until(`document.getElementById('sound-state').textContent==='Off'`);
   await evaluate(`window.fixture.sound_volume=50; const oldInvoke=window.__TAURI_INTERNALS__.invoke; window.__TAURI_INTERNALS__.invoke=async(command,args)=>{ if(command==='set_sound_volume') window.fixture.sound_volume=args.volume; return oldInvoke(command,args); };`);
   await until(`document.getElementById('volume-percent').textContent==='50%'`);
   await evaluate(`const slider=document.getElementById('sound-volume'); for(let n=51;n<=70;n++){slider.value=String(n); slider.dispatchEvent(new Event('input'));}`);
@@ -152,7 +153,7 @@ try {
   await evaluate(`window.fixture.phase='copied'; window.fixture.message='Copied. Automatic paste skipped: Not pasted [start:no-original-focus].';`);
   await until(`document.getElementById('phase').textContent==='Copied' && document.getElementById('dot').className==='copied'`);
   assert.equal(await evaluate(`document.getElementById('cancel').hidden && !document.getElementById('copy').disabled && !document.getElementById('preview-sound').disabled && !document.getElementById('record-shortcut').disabled`), true, 'Copied fallback is ready, not an error or busy state');
-  assert.equal(await evaluate(`getComputedStyle(document.getElementById('dot')).backgroundColor`), 'rgb(136, 181, 77)', 'Normal fallback is not red');
+  assert.equal(await evaluate(`getComputedStyle(document.getElementById('dot')).backgroundColor`), 'rgb(112, 107, 104)', 'Normal fallback is graphite; muted red is reserved for recording/active controls');
   assert.match(await evaluate(`document.getElementById('message').textContent`), /start:no-original-focus/);
   await evaluate(`document.getElementById('nav-settings').click();document.querySelector('.sound-options').open=false;document.getElementById('feedback').hidden=true;window.fixture.message='Select a text field and press Fn.'`);
   await until(`document.getElementById('message').textContent==='Select a text field and press Fn.'`);
@@ -162,6 +163,10 @@ try {
   await until(`document.getElementById('transcript').textContent.startsWith('A little less')`);
   for (const theme of ['light','dark']) {
     await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-color-scheme',value:theme}]});
+    assert.deepEqual(await evaluate(`({scheme:getComputedStyle(document.documentElement).colorScheme,bg:getComputedStyle(document.documentElement).backgroundColor,text:getComputedStyle(document.documentElement).color})`), {scheme:'light',bg:'rgb(247, 246, 243)',text:'rgb(48, 46, 45)'}, 'The app stays intentionally light even on a dark system');
+    await evaluate(`document.getElementById('feedback').hidden=false;document.getElementById('feedback').textContent='Could not save. Try again.'`);
+    assert.deepEqual(await evaluate(`({bg:getComputedStyle(document.getElementById('feedback')).backgroundColor,text:getComputedStyle(document.getElementById('feedback')).color})`), {bg:'rgb(250, 240, 223)',text:'rgb(48, 46, 45)'}, 'Warning feedback has dark readable text in either system mode');
+    await evaluate(`document.getElementById('feedback').hidden=true`);
     for (const width of [400, 560, 740, 980]) {
       await send('Emulation.setDeviceMetricsOverride', { width, height: 820, deviceScaleFactor: 1, mobile: false });
       for (const tab of ['overview','settings']) {

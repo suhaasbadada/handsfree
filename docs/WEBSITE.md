@@ -2,7 +2,7 @@
 
 Canonical URL: **https://suhaasbadada.github.io/handsfree/**
 
-The landing page lives in `site/`. It is plain HTML and CSS with no build step, JavaScript, tracking, external fonts, CDN assets, or paid services. The icon in `site/assets/handsfree.png` is a copy of the existing app icon (`src-tauri/icons/icon.png`); update both if the brand changes. The waveform is an illustration, not a product screenshot. Colors follow the system light/dark preference; motion respects reduced-motion settings.
+The landing page lives in `site/`. It is plain HTML and CSS with no build step, JavaScript, tracking, external fonts, CDN assets, or paid services. The icon in `site/assets/handsfree.png` is a copy of the existing app icon (`src-tauri/icons/icon.png`); update both if the brand changes. The original liked logo is retained. The waveform is an illustration, not a product screenshot. Warm whites, graphite text, and muted-red accents match the app and remain light regardless of system appearance; motion respects reduced-motion settings.
 
 ## Preview and validate
 

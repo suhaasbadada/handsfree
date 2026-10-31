@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const binary = process.env.BROWSER_BINARY;
+const port = process.env.SITE_PORT ?? '8765';
 if (!binary) throw new Error('Set BROWSER_BINARY and serve site/ on http://127.0.0.1:8765 first.');
 const profile = mkdtempSync(join(tmpdir(), 'handsfree-website-'));
 const browser = spawn(binary, ['--headless', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
@@ -61,7 +62,7 @@ try {
     { name: 'prefers-reduced-motion', value: 'reduce' },
     { name: 'prefers-color-scheme', value: 'light' },
   ] });
-  await send('Page.navigate', { url: 'http://127.0.0.1:8765/' });
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}/` });
   for (let attempt = 0; attempt < 100; attempt++) {
     if (await evaluate(`document.readyState === 'complete' && !!document.querySelector('h1')`)) break;
     await delay(50);
@@ -86,10 +87,14 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   const dark = await evaluate(`({
     dark: matchMedia('(prefers-color-scheme:dark)').matches,
+    scheme: getComputedStyle(document.documentElement).colorScheme,
+    background: getComputedStyle(document.body).backgroundColor,
     animation: getComputedStyle(document.querySelector('.wave-seed')).animationName,
     scroll: document.documentElement.scrollWidth, width: document.documentElement.clientWidth
   })`);
   assert.ok(dark.dark);
+  assert.equal(dark.scheme, 'light');
+  assert.equal(dark.background, 'rgb(247, 246, 243)');
   assert.equal(dark.animation, 'none');
   assert.equal(dark.scroll, dark.width);
   await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });

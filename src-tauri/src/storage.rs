@@ -47,7 +47,7 @@ impl Default for Store {
         Self {
             shortcut: crate::shortcut::Shortcut::default(),
             sound_style: "tap".into(),
-            sounds: true,
+            sounds: false,
             sound_volume: 50.0,
             stats: Stats::default(),
         }
@@ -115,6 +115,21 @@ pub fn validate_volume(volume: f32) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn silent_defaults_preserve_explicit_sound_preferences() {
+        assert!(!Store::default().sounds);
+        assert!(!serde_json::from_str::<Store>("{}").unwrap().sounds);
+        assert!(
+            serde_json::from_str::<Store>(r#"{"sounds":true}"#)
+                .unwrap()
+                .sounds
+        );
+        assert!(
+            !serde_json::from_str::<Store>(r#"{"sounds":false}"#)
+                .unwrap()
+                .sounds
+        );
+    }
     #[test]
     fn volume_validation_and_legacy_preferences() {
         let legacy: Store = serde_json::from_str(r#"{"sounds":false}"#).unwrap();

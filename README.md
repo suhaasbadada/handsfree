@@ -21,7 +21,7 @@ No Windows/Linux release dates are promised. The current Mac implementation live
 - **Local transcription** with Whisper and Apple Silicon Metal acceleration. No account, paid API, telemetry, or transcript uploads.
 - **Stay in flow:** a compact, focus-preserving recording capsule, live microphone meter, and Escape to cancel.
 - **Your shortcut:** Fn / 🌐, Option + Space, Control + Shift + Space, or a custom combination.
-- **Practical controls:** optional listening sounds, last-transcript copy, and local usage totals.
+- **Practical controls:** listening sounds off by default, last-transcript copy, and local usage totals. Warm light surfaces, graphite controls, and muted-red recording accents stay light regardless of system appearance. The Dock icon appears while the dashboard is open; closing it keeps HandsFree in the menu bar.
 - **Safer insertion:** checks the original app and field before submitting Paste; if insertion is refused, copies the transcript for manual paste instead.
 
 ## Download · Apple Silicon beta

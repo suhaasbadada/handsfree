@@ -125,6 +125,22 @@ for phase: Int32 in [1, 2, 3, 4, 5, 1] {
     // Exercise drawing and text layout for every state without starting capture.
     let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
     view.cacheDisplay(in: view.bounds, to: bitmap)
+    for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+        view.appearance = NSAppearance(named: appearance)
+        view.cacheDisplay(in: view.bounds, to: bitmap)
+        var lightPixels = 0, darkPixels = 0, redPixels = 0
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB), color.alphaComponent > 0.8 else { continue }
+                if color.redComponent > 0.9 && color.greenComponent > 0.9 && color.blueComponent > 0.85 { lightPixels += 1 }
+                if max(color.redComponent, color.greenComponent, color.blueComponent) < 0.6 { darkPixels += 1 }
+                if color.redComponent > color.blueComponent + 0.15 { redPixels += 1 }
+            }
+        }
+        precondition(lightPixels > 500, "Capsule stays light under either system appearance")
+        if phase == 1 { precondition(redPixels > 20, "Recording waveform uses muted red, not blue or lime") }
+        if phase == 3 || phase == 4 || phase == 5 { precondition(darkPixels > 10, "Status/error feedback must have readable dark text, not white-on-white") }
+    }
     if phase == 1, let path = ProcessInfo.processInfo.environment["HF_CAPSULE_PREVIEW"] {
         try! bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: path))
     }
@@ -139,4 +155,13 @@ overlay(1); overlay(2); overlay(4)
 RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.3))
 precondition((app.windows.first { $0 is NSPanel }!.contentView as! PillView).capsuleRect == recordingRect)
 overlay(0)
+precondition(dashboardVisible(true))
+precondition(activationPolicy() == Int32(NSApplication.ActivationPolicy.regular.rawValue))
+precondition(dashboardVisible(false))
+precondition(activationPolicy() == Int32(NSApplication.ActivationPolicy.accessory.rawValue))
+overlay(1)
+precondition(activationPolicy() == Int32(NSApplication.ActivationPolicy.accessory.rawValue), "Recording must not change Dock presence")
+precondition(!app.windows.first { $0 is NSPanel }!.isKeyWindow)
+overlay(0)
+app.setActivationPolicy(.prohibited)
 print("Native capsule geometry, state layout, nonactivation, shortcut matching and nonmusical cue passed without capture")

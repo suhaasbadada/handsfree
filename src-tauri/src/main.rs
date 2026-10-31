@@ -30,6 +30,8 @@ const MODEL_HASH: &str = "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897a
 const MODEL_URL: &str =
     "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin";
 unsafe extern "C" {
+    fn hf_dashboard_visible(visible: bool) -> bool;
+    fn hf_activation_policy() -> i32;
     fn hf_permissions() -> i32;
     fn hf_microphone_status() -> i32;
     fn hf_request_microphone();
@@ -245,6 +247,7 @@ fn write_diagnostic(
         "model_expected_bytes": MODEL_SIZE,
         "model_expected_sha256": MODEL_HASH,
         "phase": status.phase,
+        "activation_policy": unsafe { hf_activation_policy() },
         "message": status.message,
     });
     let _writer = DIAGNOSTIC_WRITE.lock().unwrap();
@@ -838,11 +841,15 @@ async fn download() -> Result<(), String> {
     result
 }
 fn show_settings(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.unminimize();
-        let _ = window.set_focus();
-    }
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        if let Some(window) = handle.get_webview_window("main") {
+            unsafe { hf_dashboard_visible(true) };
+            let _ = window.show();
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
+    });
 }
 fn handle_permission_args(app: &tauri::AppHandle, args: &[String]) {
     let requests = logic::permission_requests(args);
@@ -885,6 +892,9 @@ fn main() {
             reset_stats
         ])
         .setup(|app| {
+            // The initial dashboard is visible; LSUIElement remains the quiet
+            // background default after its window is closed.
+            unsafe { hf_dashboard_visible(true) };
             let directory = app.path().app_local_data_dir()?;
             fs::create_dir_all(&directory)?;
             use std::os::unix::fs::PermissionsExt;
@@ -1007,6 +1017,9 @@ fn main() {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 let _ = window.hide();
+                if window.label() == "main" {
+                    unsafe { hf_dashboard_visible(false) };
+                }
             }
         })
         .build(tauri::generate_context!())

@@ -36,7 +36,8 @@ test('website is dependency-free with accessible, honest platform copy', () => {
   assert.doesNotMatch(html, /<script\b|<iframe\b|https?:\/\/[^"\s]+\.(?:js|css)(?:["?])/i);
   assert.doesNotMatch(css, /@import|url\s*\(/i);
   assert.match(css, /prefers-reduced-motion/);
-  assert.match(css, /prefers-color-scheme:dark/);
+  assert.match(css, /color-scheme:light;/);
+  assert.doesNotMatch(css, /prefers-color-scheme/);
   assert.match(css, /focus-visible/);
   assert.match(html, /Mac beta prepared, not yet published/);
   assert.equal([...html.matchAll(/Not implemented or available to download/g)].length, 2);

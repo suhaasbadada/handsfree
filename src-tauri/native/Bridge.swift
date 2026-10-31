@@ -8,6 +8,21 @@ private func main<T>(_ body: () -> T) -> T {
     if Thread.isMainThread { return body() }
     return DispatchQueue.main.sync(execute: body)
 }
+// Only the dashboard lifecycle changes Dock presence. Recording never calls this.
+@_cdecl("hf_dashboard_visible") public func dashboardVisible(_ visible: Bool) -> Bool {
+    main {
+        let app = NSApplication.shared
+        if visible, let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleIconFile") as? String {
+            let path = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources").appendingPathComponent(name.hasSuffix(".icns") ? name : name + ".icns")
+            if let icon = NSImage(contentsOf: path) { app.applicationIconImage = icon }
+        }
+        // No activate()/makeKey(): only an explicit dashboard open may focus UI.
+        return app.setActivationPolicy(visible ? .regular : .accessory)
+    }
+}
+@_cdecl("hf_activation_policy") public func activationPolicy() -> Int32 {
+    main { Int32(NSApplication.shared.activationPolicy().rawValue) }
+}
 private typealias Callback = @convention(c) (Int32) -> Void
 private var callback: Callback?
 private var tap: CFMachPort?
@@ -23,7 +38,7 @@ private var targetFailure: PasteResult = .originalFocusUnavailable
 private var overlayGeneration = 0
 private var clipboardGeneration = 0
 private var restoreClipboard: (() -> Void)?
-private var soundsEnabled = true
+private var soundsEnabled = false
 private var cue: AVAudioPlayer?
 private var cueVolume: Float = 0.5
 private var audioBusy = false
@@ -167,9 +182,9 @@ private class CapsuleButton: NSButton {
     override func mouseEntered(with event: NSEvent) { hovered = true; needsDisplay = true }
     override func mouseExited(with event: NSEvent) { hovered = false; needsDisplay = true }
     override func draw(_ dirtyRect: NSRect) {
-        (finish ? NSColor(calibratedRed: 0.24, green: 0.53, blue: 1, alpha: hovered ? 1 : 0.9) : NSColor(white: hovered ? 0.28 : 0.17, alpha: 1)).setFill()
+        (finish ? NSColor(white: hovered ? 0.20 : 0.27, alpha: 1) : NSColor(white: hovered ? 0.84 : 0.90, alpha: 1)).setFill()
         NSBezierPath(ovalIn: bounds.insetBy(dx: 3, dy: 3)).fill()
-        NSColor.white.setStroke()
+        (finish ? NSColor.white : NSColor(white: 0.26, alpha: 1)).setStroke()
         let path = NSBezierPath(); path.lineWidth = 1.8; path.lineCapStyle = .round; path.lineJoinStyle = .round
         if finish {
             let points = CapsuleGeometry.checkmark(in: bounds)
@@ -223,13 +238,13 @@ class PillView: NSView {
     }
     override func draw(_ dirtyRect: NSRect) {
         let capsule = capsuleRect
-        NSColor(white: 0.035, alpha: 0.98).setFill()
+        NSColor(calibratedRed: 0.985, green: 0.981, blue: 0.969, alpha: 0.97).setFill()
         NSBezierPath(roundedRect: capsule.insetBy(dx: 1, dy: 1), xRadius: capsule.height / 2, yRadius: capsule.height / 2).fill()
-        NSColor(white: 1, alpha: 0.12).setStroke()
+        NSColor(white: 0.25, alpha: 0.12).setStroke()
         NSBezierPath(roundedRect: capsule.insetBy(dx: 1, dy: 1), xRadius: capsule.height / 2, yRadius: capsule.height / 2).stroke()
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         if phase == 1 {
-            NSColor(calibratedRed: 0.77, green: 0.96, blue: 0.43, alpha: 1).setFill()
+            NSColor(calibratedRed: 0.65, green: 0.29, blue: 0.27, alpha: 1).setFill()
             for i in 0..<9 {
                 let shape = CGFloat([0.35, 0.6, 0.85, 0.65, 1, 0.7, 0.9, 0.5, 0.3][i])
                 // Amplitude comes only from the recorder, never a fake sine wave.
@@ -239,7 +254,7 @@ class PillView: NSView {
         } else if phase == 2 {
             for i in 0..<3 {
                 let breath = reduceMotion ? 0.65 : 0.45 + 0.4 * (0.5 + 0.5 * sin(tick / 30 * 2 * .pi / 1.4 - CGFloat(i) * 0.8))
-                NSColor(calibratedRed: 0.77, green: 0.96, blue: 0.43, alpha: breath).setFill()
+                NSColor(white: 0.35, alpha: breath).setFill()
                 NSBezierPath(ovalIn: NSRect(x: capsule.midX - 12 + CGFloat(i) * 10, y: capsule.midY - 2, width: 4, height: 4)).fill()
             }
         } else {
@@ -247,7 +262,7 @@ class PillView: NSView {
             let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .center
             let x: CGFloat = 9
             let height: CGFloat = phase == 4 || phase == 5 ? 14 : 28
-            (text as NSString).draw(in: NSRect(x: x, y: (bounds.height-height)/2, width: bounds.width-x-9, height: height), withAttributes: [.font: NSFont.systemFont(ofSize: 10.5, weight: .medium), .foregroundColor: NSColor.white, .paragraphStyle: paragraph])
+            (text as NSString).draw(in: NSRect(x: x, y: (bounds.height-height)/2, width: bounds.width-x-9, height: height), withAttributes: [.font: NSFont.systemFont(ofSize: 10.5, weight: .medium), .foregroundColor: NSColor(white: 0.22, alpha: 1), .paragraphStyle: paragraph])
         }
     }
 }
