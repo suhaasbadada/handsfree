@@ -39,6 +39,10 @@ try {
 } catch { $buildFailure = $_ }
 $normalization = Invoke-Checked python @('scripts/windows-source-state.py', 'restore', '--state', $snapshot)
 if ($null -ne $buildFailure) { throw $buildFailure }
+$dependencyReport = Join-Path $root 'src-tauri/target/windows-app-dependencies.json'
+# Inspect the actual native app, not the NSIS wrapper. Reject candidates before
+# copying any artifacts if a direct/delay DLL import needs an unbundled runtime.
+Invoke-Checked python @('scripts/windows-pe-imports.py', 'src-tauri/target/x86_64-pc-windows-msvc/release/handsfree.exe', '--output', $dependencyReport)
 $installers = @(Get-ChildItem $bundle -Filter '*.exe' -File)
 if ($installers.Count -ne 1) { throw 'Expected exactly one newly built NSIS installer.' }
 # Structural check only; this does not establish successful installation or runtime behavior.
@@ -52,8 +56,7 @@ New-Item -ItemType Directory -Path $output | Out-Null
 $name = 'HandsFree-0.1.1-windows-x64-setup.exe'
 Copy-Item $installers[0].FullName (Join-Path $output $name)
 Copy-Item "$notices/*" $output -Recurse
-$sha = (Get-FileHash (Join-Path $output $name) -Algorithm SHA256).Hash.ToLowerInvariant()
-"$sha  $name" | Set-Content (Join-Path $output 'SHA256SUMS') -Encoding utf8NoBOM
+Copy-Item $dependencyReport (Join-Path $output 'APP-DEPENDENCIES.json')
 $commit = & git rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot identify source commit.' }
 $dirty = & git status --porcelain --untracked-files=normal
@@ -69,6 +72,10 @@ Worktree dirty: $([bool]$dirty)
 Source Cargo.toml SHA256 (original bytes, restored): $sourceManifestHash
 Build normalization: $normalization
 Target: $env:CARGO_BUILD_TARGET
+Rust flags: $env:RUSTFLAGS
+CMake MSVC runtime: $env:CMAKE_MSVC_RUNTIME_LIBRARY
+CMake CMP0091: $env:CMAKE_POLICY_DEFAULT_CMP0091
+PE dependency gate: passed; AMD64 PE32+; direct/delay OS-only imports (APP-DEPENDENCIES.json)
 Build: $run
 UTC: $([DateTime]::UtcNow.ToString('o'))
 Node: $node
@@ -78,4 +85,9 @@ Unsigned. No Authenticode identity, automatic release, or updater.
 No speech model, recording, local app state, or signing material included.
 Automated checks are not a microphone, shortcut, paste, or installer acceptance test.
 "@ | Set-Content (Join-Path $output 'PROVENANCE.txt') -Encoding utf8NoBOM
+$checksums = Get-ChildItem $output -File -Recurse | Sort-Object FullName | ForEach-Object {
+    $relative = [System.IO.Path]::GetRelativePath($output, $_.FullName).Replace('\', '/')
+    "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $relative"
+}
+$checksums | Set-Content (Join-Path $output 'SHA256SUMS') -Encoding utf8NoBOM
 Write-Host "Candidate ready in $output. Complete docs/WINDOWS.md acceptance checks before distribution."

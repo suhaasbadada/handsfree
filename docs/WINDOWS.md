@@ -81,17 +81,40 @@ The script runs Rust format/tests/clippy and builds NSIS with the Windows-only
 Tauri overlay. Its environment helper disables host-native and optional x86
 instruction-set tuning (including AVX/AVX2/AVX512) in the locked whisper build.
 This favors compatibility over speed; it does not establish a tested CPU matrix.
+The Windows-only helper also enables Rust `+crt-static` (including native build
+dependencies) and CMake `CMP0091=NEW`, `MSVC_RUNTIME_LIBRARY=MultiThreaded` (/MT
+for all configurations). Existing Rust flags are preserved; conflicting
+`-crt-static` or encoded flags fail explicitly. Repeated dot-sourcing is idempotent.
+This does not change Mac compiler flags or signing. A fresh native build is
+required when changing CRT settings; do not reuse older native object caches.
 For separate `cargo` commands, first dot-source `./scripts/windows-env.ps1` in
 the same PowerShell session. Changing these settings requires a clean native
 build, not reusing cached whisper objects from a different CPU configuration.
 
-Outputs are under `release/windows-x64/`: an EXE, SHA-256 checksum, provenance,
+After Tauri builds, `scripts/windows-pe-imports.py` inspects the actual
+`src-tauri/target/x86_64-pc-windows-msvc/release/handsfree.exe` before candidate
+copying. It requires AMD64 PE32+, validates file-backed PE bounds, and checks
+normal and delay imports against an explicit Windows 10/11 OS DLL allowlist and
+`api-ms-win-`/`ext-ms-win-` API-set contracts. Unknown DLLs and redistributable
+CRT imports (including MSVCP140, VCRUNTIME140, and CONCRT140 variants) fail the
+build. No Microsoft redistributable DLLs are added. Do not broaden the allowlist
+without source evidence. The previous candidate's MSVCP140 import is not safe
+merely because Tauri statically links Rust's vcruntime.
+
+Outputs are under `release/windows-x64/`: an EXE, SHA-256 checksums, provenance,
+`APP-DEPENDENCIES.json` (actual app hash, architecture, normal/delay imports),
 MIT license, dependency inventory/notices, and verified registry source archives
 (including MPL corresponding source). These notices and sources are also
 bundled under the installed app's `licenses` directory. Generated data stays in
 ignored `src-tauri/target` and `release` directories, not Git. Existing candidate
 outputs are never overwritten; preserve/move them before rebuilding. The workflow
 does not sign, publish a release, launch the app, record audio, or install anything.
+`SHA256SUMS` covers all candidate files, including the dependency report and
+provenance (not itself). A passing import gate establishes only direct/delay
+dependencies of that built app, not dynamic LoadLibrary behavior, installer
+operation, or clean-machine startup. Static C++ linkage is not verified until
+the real Windows build passes this gate; manual clean-PC acceptance remains
+required before distribution.
 
 ## Required manual acceptance before sharing
 
