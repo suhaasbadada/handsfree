@@ -69,32 +69,38 @@ enum CapsuleGeometry {
 }
 enum StartCue {
     static let rate = 44100
-    static let duration = 0.22
-    // A rounded, airy tactile transient, not a note. No oscillators or resonators.
+    static let duration = 0.085
+    // A crisp tactile UI click, not a note. No oscillators or resonators.
     static func envelope(time: Double) -> Double {
         guard time > 0 && time < duration else { return 0 }
-        let attack = 0.016
-        let release = 0.070
+        let attack = 0.002
+        let end = 0.075 // Last 10 ms are silent, not a truncated noise tail.
+        guard time < end else { return 0 }
+        let release = 0.030
         let rise = 0.5 - 0.5 * cos(.pi * min(time / attack, 1))
-        let fall = 0.5 - 0.5 * cos(.pi * min((duration - time) / release, 1))
-        return rise * fall * fall * exp(-time / 0.065)
+        let fall = 0.5 - 0.5 * cos(.pi * min((end - time) / release, 1))
+        return rise * fall * fall * exp(-time / 0.016)
     }
     static var samples: [Int16] {
         var seed: UInt32 = 0x48F2A713
-        var lowBody = 0.0, soft = 0.0, softer = 0.0
-        let highpass = 1 - exp(-2 * Double.pi * 160 / Double(rate))
-        let lowpass = 1 - exp(-2 * Double.pi * 1100 / Double(rate))
+        var lowBody = 0.0, lowBody2 = 0.0, soft = 0.0, softer = 0.0, smooth = 0.0
+        let highpass = 1 - exp(-2 * Double.pi * 1000 / Double(rate))
+        let lowpass = 1 - exp(-2 * Double.pi * 3500 / Double(rate))
         var shaped: [Double] = []
         for i in 0..<Int(Double(rate) * duration) {
             seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5
             let noise = Double(seed) / Double(UInt32.max) * 2 - 1
-            // Remove sub-bass, then two gentle lowpasses remove the sharp hiss.
+            // Two highpasses reject the thump; three lowpasses restrain hiss.
+            // Broad mid/high articulation without a sustained pitched component.
             lowBody += highpass * (noise - lowBody)
-            soft += lowpass * (noise - lowBody - soft)
+            let bright = noise - lowBody
+            lowBody2 += highpass * (bright - lowBody2)
+            soft += lowpass * (bright - lowBody2 - soft)
             softer += lowpass * (soft - softer)
-            shaped.append(softer * envelope(time: Double(i) / Double(rate)))
+            smooth += lowpass * (softer - smooth)
+            shaped.append(smooth * envelope(time: Double(i) / Double(rate)))
         }
-        let gain = 10500 / shaped.map { abs($0) }.max()!
+        let gain = 16000 / shaped.map { abs($0) }.max()!
         return shaped.map { Int16(($0 * gain).rounded()) }
     }
 }

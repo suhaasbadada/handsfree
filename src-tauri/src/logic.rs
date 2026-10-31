@@ -311,7 +311,10 @@ mod tests {
     }
     #[test]
     fn copy_only_nonempty_refusals_never_submitted_or_cancelled() {
-        assert_eq!(copied_message(3), "Copied. Automatic paste skipped: Not pasted [start:no-original-focus].");
+        assert_eq!(
+            copied_message(3),
+            "Copied. Automatic paste skipped: Not pasted [start:no-original-focus]."
+        );
         for code in 1..=15 {
             assert!(should_copy_fallback("final text", code));
         }
