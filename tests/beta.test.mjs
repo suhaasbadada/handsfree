@@ -4,11 +4,12 @@ import { readFileSync } from 'node:fs';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('app and landing brands show a semantic, visible Beta badge', () => {
+test('app footer and landing brand show a semantic, visible Beta badge', () => {
   for (const path of ['src/main.ts', 'site/index.html']) {
     const source = read(path);
-    assert.match(source, /aria-label="HandsFree beta (?:overview|home)"/);
-    assert.match(source, /<sup class="beta-badge">BETA<\/sup>/);
+    if (path.startsWith('site')) assert.match(source, /aria-label="HandsFree beta home"/);
+    else assert.match(source, /<footer>[\s\S]*<span class="beta-badge">BETA<\/span>[\s\S]*<\/footer>/);
+    assert.match(source, /class="beta-badge">BETA<\/(?:sup|span)>/);
     assert.equal([...source.matchAll(/class="beta-badge"/g)].length, 1, 'One unobtrusive badge per surface');
   }
   for (const path of ['src/style.css', 'site/styles.css']) {
@@ -51,6 +52,7 @@ test('beta 2 app, package, release manifest and audit versions stay coordinated'
   assert.equal(candidate, `HandsFree-${release.version}-macos-arm64.dmg`);
   assert.ok(read('scripts/package-release.sh').includes(`NAME=${candidate.slice(0, -4)}`));
   assert.ok(read('scripts/package-release.sh').includes(`== ${version} ]]`));
-  assert.ok(read('src/main.ts').includes(`HandsFree · ${version} beta`));
+  assert.ok(read('src/main.ts').includes(`<span id="app-version">${version}</span>`));
+  assert.match(read('src/main.ts'), /getVersion\(\)\.then/);
   assert.ok(read(`docs/releases/${tag}.md`).includes(`Internal app version: **${version}**`));
 });

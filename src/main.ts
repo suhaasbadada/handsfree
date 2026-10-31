@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { getVersion } from '@tauri-apps/api/app';
 import './style.css';
 import './typography.css';
 import { shortcutFromEvent, type Shortcut } from './shortcut';
@@ -8,7 +9,7 @@ type Status = { phase: string; message: string; progress: number; model_ready: b
 const logo = new URL('../src-tauri/icons/icon.png', import.meta.url).href;
 document.querySelector('#app')!.innerHTML = `
 <div class="shell">
- <aside><a class="brand" href="#overview" aria-label="HandsFree beta overview"><img src="${logo}" alt="" width="36" height="36"><span>HandsFree</span><sup class="beta-badge">BETA</sup></a>
+ <aside><a class="brand" href="#overview" aria-label="HandsFree overview"><img src="${logo}" alt="" width="36" height="36"><span>HandsFree</span></a>
   <nav aria-label="Main navigation"><button id="nav-overview" class="nav active" aria-label="Overview" title="Overview" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-6v-6h-4v6H4Z"/></svg></button><button id="nav-settings" class="nav" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg></button></nav></aside>
  <main>
  <section id="overview" aria-labelledby="overview-title">
@@ -16,12 +17,12 @@ document.querySelector('#app')!.innerHTML = `
    <section class="card readiness"><div><h2 id="ready-title">Finish setting up</h2><p id="ready-detail">Checking permissions and model…</p></div><button id="setup" class="primary">Open settings</button></section>
    <section id="overview-model" class="card readiness" hidden aria-label="English model"><div><h2>English model</h2><p id="overview-model-state">One-time download · Works offline afterward</p></div><button id="overview-download" class="primary" disabled>Download English model (~148 MB)</button></section>
    <div class="metrics" aria-label="Local usage since tracking began"><article><strong id="words">0</strong><span>Words dictated</span></article><article><strong id="saved">0 min</strong><span tabindex="0" title="Estimate per dictation: typing at 40 words/minute, minus recording time, never below zero. Not a productivity measurement.">Estimated time saved</span></article><article><strong id="count">0</strong><span>Dictations</span></article></div>
-   <section class="card transcript-card"><div class="card-heading"><h2>Last transcript</h2><button id="copy" disabled>Copy text</button></div><p id="transcript" class="transcript empty">No transcript yet.</p></section>
+    <section class="transcript-section" aria-labelledby="transcript-title"><div class="card-heading"><h2 id="transcript-title">Transcript</h2><button id="copy" disabled>Copy text</button></div><p id="transcript" class="transcript empty">Your next dictation appears here.</p></section>
  </section>
  <section id="settings" hidden aria-labelledby="settings-title">
   <div class="settings-intro"><h1 id="settings-title">Settings</h1></div>
    <section class="card preferences" aria-labelledby="preferences-title"><h2 id="preferences-title">Preferences</h2>
-    <div class="setting-row shortcut-row"><div><h3>Shortcut</h3></div><div class="shortcut-value"><kbd id="saved-shortcut">Fn</kbd><button id="change-shortcut" aria-haspopup="dialog">Change</button></div></div>
+    <div class="setting-row shortcut-row"><div><h3>Shortcut</h3></div><div class="shortcut-value"><button id="change-shortcut" aria-label="Record shortcut" title="Record shortcut" aria-pressed="false" aria-describedby="shortcut-feedback"><span id="saved-shortcut">Fn</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/></svg></button><button id="stop-shortcut" hidden>Cancel</button><button id="shortcut-fn" class="text-action" hidden>Use Fn</button></div><p id="shortcut-feedback" role="status" hidden></p></div>
     <div class="setting-row"><div><h3><label for="recording-limit">Recording limit</label></h3></div><select id="recording-limit" title="Applies to the next recording"><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="240">4 minutes</option><option value="300">5 minutes</option></select></div>
     <div class="setting-row listening-row"><div><h3>Listening sound</h3></div><span id="sound-state" class="state">Off</span><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Listening sound"><span aria-hidden="true"></span></label></div>
     <div class="setting-row volume-row"><h3><label for="sound-volume">Volume</label></h3><div class="sound-controls"><input id="sound-volume" type="range" min="0" max="100" step="1" value="50" aria-describedby="volume-percent"><output id="volume-percent" for="sound-volume">50%</output></div><button id="preview-sound" disabled>Preview</button></div>
@@ -38,10 +39,9 @@ document.querySelector('#app')!.innerHTML = `
  </section>
  <section class="status" aria-label="App status"><span id="dot" aria-hidden="true"></span><div><strong id="phase">Connecting…</strong><p id="message" aria-live="polite"></p></div><button id="cancel" hidden>Cancel</button></section>
  <p id="feedback" class="feedback" role="status" hidden></p><p id="storage-error" class="feedback" role="status" hidden></p>
-   <footer><span>HandsFree · 0.1.1 beta</span><span>English · On-device transcription</span></footer>
- </main>
+  </main>
+  <footer><span class="footer-brand">HandsFree <span id="app-version">0.1.1</span> <span class="beta-badge">BETA</span></span><span>English · On-device transcription</span></footer>
 </div>
- <dialog id="shortcut-dialog" aria-labelledby="shortcut-title"><h2 id="shortcut-title">Choose a shortcut</h2><div class="shortcut-options"><button id="shortcut-fn" autofocus>Fn</button><button id="shortcut-option">Option + Space</button><button id="shortcut-control">Control + Shift + Space</button><button id="record-shortcut">Custom shortcut…</button></div><input id="shortcut-recorder" readonly hidden aria-label="Record shortcut" placeholder="Press a shortcut. Escape cancels." aria-describedby="shortcut-help"><p id="shortcut-feedback" role="status" hidden></p><p id="shortcut-help">Use Control, Option or Command with a letter, number or Space (US key positions). Avoid shortcuts used by your other apps.</p><p>For Fn, set the Globe key to Do Nothing and disable macOS Dictation’s Fn shortcut.</p><button id="keyboard">Keyboard settings</button><div class="dialog-actions"><button id="close-shortcut">Done</button></div></dialog>
 <dialog id="reset-dialog" aria-labelledby="reset-title"><h2 id="reset-title">Reset usage totals?</h2><p>Totals will return to zero. Your preferences and language model won’t change.</p><div class="dialog-actions"><button id="keep-stats" autofocus>Keep totals</button><button id="confirm-reset" class="danger">Reset totals</button></div></dialog>`;
 const el = (id: string) => document.getElementById(id)!;
 const button = (id: string) => el(id) as HTMLButtonElement;
@@ -50,7 +50,7 @@ for (const id of ['change-shortcut', 'mic', 'permissions', 'download', 'reset', 
   (el(id) as HTMLInputElement | HTMLButtonElement).disabled = true;
 }
 let current: Status | undefined;
-let refreshing = false;
+let refreshTask: Promise<void> | undefined;
 let soundsPending = false;
 let volumePending = false;
 let limitPending = false;
@@ -60,10 +60,14 @@ let shortcutPending = false;
 let downloadPending = false;
 let capturing = false;
 let captureTimer: ReturnType<typeof setTimeout> | undefined;
+let captureStart: Promise<unknown> | undefined;
+let captureStopping = false;
+let activationHeld = false;
 const canEditShortcut = () => ['idle', 'copied', 'setup_required', 'not_pasted', 'error'].includes(current?.phase ?? '');
 const isIdle = () => ['idle', 'copied'].includes(current?.phase ?? '');
 let seenPermissionRequests = 0;
 function navigate(tab: 'overview' | 'settings') {
+  if (capturing && tab !== 'settings') void stopCapture();
   for (const name of ['overview', 'settings']) {
     el(name).hidden = name !== tab;
     el(`nav-${name}`).classList.toggle('active', name === tab);
@@ -73,7 +77,6 @@ function navigate(tab: 'overview' | 'settings') {
 }
 function feedback(message: string) {
   el('feedback').hidden = !message; el('feedback').textContent = message;
-  el('shortcut-feedback').hidden = !message; el('shortcut-feedback').textContent = message;
 }
 async function action(command: string, args?: Record<string, unknown>): Promise<boolean> {
   try { await invoke(command, args); feedback(''); await refresh(); return true; }
@@ -90,53 +93,66 @@ el('setup').onclick = () => {
 };
 el('mic').onclick = () => void action('request_microphone');
 el('permissions').onclick = () => void action('request_permissions');
-el('keyboard').onclick = () => void action('open_keyboard');
-const recorder = el('shortcut-recorder') as HTMLInputElement;
-const shortcutDialog = el('shortcut-dialog') as HTMLDialogElement;
-el('change-shortcut').onclick = () => { feedback(''); shortcutDialog.showModal(); };
-el('close-shortcut').onclick = () => shortcutDialog.close();
-shortcutDialog.addEventListener('close', () => {
-  // A queued close event must not interrupt a newly reopened dialog.
-  if (shortcutDialog.open) return;
-  void stopCapture(); button('change-shortcut').focus();
-});
-shortcutDialog.addEventListener('cancel', e => {
-  if (capturing) { e.preventDefault(); void stopCapture(); feedback('Shortcut unchanged.'); }
-});
+const recorder = button('change-shortcut');
+function shortcutFeedback(message: string) {
+  el('shortcut-feedback').hidden = !message; el('shortcut-feedback').textContent = message;
+}
+function renderShortcut() {
+  recorder.setAttribute('aria-pressed', String(capturing));
+  recorder.disabled = shortcutPending || captureStopping || !canEditShortcut();
+  if (!shortcutPending) el('saved-shortcut').textContent = capturing ? 'Press shortcut…' : current?.shortcut_label ?? 'Fn';
+  el('stop-shortcut').hidden = !capturing;
+  button('stop-shortcut').disabled = shortcutPending;
+  el('shortcut-fn').hidden = capturing || !current || current.shortcut.code === 'Fn';
+  button('shortcut-fn').disabled = shortcutPending || captureStopping || !canEditShortcut();
+}
 async function stopCapture() {
-  const wasCapturing = capturing;
-  capturing = false; clearTimeout(captureTimer); recorder.hidden = true;
-  if (wasCapturing && shortcutDialog.open) button('close-shortcut').focus();
-  try { await invoke('capture_shortcut', { active: false }); } catch (e) { feedback(String(e)); }
+  if (!capturing || captureStopping) return;
+  const restoreFocus = document.activeElement === recorder;
+  capturing = false; captureStopping = true; clearTimeout(captureTimer); renderShortcut();
+  try { await captureStart; await invoke('capture_shortcut', { active: false }); }
+  catch (e) { shortcutFeedback(String(e)); }
+  finally { captureStopping = false; renderShortcut(); if (restoreFocus) restoreRecorderFocus(); }
+}
+function restoreRecorderFocus() {
+  if (!el('settings').hidden && document.hasFocus() && document.activeElement === document.body && !recorder.disabled) recorder.focus();
 }
 async function saveShortcut(shortcut: Shortcut) {
-  if (shortcutPending || !canEditShortcut()) return;
-  shortcutPending = true;
-  const saved = await action('set_shortcut', { shortcut });
-  await stopCapture(); shortcutPending = false;
-  button('change-shortcut').disabled = !canEditShortcut();
-  if (saved) shortcutDialog.close();
+  if (shortcutPending || captureStopping || !canEditShortcut()) return;
+  const restoreFocus = document.activeElement === recorder;
+  shortcutPending = true; clearTimeout(captureTimer); renderShortcut();
+  try { await invoke('set_shortcut', { shortcut }); await refresh(); shortcutFeedback(''); }
+  catch (e) { shortcutFeedback(String(e)); }
+  finally {
+    await stopCapture(); await refresh(); shortcutPending = false; renderShortcut();
+    if (restoreFocus) restoreRecorderFocus();
+  }
 }
 el('shortcut-fn').onclick = () => void saveShortcut({code: 'Fn', modifiers: 0});
-el('shortcut-option').onclick = () => void saveShortcut({code: 'Space', modifiers: 2});
-el('shortcut-control').onclick = () => void saveShortcut({code: 'Space', modifiers: 5});
-el('record-shortcut').onclick = async () => {
-  if (!canEditShortcut() || shortcutPending || capturing) return;
+el('stop-shortcut').onclick = () => void stopCapture();
+recorder.onclick = async e => {
+  if (!canEditShortcut() || shortcutPending || capturing || captureStopping) return;
+  capturing = true; activationHeld = e.detail === 0; shortcutFeedback(''); renderShortcut(); recorder.focus();
   try {
-    await invoke('capture_shortcut', {active: true});
-    if (!shortcutDialog.open || !canEditShortcut()) { await stopCapture(); return; }
-    capturing = true; recorder.hidden = false; recorder.value = ''; recorder.focus();
-    feedback('Press a shortcut, or Escape to cancel.');
-    captureTimer = setTimeout(() => { void stopCapture(); feedback('Shortcut recording timed out.'); }, 25000);
-  } catch (e) { feedback(String(e)); }
+    captureStart = invoke('capture_shortcut', {active: true});
+    await captureStart;
+    if (!capturing || !canEditShortcut()) { await stopCapture(); return; }
+    captureTimer = setTimeout(() => { void stopCapture(); shortcutFeedback('Shortcut recording timed out.'); }, 15000);
+  } catch (e) { capturing = false; renderShortcut(); shortcutFeedback(String(e)); }
 };
 recorder.onkeydown = e => {
-  e.preventDefault(); e.stopPropagation();
   if (!capturing || shortcutPending) return;
-  if (e.code === 'Escape') { void stopCapture(); feedback('Shortcut unchanged.'); return; }
+  if (e.code === 'Tab') { void stopCapture(); return; }
+  e.preventDefault(); e.stopPropagation();
+  if (e.repeat || e.isComposing) return;
+  if (e.code === 'Escape') { void stopCapture(); return; }
+  if (activationHeld && (e.code === 'Enter' || (e.code === 'Space' && !e.ctrlKey && !e.altKey && !e.metaKey))) return;
+  if (captureStart && captureStopping) return;
   if (/^(Control|Alt|Shift|Meta)/.test(e.code)) return;
-  try { void saveShortcut(shortcutFromEvent(e)); } catch (error) { feedback(String(error)); }
+  try { const shortcut = shortcutFromEvent(e); void captureStart?.then(() => { if (capturing) void saveShortcut(shortcut); }).catch(error => shortcutFeedback(String(error))); }
+  catch (error) { shortcutFeedback(String(error)); }
 };
+recorder.onkeyup = () => { activationHeld = false; };
 recorder.onblur = () => { if (capturing && !shortcutPending) void stopCapture(); };
 window.addEventListener('blur', () => { if (capturing) void stopCapture(); });
 async function downloadModel() {
@@ -193,9 +209,11 @@ el('confirm-reset').onclick = async () => {
   if (await action('reset_stats', { confirmed: true })) { resetDialog.close(); feedback('Usage totals reset. Your next dictation starts fresh.'); }
   button('confirm-reset').disabled = false;
 };
-async function refresh() {
-  if (refreshing) return;
-  refreshing = true;
+function refresh(): Promise<void> {
+  if (!refreshTask) refreshTask = refreshStatus().finally(() => { refreshTask = undefined; });
+  return refreshTask;
+}
+async function refreshStatus() {
   try {
     current = await invoke<Status>('status');
     button('reset').disabled = false;
@@ -235,18 +253,15 @@ async function refresh() {
     (el('progress') as HTMLProgressElement).value = current.progress;
     el('cancel').hidden = !canCancel(current.phase);
     button('copy').disabled = !current.transcript;
-    el('transcript').textContent = current.transcript || 'No transcript yet.';
+    el('transcript').textContent = current.transcript || 'Your next dictation appears here.';
     el('transcript').classList.toggle('empty', !current.transcript);
     if (!soundsPending) {
       sounds.checked = current.sounds;
       el('sound-state').textContent = current.sounds ? 'On' : 'Off';
     }
     el('overview-shortcut').textContent = current.shortcut_label;
-    el('saved-shortcut').textContent = current.shortcut_label;
-    for (const id of ['shortcut-fn', 'shortcut-option', 'shortcut-control', 'record-shortcut']) button(id).disabled = shortcutPending || !canEditShortcut() || capturing;
-    button('shortcut-fn').setAttribute('aria-pressed', String(current.shortcut.code === 'Fn'));
-    button('shortcut-option').setAttribute('aria-pressed', String(current.shortcut.code === 'Space' && current.shortcut.modifiers === 2));
-    button('shortcut-control').setAttribute('aria-pressed', String(current.shortcut.code === 'Space' && current.shortcut.modifiers === 5));
+    if (capturing && !canEditShortcut() && !shortcutPending) void stopCapture();
+    renderShortcut();
     if (!volumePending && !volumeEditing) { volume.value = String(current.sound_volume); showVolume(); }
     button('preview-sound').disabled = !isIdle() || previewPending || volumePending || volumeEditing;
     el('words').textContent = current.stats.words.toLocaleString();
@@ -255,7 +270,6 @@ async function refresh() {
     const ready = readiness(current);
     el('setup-state').textContent = ready ? 'Ready' : 'Needs attention';
     el('setup-missing').hidden = ready;
-    button('change-shortcut').disabled = shortcutPending || !canEditShortcut();
     document.querySelector<HTMLElement>('.readiness')!.hidden = ready;
     el('ready-title').textContent = ready ? 'Ready' : 'Finish setting up';
     el('ready-detail').textContent = readinessDetail(current);
@@ -263,8 +277,8 @@ async function refresh() {
     el('storage-error').hidden = !current.persistence_error;
     el('storage-error').textContent = current.persistence_error;
   } catch (e) { feedback(`Couldn’t connect to HandsFree: ${String(e)}`); }
-  finally { refreshing = false; }
 }
 void refresh();
+void getVersion().then(version => { el('app-version').textContent = version; }).catch(() => { /* Packaged version fallback for browser previews. */ });
 setInterval(() => { if (!document.hidden) void refresh(); }, 800);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) void refresh(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && capturing) void stopCapture(); else if (!document.hidden) void refresh(); });

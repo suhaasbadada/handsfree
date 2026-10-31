@@ -49,7 +49,7 @@ try {
   };
   await send('Emulation.setDeviceMetricsOverride', { width: 980, height: 820, deviceScaleFactor: 1, mobile: false });
   await until(`Boolean(document.getElementById('nav-settings'))`);
-  assert.equal(await evaluate(`document.querySelector('.brand .beta-badge').textContent==='BETA' && document.querySelector('.brand .beta-badge').getBoundingClientRect().width>0`), true, 'App brand visibly identifies uppercase beta status');
+  assert.equal(await evaluate(`document.querySelector('footer .beta-badge').textContent==='BETA' && document.querySelector('footer .beta-badge').getBoundingClientRect().width>0 && !document.querySelector('.brand .beta-badge') && !document.querySelector('main footer') && document.getElementById('app-version').textContent==='0.1.1'`), true, 'Version, beta and language metadata live in the actual footer');
   assert.equal(await evaluate(`['change-shortcut','mic','permissions','download','reset','sounds','sound-volume'].every(id=>document.getElementById(id).disabled)`), true, 'Native controls are unavailable before the backend connects');
   await evaluate(`window.calls = []; window.fixture = {phase:'idle',message:'Select a text field and press Fn.', progress:0,model_ready:true,microphone:true,accessibility:true,input_monitoring:true,hotkey:true,transcript:'',sounds:true,sound_volume:50,sound_style:'tap',shortcut:{code:'Fn',modifiers:0},shortcut_label:'Fn',stats:{words:0,transcriptions:0,speech_seconds:0,saved_seconds:0},persistence_error:''}; window.__TAURI_INTERNALS__ = { invoke: async (command,args) => { window.calls.push({command,args}); if(command==='status') return structuredClone(window.fixture); if(command==='set_sounds') window.fixture.sounds=args.enabled; if(command==='set_sound_style') window.fixture.sound_style=args.style; if(command==='set_shortcut'){if(window.rejectShortcut) throw 'Could not save shortcut'; window.fixture.shortcut=args.shortcut;window.fixture.shortcut_label=args.shortcut.code==='Fn'?'Fn':args.shortcut.code==='Space'?'Option + Space':'Control + Shift + J';} if(command==='reset_stats') window.fixture.stats={words:0,transcriptions:0,speech_seconds:0,saved_seconds:0}; } }; document.getElementById('feedback').hidden=true;`);
   await until(`document.getElementById('ready-title').textContent==='Ready'`);
@@ -85,6 +85,7 @@ try {
   // and reflects refreshed persisted values without starting capture.
   await evaluate(`window.fixture.recording_limit=120; const limitInvoke=window.__TAURI_INTERNALS__.invoke; window.__TAURI_INTERNALS__.invoke=async(command,args)=>{ if(command==='set_recording_limit'){if(window.rejectLimit)throw 'Could not save recording limit';window.fixture.recording_limit=args.seconds;} return limitInvoke(command,args); };`);
   assert.equal(await evaluate(`document.getElementById('copy').disabled`), true);
+  assert.equal(await evaluate(`document.querySelector('.transcript-section').getBoundingClientRect().height<96 && document.getElementById('transcript').textContent==='Your next dictation appears here.'`), true, 'Empty transcript is a quiet line, not a tall blank panel');
   await evaluate(`document.getElementById('nav-settings').click()`);
   assert.equal(await evaluate(`document.getElementById('overview').hidden && !document.getElementById('settings').hidden`), true);
   assert.equal(await evaluate(`document.querySelector('.readiness').hidden`), true, 'No readiness card when ready');
@@ -98,47 +99,60 @@ try {
   await evaluate(`window.rejectLimit=false;window.fixture.recording_limit=240`);
   await until(`document.getElementById('recording-limit').value==='240'`);
   assert.equal(await evaluate(`document.getElementById('setup-state').textContent==='Ready' && document.getElementById('setup-missing').hidden`), true, 'Ready setup is a single row, details optional');
-  assert.equal(await evaluate(`document.getElementById('shortcut-dialog').open`), false);
+  assert.equal(await evaluate(`document.getElementById('shortcut-dialog')`), null);
   assert.equal(await evaluate(`['change-shortcut','recording-limit','sounds','sound-volume','preview-sound','reset'].every(id=>document.getElementById(id).getBoundingClientRect().height>0)`), true, 'Every essential preference is visible without expansion');
   assert.deepEqual(await evaluate(`['change-shortcut','recording-limit','preview-sound','reset'].map(id=>document.getElementById(id).getBoundingClientRect().height)`), [36,36,36,36], 'Settings actions and select share one control height');
+  const recording = `document.getElementById('change-shortcut').getAttribute('aria-pressed')==='true'`;
+  const stopped = `document.getElementById('change-shortcut').getAttribute('aria-pressed')==='false' && !document.getElementById('change-shortcut').disabled`;
+  const key = (code, mods = '') => evaluate(`document.getElementById('change-shortcut').dispatchEvent(new KeyboardEvent('keydown',{code:'${code}',${mods}bubbles:true,cancelable:true}))`);
   await evaluate(`document.getElementById('change-shortcut').click()`);
-  assert.equal(await evaluate(`document.getElementById('shortcut-dialog').open && document.activeElement.id==='shortcut-fn'`), true, 'Shortcut dialog focuses its first choice');
-  for (let tab = 0; tab < 12; tab++) {
-    await send('Input.dispatchKeyEvent', {type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
-    await send('Input.dispatchKeyEvent', {type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
-    // Native dialog focus wraps through the document body between its ends;
-    // no underlying setting may receive focus while it is modal.
-    assert.equal(await evaluate(`document.activeElement===document.body || document.getElementById('shortcut-dialog').contains(document.activeElement)`), true, 'Tab stays in the modal');
-  }
-  await evaluate(`document.getElementById('shortcut-option').click()`);
-  await until(`document.getElementById('saved-shortcut').textContent==='Option + Space' && !document.getElementById('record-shortcut').disabled`);
-  assert.equal(await evaluate(`!document.getElementById('shortcut-dialog').open && document.activeElement.id==='change-shortcut'`), true, 'Saving returns focus to Change');
-  await evaluate(`document.getElementById('change-shortcut').click(); document.getElementById('record-shortcut').click()`);
-  await until(`!document.getElementById('shortcut-recorder').hidden`);
-  await evaluate(`document.getElementById('shortcut-recorder').dispatchEvent(new KeyboardEvent('keydown',{code:'KeyQ',metaKey:true,bubbles:true,cancelable:true}))`);
-  assert.equal(await evaluate(`document.getElementById('shortcut-recorder').hidden`), false, 'Reserved combo stays unsaved');
-  await evaluate(`document.getElementById('shortcut-recorder').dispatchEvent(new KeyboardEvent('keydown',{code:'KeyJ',ctrlKey:true,shiftKey:true,bubbles:true,cancelable:true}))`);
-  await until(`document.getElementById('shortcut-recorder').hidden && document.getElementById('saved-shortcut').textContent==='Control + Shift + J'`);
+  await until(recording);
+  assert.equal(await evaluate(`document.activeElement.id==='change-shortcut' && document.getElementById('saved-shortcut').textContent==='Press shortcut…' && !document.querySelector('dialog[open]')`), true, 'Single inline recorder, no modal or presets');
+  const initialSaves = await evaluate(`window.calls.filter(c=>c.command==='set_shortcut').length`);
+  for (const [code, mods] of [['Space',''],['KeyQ','metaKey:true,'],['KeyJ','ctrlKey:true,repeat:true,'],['KeyJ','ctrlKey:true,isComposing:true,']]) await key(code, mods);
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='set_shortcut').length`), initialSaves, 'Activation Space, reserved keys, repeats and composition never save');
+  await key('KeyJ', 'ctrlKey:true,shiftKey:true,');
+  await until(`${stopped} && document.getElementById('saved-shortcut').textContent==='Control + Shift + J'`);
   assert.deepEqual(await evaluate(`window.calls.filter(c=>c.command==='set_shortcut').at(-1).args.shortcut`), {code:'KeyJ',modifiers:5});
-  await until(`!document.getElementById('shortcut-fn').disabled`);
-  await evaluate(`document.getElementById('change-shortcut').click(); window.rejectShortcut=true;document.getElementById('shortcut-fn').click()`);
-  await until(`document.getElementById('feedback').textContent.includes('Could not save')`);
-  assert.equal(await evaluate(`document.getElementById('saved-shortcut').textContent`), 'Control + Shift + J', 'Failed save preserves active shortcut');
-  assert.equal(await evaluate(`document.getElementById('shortcut-dialog').open && document.getElementById('shortcut-feedback').textContent.includes('Could not save')`), true, 'Save errors remain visible inside the dialog');
-  await evaluate(`document.getElementById('record-shortcut').click()`);
-  await until(`!document.getElementById('shortcut-recorder').hidden`);
-  await evaluate(`document.getElementById('shortcut-recorder').dispatchEvent(new KeyboardEvent('keydown',{code:'Escape',bubbles:true,cancelable:true}))`);
-  await until(`document.getElementById('shortcut-recorder').hidden`);
-  assert.equal(await evaluate(`document.getElementById('shortcut-dialog').open && document.activeElement.id==='close-shortcut'`), true, 'Escape cancels recording without closing dialog');
-  await send('Input.dispatchKeyEvent', {type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
-  await send('Input.dispatchKeyEvent', {type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
-  await until(`!document.getElementById('shortcut-dialog').open`);
-  assert.equal(await evaluate(`document.activeElement.id==='change-shortcut'`), true, 'Dialog Escape restores focus');
-  await until(`!document.getElementById('record-shortcut').disabled`);
-  await evaluate(`window.realTimeout=window.setTimeout; window.setTimeout=(fn,ms,...args)=>window.realTimeout(fn,ms===25000?30:ms,...args); document.getElementById('change-shortcut').click(); document.getElementById('record-shortcut').click()`);
-  await until(`document.getElementById('shortcut-feedback').textContent.includes('timed out')`);
-  assert.equal(await evaluate(`document.getElementById('shortcut-dialog').open && document.getElementById('shortcut-recorder').hidden && window.calls.filter(c=>c.command==='capture_shortcut').at(-1).args.active===false`), true, 'Recording timeout releases native capture and keeps dialog usable');
-  await evaluate(`window.setTimeout=window.realTimeout;document.getElementById('close-shortcut').click()`);
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='set_shortcut').length`), initialSaves+1, 'Valid combo automatically persists exactly once');
+  await evaluate(`window.rejectShortcut=true;document.getElementById('change-shortcut').click()`);
+  await key('Space', 'altKey:true,');
+  await until(`${stopped} && document.getElementById('shortcut-feedback').textContent.includes('Could not save')`);
+  assert.equal(await evaluate(`document.getElementById('saved-shortcut').textContent`), 'Control + Shift + J', 'Failed save restores active binding with concise inline error');
+  for (const cancel of ['escape','blur','tab','navigation','cancel']) {
+    await evaluate(`document.getElementById('change-shortcut').click()`);
+    await until(recording);
+    if (cancel==='escape') await key('Escape');
+    if (cancel==='tab') await key('Tab');
+    if (cancel==='blur') await evaluate(`window.dispatchEvent(new Event('blur'))`);
+    if (cancel==='navigation') await evaluate(`document.getElementById('nav-overview').click()`);
+    if (cancel==='cancel') await evaluate(`document.getElementById('stop-shortcut').click()`);
+    await until(stopped);
+    assert.equal(await evaluate(`window.calls.filter(c=>c.command==='capture_shortcut').at(-1).args.active`), false, `${cancel} releases native capture`);
+    await evaluate(`document.getElementById('nav-settings').click()`);
+  }
+  await evaluate(`window.realTimeout=window.setTimeout;window.setTimeout=(fn,ms,...args)=>window.realTimeout(fn,ms===15000?30:ms,...args);document.getElementById('change-shortcut').click()`);
+  await until(`${stopped} && document.getElementById('shortcut-feedback').textContent.includes('timed out')`);
+  await evaluate(`window.setTimeout=window.realTimeout;window.rejectShortcut=false;document.getElementById('shortcut-fn').click()`);
+  await until(`${stopped} && document.getElementById('saved-shortcut').textContent==='Fn'`);
+  assert.equal(await evaluate(`document.getElementById('shortcut-fn').hidden`), true, 'Fn reset remains a small contextual action');
+  // Hold persistence across polling: never replace the recorder with stale status.
+  await evaluate(`const shortcutInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='set_shortcut')await new Promise(resolve=>window.releaseShortcut=resolve);return shortcutInvoke(command,args);};document.getElementById('change-shortcut').click()`);
+  await key('Space','altKey:true,');
+  await until(`document.getElementById('change-shortcut').disabled`);
+  await delay(1000);
+  assert.equal(await evaluate(`document.getElementById('saved-shortcut').textContent`), 'Press shortcut…', 'Pending capture survives a status poll');
+  await evaluate(`window.releaseShortcut()`);
+  await until(`${stopped} && document.getElementById('saved-shortcut').textContent==='Option + Space'`);
+  await evaluate(`window.__TAURI_INTERNALS__.invoke=shortcutInvoke`);
+  // A blur while the native start IPC is pending must still release capture
+  // after that start completes, never leaving the global hook suspended.
+  await evaluate(`const captureInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='capture_shortcut'&&args.active)await new Promise(resolve=>window.releaseCapture=resolve);return captureInvoke(command,args);};document.getElementById('change-shortcut').click();window.dispatchEvent(new Event('blur'))`);
+  await until(`document.getElementById('change-shortcut').disabled`);
+  await evaluate(`window.releaseCapture()`);
+  await until(stopped);
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='capture_shortcut').at(-1).args.active`), false, 'Delayed native start cannot outlive cancellation');
+  await evaluate(`window.__TAURI_INTERNALS__.invoke=captureInvoke`);
   await evaluate(`window.rejectShortcut=false;window.fixture.sound_style='bell'`);
   assert.equal(await evaluate(`document.getElementById('sound-style')===null`), true, 'One cue, no style selector even with a legacy preference');
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='preview_sound').length`), 0, 'Visible sound controls never autoplay');
@@ -220,7 +234,7 @@ try {
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='copy_transcript').length`), 1);
   await evaluate(`window.fixture.phase='copied'; window.fixture.message='Copied. Automatic paste skipped: Not pasted [start:no-original-focus].';`);
   await until(`document.getElementById('phase').textContent==='Copied' && document.getElementById('dot').className==='copied'`);
-  assert.equal(await evaluate(`document.getElementById('cancel').hidden && !document.getElementById('copy').disabled && !document.getElementById('preview-sound').disabled && !document.getElementById('record-shortcut').disabled`), true, 'Copied fallback is ready, not an error or busy state');
+  assert.equal(await evaluate(`document.getElementById('cancel').hidden && !document.getElementById('copy').disabled && !document.getElementById('preview-sound').disabled && !document.getElementById('change-shortcut').disabled`), true, 'Copied fallback is ready, not an error or busy state');
   assert.equal(await evaluate(`getComputedStyle(document.getElementById('dot')).backgroundColor`), 'rgb(112, 107, 104)', 'Normal fallback is graphite; muted red is reserved for recording/active controls');
   assert.match(await evaluate(`document.getElementById('message').textContent`), /start:no-original-focus/);
   await evaluate(`document.getElementById('nav-settings').click();document.getElementById('feedback').hidden=true;window.fixture.message='Select a text field and press Fn.'`);
@@ -243,10 +257,13 @@ try {
         assert.deepEqual(nav, {same:true,width:40,height:40,centered:true,active:`nav-${tab}`}, `Header aligned at ${width}px`);
         assert.equal(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth`), true, `No horizontal overflow at ${width}px, ${theme}, ${tab}`);
         assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('button, select, input')).filter(e=>e.getClientRects().length && (e.getBoundingClientRect().right>innerWidth || e.getBoundingClientRect().left<0)).map(e=>e.id)`), [], 'All controls fit');
+        if (tab==='settings') assert.equal(await evaluate(`(() => {const label=document.querySelector('.shortcut-row h3').getBoundingClientRect(),value=document.querySelector('.shortcut-value').getBoundingClientRect();return value.top>=label.bottom || value.left>=label.right;})()`), true, 'Shortcut value never overlaps its label');
+        assert.equal(await evaluate(`(() => {const s=getComputedStyle(document.querySelector('.transcript-section'));return s.backgroundColor==='rgba(0, 0, 0, 0)' && s.borderTopWidth==='0px' && s.boxShadow==='none' && getComputedStyle(document.getElementById('transcript')).minHeight==='0px';})()`), true, 'Transcript has no card background, border, shadow or forced blank height');
       }
       await evaluate(`document.getElementById('change-shortcut').click()`);
-      assert.equal(await evaluate(`document.getElementById('shortcut-dialog').scrollWidth<=document.getElementById('shortcut-dialog').clientWidth`), true, `Shortcut dialog fits ${width}px, ${theme}`);
-      await evaluate(`document.getElementById('close-shortcut').click()`);
+      await until(recording);
+      assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth`), true, `Inline recording fits ${width}px, ${theme}`);
+      await key('Escape'); await until(stopped);
       await evaluate(`Object.assign(window.fixture,{microphone:false,accessibility:false,input_monitoring:false,hotkey:false,model_ready:false})`);
       await until(`document.getElementById('setup-state').textContent==='Needs attention'`);
       for (const tab of ['settings','overview']) {

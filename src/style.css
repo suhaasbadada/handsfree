@@ -36,15 +36,15 @@ button:disabled { opacity: .45; cursor: default; }
 :where(button, a, input, select, [tabindex]):focus-visible { outline: 3px solid #b56c62; outline-offset: 3px; }
 a { color: inherit; }
 svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-.shell { max-width: 1040px; margin: 0 auto; padding: 0 38px; }
+.shell { max-width: 1040px; min-height: 100vh; margin: 0 auto; padding: 0 38px; display: flex; flex-direction: column; }
 aside { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 24px 0; }
 .brand { display: flex; align-items: center; gap: 9px; text-decoration: none; white-space: nowrap; }
 .brand img { border-radius: 11px; }
-.beta-badge { position: relative; top: -.55em; flex: none; color: #873c38; font-size: 10px; font-weight: 600; line-height: 1; letter-spacing: .06em; }
+.beta-badge { flex: none; color: #873c38; font-size: 10px; font-weight: 600; line-height: 1; letter-spacing: .06em; }
 nav { display: flex; gap: 6px; flex: none; }
 .nav { display: grid; place-items: center; width: 40px; height: 40px; min-width: 40px; padding: 0; background: transparent; color: var(--muted); }
 .nav.active { background: var(--active); color: var(--text); }
-main { max-width: 800px; margin: auto; padding: 12px 0 24px; }
+main { width: 100%; max-width: 800px; margin: 0 auto; padding: 12px 0 24px; }
 h1 { margin: 0 0 12px; }
 h2, h3 { margin: 0; }
 .hero { margin-bottom: 24px; }
@@ -63,7 +63,10 @@ kbd { display: inline-block; max-width: 100%; background: var(--button); border:
 .primary { background: var(--text); color: #fff; }
 .primary:hover:not(:disabled) { background: #45403d; }
 .subtle { color: var(--muted); line-height: 1.6; }
-.transcript { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; min-height: 96px; overflow-y: auto; margin: 18px 0 0; line-height: 1.8; }
+.transcript-section { padding: 0 4px; margin: 28px 0 8px; }
+.transcript-section h2 { color: var(--muted); font-size: 13px; font-weight: 500; }
+.transcript-section button { min-width: 0; background: transparent; color: var(--muted); }
+.transcript { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow-y: auto; margin: 10px 0 0; line-height: 1.8; }
 .transcript.empty { color: var(--muted); }
 .settings-intro { margin-bottom: 18px; }
 .settings-intro h1 { margin: 0; }
@@ -73,8 +76,16 @@ kbd { display: inline-block; max-width: 100%; background: var(--button); border:
 .setting-row > div:first-child { flex: 1; min-width: 0; }
 .setting-row p { color: var(--muted); line-height: 1.6; margin: 4px 0 0; }
 .setting-row button { flex: none; }
-.shortcut-value { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; max-width: 75%; }
-.shortcut-value kbd { min-width: 0; }
+.shortcut-row { flex-wrap: wrap; }
+.shortcut-row > div:first-child { min-width: 60px; }
+.shortcut-value { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; min-width: 0; max-width: 75%; }
+#change-shortcut { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 132px; max-width: 100%; border-color: var(--line); text-align: left; }
+#change-shortcut svg { width: 16px; height: 16px; }
+#change-shortcut[aria-pressed=true] { border-color: var(--accent); color: var(--accent); background: var(--active); }
+#saved-shortcut { overflow-wrap: anywhere; }
+.shortcut-value .text-action { background: transparent; min-width: 0; color: var(--muted); padding-inline: 6px; }
+#stop-shortcut { min-width: 0; }
+#shortcut-feedback { flex-basis: 100%; color: var(--danger); margin: 0; }
 select { height: 36px; width: 132px; max-width: 100%; border: 1px solid var(--line); border-radius: 9px; background: var(--button); padding: 0 10px; }
 .state { color: var(--muted); }
 .switch { position: relative; width: 40px; height: 24px; flex: none; }
@@ -107,15 +118,11 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); margin-top: 10
 #dot.processing, #dot.downloading { animation: pulse 1.6s infinite; }
 #dot.error, #dot.not_pasted { background: var(--danger); }
 .feedback { background: var(--warning); color: var(--text); border-radius: 10px; padding: 12px; overflow-wrap: anywhere; line-height: 1.6; }
-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; color: var(--muted); margin-top: 16px; padding: 0 4px; }
+footer { width: 100%; max-width: 800px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; color: var(--muted); margin: auto auto 0; padding: 18px 4px 24px; }
+.footer-brand { display: flex; align-items: center; gap: 6px; }
 dialog { width: 420px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); overflow-y: auto; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 16px; padding: 24px; box-shadow: 0 20px 90px #0003; }
 dialog::backdrop { background: #0005; backdrop-filter: blur(5px); }
 dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
-.shortcut-options { display: grid; gap: 7px; margin: 20px 0; }
-.shortcut-options button { text-align: left; }
-.shortcut-options button[aria-pressed=true] { background: var(--active); border-color: #b98179; color: #873c38; }
-#shortcut-recorder { display: block; width: 100%; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); padding: 12px; margin: 16px 0; }
-#shortcut-feedback { background: var(--warning); padding: 10px; border-radius: 8px; }
 .dialog-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
 @keyframes pulse { 50% { opacity: .4; } }
 @media (max-width: 650px) {
