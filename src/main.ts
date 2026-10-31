@@ -13,29 +13,37 @@ document.querySelector('#app')!.innerHTML = `
  <main>
  <header><span id="page-label">Overview</span><span class="badge"><i></i> On this Mac</span></header>
  <section id="overview" aria-labelledby="overview-title">
-  <div class="hero"><h1 id="overview-title">Ready when you are.</h1><p>Choose a text field, press <kbd id="overview-shortcut">Fn</kbd> and speak.<br>Press again to finish. Escape cancels.</p></div>
+  <div class="hero"><h1 id="overview-title">Dictation</h1><p>Choose a text field, press <kbd id="overview-shortcut">Fn</kbd> and speak.<br>Press again to finish. Escape cancels.</p></div>
   <section class="card readiness"><div><h2 id="ready-title">Finish setting up</h2><p id="ready-detail">Checking permissions and model…</p></div><button id="setup" class="primary">Open settings</button></section>
   <div class="metrics" aria-label="Local usage since tracking began"><article><strong id="words">0</strong><span>Words dictated</span></article><article><strong id="saved">0 min</strong><span>Estimated time saved</span></article><article><strong id="count">0</strong><span>Dictations</span><small id="duration">0 sec recorded</small></article></div>
-  <p class="metric-note">Local totals · Time saved estimates typing at 40 words/min, minus recording time.</p>
+  <details class="metric-note"><summary title="Time saved is an estimate, not a productivity measurement.">About the estimate</summary><p>Assumes typing at 40 words/min, minus recording time: max(0, words ÷ 40 × 60 − recording seconds), per dictation. Totals stay on this Mac.</p></details>
   <section class="card transcript-card"><div class="card-heading"><h2>Last transcript</h2><span class="subtle">This session</span></div><p id="transcript" class="transcript empty">No transcript yet. Your next dictation will appear here.</p><div class="transcript-footer"><span class="subtle">Only held in memory until you quit.</span><button id="copy" disabled>Copy text</button></div></section>
  </section>
  <section id="settings" hidden aria-labelledby="settings-title">
-  <div class="settings-intro"><h1 id="settings-title">Settings</h1><p>A little more personal. Still entirely local.</p></div>
-  <section class="card"><h2>Keyboard shortcut</h2><div class="setting-row"><div><h3>Start and finish dictation</h3><p>Works even when HandsFree is in the background. Escape cancels.</p></div><kbd id="saved-shortcut">Fn</kbd></div><div class="shortcut-options"><button id="shortcut-fn">Fn</button><button id="shortcut-option">Option + Space</button><button id="shortcut-control">Control + Shift + Space</button><button id="record-shortcut">Record shortcut…</button></div><input id="shortcut-recorder" readonly hidden aria-label="Record shortcut" placeholder="Press your shortcut. Escape cancels." aria-describedby="shortcut-help"><p id="shortcut-help" class="subtle">Use Control, Option or Command with a letter, number or Space. Bindings use physical US key positions on all layouts. Shortcuts also reach the foreground app; choose one it doesn’t use. System and common editing shortcuts are blocked.</p><div class="setting-row"><p>For Fn, set the Globe key action to Do Nothing and disable macOS Dictation’s Fn shortcut.</p><button id="keyboard">Keyboard settings</button></div></section>
-  <section class="card"><h2>Listening sound</h2><div class="setting-row"><div><h3>Play a cue before listening</h3><p>A short, original sound. Audio capture starts after it finishes.</p></div><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Listening sound"><span aria-hidden="true"></span></label></div><div class="setting-row"><div><label for="sound-style">Sound</label><p>Selection is silent. Use Preview to listen.</p></div><select id="sound-style"><option value="tap">Soft tap</option><option value="bell">Soft bell</option></select></div></section>
-   <section class="card"><div class="card-heading"><h2>Permissions & model</h2><span class="subtle">One-time setup</span></div>
-   <div class="setting-row"><div><h3>Microphone <span id="mic-state" class="state"></span></h3><p>Your Mac’s default input. If previously denied, enable HandsFree in System Settings → Privacy & Security → Microphone.</p></div><button id="mic">Allow</button></div>
-    <div class="setting-row"><div><h3>Accessibility & Input Monitoring</h3><p id="permission-state">Checking…</p><p>Enable /Applications/HandsFree.app in the missing pane. Already-allowed permissions do not need to be repeated. Used for shortcuts and safe paste, not background logging.</p></div><button id="permissions">Open settings</button></div>
-   <div class="setting-row"><div><h3>English language model <span id="model-state" class="state"></span></h3><p>Whisper base.en · 148 MB · verified one-time download from Hugging Face. After setup, inference works offline.</p><progress id="progress" max="100" value="0" hidden aria-label="Model download progress"></progress></div><button id="download">Download</button></div>
+  <div class="settings-intro"><h1 id="settings-title">Settings</h1></div>
+  <section class="card preferences" aria-labelledby="preferences-title"><h2 id="preferences-title">Preferences</h2>
+   <div class="setting-row"><div><h3>Shortcut</h3></div><kbd id="saved-shortcut">Fn</kbd><button id="change-shortcut" aria-haspopup="dialog">Change…</button></div>
+   <div class="setting-row listening-row"><div><h3>Listening sound</h3></div><div class="sound-selection"><select id="sound-style" aria-label="Listening sound style"><option value="tap">Soft tap</option><option value="bell">Soft bell</option></select><button id="preview-sound" disabled>Preview</button></div><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Listening sound"><span aria-hidden="true"></span></label></div>
+   <details class="sound-options"><summary>Sound options</summary><div class="sound-controls"><label for="sound-volume">Volume</label><input id="sound-volume" type="range" min="0" max="100" step="1" value="50" aria-describedby="volume-percent"><output id="volume-percent" for="sound-volume">50%</output></div><p class="subtle">If Bluetooth delays listening, turn the cue off.</p></details>
   </section>
-  <section class="card"><h2>Private by design</h2><p class="body-copy">Audio is processed on this Mac and deleted after each attempt. The last transcript lives in memory until you quit. No accounts, telemetry, cloud transcription, or stored transcript history. Paste briefly uses the system clipboard; clipboard managers may see it.</p><div class="setting-row"><div><h3>Local usage totals</h3><p>Only counts, recording duration, and time-saved estimates are saved. Silence, failures, and cancellations don’t count. Successful transcripts count even when paste is unavailable.</p></div><button id="reset" class="danger">Reset totals</button></div><p class="subtle">Time saved = max(0, words ÷ 40 × 60 − recording seconds), per dictation. An estimate, not a productivity measurement. Login startup is not enabled; open HandsFree when you need it.</p></section>
+  <section class="card setup-card" aria-labelledby="setup-title"><div class="card-heading"><h2 id="setup-title">Setup</h2><span id="setup-state" class="subtle" role="status">Checking…</span></div>
+   <div id="setup-missing">
+    <div id="mic-row" class="setting-row"><div><h3>Microphone</h3><p id="mic-state">Allow access to record your voice.</p></div><button id="mic">Allow</button></div>
+    <div id="permissions-row" class="setting-row"><div><h3>Shortcuts & paste</h3><p id="permission-state">Checking…</p></div><button id="permissions">Open settings</button></div>
+    <div id="hotkey-row" class="setting-row" hidden><div><h3>Shortcut disconnected</h3><p>Quit and reopen HandsFree to reconnect.</p></div></div>
+    <div id="model-row" class="setting-row"><div><h3>English model</h3><p id="model-state">148 MB · One-time download</p><progress id="progress" max="100" value="0" hidden aria-label="Model download progress"></progress></div><button id="download">Download</button></div>
+   </div>
+   <details class="setup-details"><summary>Setup details</summary><p id="setup-detail" class="subtle">Checking…</p><p class="subtle">Enable HandsFree in System Settings → Privacy & Security for missing permissions. If the shortcut is disconnected, quit and reopen the app.</p><p class="subtle">Whisper base.en · Verified download from Hugging Face. Transcription works offline after setup.</p></details>
+  </section>
+  <section class="local-data" aria-labelledby="data-title"><h2 id="data-title">Local data</h2><div class="setting-row"><div><h3>Usage totals</h3><p>Counts and estimates, saved on this Mac.</p></div><button id="reset" class="danger">Reset totals…</button></div><details><summary>Privacy</summary><p class="subtle">Audio stays on this Mac and is deleted after each attempt. The last transcript stays in memory until you quit. No telemetry or transcript history. Paste briefly uses the clipboard; clipboard managers may see it.</p></details></section>
  </section>
  <section class="status" aria-label="App status"><span id="dot"></span><div><strong id="phase">Connecting…</strong><p id="message" aria-live="polite"></p></div><button id="cancel" hidden>Cancel</button></section>
  <p id="feedback" class="feedback" role="status" hidden></p><p id="storage-error" class="feedback" role="status" hidden></p>
   <footer><span>HandsFree · 0.1</span><span>English · On-device transcription</span></footer>
  </main>
 </div>
-<dialog id="reset-dialog" aria-labelledby="reset-title"><h2 id="reset-title">Reset usage totals?</h2><p>This permanently resets your local usage totals to zero. Your shortcut, sound preferences and language model stay as they are.</p><div class="dialog-actions"><button id="keep-stats" autofocus>Keep my totals</button><button id="confirm-reset" class="danger">Reset totals</button></div></dialog>`;
+<dialog id="shortcut-dialog" aria-labelledby="shortcut-title"><h2 id="shortcut-title">Choose a shortcut</h2><div class="shortcut-options"><button id="shortcut-fn" autofocus>Fn</button><button id="shortcut-option">Option + Space</button><button id="shortcut-control">Control + Shift + Space</button><button id="record-shortcut">Custom shortcut…</button></div><input id="shortcut-recorder" readonly hidden aria-label="Record shortcut" placeholder="Press a shortcut. Escape cancels." aria-describedby="shortcut-help"><p id="shortcut-feedback" role="status" hidden></p><details><summary>More about shortcuts</summary><p id="shortcut-help">Use Control, Option or Command with a letter, number or Space. Uses physical US key positions. Shortcuts also reach the foreground app; avoid ones it uses. System and common editing shortcuts are blocked.</p><p>For Fn, set the Globe key to Do Nothing and disable macOS Dictation’s Fn shortcut.</p><button id="keyboard">Keyboard settings</button></details><div class="dialog-actions"><button id="close-shortcut">Done</button></div></dialog>
+<dialog id="reset-dialog" aria-labelledby="reset-title"><h2 id="reset-title">Reset usage totals?</h2><p>Totals will return to zero. Your preferences and language model won’t change.</p><div class="dialog-actions"><button id="keep-stats" autofocus>Keep totals</button><button id="confirm-reset" class="danger">Reset totals</button></div></dialog>`;
 const el = (id: string) => document.getElementById(id)!;
 const button = (id: string) => el(id) as HTMLButtonElement;
 let current: Status | undefined;
@@ -60,7 +68,10 @@ function navigate(tab: 'overview' | 'settings') {
   }
   el('page-label').textContent = tab === 'overview' ? 'Overview' : 'Settings';
 }
-function feedback(message: string) { el('feedback').hidden = !message; el('feedback').textContent = message; }
+function feedback(message: string) {
+  el('feedback').hidden = !message; el('feedback').textContent = message;
+  el('shortcut-feedback').hidden = !message; el('shortcut-feedback').textContent = message;
+}
 async function action(command: string, args?: Record<string, unknown>): Promise<boolean> {
   try { await invoke(command, args); feedback(''); await refresh(); return true; }
   catch (e) { feedback(String(e)); return false; }
@@ -73,15 +84,30 @@ el('mic').onclick = () => void action('request_microphone');
 el('permissions').onclick = () => void action('request_permissions');
 el('keyboard').onclick = () => void action('open_keyboard');
 const recorder = el('shortcut-recorder') as HTMLInputElement;
+const shortcutDialog = el('shortcut-dialog') as HTMLDialogElement;
+el('change-shortcut').onclick = () => { feedback(''); shortcutDialog.showModal(); };
+el('close-shortcut').onclick = () => shortcutDialog.close();
+shortcutDialog.addEventListener('close', () => {
+  // A queued close event must not interrupt a newly reopened dialog.
+  if (shortcutDialog.open) return;
+  void stopCapture(); button('change-shortcut').focus();
+});
+shortcutDialog.addEventListener('cancel', e => {
+  if (capturing) { e.preventDefault(); void stopCapture(); feedback('Shortcut unchanged.'); }
+});
 async function stopCapture() {
+  const wasCapturing = capturing;
   capturing = false; clearTimeout(captureTimer); recorder.hidden = true;
+  if (wasCapturing && shortcutDialog.open) button('close-shortcut').focus();
   try { await invoke('capture_shortcut', { active: false }); } catch (e) { feedback(String(e)); }
 }
 async function saveShortcut(shortcut: Shortcut) {
-  if (shortcutPending) return;
+  if (shortcutPending || !canEditShortcut()) return;
   shortcutPending = true;
-  await action('set_shortcut', { shortcut });
+  const saved = await action('set_shortcut', { shortcut });
   await stopCapture(); shortcutPending = false;
+  button('change-shortcut').disabled = !canEditShortcut();
+  if (saved) shortcutDialog.close();
 }
 el('shortcut-fn').onclick = () => void saveShortcut({code: 'Fn', modifiers: 0});
 el('shortcut-option').onclick = () => void saveShortcut({code: 'Space', modifiers: 2});
@@ -90,6 +116,7 @@ el('record-shortcut').onclick = async () => {
   if (!canEditShortcut() || shortcutPending || capturing) return;
   try {
     await invoke('capture_shortcut', {active: true});
+    if (!shortcutDialog.open || !canEditShortcut()) { await stopCapture(); return; }
     capturing = true; recorder.hidden = false; recorder.value = ''; recorder.focus();
     feedback('Press a shortcut, or Escape to cancel.');
     captureTimer = setTimeout(() => { void stopCapture(); feedback('Shortcut recording timed out.'); }, 25000);
@@ -116,8 +143,6 @@ el('copy').onclick = async () => { if (await action('copy_transcript')) feedback
 const sounds = el('sounds') as HTMLInputElement;
 // Commit once on release/key change, not on every pointer movement. Keep the
 // percentage local during a drag so background status polls cannot reset it.
-const soundRow = sounds.closest('.setting-row')!;
-soundRow.parentElement!.insertAdjacentHTML('beforeend', `<div class="setting-row sound-controls"><div><label for="sound-volume">Volume <output id="volume-percent" for="sound-volume">50%</output></label><p>Bluetooth adds a short settling pause. For delayed outputs, turn sound off. Preview works even with sound off.</p><input id="sound-volume" type="range" min="0" max="100" step="1" value="50" aria-describedby="volume-percent"></div><button id="preview-sound" disabled>Preview sound</button></div>`);
 const volume = el('sound-volume') as HTMLInputElement;
 const showVolume = () => { el('volume-percent').textContent = `${volume.value}%`; volume.setAttribute('aria-valuetext', `${volume.value} percent`); };
 volume.oninput = () => { volumeEditing = true; showVolume(); button('preview-sound').disabled = true; };
@@ -161,11 +186,16 @@ async function refresh() {
     el('dot').className = current.phase;
     button('mic').disabled = current.microphone;
     el('mic').textContent = current.microphone ? 'Allowed' : 'Allow';
-    el('mic-state').textContent = current.microphone ? 'Ready' : 'Needs access';
-    el('permission-state').textContent = `Accessibility: ${current.accessibility ? 'allowed' : 'needs access'} · Input Monitoring: ${current.input_monitoring ? 'allowed' : 'needs access'} · Shortcut: ${current.hotkey ? 'connected' : 'restart after granting access'}`;
+    el('mic-state').textContent = 'Allow access in Privacy & Security → Microphone.';
+    el('permission-state').textContent = !current.accessibility ? 'Allow Accessibility for automatic paste.' : 'Allow Input Monitoring for the shortcut.';
+    el('setup-detail').textContent = `Microphone: ${current.microphone ? 'allowed' : 'needs access'} · Accessibility: ${current.accessibility ? 'allowed' : 'needs access'} · Input Monitoring: ${current.input_monitoring ? 'allowed' : 'needs access'} · Shortcut: ${current.hotkey ? 'connected' : 'disconnected'} · Model: ${current.model_ready ? 'ready' : 'not installed'}`;
+    el('mic-row').hidden = current.microphone;
+    el('permissions-row').hidden = current.accessibility && current.input_monitoring;
+    el('hotkey-row').hidden = current.hotkey;
+    el('model-row').hidden = current.model_ready && current.phase !== 'downloading';
     button('permissions').disabled = current.accessibility && current.input_monitoring;
     el('permissions').textContent = !current.accessibility ? 'Allow Accessibility ↗' : !current.input_monitoring ? 'Allow Input Monitoring ↗' : 'Allowed';
-    el('model-state').textContent = current.model_ready ? 'Ready' : 'Not installed';
+    el('model-state').textContent = current.phase === 'downloading' ? 'Downloading…' : '148 MB · One-time download';
     button('download').disabled = current.model_ready || current.phase === 'downloading';
     el('download').textContent = current.model_ready ? 'Ready offline' : current.phase === 'downloading' ? `${Math.round(current.progress)}%` : 'Download';
     el('progress').hidden = current.phase !== 'downloading';
@@ -190,6 +220,9 @@ async function refresh() {
     el('saved').textContent = formatTime(current.stats.saved_seconds);
     el('duration').textContent = `${formatTime(current.stats.speech_seconds)} recorded`;
     const ready = readiness(current);
+    el('setup-state').textContent = ready ? 'Ready' : 'Needs attention';
+    el('setup-missing').hidden = ready;
+    button('change-shortcut').disabled = shortcutPending || !canEditShortcut();
     document.querySelector<HTMLElement>('.readiness')!.hidden = ready;
     el('ready-title').textContent = ready ? 'You’re ready for your next thought.' : 'A few steps to your first dictation.';
     el('ready-detail').textContent = readinessDetail(current);
