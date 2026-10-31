@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 
 let app = NSApplication.shared
 app.setActivationPolicy(.prohibited)
@@ -7,19 +8,27 @@ precondition(points[0].x < points[1].x && points[1].x < points[2].x)
 precondition(points[1].y > points[0].y && points[1].y > points[2].y, "Check vertex must point down in flipped coordinates")
 precondition(points[2].y < points[0].y, "Check must have a longer rising right arm")
 do {
-    let samples = StartCue.samples
+    let resourceRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("src-tauri/native/assets")
+    let data = StartCue.data(resourceRoot: resourceRoot)!
+    precondition(StartCue.data(resourceRoot: nil) == nil, "Missing resources fail silently, never substitute another cue")
+    precondition(String(data: data.prefix(4), encoding: .ascii) == "RIFF")
+    precondition(String(data: data[36..<40], encoding: .ascii) == "data")
+    let samples = stride(from: 44, to: data.count, by: 2).map { Int16(bitPattern: UInt16(data[$0]) | UInt16(data[$0 + 1]) << 8) }
+    let player = try! AVAudioPlayer(data: data) // Decode only: never play audio.
+    precondition(abs(player.duration - StartCue.duration) < 0.000001)
+    precondition(player.format.sampleRate == Double(StartCue.rate) && player.numberOfChannels == 1)
     precondition(samples.count == Int(StartCue.duration * Double(StartCue.rate)))
-    precondition(StartCue.duration == 0.085)
-    precondition(samples == StartCue.samples, "Deterministic noise, no random playback variation")
+    precondition(StartCue.duration == 0.200)
+    precondition(data == StartCue.data(resourceRoot: resourceRoot), "Exact deterministic bundled PCM")
     for legacyStyle: Int32 in [0, 1] {
         soundStyle(legacyStyle)
-        precondition(samples == StartCue.samples, "Both legacy styles normalize to one cue")
+        precondition(data == StartCue.data(resourceRoot: resourceRoot), "Both legacy styles normalize to one cue")
     }
     precondition(samples.first == 0 && samples.last == 0)
     let peak = samples.map { abs(Int($0)) }.max()!
-    precondition(peak > 14000 && peak < 18000, "Clear click with over 5 dB full-volume headroom")
+    precondition(peak > 14000 && peak < 15000, "Gentle double-tap with over 6.8 dB full-volume headroom")
     let steps = zip(samples, samples.dropFirst()).map { abs(Int($0) - Int($1)) }
-    precondition(steps.max()! < 9000, "Filtered transient, not an unbounded one-sample spike")
+    precondition(steps.max()! < 3000, "Smooth percussive transient, no harsh one-sample spike")
     func rms(_ from: Double, _ to: Double) -> Double {
         let window = samples[Int(from * Double(StartCue.rate))..<Int(to * Double(StartCue.rate))]
         return sqrt(window.reduce(0) { $0 + pow(Double($1) / 32768, 2) } / Double(window.count))
@@ -37,28 +46,37 @@ do {
         return hypot(real, imaginary) / Double(end - start)
     }
     precondition((0.045...0.12).contains(level), "Moderate RMS, not a nearly silent or over-loud impulse")
-    let peakIndex = samples.firstIndex { abs(Int($0)) == peak }!
-    precondition(Double(peakIndex) / Double(StartCue.rate) < 0.010, "Transient peaks promptly, not a slow swell")
-    precondition(rms(0, 0.001) < rms(0.002, 0.006) * 0.5, "Controlled 2 ms attack, not a hard discontinuity")
-    precondition(rms(0.002, 0.015) * 0.5 > 0.035, "Articulated attack remains substantial at default 50% volume")
-    precondition(rms(0.010, 0.040) > 0.025, "Audible short body, not the former nearly inaudible tiny tick")
-    precondition(rms(0.030, 0.045) < rms(0.005, 0.020) * 0.4, "Controlled 30–50 ms decay")
-    precondition(rms(0.050, 0.070) < rms(0.030, 0.045) * 0.4, "No sustained swish or ringing")
-    precondition(rms(0.075, StartCue.duration) == 0, "Silent final 10 ms, no truncated endpoint")
-    precondition(rms(0.070, 0.075) < 0.0001, "Smooth taper into silence")
-    precondition(StartCue.envelope(time: 0) == 0)
-    precondition(StartCue.envelope(time: StartCue.duration) == 0)
+    func peakIndex(_ from: Double, _ to: Double) -> Int {
+        let range = Int(from * Double(StartCue.rate))..<Int(to * Double(StartCue.rate))
+        return range.max { abs(Int(samples[$0])) < abs(Int(samples[$1])) }!
+    }
+    let firstPeak = peakIndex(0.020, 0.085), secondPeak = peakIndex(0.085, 0.150)
+    precondition(secondPeak - firstPeak == 3120, "Two tactile impacts exactly 65 ms apart")
+    precondition((0.022...0.025).contains(Double(firstPeak) / Double(StartCue.rate)))
+    let accent = rms(0.085, 0.150) / rms(0.020, 0.085)
+    precondition((1.40...1.48).contains(accent), "Approved 0.78:1 balance plus subtle 1 dB second accent")
+    precondition(rms(0, 0.020) == 0 && rms(0.180, 0.200) == 0, "At least 20 ms exact silence at each endpoint")
+    for start in [0.020, 0.085] {
+        precondition(rms(start, start + 0.001) < rms(start + 0.002, start + 0.006) * 0.4, "Soft attack")
+        precondition(rms(start + 0.002, start + 0.015) * 0.5 > 0.05, "Clear at unchanged default 50% volume")
+        precondition(rms(start + 0.030, start + 0.050) < rms(start + 0.002, start + 0.015) * 0.02, "No long ring or noise bed")
+    }
+    precondition(rms(0.070, 0.085) < 0.001, "Distinct quiet gap, not a fuzzy sustained click")
     // Full-window DFT bins give an approximate power spectrum without audio I/O.
     let powers = (1...Int(Double(StartCue.rate) * StartCue.duration / 2)).map { bin in pow(magnitude(Double(bin) / StartCue.duration, 0, StartCue.duration), 2) }
     let total = powers.reduce(0, +)
     func power(_ low: Double, _ high: Double) -> Double {
         powers.enumerated().filter { (low..<high).contains(Double($0.offset + 1) / StartCue.duration) }.reduce(0) { $0 + $1.element }
     }
-    precondition(powers.max()! / total < 0.08, "No single pure-tone dominance")
-    precondition(power(1000, 4000) / total > 0.50, "Mid/high articulation rather than muffled low-mid pop")
-    precondition(power(8000, 22050) / total < 0.06, "Restrained high-frequency hiss")
+    precondition(powers.max()! / total < 0.11, "Damped percussive body, not a sustained pure tone")
+    precondition(power(300, 4000) / total > 0.95, "Preserve approved tactile body, not unrelated high-passed fuzz")
+    precondition(power(8000, 24000) / total < 0.001, "No harsh high-frequency hiss")
     precondition(power(0, 300) / total < 0.015, "No heavy bass thump")
-    precondition(power(1000, 2000) > total * 0.15 && power(2000, 4000) > total * 0.15, "Broad non-tonal click, not a beep")
+    func brightness(_ start: Double) -> Double {
+        let bins = (1...160).map { bin in pow(magnitude(Double(bin) * 50, start, start + 0.065), 2) }
+        return bins.dropFirst(40).reduce(0, +) / bins.reduce(0, +)
+    }
+    precondition(brightness(0.085) > brightness(0.020) * 1.1, "Second accent is subtly brighter, not merely louder")
     precondition(powers.max()! > powers.min()! * 100, "Filtered, nonconstant spectrum")
     print("Cue: \(samples.count) samples / \(StartCue.duration)s, peak \(peak), RMS \(level), max step \(steps.max()!), strongest bin \(powers.max()! / total)")
 }

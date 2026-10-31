@@ -83,62 +83,22 @@ enum CapsuleGeometry {
     }
 }
 enum StartCue {
-    static let rate = 44100
-    static let duration = 0.085
-    // A crisp tactile UI click, not a note. No oscillators or resonators.
-    static func envelope(time: Double) -> Double {
-        guard time > 0 && time < duration else { return 0 }
-        let attack = 0.002
-        let end = 0.075 // Last 10 ms are silent, not a truncated noise tail.
-        guard time < end else { return 0 }
-        let release = 0.030
-        let rise = 0.5 - 0.5 * cos(.pi * min(time / attack, 1))
-        let fall = 0.5 - 0.5 * cos(.pi * min((end - time) / release, 1))
-        return rise * fall * fall * exp(-time / 0.016)
-    }
-    static var samples: [Int16] {
-        var seed: UInt32 = 0x48F2A713
-        var lowBody = 0.0, lowBody2 = 0.0, soft = 0.0, softer = 0.0, smooth = 0.0
-        let highpass = 1 - exp(-2 * Double.pi * 1000 / Double(rate))
-        let lowpass = 1 - exp(-2 * Double.pi * 3500 / Double(rate))
-        var shaped: [Double] = []
-        for i in 0..<Int(Double(rate) * duration) {
-            seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5
-            let noise = Double(seed) / Double(UInt32.max) * 2 - 1
-            // Two highpasses reject the thump; three lowpasses restrain hiss.
-            // Broad mid/high articulation without a sustained pitched component.
-            lowBody += highpass * (noise - lowBody)
-            let bright = noise - lowBody
-            lowBody2 += highpass * (bright - lowBody2)
-            soft += lowpass * (bright - lowBody2 - soft)
-            softer += lowpass * (soft - softer)
-            smooth += lowpass * (softer - smooth)
-            shaped.append(smooth * envelope(time: Double(i) / Double(rate)))
-        }
-        let gain = 16000 / shaped.map { abs($0) }.max()!
-        return shaped.map { Int16(($0 * gain).rounded()) }
+    static let rate = 48000
+    static let duration = 0.200
+    // Original approved double-tap, reproduced by scripts/generate-listening-cue.py.
+    // Exact generated PCM, not a different native random implementation.
+    static func data(resourceRoot: URL? = Bundle.main.resourceURL) -> Data? {
+        guard let url = resourceRoot?.appendingPathComponent("sounds/listening.wav") else { return nil }
+        return try? Data(contentsOf: url)
     }
 }
 @_cdecl("hf_sound_style") public func soundStyle(_ style: Int32) {
     // Deprecated ABI: saved tap/bell preferences both use the same cue.
     // Deliberately no player mutation, playback, or capture side effects.
 }
-// Original filtered-noise cue, synthesized locally (no borrowed audio).
+// Preview and dictation share this one original, bundled cue (no borrowed audio).
 private func makeCue() -> AVAudioPlayer? {
-    let rate = StartCue.rate
-    let samples = StartCue.samples
-    let count = samples.count
-    var data = Data()
-    func tag(_ value: String) { data.append(contentsOf: value.utf8) }
-    func number<T: FixedWidthInteger>(_ value: T) {
-        var little = value.littleEndian
-        withUnsafeBytes(of: &little) { data.append(contentsOf: $0) }
-    }
-    tag("RIFF"); number(UInt32(36 + count * 2)); tag("WAVEfmt ")
-    number(UInt32(16)); number(UInt16(1)); number(UInt16(1)); number(UInt32(rate))
-    number(UInt32(rate * 2)); number(UInt16(2)); number(UInt16(16))
-    tag("data"); number(UInt32(count * 2))
-    for sample in samples { number(sample) }
+    guard let data = StartCue.data() else { return nil }
     let player = try? AVAudioPlayer(data: data)
     player?.volume = cueVolume
     player?.prepareToPlay()
