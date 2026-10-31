@@ -1,9 +1,9 @@
 # Experimental Windows beta
 
-**[Download for Windows (.exe)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-windows-beta.1/HandsFree-0.1.1-windows-x64-setup.exe)**
+**[Download for Windows (.exe)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-windows-beta.2/HandsFree-0.1.1-windows-x64-setup.exe)**
 
 **Experimental · Windows 10/11 x64 · CPU · English.** Public beta
-[`v0.1.1-windows-beta.1`](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-windows-beta.1)
+[`v0.1.1-windows-beta.2`](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-windows-beta.2)
 is available; not yet hardware-tested. Hosted Windows compilation, native tests,
 NSIS packaging and actual CPU model transcription passed. This does not prove
 live microphone, editor, clean-PC installation or SmartScreen behavior.
@@ -19,7 +19,7 @@ Use a supported, security-updated Windows installation (Windows 10 may require
 ESU). CPU-only transcription may be substantially slower than Mac Metal.
 
 Download the EXE above directly; no GitHub account, Actions ZIP or developer
-tools are needed. Read the release's `PROVENANCE.txt`, `POST-BUNDLE-AUDIT.txt`,
+tools are needed. Read the release's original `PROVENANCE.txt`,
 `APP-DEPENDENCIES.json`, and license. Dependency notices and corresponding source
 are bundled with the app; the release also provides `THIRD_PARTY_SOURCES.tar.gz`.
 
@@ -31,7 +31,7 @@ Get-FileHash .\HandsFree-0.1.1-windows-x64-setup.exe -Algorithm SHA256
 
 A matching hash checks integrity against that file, not the publisher's identity.
 For this exact installer, SHA-256 is
-`9e851cd194101e512970c34d94976d547b8e2b30d58409570d10e565e74677b5`.
+`4801d50d527c8e6ad4019dfdeeb158c4ff6c8e1a79d192aad30e2c6cb0df5b1f`.
 This beta is **unsigned**: SmartScreen may warn about an unknown publisher. Only
 if you trust the official candidate and your organization's policy permits it,
 use **More info → Run anyway** when Windows offers it. If the option is absent,
@@ -41,7 +41,7 @@ The NSIS installer is per-user; it should not require administrator elevation
 for HandsFree itself. WebView2's Microsoft bootstrapper may need internet and
 additional permission if the runtime is absent. Do not run HandsFree elevated.
 Installation is not an automatic update to any existing app.
-The actual extracted beta.1 application was inspected as AMD64 PE32+ with
+The actual extracted beta.2 application was independently inspected as AMD64 PE32+ with
 31 direct imports, all Windows OS DLLs, and no MSVCP/VCRUNTIME or custom DLL
 dependency. No separate Visual C++ redistributable is needed for those inspected
 imports. This is evidence about this payload, not a guarantee about dynamic
@@ -57,7 +57,7 @@ loading, all future builds, or every Windows installation. WebView2 is still req
    checksum verified). Setup requires internet; transcription runs locally after
    download. No account or cloud transcription API is required.
 3. Focus a disposable text field in a normal, non-elevated app. The Windows
-   published beta.1 default shortcut is **Ctrl+Shift+Space**; Fn / 🌐 is Mac-only. Tap once to start,
+   beta.2 default shortcut is **Right Ctrl** (release within 400 ms); Fn / 🌐 is Mac-only. Tap once to start,
    speak briefly, then tap again to finish. **Escape** cancels recording.
    The shared settings retain the two-minute default recording limit and
    optional listening tones; use Settings to adjust them.
@@ -72,15 +72,17 @@ retain copied text. Do not share recordings, private text, settings, or models
 in bug reports. Report Windows version/build, CPU architecture, app/version,
 candidate commit, and synthetic reproduction steps instead.
 
-### Current source: Right Ctrl (not in the published beta.1 EXE)
+### Right Ctrl and upgrades
 
-New preferences and **Use default** in source-built Windows candidates use
+New preferences and **Use default** in public Windows beta 2 use
 **Right Ctrl** alone. Press and release within **400 ms** to start; tap again to
 finish. Holding it, repeating it, using it with another key or mouse button,
 AltGr, injected input, and changing foreground windows cancel the gesture.
 Normal Ctrl messages pass through to other apps. Left Ctrl alone never triggers.
 Existing saved bindings—including the old Ctrl+Shift+Space default—are kept
-exactly; choose **Settings → Use default** to opt in. Custom combinations still
+exactly; choose **Settings → Use default** to opt in after upgrading. Quit the
+app before running the new installer; upgrade retains settings. There is no
+guarantee of universal conflict-free behavior across keyboards/apps. Custom combinations still
 work: click **Record shortcut**, hold modifiers, then press a letter, number or
 Space. To record Right Ctrl alone, release it promptly; Escape, Cancel, Tab,
 loss of focus, or the recording timeout leaves the saved binding unchanged.
@@ -160,18 +162,39 @@ Before publishing, verify the complete downloaded Actions artifact against
 The full notices and source remain inside the NSIS payload as well.
 A passing import gate establishes only direct/delay
 dependencies of that built app, not dynamic LoadLibrary behavior, installer
-operation, or clean-machine startup. The public beta.1 payload's imports were
-verified by extraction; future builds must pass this gate independently. The
+operation, or clean-machine startup. The public beta.2 payload's imports were
+independently verified by extraction; future builds must pass this gate independently. The
 newer packaging/checksum pipeline at `1bb9112` does not change published beta.1
 bytes or retroactively establish a passing CI run for that newer commit.
 
-## Published beta.1 provenance and verification
+## Published beta.2 provenance and verification
+
+The immutable installer was compiled from clean source
+`3d68d4b53e895988683b1c4372bc552eb4cf1a3b` in successful
+[Windows CI run 41220795488](https://github.com/suhaasbadada/handsfree/actions/runs/41220795488).
+JavaScript: 170 passed, 21 skipped, zero failures. Native Rust: 63 passed,
+one ignored; the separate real-model CPU transcription test passed. Production
+build, format, Clippy and NSIS packaging also passed. All 614 internal artifact
+checksum entries and all five public manifest entries passed safe-path and
+complete-file-set verification. All six public assets were anonymously fetched
+and matched local hashes before website promotion.
+
+Independent extraction on macOS (without executing the installer) reproduced
+`APP-DEPENDENCIES.json` exactly. The packaged app SHA-256 is
+`8d3d47037df92da1f479dbe9af9906edc9565001783d618763d4a2bab75aabbc`;
+bundled license and corresponding source matched the public files. Static CRT
+build settings and OS-only direct/delay PE import evidence do not establish
+dynamic DLL loading or hardware acceptance. Original provenance is unmodified;
+later documentation commits are not the binary source. See [release notes](releases/v0.1.1-windows-beta.2.md).
+
+## Historical beta.1 provenance and verification
 
 The immutable installer was compiled from `1625d4874c15e2529b24adb04930bcd4efaf64df`.
 [Windows CI run 41191415412](https://github.com/suhaasbadada/handsfree/actions/runs/41191415412)
 passed full MSVC build/test/NSIS packaging and actual English-model CPU
 transcription, without microphone access. Source/packaged notices were reviewed.
-The published installer SHA above is unchanged from that build.
+Its historical installer SHA-256 remains
+`9e851cd194101e512970c34d94976d547b8e2b30d58409570d10e565e74677b5`.
 
 The original CI metadata reported the raw pre-bundle EXE hash, not the
 Tauri-modified embedded app hash, and its artifact checksum listing omitted
@@ -181,7 +204,7 @@ is retained, not silently rewritten. Public `SHA256SUMS` covers six payload
 assets, including this audit, and is the seventh release asset. All seven were
 downloaded anonymously and verified by the publishing maintainer. The newer
 pipeline fixes future metadata/hidden-file coverage; it is independent of this
-release's post-bundle audit. No claim is made here about a later CI run's result.
+release's post-bundle audit. Beta 2's independent later CI result is recorded above.
 
 ## Required manual acceptance before a hardware-tested label
 
@@ -216,7 +239,7 @@ replace or hide the working Mac download to announce a Windows beta.
 
 ## Website publication checklist (maintainers)
 
-The public distribution label is `v0.1.1-windows-beta.1`; the embedded app and
+The public distribution label is `v0.1.1-windows-beta.2`; the embedded app and
 installer version is `0.1.1`. `site/release.js` has
 `windowsRelease.publicAvailable: true` after anonymous public asset verification.
 Never use GitHub's `latest` endpoint for this prerelease.

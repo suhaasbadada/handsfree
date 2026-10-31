@@ -14,8 +14,8 @@ export const release = Object.freeze({
 export const windowsRelease = Object.freeze({
   schemaVersion: 1,
   publicAvailable: true,
-  version: '0.1.1-windows-beta.1',
+  version: '0.1.1-windows-beta.2',
   appVersion: '0.1.1',
-  installerUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-windows-beta.1/HandsFree-0.1.1-windows-x64-setup.exe',
-  status: 'Experimental Windows beta available. Unsigned; not yet hardware-tested.',
+  installerUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-windows-beta.2/HandsFree-0.1.1-windows-x64-setup.exe',
+  status: 'Experimental Windows beta 2 available. Right Ctrl default; existing users: Settings → Use default. Unsigned; not yet hardware-tested.',
 });

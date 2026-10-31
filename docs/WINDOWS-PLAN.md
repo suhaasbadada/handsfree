@@ -3,8 +3,8 @@
 ## Scope
 
 The experimental Windows x64 beta is [public](WINDOWS.md): existing dashboard/settings,
-local English transcription, Right Ctrl alone or a custom global shortcut in current source
-(published beta.1 still uses Ctrl+Shift+Space),
+local English transcription, Right Ctrl alone or a custom global shortcut in public beta 2
+(existing saved shortcuts are preserved; Settings → Use default opts in),
 recording controls, audio cues, safe insertion and clipboard fallback, and an
 NSIS EXE installer. Linux, cloud services, new models and UI redesigns are out
 of scope. Fn remains a macOS-only option.
@@ -27,13 +27,12 @@ of scope. Fn remains a macOS-only option.
 3. **Complete — platform-aware settings:** correct shortcut labels, microphone setup and
    model download without macOS-only permission instructions.
 4. **Complete — review, native Windows CI, packaging and experimental publication:**
-   [run 41191415412](https://github.com/suhaasbadada/handsfree/actions/runs/41191415412)
+   [run 41220795488](https://github.com/suhaasbadada/handsfree/actions/runs/41220795488)
    passed full MSVC/native tests, NSIS build and real-model CPU transcription.
-   Public `v0.1.1-windows-beta.1` was built from `1625d4874c15e2529b24adb04930bcd4efaf64df`;
-   its seven public assets were anonymously verified. The post-bundle audit
-   transparently supplements original metadata without changing installer bytes.
-   Newer checksum/payload pipeline source `1bb9112` is independent; no later CI
-   result is claimed here. Mac beta and Homebrew remain unchanged.
+   Public `v0.1.1-windows-beta.2` was built from `3d68d4b53e895988683b1c4372bc552eb4cf1a3b`;
+   all six public assets were anonymously verified, all 614 internal checksum
+   entries passed, and independent extraction matched the CI payload PE report.
+   Historical beta.1 assets/audit remain immutable. Mac beta and Homebrew remain unchanged.
 5. **Pending — manual hardware acceptance:** installation, microphone, actual
    editors, clipboard, sound/HUD and SmartScreen checks in [the tester guide](WINDOWS.md).
    Publication is experimental, not a hardware-tested label. Record real results

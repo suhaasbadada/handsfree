@@ -147,7 +147,9 @@ test('website is dependency-free with accessible, honest platform copy', () => {
   assert.match(html, /Experimental · Windows 10\/11 x64/);
   assert.match(html, /Not yet hardware-tested/);
   assert.match(html, /Windows ARM is unsupported/);
-  assert.match(html, /href="https:\/\/github.com\/suhaasbadada\/handsfree\/releases\/download\/v0\.1\.1-windows-beta\.1\/HandsFree-0\.1\.1-windows-x64-setup\.exe"/);
+  assert.match(html, /href="https:\/\/github.com\/suhaasbadada\/handsfree\/releases\/download\/v0\.1\.1-windows-beta\.2\/HandsFree-0\.1\.1-windows-x64-setup\.exe"/);
+  assert.match(html, /Settings → Use default switches to Right Ctrl/);
+  assert.match(html, /download the English model \(~148 MB\)/);
   assert.match(html, /<noscript>/);
   assert.equal([...html.matchAll(/class="button primary"/g)].length, 2, 'Hero and platform card offer the same Mac download');
   assert.match(html, /releases\/download\/v0\.1\.1-beta\.2\/HandsFree-0\.1\.1-beta\.2-macos-arm64\.dmg/);

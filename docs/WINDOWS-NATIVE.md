@@ -10,8 +10,8 @@ CPU transcription passed; live microphone/editor/installer acceptance is pending
 `src-tauri/src/platform` selects Swift FFI on macOS and Rust/Win32 on Windows.
 Linux deliberately fails compilation. Swift source, Mac configuration, signing
 and installed application are unchanged. Mac keeps Fn, native keycodes, Metal
-and existing preferences. Current Windows source uses a release-only Right Ctrl
-tap (400 ms maximum), while the published beta.1 still uses Ctrl+Shift+Space.
+and existing preferences. Public Windows beta 2 uses a release-only Right Ctrl
+tap (400 ms maximum) for new preferences; beta 1 used Ctrl+Shift+Space.
 Saved bindings are never rewritten; existing users can choose **Use default**.
 Windows uses CPU inference with
 four threads; physical DOM shortcut codes are translated to Windows VK codes.
@@ -186,7 +186,19 @@ status. The successful native MSVC run and published payload audit follow below.
 Windows WASAPI, Win32/UIA editor behavior, clipboard restoration, sound playback,
 HUD input/DPI, NSIS installation and SmartScreen remain hardware/manual tests.
 
-## Native Windows verification and public beta.1 (2026-10-31)
+## Public beta 2 verification (2026-10-31)
+
+[Run 41220795488](https://github.com/suhaasbadada/handsfree/actions/runs/41220795488)
+passed on clean source `3d68d4b53e895988683b1c4372bc552eb4cf1a3b`: full MSVC
+build, 63 native tests (one ignored), separate real-model CPU transcription,
+format, Clippy and NSIS packaging. All 614 internal manifest entries and five
+public payload entries were verified. Independent macOS extraction reproduced
+the CI PE report exactly: AMD64 PE32+, 31 OS-only direct imports, zero delay
+imports, no redistributable CRT imports. All six public assets were anonymously
+fetched and matched before website promotion. See [beta 2 notes](releases/v0.1.1-windows-beta.2.md)
+for exact hashes and the outstanding hardware acceptance scope. Mac is unchanged.
+
+## Historical native Windows verification and public beta.1 (2026-10-31)
 
 [CI run 41191415412](https://github.com/suhaasbadada/handsfree/actions/runs/41191415412)
 passed on source `1625d4874c15e2529b24adb04930bcd4efaf64df`: full MSVC app
@@ -195,7 +207,7 @@ transcription, without microphone capture. These results supersede the earlier
 Mac-only inability to compile the full Windows app; they do not establish
 hardware/runtime acceptance.
 
-The public installer is immutable. Its actual extracted Tauri-bundled application
+The beta.1 installer is immutable. Its actual extracted Tauri-bundled application
 was independently inspected as AMD64 PE32+, with 31 direct imports, all Windows
 OS DLLs, and no MSVCP/VCRUNTIME/custom DLL dependency. This inspected payload
 does not require a separate Visual C++ redistributable for those imports;
@@ -207,9 +219,9 @@ its artifact hash listing. The public release preserves it and adds a transparen
 `POST-BUNDLE-AUDIT.txt` with the corrected embedded-payload hash and scope. Its
 public checksum manifest covers six payload assets; all seven public assets
 (including that manifest) were fetched anonymously and verified by the publishing
-maintainer. See [Windows provenance and installer SHA-256](WINDOWS.md#published-beta1-provenance-and-verification).
+maintainer. See [historical Windows provenance and installer SHA-256](WINDOWS.md#historical-beta1-provenance-and-verification).
 Newer source `1bb9112` fixes future post-bundle metadata and hidden-file checksum
-coverage; it does not alter published bytes, and no later CI success is asserted.
+coverage; it does not alter beta.1 bytes. Beta 2's later CI is recorded separately above.
 
 ### Independent-review fixes
 

@@ -28,7 +28,7 @@ Open **Applications → HandsFree**, allow Microphone, Accessibility, and Input 
 
 **DMG alternative:** drag HandsFree to Applications before opening it or granting permissions. Intel Macs are unsupported. See [Open Anyway and installation guidance](docs/INSTALL.md). No developer tools needed.
 
-### [Download for Windows (.exe)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-windows-beta.1/HandsFree-0.1.1-windows-x64-setup.exe)
+### [Download for Windows (.exe)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-windows-beta.2/HandsFree-0.1.1-windows-x64-setup.exe)
 
 **Experimental · Windows 10/11 x64 (Intel/AMD) · CPU · English.** Unsigned; not yet hardware-tested. Windows ARM and 32-bit Windows are unsupported. [Windows install guide & SmartScreen guidance](docs/WINDOWS.md). No developer tools or account needed.
 
@@ -41,7 +41,7 @@ Mac beta and experimental Windows beta are available; Linux is planned.
 
 - **Private by design:** Whisper runs locally with Apple Silicon Metal on Mac or CPU inference on Windows. Download the model once; dictate offline afterward. Windows CPU transcription may be slower.
 - **Stay in flow:** a compact recording capsule, live mic meter, and Escape to cancel.
-- **Your shortcut:** Fn / 🌐 on Mac, Right Ctrl in current Windows source, or a custom key combination. The published Windows beta.1 still uses Ctrl+Shift+Space.
+- **Your shortcut:** Fn / 🌐 on Mac, a short Right Ctrl tap on Windows beta 2, or a custom key combination. Existing saved shortcuts are preserved.
 - **Practical controls:** optional listening sounds and local usage totals. Dictation text stays out of the app window.
 - **Safer insertion:** checks the original app and field before submitting Paste; otherwise copies for manual paste.
 
@@ -60,16 +60,16 @@ No special integration is required: insertion depends on the focused field, with
 | --- | --- |
 | macOS 14+, Apple Silicon | [Mac beta available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.2) · self-signed, not notarized |
 | Intel Macs | Unsupported |
-| Windows 10/11, x64 | [Experimental Windows beta available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-windows-beta.1) · unsigned, not yet hardware-tested |
+| Windows 10/11, x64 | [Experimental Windows beta 2 available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-windows-beta.2) · unsigned, not yet hardware-tested |
 | Linux | Planned; no build or download available |
 
 Windows ARM and 32-bit Windows are unsupported. Linux has no release date.
 
 ## Install
 
-**Windows:** run the [EXE above](#download-for-windows-exe), then follow the [Windows guide](docs/WINDOWS.md): allow desktop microphone access in Windows Settings, explicitly download the English model (~148 MB), and use **Ctrl+Shift+Space**. Mac Accessibility/Input Monitoring permissions do not apply. Review the experimental limitations before testing.
+**Windows:** run the [EXE above](#download-for-windows-exe), then follow the [Windows guide](docs/WINDOWS.md): allow desktop microphone access in Windows Settings, explicitly download the English model (~148 MB), and briefly tap **Right Ctrl** to start, then again to finish. Mac Accessibility/Input Monitoring permissions do not apply. Review the experimental limitations before testing.
 
-Current Windows source (not yet shipped in that EXE) defaults to a short **Right Ctrl** tap: release within 400 ms to start or finish. Existing saved shortcuts, including Ctrl+Shift+Space, are preserved; choose **Use default** in Settings to opt in after upgrading to a build containing this change.
+**Upgrading from Windows beta 1?** Quit HandsFree and run the new installer; settings are retained. Existing saved shortcuts, including Ctrl+Shift+Space, are preserved: choose **Settings → Use default** to switch to **Right Ctrl**. Release within 400 ms; holds, chords and AltGr cancel the gesture. This is not a promise of universal conflict-free behavior. [Windows beta 2 notes and exact build verification](docs/releases/v0.1.1-windows-beta.2.md).
 
 ### Mac
 

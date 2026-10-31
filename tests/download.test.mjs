@@ -97,7 +97,7 @@ test('rendering transitions remove stale links and disabled state without click 
 
 test('public Windows coordinates are verified while unavailable fixtures still fail closed', () => {
   assert.equal(windowsRelease.publicAvailable, true);
-  assert.equal(windowsRelease.version, '0.1.1-windows-beta.1');
+  assert.equal(windowsRelease.version, '0.1.1-windows-beta.2');
   assert.equal(windowsRelease.appVersion, '0.1.1');
   assert.equal(publishedWindowsUrl(windowsRelease), windowsRelease.installerUrl);
   assert.equal(publishedWindowsUrl(windowsDisabled), null);
