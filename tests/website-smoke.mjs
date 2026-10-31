@@ -96,6 +96,27 @@ try {
     assert.equal(metrics.scroll, metrics.width, `No horizontal overflow at ${width}px`);
     assert.ok(metrics.images, 'Icons loaded');
     assert.equal(metrics.styles, 'grid', 'Stylesheet loaded');
+    const demo = await evaluate(`(() => {
+      const figure = document.querySelector('.dictation-demo');
+      const text = document.getElementById('demo-text');
+      const capsule = document.querySelector('.demo-capsule').getBoundingClientRect();
+      const style = getComputedStyle(text);
+      const bounds = text.getBoundingClientRect();
+      const before = figure.getBoundingClientRect().height;
+      const sample = text.value;
+      text.value = '';
+      const stable = figure.getBoundingClientRect().height === before;
+      text.value = sample;
+      return {
+        direct: text.parentElement === figure && !figure.querySelector('.demo-card'),
+        border: style.borderTopWidth, background: style.backgroundColor,
+        labelHidden: getComputedStyle(text.labels[0]).clipPath === 'inset(50%)',
+        fits: text.scrollHeight <= text.clientHeight && text.scrollWidth <= text.clientWidth,
+        separated: bounds.top - capsule.bottom >= 24,
+        stable
+      };
+    })()`);
+    assert.deepEqual(demo, { direct: true, border: '0px', background: 'rgba(0, 0, 0, 0)', labelHidden: true, fits: true, separated: true, stable: true }, `Borderless, readable, stable demo at ${width}px`);
     const platforms = await evaluate(`(() => {
       const cards = [...document.querySelectorAll('.platform-card')];
       const card = cards[0];

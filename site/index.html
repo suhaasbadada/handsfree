@@ -42,16 +42,16 @@
           <noscript><p class="availability">The download above is for Apple Silicon Macs only. Intel Macs and mobile are unsupported; Windows and Linux are planned.</p></noscript>
         </div>
         <figure class="dictation-demo" aria-label="Speech-to-text example" aria-describedby="demo-caption" data-state="done">
-          <div class="demo-card">
+          <div class="demo-controls">
             <div class="demo-capsule" aria-hidden="true">
               <span class="demo-wave"><i></i><i></i><i></i><i></i><i></i></span>
               <span id="demo-phase">Done</span>
               <span class="demo-dots"><i></i><i></i><i></i></span>
             </div>
-            <label class="demo-label" for="demo-text">Text</label>
-            <textarea id="demo-text" readonly rows="3" spellcheck="false">Let’s move our meeting to tomorrow morning.</textarea>
             <button id="demo-pause" type="button" aria-label="Pause animation" title="Pause animation" hidden>Ⅱ</button>
           </div>
+          <label class="visually-hidden" for="demo-text">Text</label>
+          <textarea id="demo-text" readonly rows="2" spellcheck="false">Let’s move our meeting to tomorrow morning.</textarea>
           <figcaption id="demo-caption">Illustrative demo — no microphone access</figcaption>
         </figure>
       </section>

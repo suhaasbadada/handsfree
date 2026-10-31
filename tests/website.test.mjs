@@ -152,10 +152,13 @@ test('hero demonstrates dictation honestly with an accessible static fallback', 
   assert.match(html, /<script type="module" src="\.\/demo.js"><\/script>/);
   assert.match(html, /Illustrative demo — no microphone access/);
   assert.match(html, /<label[^>]+for="demo-text">Text<\/label>/);
+  assert.match(html, /<label class="visually-hidden" for="demo-text">Text<\/label>/);
   assert.match(html, /<textarea id="demo-text" readonly[^>]*>Let’s move our meeting to tomorrow morning\.<\/textarea>/);
   assert.match(html, /<button id="demo-pause"[^>]*aria-label="Pause animation"[^>]* hidden>/);
   assert.doesNotMatch(html, /Play demo|Reset demo|demo-play|demo-status/);
   const demo = html.match(/<figure class="dictation-demo"[\s\S]*?<\/figure>/)[0];
+  assert.doesNotMatch(demo + css, /demo-card|demo-label/);
+  assert.match(css, /#demo-text\{[^}]*border:0;[^}]*background:transparent;[^}]*padding:0;/);
   assert.doesNotMatch(demo, /aria-live|role="status"/);
   assert.doesNotMatch(html + css, /voice-garden|wave-seed|garden-label|\borbit\b|infinite/);
   const js = readFileSync(new URL('site/demo.js', root), 'utf8');
