@@ -273,7 +273,11 @@ mod tests {
     }
     #[test]
     fn final_cleanup_discards_artifact_chunks_and_counts_only_final_words() {
-        for tail in ["[NO_SPEECH].", "Hello,world! [APPLAUSE] don't stop."] {
+        for tail in [
+            "[NO_SPEECH].",
+            "[WHISTLING] (HUMMING)! ♪♫",
+            "Hello,world! [APPLAUSE] don't stop.",
+        ] {
             let session = Session::new(1, 2, 120);
             session.push(&speech(8 * RATE));
             session.push(&vec![0.; RATE]);
@@ -285,15 +289,19 @@ mod tests {
                 || Ok(()),
                 |_, _| {
                     calls += 1;
-                    Ok(if calls == 1 { "[BLANK_AUDIO]" } else { tail }.into())
+                    Ok(if calls == 1 { "[WHISTLING]" } else { tail }.into())
                 },
             )
             .unwrap();
             assert_eq!(calls, 2);
             let mut stats = crate::storage::Stats::default();
             stats.record(&text, session.seconds());
-            if tail == "[NO_SPEECH]." {
+            if !tail.starts_with("Hello") {
                 assert!(text.is_empty());
+                assert_eq!(crate::logic::insertion_text(&text), "");
+                for paste_code in 0..=15 {
+                    assert!(!crate::logic::should_copy_fallback(&text, paste_code));
+                }
                 assert_eq!(stats, crate::storage::Stats::default());
             } else {
                 assert_eq!(text, "Hello,world!   don't stop.");

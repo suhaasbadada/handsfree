@@ -2,41 +2,199 @@
 //! Never blacklist ordinary speech (including common silence hallucinations).
 use unicode_segmentation::UnicodeSegmentation;
 
-const ANNOTATIONS: &[&str] = &[
-    "blankaudio",
-    "noaudio",
-    "nospeech",
-    "silence",
-    "silent",
-    "music",
-    "instrumentalmusic",
-    "backgroundmusic",
-    "applause",
-    "clapping",
-    "laughter",
-    "laughing",
-    "laughs",
-    "chuckling",
-    "chuckles",
-    "inaudible",
-    "unintelligible",
-    "crosstalk",
-    "backgroundnoise",
-    "static",
-    "noise",
-    "sighs",
-    "sighing",
-    "cough",
-    "coughs",
-    "coughing",
-    "breathing",
-    "gasp",
-    "gasps",
-    "gasping",
-    "sobbing",
-    "crying",
-    "sneezing",
-    "sneezes",
+// Canonical display names also define the documentation table (checked below).
+const ANNOTATIONS: &[(&str, &[&str])] = &[
+    (
+        "No audio/speech",
+        &[
+            "BLANK_AUDIO",
+            "NO_AUDIO",
+            "NO_SPEECH",
+            "NO_SOUND",
+            "SILENCE",
+            "SILENT",
+        ],
+    ),
+    (
+        "Music",
+        &[
+            "MUSIC",
+            "MUSIC_PLAYING",
+            "INSTRUMENTAL",
+            "INSTRUMENTAL_MUSIC",
+            "BACKGROUND_MUSIC",
+            "SOFT_MUSIC",
+            "DRAMATIC_MUSIC",
+        ],
+    ),
+    (
+        "Whistling, humming and singing",
+        &[
+            "WHISTLE",
+            "WHISTLES",
+            "WHISTLING",
+            "HUM",
+            "HUMS",
+            "HUMMING",
+            "SINGING",
+        ],
+    ),
+    (
+        "Audience",
+        &[
+            "APPLAUSE",
+            "CLAPPING",
+            "CHEER",
+            "CHEERS",
+            "CHEERING",
+            "BOOING",
+            "CROWD_NOISE",
+        ],
+    ),
+    (
+        "Laughter",
+        &[
+            "LAUGHTER",
+            "LAUGH",
+            "LAUGHING",
+            "LAUGHS",
+            "CHUCKLE",
+            "CHUCKLING",
+            "CHUCKLES",
+            "GIGGLE",
+            "GIGGLES",
+            "GIGGLING",
+        ],
+    ),
+    (
+        "Unclear audio and vocal delivery",
+        &[
+            "INAUDIBLE",
+            "UNINTELLIGIBLE",
+            "CROSSTALK",
+            "MUMBLES",
+            "MUMBLING",
+            "WHISPERING",
+            "SHOUTING",
+        ],
+    ),
+    (
+        "Breathing and sighs",
+        &[
+            "BREATH",
+            "BREATHING",
+            "HEAVY_BREATHING",
+            "EXHALE",
+            "EXHALES",
+            "EXHALING",
+            "INHALE",
+            "INHALES",
+            "INHALING",
+            "SIGH",
+            "SIGHS",
+            "SIGHING",
+            "GASP",
+            "GASPS",
+            "GASPING",
+        ],
+    ),
+    (
+        "Coughs, sneezes and throat sounds",
+        &[
+            "COUGH",
+            "COUGHS",
+            "COUGHING",
+            "SNEEZE",
+            "SNEEZES",
+            "SNEEZING",
+            "THROAT_CLEARING",
+            "CLEARS_THROAT",
+            "SNIFF",
+            "SNIFFS",
+            "SNIFFING",
+            "SNIFFLING",
+            "HICCUP",
+            "HICCUPS",
+            "HICCUPPING",
+        ],
+    ),
+    (
+        "Other vocal sounds",
+        &[
+            "SOB",
+            "SOBS",
+            "SOBBING",
+            "CRYING",
+            "GRUNT",
+            "GRUNTS",
+            "GRUNTING",
+            "GROAN",
+            "GROANS",
+            "GROANING",
+            "SCREAM",
+            "SCREAMS",
+            "SCREAMING",
+            "SNORE",
+            "SNORES",
+            "SNORING",
+        ],
+    ),
+    (
+        "Electronic sounds and bells",
+        &[
+            "BEEP",
+            "BEEPS",
+            "BEEPING",
+            "BLEEP",
+            "BLEEPS",
+            "BLEEPING",
+            "BUZZ",
+            "BUZZES",
+            "BUZZING",
+            "RING",
+            "RINGS",
+            "RINGING",
+            "PHONE_RINGING",
+            "CHIME",
+            "CHIMES",
+            "CHIMING",
+            "DING",
+            "DOORBELL",
+        ],
+    ),
+    (
+        "Movement and objects",
+        &[
+            "CLICK",
+            "CLICKS",
+            "CLICKING",
+            "TAP",
+            "TAPS",
+            "TAPPING",
+            "FOOTSTEPS",
+            "RUSTLING",
+            "CRACKLING",
+            "DOOR_SLAMMING",
+        ],
+    ),
+    ("Weather", &["THUNDER", "RAIN", "WIND", "WIND_BLOWING"]),
+    (
+        "Animals",
+        &[
+            "BARK",
+            "BARKS",
+            "BARKING",
+            "DOG_BARKING",
+            "MEOW",
+            "MEOWS",
+            "MEOWING",
+            "BIRDS_CHIRPING",
+            "CHIRP",
+            "CHIRPS",
+            "CHIRPING",
+        ],
+    ),
+    ("Noise", &["BACKGROUND_NOISE", "STATIC", "NOISE"]),
 ];
 
 fn language(value: &str) -> bool {
@@ -80,12 +238,19 @@ fn timing(value: &str) -> bool {
 }
 
 fn annotation(value: &str) -> bool {
-    let normalized: String = value
+    let normalized = normalize_annotation(value);
+    ANNOTATIONS
+        .iter()
+        .flat_map(|(_, names)| *names)
+        .any(|name| normalize_annotation(name) == normalized)
+}
+
+fn normalize_annotation(value: &str) -> String {
+    value
         .chars()
         .filter(|c| !c.is_whitespace() && !matches!(c, '_' | '-'))
         .flat_map(char::to_lowercase)
-        .collect();
-    ANNOTATIONS.contains(&normalized.as_str())
+        .collect()
 }
 
 fn native_token(value: &str) -> bool {
@@ -225,12 +390,21 @@ mod tests {
 
     #[test]
     fn every_supported_annotation_and_separator_variant() {
-        for name in ANNOTATIONS {
-            for value in [name.to_string(), name.to_uppercase(), format!(" _{name}- ")] {
+        for name in ANNOTATIONS.iter().flat_map(|(_, names)| *names) {
+            for value in [
+                name.to_string(),
+                name.to_lowercase(),
+                normalize_annotation(name),
+                name.replace('_', " "),
+                name.replace('_', "-"),
+                format!(" _{name}- "),
+            ] {
                 for (open, close) in [('[', ']'), ('(', ')')] {
                     let marker = format!("{open}{value}{close}");
                     assert_eq!(clean(&marker), "", "{marker}");
                     assert_eq!(count_words(&marker), 0);
+                    assert_eq!(clean(&format!("hello{marker}world")), "hello world");
+                    assert_eq!(count_words(&format!("hello{marker}world")), 2);
                 }
             }
         }
@@ -242,6 +416,29 @@ mod tests {
         ] {
             assert_eq!(clean(marker), "");
         }
+    }
+
+    #[test]
+    fn documented_annotations_match_the_single_source() {
+        let docs = include_str!("../../docs/TRANSCRIPTION.md");
+        let start = docs.find("| Category | Recognized names |\n").unwrap();
+        let table = docs[start..].split("\n\n").next().unwrap();
+        let mut expected = String::from("| Category | Recognized names |\n| --- | --- |");
+        let mut unique = std::collections::HashSet::new();
+        for (category, names) in ANNOTATIONS {
+            let names: Vec<_> = names
+                .iter()
+                .map(|name| {
+                    assert!(
+                        unique.insert(normalize_annotation(name)),
+                        "duplicate {name}"
+                    );
+                    format!("`{name}`")
+                })
+                .collect();
+            expected.push_str(&format!("\n| {category} | {} |", names.join(", ")));
+        }
+        assert_eq!(table, expected);
     }
 
     #[test]
@@ -298,10 +495,13 @@ mod tests {
             "[12:34]",
             "Thank you. Thanks for watching.",
             "Um, uh, I, I mean… well.",
+            "whistling",
+            "Whistle hum singing rain wind beep.",
         ] {
             assert_eq!(clean(text), text);
         }
         assert_eq!(count_words("[TODO] [API] [NASA] [2026]"), 4);
+        assert_eq!(count_words("whistling"), 1);
     }
 
     #[test]

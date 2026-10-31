@@ -15,17 +15,28 @@ hyphens are ignored within these names: `[BLANK_AUDIO]`, `[blank audio]` and
 
 | Category | Recognized names |
 | --- | --- |
-| No audio/speech | `BLANK_AUDIO`, `NO_AUDIO`, `NO_SPEECH`, `SILENCE`, `SILENT` |
-| Music | `MUSIC`, `INSTRUMENTAL_MUSIC`, `BACKGROUND_MUSIC` |
-| Audience | `APPLAUSE`, `CLAPPING` |
-| Laughter | `LAUGHTER`, `LAUGHING`, `LAUGHS`, `CHUCKLING`, `CHUCKLES` |
-| Unclear audio | `INAUDIBLE`, `UNINTELLIGIBLE`, `CROSSTALK` |
+| No audio/speech | `BLANK_AUDIO`, `NO_AUDIO`, `NO_SPEECH`, `NO_SOUND`, `SILENCE`, `SILENT` |
+| Music | `MUSIC`, `MUSIC_PLAYING`, `INSTRUMENTAL`, `INSTRUMENTAL_MUSIC`, `BACKGROUND_MUSIC`, `SOFT_MUSIC`, `DRAMATIC_MUSIC` |
+| Whistling, humming and singing | `WHISTLE`, `WHISTLES`, `WHISTLING`, `HUM`, `HUMS`, `HUMMING`, `SINGING` |
+| Audience | `APPLAUSE`, `CLAPPING`, `CHEER`, `CHEERS`, `CHEERING`, `BOOING`, `CROWD_NOISE` |
+| Laughter | `LAUGHTER`, `LAUGH`, `LAUGHING`, `LAUGHS`, `CHUCKLE`, `CHUCKLING`, `CHUCKLES`, `GIGGLE`, `GIGGLES`, `GIGGLING` |
+| Unclear audio and vocal delivery | `INAUDIBLE`, `UNINTELLIGIBLE`, `CROSSTALK`, `MUMBLES`, `MUMBLING`, `WHISPERING`, `SHOUTING` |
+| Breathing and sighs | `BREATH`, `BREATHING`, `HEAVY_BREATHING`, `EXHALE`, `EXHALES`, `EXHALING`, `INHALE`, `INHALES`, `INHALING`, `SIGH`, `SIGHS`, `SIGHING`, `GASP`, `GASPS`, `GASPING` |
+| Coughs, sneezes and throat sounds | `COUGH`, `COUGHS`, `COUGHING`, `SNEEZE`, `SNEEZES`, `SNEEZING`, `THROAT_CLEARING`, `CLEARS_THROAT`, `SNIFF`, `SNIFFS`, `SNIFFING`, `SNIFFLING`, `HICCUP`, `HICCUPS`, `HICCUPPING` |
+| Other vocal sounds | `SOB`, `SOBS`, `SOBBING`, `CRYING`, `GRUNT`, `GRUNTS`, `GRUNTING`, `GROAN`, `GROANS`, `GROANING`, `SCREAM`, `SCREAMS`, `SCREAMING`, `SNORE`, `SNORES`, `SNORING` |
+| Electronic sounds and bells | `BEEP`, `BEEPS`, `BEEPING`, `BLEEP`, `BLEEPS`, `BLEEPING`, `BUZZ`, `BUZZES`, `BUZZING`, `RING`, `RINGS`, `RINGING`, `PHONE_RINGING`, `CHIME`, `CHIMES`, `CHIMING`, `DING`, `DOORBELL` |
+| Movement and objects | `CLICK`, `CLICKS`, `CLICKING`, `TAP`, `TAPS`, `TAPPING`, `FOOTSTEPS`, `RUSTLING`, `CRACKLING`, `DOOR_SLAMMING` |
+| Weather | `THUNDER`, `RAIN`, `WIND`, `WIND_BLOWING` |
+| Animals | `BARK`, `BARKS`, `BARKING`, `DOG_BARKING`, `MEOW`, `MEOWS`, `MEOWING`, `BIRDS_CHIRPING`, `CHIRP`, `CHIRPS`, `CHIRPING` |
 | Noise | `BACKGROUND_NOISE`, `STATIC`, `NOISE` |
-| Other vocal sounds | `SIGHS`, `SIGHING`, `COUGH`, `COUGHS`, `COUGHING`, `BREATHING`, `GASP`, `GASPS`, `GASPING`, `SOBBING`, `CRYING`, `SNEEZING`, `SNEEZES` |
 
 These are conventional sound/transcript labels, not guaranteed outputs of every
-model. An intentionally dictated literal `(music)` is indistinguishable from a
-generated annotation and will also be removed. Unknown labels such as
+model. This is the complete supported list, not an exhaustive vocabulary of
+possible generated events. `[WHISTLING]` and `(whistling)` are removed, but bare
+`whistling` remains one word. Delivery labels such as `[SHOUTING]` remove only
+the label, not any accompanying spoken words. An intentionally dictated literal
+`(music)` or `(rain)` is indistinguishable from a generated annotation and will
+also be removed. Unknown labels such as
 `[SOUND_OF_A_DOOR]` remain intact; add a narrow rule and regression test if an
 actual additional artifact is reported. There is no wildcard `SOUND_OF_*` rule.
 

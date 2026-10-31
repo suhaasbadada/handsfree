@@ -290,6 +290,8 @@ mod tests {
         for text in [
             "[BLANK_AUDIO]",
             "[SILENCE] (music)!",
+            "[WHISTLING] (HUMMING)! ♪♫",
+            "[PHONE_RINGING] [DOG_BARKING] (rain)",
             "[_NOSP_] <|nospeech|>",
             "... ♪♫ 😀",
             "[00:00:01.000 --> 00:00:02.000]",
