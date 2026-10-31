@@ -1,8 +1,22 @@
 # HandsFree
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-38765b.svg)](LICENSE)
+
 **Speak naturally. Keep your hands on your work.**
 
-HandsFree is a native macOS menu-bar dictation app that turns speech into text locally on your Mac. Tap a shortcut, speak, and tap again to transcribe into the text field you started in.
+HandsFree is a local-first desktop dictation project: turn speech into text without sending it to a cloud transcription service. The goal is a simple, private dictation companion across macOS, Windows, and Linux. **Today, only the macOS Apple Silicon beta is implemented and prepared; it is not yet publicly downloadable.** Windows and Linux are planned, not available.
+
+[Website](https://suhaasbadada.github.io/handsfree/) · [Source code](https://github.com/suhaasbadada/handsfree) · [MIT license](LICENSE)
+
+## Platforms
+
+| Platform | Status |
+| --- | --- |
+| macOS 14+, Apple Silicon | Beta prepared; public release pending third-party licensing review |
+| Windows | Planned; no build or download available |
+| Linux | Planned; no build or download available |
+
+No Windows/Linux release dates are promised. The current Mac implementation lives in the menu bar: tap a shortcut, speak, and tap again to transcribe into the text field you started in. Current beta features:
 
 - **Local transcription** with Whisper and Apple Silicon Metal acceleration. No account, paid API, telemetry, or transcript uploads.
 - **Stay in flow:** a compact, focus-preserving recording capsule, live microphone meter, and Escape to cancel.
@@ -16,7 +30,7 @@ HandsFree is a native macOS menu-bar dictation app that turns speech into text l
 
 [Published releases](https://github.com/suhaasbadada/handsfree/releases) · [Beta release notes](docs/releases/v0.1.0-beta.1.md)
 
-**Requires macOS 14+ and Apple Silicon (M-series). English only.** Intel Macs, Windows, and Linux are not supported. The prebuilt app needs **no Node.js, Rust, or developer tools**. Release label: `v0.1.0-beta.1`; internal app version: `0.1.0`.
+**Requires macOS 14+ and Apple Silicon (M-series). English only.** Intel Macs are not supported; Windows and Linux are planned but unavailable. The prebuilt app needs **no Node.js, Rust, or developer tools**. Release label: `v0.1.0-beta.1`; internal app version: `0.1.0`.
 
 ### Install (once the beta is published)
 
@@ -44,6 +58,9 @@ Audio is temporarily stored locally and deleted after completion/cancel/normal q
 - [Build, stable local signing, diagnostics, tests, and manual checklist](docs/DEVELOPMENT.md)
 - [Beta release notes](docs/releases/v0.1.0-beta.1.md)
 - [Release packaging and third-party licensing](docs/RELEASING.md)
+- [Website and GitHub Pages setup](docs/WEBSITE.md)
 - [Report an issue](https://github.com/suhaasbadada/handsfree/issues) — include macOS version, Mac model, affected app, and diagnostics; do not post private recordings or transcripts.
 
-Source is publicly viewable, but **no project license has been granted in this repository**. Third-party components retain their own licenses; the release includes their notices and corresponding source copies. This is not a claim that HandsFree itself is open-source licensed.
+## License
+
+HandsFree's own source code is available under the [MIT license](LICENSE), copyright 2026 Suhaas Badada. Third-party dependencies and speech models retain their own licenses; this grant does not relicense them or resolve the upstream objc2 publication caveat. Public binary redistribution remains gated by the review described in [release preparation](docs/RELEASING.md).

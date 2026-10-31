@@ -32,6 +32,8 @@ mkdir -p "$STAGE/$NAME/docs/releases"
 cp docs/DEVELOPMENT.md docs/RELEASING.md "$STAGE/$NAME/docs/"
 cp docs/releases/v0.1.0-beta.1.md "$STAGE/$NAME/docs/releases/"
 cp README.md "$STAGE/$NAME/README.md"
+cp LICENSE "$STAGE/$NAME/LICENSE"
+cp docs/WEBSITE.md "$STAGE/$NAME/docs/"
 python3 scripts/release-notices.py "$STAGE/$NAME"
 printf '%s\n' 'CANDIDATE ONLY — PUBLICATION BLOCKED: see THIRD_PARTY_NOTICES/README.txt and docs/RELEASING.md.' > "$STAGE/$NAME/PUBLICATION-BLOCKED.txt"
 # Reject unexpected bundle payloads; do not silently omit signed resources.
