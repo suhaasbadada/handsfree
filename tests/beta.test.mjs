@@ -8,7 +8,7 @@ test('app and landing brands show a semantic, visible Beta badge', () => {
   for (const path of ['src/main.ts', 'site/index.html']) {
     const source = read(path);
     assert.match(source, /aria-label="HandsFree beta (?:overview|home)"/);
-    assert.match(source, /<(?:span|sup) class="beta-badge">Beta<\/(?:span|sup)>/);
+    assert.match(source, /<(?:span|sup) class="beta-badge">(?:Beta|BETA)<\/(?:span|sup)>/);
     assert.equal([...source.matchAll(/class="beta-badge"/g)].length, 1, 'One unobtrusive badge per surface');
   }
   for (const path of ['src/style.css', 'site/styles.css']) {
@@ -17,7 +17,7 @@ test('app and landing brands show a semantic, visible Beta badge', () => {
 });
 
 test('landing Beta is a small superscript, not a full-size wordmark or pill', () => {
-  assert.match(read('site/index.html'), /<sup class="beta-badge">Beta<\/sup>/);
+  assert.match(read('site/index.html'), /<sup class="beta-badge">BETA<\/sup>/);
   const rule = read('site/styles.css').match(/\.beta-badge\{([^}]*)\}/)?.[1];
   assert.match(rule, /top:-0\.55em/);
   assert.match(rule, /font-size:10px/);

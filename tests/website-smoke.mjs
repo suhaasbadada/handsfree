@@ -88,7 +88,7 @@ try {
     assert.equal(metrics.scroll, metrics.width, `No horizontal overflow at ${width}px`);
     assert.ok(metrics.images, 'Icons loaded');
     assert.equal(metrics.styles, 'grid', 'Stylesheet loaded');
-    assert.equal(await evaluate(`document.querySelector('.site-header .beta-badge').textContent==='Beta' && document.querySelector('.site-header .beta-badge').getBoundingClientRect().width>0`), true, 'Visible beta identity at every width');
+    assert.equal(await evaluate(`document.querySelector('.site-header .beta-badge').textContent==='BETA' && document.querySelector('.site-header .beta-badge').getBoundingClientRect().width>0`), true, 'Visible uppercase beta identity at every width');
     assert.equal(await evaluate(`document.getElementById('primary-download').getBoundingClientRect().bottom < innerHeight`), true, `Primary action above fold at ${width}px`);
     console.log(`Light ${width}px: layout and assets passed`);
     if (width === 1280) await screenshot('desktop');
