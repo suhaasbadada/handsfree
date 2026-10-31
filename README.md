@@ -16,6 +16,14 @@ Say it while it’s clear. HandsFree turns your thoughts into text, without maki
 
 **Apple Silicon Mac · macOS 14+ · English.** Intel Macs are unsupported. This beta is self-signed, not notarized: see [Open Anyway and installation guidance](docs/INSTALL.md). No developer tools needed.
 
+Prefer Homebrew? As a second option, with Homebrew already installed:
+
+```sh
+brew install --cask suhaasbadada/handsfree/handsfree
+```
+
+If Homebrew prompts for trust, review the [tap README](https://github.com/suhaasbadada/homebrew-handsfree#readme) first. Cask trust approves Homebrew code, not the app’s Apple identity or notarization. See [Homebrew setup and existing-app guidance](docs/INSTALL.md#homebrew-option).
+
 [Website](https://suhaasbadada.github.io/handsfree/) · [Releases](https://github.com/suhaasbadada/handsfree/releases) · [Report a bug](https://github.com/suhaasbadada/handsfree/issues)
 
 HandsFree is an open-source, local-first dictation companion. Tap a shortcut, speak, and get text in the field you started in. No account, paid API, telemetry, or cloud transcription service.

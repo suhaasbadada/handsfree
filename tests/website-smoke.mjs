@@ -96,6 +96,17 @@ try {
     assert.equal(metrics.scroll, metrics.width, `No horizontal overflow at ${width}px`);
     assert.ok(metrics.images, 'Icons loaded');
     assert.equal(metrics.styles, 'grid', 'Stylesheet loaded');
+    const brew = await evaluate(`(() => {
+      const option = document.querySelector('.homebrew-option');
+      const code = option.querySelector('code');
+      const details = option.querySelector('details');
+      const closed = !details.open;
+      details.open = true;
+      const fits = document.documentElement.scrollWidth === document.documentElement.clientWidth;
+      details.open = false;
+      return { command: code.textContent, closed, fits, wraps: getComputedStyle(code).overflowWrap === 'anywhere', contained: code.getBoundingClientRect().right <= innerWidth };
+    })()`);
+    assert.deepEqual(brew, { command: 'brew install --cask suhaasbadada/handsfree/handsfree', closed: true, fits: true, wraps: true, contained: true }, `Homebrew command and expanded trust note fit at ${width}px`);
     const demo = await evaluate(`(() => {
       const figure = document.querySelector('.dictation-demo');
       const text = document.getElementById('demo-text');

@@ -8,6 +8,38 @@ const html = readFileSync(new URL('site/index.html', root), 'utf8');
 const css = readFileSync(new URL('site/styles.css', root), 'utf8');
 const workflow = readFileSync(new URL('.github/workflows/pages.yml', root), 'utf8');
 
+test('Homebrew is a scoped, safe secondary install option across website and docs', () => {
+  const readme = readFileSync(new URL('README.md', root), 'utf8');
+  const install = readFileSync(new URL('docs/INSTALL.md', root), 'utf8');
+  const command = 'brew install --cask suhaasbadada/handsfree/handsfree';
+  const download = readme.match(/## Download\n([\s\S]*?)\n## Features/)?.[1];
+  assert.ok(download.indexOf('Download for Mac (.dmg)') < download.indexOf(command));
+  assert.equal([...download.matchAll(/```sh/g)].length, 1, 'One simple second-option command block');
+  const section = html.match(/<section class="getting-started[\s\S]*?<\/section>/)?.[0];
+  assert.ok(section.includes(`<code>${command}</code>`));
+  assert.match(section, /Prefer Homebrew\?/);
+  assert.match(section, /<details class="release-note"><summary>Homebrew trust &amp; setup<\/summary>/);
+  assert.doesNotMatch(html.match(/<section class="hero[\s\S]*?<\/section>/)[0], /Homebrew|brew install/);
+  for (const copy of [download, section, install]) {
+    assert.ok(copy.includes(command));
+    assert.match(copy, /https:\/\/github.com\/suhaasbadada\/homebrew-handsfree#readme/);
+    assert.match(copy, /trust/i);
+    assert.match(copy, /Apple identity/);
+    assert.match(copy, /notarization/);
+    assert.doesNotMatch(copy, /--no-quarantine|--force|--zap|sudo|xattr|spctl|rm -|\bbrew trust (?!\x2d\x2dcask suhaasbadada\/handsfree\/handsfree)/);
+    const tokens = [...copy.matchAll(/brew (?:install|upgrade|trust) --cask ([^\s<`]+)/g)].map(match => match[1]);
+    assert.ok(tokens.every(token => token === 'suhaasbadada/handsfree/handsfree'));
+  }
+  assert.match(install, /Only if prompted/);
+  assert.match(install, /brew trust --cask suhaasbadada\/handsfree\/handsfree/);
+  assert.match(install, /brew update\nbrew upgrade --cask suhaasbadada\/handsfree\/handsfree/);
+  assert.match(install, /keep using your current manual installation/);
+  assert.match(install, /quit HandsFree and move the existing app copy to a safe backup/);
+  assert.match(install, /do not delete your models, settings, statistics, or other user data/);
+  assert.match(install, /Gatekeeper, quarantine/);
+  assert.match(css, /\.homebrew-option>code\{[^}]*white-space:normal;overflow-wrap:anywhere/);
+});
+
 test('hero has a direct, accessible Mac download with a real decorative Apple SVG', () => {
   const hero = html.match(/<section class="hero[\s\S]*?<\/section>/)[0];
   const cta = hero.match(/<a id="primary-download"[\s\S]*?<\/a>/)[0];
