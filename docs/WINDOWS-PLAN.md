@@ -3,8 +3,9 @@
 ## Scope
 
 The experimental Windows x64 beta is [public](WINDOWS.md): existing dashboard/settings,
-local English transcription, Right Ctrl alone or a custom global shortcut in public beta 2
-(existing saved shortcuts are preserved; Settings → Use default opts in),
+local English transcription, Right Ctrl alone or a custom global shortcut,
+default Toggle and opt-in push to talk in beta 3
+(existing saved shortcuts are preserved; Settings → Use default changes only the shortcut),
 recording controls, audio cues, safe insertion and clipboard fallback, and an
 NSIS EXE installer. Linux, cloud services, new models and UI redesigns are out
 of scope. Fn remains a macOS-only option.
@@ -32,7 +33,9 @@ of scope. Fn remains a macOS-only option.
    Public `v0.1.1-windows-beta.2` was built from `3d68d4b53e895988683b1c4372bc552eb4cf1a3b`;
    all six public assets were anonymously verified, all 614 internal checksum
    entries passed, and independent extraction matched the CI payload PE report.
-   Historical beta.1 assets/audit remain immutable. Mac beta and Homebrew remain unchanged.
+   Historical beta.1 assets/audit remain immutable. Mac beta and Homebrew were unchanged by that release.
+   Beta 3 adds optional push to talk from `bfe0a3f874b496777ab0342e22cac59220ad390d`;
+   see [its build evidence and release notes](releases/v0.1.1-windows-beta.3.md).
 5. **Pending — manual hardware acceptance:** installation, microphone, actual
    editors, clipboard, sound/HUD and SmartScreen checks in [the tester guide](WINDOWS.md).
    Publication is experimental, not a hardware-tested label. Record real results

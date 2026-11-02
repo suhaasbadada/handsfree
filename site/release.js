@@ -3,8 +3,8 @@
 export const release = Object.freeze({
   schemaVersion: 1,
   version: '0.1.1-beta.4',
-  publicAvailable: false,
-  status: 'Experimental Mac beta 4 candidate. Not yet published; not notarized.',
+  publicAvailable: true,
+  status: 'Experimental Mac beta 4 available. Optional push to talk; self-signed, not notarized.',
   dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.4/HandsFree-0.1.1-beta.4-macos-arm64.dmg',
 });
 
@@ -14,8 +14,8 @@ export const release = Object.freeze({
 export const windowsRelease = Object.freeze({
   schemaVersion: 1,
   publicAvailable: true,
-  version: '0.1.1-windows-beta.2',
+  version: '0.1.1-windows-beta.3',
   appVersion: '0.1.1',
-  installerUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-windows-beta.2/HandsFree-0.1.1-windows-x64-setup.exe',
-  status: 'Experimental Windows beta 2 available. Right Ctrl default; existing users: Settings → Use default. Unsigned; not yet hardware-tested.',
+  installerUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-windows-beta.3/HandsFree-0.1.1-windows-x64-setup.exe',
+  status: 'Experimental Windows beta 3 available. Right Ctrl Toggle default; optional push to talk. Unsigned; not yet hardware-tested.',
 });

@@ -186,7 +186,15 @@ status. The successful native MSVC run and published payload audit follow below.
 Windows WASAPI, Win32/UIA editor behavior, clipboard restoration, sound playback,
 HUD input/DPI, NSIS installation and SmartScreen remain hardware/manual tests.
 
-## Public beta 2 verification (2026-10-31)
+## Beta 3 source and build evidence
+
+Optional push to talk is built from `bfe0a3f874b496777ab0342e22cac59220ad390d`.
+See [run 41389815936](https://github.com/suhaasbadada/handsfree/actions/runs/41389815936)
+for the actual Windows build result and [beta 3 notes](releases/v0.1.1-windows-beta.3.md)
+for release asset evidence and remaining manual acceptance. No hardware result
+is inferred from the build.
+
+## Historical public beta 2 verification (2026-10-31)
 
 [Run 41220795488](https://github.com/suhaasbadada/handsfree/actions/runs/41220795488)
 passed on clean source `3d68d4b53e895988683b1c4372bc552eb4cf1a3b`: full MSVC

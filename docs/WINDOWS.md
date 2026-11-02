@@ -1,13 +1,12 @@
 # Experimental Windows beta
 
-**[Download for Windows (.exe)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-windows-beta.2/HandsFree-0.1.1-windows-x64-setup.exe)**
+**[Download for Windows (.exe)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-windows-beta.3/HandsFree-0.1.1-windows-x64-setup.exe)**
 
 **Experimental · Windows 10/11 x64 · CPU · English.** Public beta
-[`v0.1.1-windows-beta.2`](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-windows-beta.2)
-is available; not yet hardware-tested. Hosted Windows compilation, native tests,
-NSIS packaging and actual CPU model transcription passed. This does not prove
-live microphone, editor, clean-PC installation or SmartScreen behavior.
-The published Apple Silicon Mac beta and Homebrew are unchanged.
+[`v0.1.1-windows-beta.3`](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-windows-beta.3)
+offers optional push to talk; not yet hardware-tested. Build evidence is linked
+below; automated checks do not prove live microphone, editor, clean-PC installation
+or SmartScreen behavior. The Apple Silicon Mac beta and Homebrew are independent.
 
 ## For testers
 
@@ -30,8 +29,8 @@ Get-FileHash .\HandsFree-0.1.1-windows-x64-setup.exe -Algorithm SHA256
 ```
 
 A matching hash checks integrity against that file, not the publisher's identity.
-For this exact installer, SHA-256 is
-`4801d50d527c8e6ad4019dfdeeb158c4ff6c8e1a79d192aad30e2c6cb0df5b1f`.
+Use the current release's [public SHA256SUMS](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-windows-beta.3/SHA256SUMS),
+not a checksum from an older beta.
 This beta is **unsigned**: SmartScreen may warn about an unknown publisher. Only
 if you trust the official candidate and your organization's policy permits it,
 use **More info → Run anyway** when Windows offers it. If the option is absent,
@@ -41,11 +40,11 @@ The NSIS installer is per-user; it should not require administrator elevation
 for HandsFree itself. WebView2's Microsoft bootstrapper may need internet and
 additional permission if the runtime is absent. Do not run HandsFree elevated.
 Installation is not an automatic update to any existing app.
-The actual extracted beta.2 application was independently inspected as AMD64 PE32+ with
-31 direct imports, all Windows OS DLLs, and no MSVCP/VCRUNTIME or custom DLL
-dependency. No separate Visual C++ redistributable is needed for those inspected
-imports. This is evidence about this payload, not a guarantee about dynamic
-loading, all future builds, or every Windows installation. WebView2 is still required.
+The packaging gate inspects the actual extracted AMD64 PE32+ application,
+rejecting non-OS direct/delay imports, including MSVCP/VCRUNTIME or custom DLLs.
+See the release's `APP-DEPENDENCIES.json` for its exact inspected payload.
+Static imports do not establish dynamic loading or every Windows installation's
+behavior. WebView2 is still required.
 
 ## First run and privacy
 
@@ -57,7 +56,7 @@ loading, all future builds, or every Windows installation. WebView2 is still req
    checksum verified). Setup requires internet; transcription runs locally after
    download. No account or cloud transcription API is required.
 3. Focus a disposable text field in a normal, non-elevated app. The Windows
-   beta.2 default shortcut is **Right Ctrl** (release within 400 ms); Fn / 🌐 is Mac-only. Tap once to start,
+   default shortcut is **Right Ctrl** in **Toggle** mode (release within 400 ms); Fn / 🌐 is Mac-only. Tap once to start,
    speak briefly, then tap again to finish. **Escape** cancels recording.
    The shared settings retain the two-minute default recording limit and
    optional listening tones; use Settings to adjust them.
@@ -74,8 +73,8 @@ candidate commit, and synthetic reproduction steps instead.
 
 ### Right Ctrl and upgrades
 
-New preferences and **Use default** in public Windows beta 2 use
-**Right Ctrl** alone. Press and release within **400 ms** to start; tap again to
+New preferences and **Use default** use **Right Ctrl** alone. In default
+**Toggle** mode, press and release within **400 ms** to start; tap again to
 finish. Holding it, repeating it, using it with another key or mouse button,
 AltGr, injected input, and changing foreground windows cancel the gesture.
 Normal Ctrl messages pass through to other apps. Left Ctrl alone never triggers.
@@ -88,6 +87,23 @@ Space. To record Right Ctrl alone, release it promptly; Escape, Cancel, Tab,
 loss of focus, or the recording timeout leaves the saved binding unchanged.
 If the Windows hooks cannot connect, Settings reports the shortcut unavailable;
 no RegisterHotKey success alone can make Right Ctrl ready.
+
+### Optional push to talk
+
+In Windows beta 3, choose **Settings → Recording mode → Push to talk**.
+Hold physical Right Ctrl (or your saved custom combination), speak, and release
+to finish; holds can exceed Toggle's 400 ms tap deadline. A combination finishes
+when its primary key or the first required modifier is released. Other keys,
+mouse actions during a hold, AltGr, injected input and observed focus changes
+cancel without paste. Focus surveillance continues through processing/delivery;
+switching away and back does not re-enable a cancelled result. A still-held key
+cannot restart recording after cancellation or the duration limit. Escape and
+native HUD Finish/Cancel remain available. Ordinary Ctrl messages still pass
+through. See [full behavior and focus-observation limits](PUSH-TO-TALK.md).
+
+Upgrades do not opt you in. Missing/unknown mode preferences fall back to Toggle;
+saved shortcuts, sounds, model files, statistics and other settings are preserved.
+**Use default** changes the shortcut to Right Ctrl, not the recording mode.
 
 ## Build a candidate on Windows
 
@@ -167,7 +183,17 @@ independently verified by extraction; future builds must pass this gate independ
 newer packaging/checksum pipeline at `1bb9112` does not change published beta.1
 bytes or retroactively establish a passing CI run for that newer commit.
 
-## Published beta.2 provenance and verification
+## Beta.3 provenance and verification
+
+Compiled source: `bfe0a3f874b496777ab0342e22cac59220ad390d`.
+[Windows CI run 41389815936](https://github.com/suhaasbadada/handsfree/actions/runs/41389815936)
+records this build; consult the run for its actual result. The release's original
+`PROVENANCE.txt`, `APP-DEPENDENCIES.json` and linked `SHA256SUMS` identify the
+exact artifact and dependency evidence. Later documentation commits are not
+the compiled source. See [beta 3 release notes](releases/v0.1.1-windows-beta.3.md).
+Live keyboard, microphone, editor and clean-PC acceptance remains pending.
+
+## Historical beta.2 provenance and verification
 
 The immutable installer was compiled from clean source
 `3d68d4b53e895988683b1c4372bc552eb4cf1a3b` in successful
@@ -223,6 +249,10 @@ unchecked items as passed. Automated CI does **not** perform these tests.
       dictation; short and long speech, silence, and non-speech without bogus text.
 - [ ] Default/custom shortcut conflict handling; idle/recording/transcribing UI;
       clean/warm/off listening cue behavior without capturing playback as speech.
+- [ ] Opt-in push to talk: long Right Ctrl/custom holds, cue-time fast release,
+      modifier-first release, AltGr/chords, mouse/focus cancellation, duration
+      limit and HUD Finish/Cancel while held; one original-field delivery, no
+      cancelled paste and no restart until physical release. Toggle unchanged.
 - [ ] Notepad and a browser text field: finish inserts once in the original field,
       without Enter/send. Verify clipboard fallback in terminals/custom editors.
 - [ ] While recording/transcribing, switch app, change field, close the target,
@@ -239,7 +269,7 @@ replace or hide the working Mac download to announce a Windows beta.
 
 ## Website publication checklist (maintainers)
 
-The public distribution label is `v0.1.1-windows-beta.2`; the embedded app and
+The public distribution label is `v0.1.1-windows-beta.3`; the embedded app and
 installer version is `0.1.1`. `site/release.js` has
 `windowsRelease.publicAvailable: true` after anonymous public asset verification.
 Never use GitHub's `latest` endpoint for this prerelease.
@@ -255,8 +285,9 @@ Keep the static fallback in `site/index.html` at `windows-card-download`
 `windows-release-badge` (Experimental · x64), and `windows-release-status`
 (version, unsigned, not yet hardware-tested). Update its metadata descriptions
 and `noscript` copy, and the Windows status in this guide and README. Keep any
-untested hardware limitations explicit. Leave the static hero and Mac card URLs
-on **v0.1.1-beta.2**, and leave Mac availability untouched. Without JavaScript,
+untested hardware limitations explicit. Keep the static hero and Mac card URLs
+on the independently verified current Mac release (**v0.1.1-beta.4**), not the
+Windows tag, and leave Mac availability independent. Without JavaScript,
 visitors use the explicit platform cards; no automatic download occurs.
 
 Run `npm test`, `npm run build`, and `node tests/website-smoke.mjs` plus

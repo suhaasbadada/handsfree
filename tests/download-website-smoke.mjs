@@ -22,7 +22,10 @@ const server = createServer(async (req, res) => {
     let body = await readFile(path);
     if (disabled && relative === 'release.js') {
       // Fixture revokes the real public manifest, exercising removal of static/stale EXE links.
-      body = Buffer.from(body.toString().replace(/(export const windowsRelease[\s\S]*?publicAvailable:) true/, '$1 false'));
+      const source = body.toString();
+      const revoked = source.replace(/(export const windowsRelease[\s\S]*?publicAvailable:) true/, '$1 false');
+      assert.notEqual(revoked, source, 'Disabled fixture must revoke the actual Windows manifest');
+      body = Buffer.from(revoked);
     }
     res.setHeader('Content-Type', ({ '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png' })[extname(path)] || 'application/octet-stream');
     res.end(body);

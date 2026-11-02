@@ -97,11 +97,11 @@ test('rendering transitions remove stale links and disabled state without click 
 
 test('public Windows coordinates are verified while unavailable fixtures still fail closed', () => {
   assert.equal(windowsRelease.publicAvailable, true);
-  assert.equal(windowsRelease.version, '0.1.1-windows-beta.2');
+  assert.equal(windowsRelease.version, '0.1.1-windows-beta.3');
   assert.equal(windowsRelease.appVersion, '0.1.1');
   assert.equal(publishedWindowsUrl(windowsRelease), windowsRelease.installerUrl);
   assert.equal(publishedWindowsUrl(windowsDisabled), null);
-  assert.equal(release.publicAvailable, false, 'Mac beta 4 candidate is independent from verified public Windows beta 2');
+  assert.equal(release.publicAvailable, true, 'Mac beta 4 availability is independent from Windows beta 3');
   assert.equal(release.dmgUrl, 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.4/HandsFree-0.1.1-beta.4-macos-arm64.dmg');
   for (const arch of ['unknown', 'intel', 'arm64']) {
     const state = downloadState({ os: 'windows', arch }, enabled, windowsDisabled);

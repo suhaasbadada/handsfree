@@ -4,7 +4,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homebrewCommand } from '../site/install.js';
-import { release } from '../site/release.js';
+import { release, windowsRelease } from '../site/release.js';
 
 const root = new URL('../', import.meta.url);
 const html = readFileSync(new URL('site/index.html', root), 'utf8');
@@ -150,12 +150,12 @@ test('website is dependency-free with accessible, honest platform copy', () => {
   assert.match(html, /Experimental · Windows 10\/11 x64/);
   assert.match(html, /Not yet hardware-tested/);
   assert.match(html, /Windows ARM is unsupported/);
-  assert.match(html, /href="https:\/\/github.com\/suhaasbadada\/handsfree\/releases\/download\/v0\.1\.1-windows-beta\.2\/HandsFree-0\.1\.1-windows-x64-setup\.exe"/);
+  assert.ok(html.includes(`href="${windowsRelease.installerUrl}"`), 'Static Windows link matches the activated manifest');
   assert.match(html, /Settings → Use default switches to Right Ctrl/);
   assert.match(html, /download the English model \(~148 MB\)/);
   assert.match(html, /<noscript>/);
   assert.equal([...html.matchAll(/class="button primary"/g)].length, 2, 'Hero and platform card offer the same Mac download');
-  assert.ok(html.includes('href="https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.3/HandsFree-0.1.1-beta.3-macos-arm64.dmg"'), 'Static defaults retain verified beta 3 until candidate activation');
+  assert.ok(html.includes(`href="${release.dmgUrl}"`), 'Static defaults match the activated Mac manifest');
   assert.match(html, /MIT license does not relicense dependencies/);
 });
 
@@ -164,7 +164,7 @@ test('Mac platform card has a primary Apple download, with technical details dis
   assert.ok(card);
   const cta = card.match(/<a class="button primary"[\s\S]*?<\/a>/)?.[0];
   assert.ok(cta);
-  assert.ok(cta.includes('href="https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.3/HandsFree-0.1.1-beta.3-macos-arm64.dmg"'), 'Static card retains verified beta 3 until candidate activation');
+  assert.ok(cta.includes(`href="${release.dmgUrl}"`), 'Static card matches the activated Mac manifest');
   assert.match(cta, /aria-label="Download for Mac \(Apple Silicon\)"/);
   assert.match(cta, /<svg class="apple-logo"[^>]*aria-hidden="true"[^>]*focusable="false"><path d="[^"]+"\/><\/svg><span>Download for Mac<\/span>/);
   assert.match(card, /Apple Silicon · macOS 14\+ · English/);
