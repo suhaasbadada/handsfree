@@ -52,6 +52,20 @@ pub unsafe fn hf_keyboard() {
 pub unsafe fn hf_hook(callback: extern "C" fn(i32)) -> bool {
     ui::hook(callback)
 }
+pub unsafe fn hf_mode(mode: i32) -> bool {
+    ui::mode(mode == 1)
+}
+static START_GATE: std::sync::Mutex<Option<extern "C" fn(u64) -> bool>> =
+    std::sync::Mutex::new(None);
+pub unsafe fn hf_start_gate(callback: extern "C" fn(u64) -> bool) {
+    *START_GATE.lock().unwrap() = Some(callback);
+}
+fn capture_start_allowed(generation: u64) -> bool {
+    START_GATE.lock().unwrap().is_none_or(|cb| cb(generation))
+}
+pub unsafe fn hf_gesture_hook(callback: extern "C" fn(i32, i32, u64)) {
+    ui::gesture_hook(callback);
+}
 pub unsafe fn hf_hook_state() -> i32 {
     if ui::REASON.load(Ordering::Acquire) == 1 {
         1

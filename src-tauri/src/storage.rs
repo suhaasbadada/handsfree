@@ -75,6 +75,8 @@ impl Stats {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(default)]
 pub struct Store {
+    #[serde(deserialize_with = "read_recording_mode")]
+    pub recording_mode: RecordingMode,
     #[serde(deserialize_with = "read_shortcut")]
     pub shortcut: crate::shortcut::Shortcut,
     #[serde(deserialize_with = "read_sound_style")]
@@ -84,6 +86,21 @@ pub struct Store {
     #[serde(deserialize_with = "read_recording_limit")]
     pub recording_limit: u32,
     pub stats: Stats,
+}
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RecordingMode {
+    #[default]
+    Toggle,
+    PushToTalk,
+}
+fn read_recording_mode<'de, D: serde::Deserializer<'de>>(d: D) -> Result<RecordingMode, D::Error> {
+    let value = serde_json::Value::deserialize(d)?;
+    Ok(if value.as_str() == Some("push_to_talk") {
+        RecordingMode::PushToTalk
+    } else {
+        RecordingMode::Toggle
+    })
 }
 fn read_sound_style<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
     let value = serde_json::Value::deserialize(deserializer)?;
@@ -123,6 +140,7 @@ fn read_shortcut<'de, D: serde::Deserializer<'de>>(
 impl Default for Store {
     fn default() -> Self {
         Self {
+            recording_mode: RecordingMode::default(),
             shortcut: crate::shortcut::Shortcut::default(),
             sound_style: "clean".into(),
             sounds: false,
@@ -196,6 +214,34 @@ pub fn validate_recording_limit(seconds: u32) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn recording_mode_is_opt_in_tolerant_and_preserves_saved_data() {
+        for mode in [None, Some("unknown"), Some("toggle"), Some("push_to_talk")] {
+            let mut value = serde_json::json!({"sounds":true,"sound_volume":73,"recording_limit":300,"stats":{"words":123,"transcriptions":7}});
+            if let Some(mode) = mode {
+                value["recording_mode"] = mode.into();
+            }
+            let store: super::Store = serde_json::from_value(value).unwrap();
+            assert_eq!(
+                store.recording_mode,
+                if mode == Some("push_to_talk") {
+                    super::RecordingMode::PushToTalk
+                } else {
+                    super::RecordingMode::Toggle
+                }
+            );
+            assert_eq!(store.stats.words, 123);
+            assert_eq!(store.stats.transcriptions, 7);
+            assert!(store.sounds);
+            assert_eq!(store.sound_volume, 73.);
+            assert_eq!(store.recording_limit, 300);
+            assert_eq!(
+                serde_json::from_str::<super::Store>(&serde_json::to_string(&store).unwrap())
+                    .unwrap(),
+                store
+            );
+        }
+    }
     use super::*;
     #[test]
     fn shortcuts_are_preserved_and_missing_preferences_use_platform_default() {
@@ -412,6 +458,7 @@ mod tests {
         let path = dir.join("usage.json");
         assert_eq!(load(&path).unwrap(), Store::default());
         let mut store = Store {
+            recording_mode: RecordingMode::PushToTalk,
             sounds: false,
             sound_volume: 42.0,
             sound_style: "warm".into(),
@@ -436,6 +483,10 @@ mod tests {
         assert!(!load(&path).unwrap().sounds);
         assert_eq!(load(&path).unwrap().sound_volume, 42.0);
         assert_eq!(load(&path).unwrap().sound_style, "warm");
+        assert_eq!(
+            load(&path).unwrap().recording_mode,
+            RecordingMode::PushToTalk
+        );
         fs::write(&path, b"broken").unwrap();
         assert!(load(&path).is_err());
         fs::write(&path, br#"{"stats":{"speech_seconds":-1}}"#).unwrap();

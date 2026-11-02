@@ -1,4 +1,25 @@
 import AppKit
+
+// Production physical-edge recognizer only: no event tap, mic, or playback.
+for cancel in [false, true] {
+    var hold = HoldGesture()
+    precondition(hold.key(down: true, valid: true) == 1)
+    let first = hold.token
+    for _ in 0..<100 { precondition(hold.key(down: true, valid: true) == nil) }
+    if cancel { precondition(hold.interrupt() == 3); precondition(hold.interrupt() == nil) }
+    precondition(hold.finish() == 2) // First required modifier released / HUD finish.
+    precondition(hold.key(down: true, valid: true) == nil)
+    precondition(hold.key(down: false, valid: true) == nil)
+    precondition(hold.key(down: true, valid: true) == 1 && hold.token > first)
+    precondition(hold.key(down: false, valid: true) == 2)
+}
+var quarantined = HoldGesture()
+quarantined.held = true
+precondition(quarantined.key(down: true, valid: true) == nil)
+precondition(quarantined.key(down: false, valid: true) == nil)
+precondition(quarantined.key(down: true, valid: false) == nil)
+precondition(quarantined.key(down: true, valid: true) == nil)
+precondition(quarantined.key(down: false, valid: true) == nil)
 import AVFoundation
 import CryptoKit
 

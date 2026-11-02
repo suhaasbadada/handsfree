@@ -80,6 +80,8 @@ Windows ARM and 32-bit Windows are unsupported. Linux has no release date.
 
 Focus a text field, briefly tap **Fn / 🌐**, speak, and tap again to finish. **Escape** cancels. Choose a different shortcut in Settings if Fn conflicts with macOS or your keyboard. If insertion is unavailable, paste the copied transcript yourself. **Review important text:** speech recognition can make mistakes.
 
+**Push to talk (source builds):** choose **Settings → Recording mode → Push to talk**. Hold your shortcut to record; release to finish. This works with Fn on Mac, Right Ctrl on Windows, and custom combinations. Other keys, mouse actions, or switching apps cancel the hold without pasting. Toggle remains the default and existing preferences are preserved. See [behavior and test notes](docs/PUSH-TO-TALK.md).
+
 [Full installation and troubleshooting guide](docs/INSTALL.md) · [Beta release notes](docs/releases/v0.1.1-beta.3.md)
 
 **Homebrew updates:** quit HandsFree, run the following in Terminal, then reopen from Applications:

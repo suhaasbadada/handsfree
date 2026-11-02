@@ -61,7 +61,9 @@ pub fn start(generation: u64, epoch: u64, allowed: Allowed, sink: Sink) -> bool 
     }
     let profile = cues::snapshot();
     cues::session(profile);
-    if !cues::start(profile, epoch, allowed) {
+    if !cues::start(profile, epoch, move |e| {
+        allowed(e) && super::capture_start_allowed(generation)
+    }) {
         return false;
     }
     let (stop, stopped) = mpsc::channel();
@@ -127,7 +129,7 @@ pub fn start(generation: u64, epoch: u64, allowed: Allowed, sink: Sink) -> bool 
             let _ = ready.send(false);
             return false;
         };
-        if !allowed(epoch) || stream.play().is_err() {
+        if !allowed(epoch) || !super::capture_start_allowed(generation) || stream.play().is_err() {
             let _ = ready.send(false);
             return false;
         }

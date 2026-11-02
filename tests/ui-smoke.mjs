@@ -91,6 +91,19 @@ try {
   assert.equal(await evaluate(`document.getElementById('overview').hidden && !document.getElementById('settings').hidden`), true);
   assert.equal(await evaluate(`document.querySelector('.readiness').hidden`), true, 'No readiness card when ready');
   await until(`!document.getElementById('recording-limit').disabled`);
+  assert.equal(await evaluate(`document.getElementById('recording-mode').value`), 'toggle', 'Old status defaults to Toggle');
+  await evaluate(`const modeInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='set_recording_mode'){if(window.rejectMode)throw 'Could not save recording mode';if(window.delayMode)await new Promise(resolve=>window.releaseMode=resolve);window.fixture.recording_mode=args.mode;}return modeInvoke(command,args);};window.delayMode=true;document.getElementById('recording-mode').value='push_to_talk';document.getElementById('recording-mode').dispatchEvent(new Event('change'))`);
+  await until(`document.getElementById('recording-mode').disabled`);
+  await delay(1000);
+  assert.equal(await evaluate(`document.getElementById('recording-mode').value==='push_to_talk' && document.getElementById('change-shortcut').disabled`), true, 'Pending choice survives polls and blocks shortcut editing');
+  await evaluate(`window.releaseMode();window.delayMode=false`);
+  await until(`!document.getElementById('recording-mode').disabled && document.getElementById('recording-action').textContent==='Hold'`);
+  assert.equal(await evaluate(`!document.getElementById('recording-mode-help').hidden && document.getElementById('recording-instruction').textContent.includes('Release')`), true);
+  await evaluate(`window.rejectMode=true;document.getElementById('recording-mode').value='toggle';document.getElementById('recording-mode').dispatchEvent(new Event('change'))`);
+  await until(`!document.getElementById('recording-mode').disabled && document.getElementById('recording-mode').value==='push_to_talk'`);
+  assert.equal(await evaluate(`document.getElementById('feedback').textContent.includes('Could not save recording mode')`), true);
+  await evaluate(`window.rejectMode=false;document.getElementById('recording-mode').value='toggle';document.getElementById('recording-mode').dispatchEvent(new Event('change'))`);
+  await until(`!document.getElementById('recording-mode').disabled && document.getElementById('recording-action').textContent==='Press'`);
   assert.deepEqual(await evaluate(`Array.from(document.getElementById('recording-limit').options,o=>o.value)`), ['120','180','240','300']);
   await evaluate(`document.getElementById('recording-limit').value='300'; document.getElementById('recording-limit').dispatchEvent(new Event('change'))`);
   await until(`window.fixture.recording_limit===300 && !document.getElementById('recording-limit').disabled`);
@@ -108,6 +121,7 @@ try {
   const key = (code, mods = '') => evaluate(`['keydown','keyup'].forEach(type=>document.getElementById('change-shortcut').dispatchEvent(new KeyboardEvent(type,{code:'${code}',${mods}bubbles:true,cancelable:true})))`);
   await evaluate(`document.getElementById('change-shortcut').click()`);
   await until(recording);
+  assert.equal(await evaluate(`document.getElementById('recording-mode').disabled`), true, 'Mode cannot change during shortcut capture');
   assert.equal(await evaluate(`document.activeElement.id==='change-shortcut' && document.getElementById('saved-shortcut').textContent==='Press shortcut…' && !document.querySelector('dialog[open]')`), true, 'Single inline recorder, no modal or presets');
   const initialSaves = await evaluate(`window.calls.filter(c=>c.command==='set_shortcut').length`);
   for (const [code, mods] of [['Space',''],['KeyQ','metaKey:true,'],['KeyJ','ctrlKey:true,repeat:true,'],['KeyJ','ctrlKey:true,isComposing:true,']]) await key(code, mods);
@@ -202,6 +216,7 @@ try {
     await until(`document.getElementById('dot').className===${JSON.stringify(phase)}`);
     assert.equal(await evaluate(`document.getElementById('preview-sound').disabled`), true);
     assert.equal(await evaluate(`document.getElementById('sound-style').disabled`), true, 'Profile selection is idle-only');
+    assert.equal(await evaluate(`document.getElementById('recording-mode').disabled`), true, 'Mode cannot change while busy');
     await evaluate(`document.getElementById('preview-sound').click()`);
   }
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='preview_sound').length`), 1, 'No preview while busy');
@@ -368,7 +383,19 @@ try {
    await until(`${stopped} && document.getElementById('shortcut-feedback').textContent.includes('Could not save')`);
    assert.equal(await evaluate(`document.getElementById('saved-shortcut').textContent`), 'Ctrl + Alt + Win + J', 'Windows registration failure restores the previous binding');
    await evaluate(`window.rejectShortcut=false;document.getElementById('shortcut-fn').click()`);
-   await until(`${stopped} && document.getElementById('saved-shortcut').textContent==='Right Ctrl'`);
+    await until(`${stopped} && document.getElementById('saved-shortcut').textContent==='Right Ctrl'`);
+    await evaluate(`document.getElementById('recording-mode').value='push_to_talk';document.getElementById('recording-mode').dispatchEvent(new Event('change'))`);
+    await until(`!document.getElementById('recording-mode').disabled && document.getElementById('recording-action').textContent==='Hold'`);
+    assert.equal(await evaluate(`document.getElementById('overview-shortcut').textContent==='Right Ctrl' && window.fixture.recording_mode==='push_to_talk'`), true, 'Windows hold instructions use the actual native shortcut');
+    for (const width of [320,390,400,560,740,980,1280]) {
+      await send('Emulation.setDeviceMetricsOverride', {width,height:820,deviceScaleFactor:1,mobile:false});
+      for (const tab of ['overview','settings']) {
+        await evaluate(`document.getElementById('nav-${tab}').click()`);
+        assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth`), true, `Push to talk fits ${width}px ${tab}`);
+      }
+    }
+    await evaluate(`document.getElementById('recording-mode').value='toggle';document.getElementById('recording-mode').dispatchEvent(new Event('change'))`);
+    await until(`!document.getElementById('recording-mode').disabled && document.getElementById('recording-action').textContent==='Press'`);
    assert.deepEqual(await evaluate(`window.calls.filter(c=>c.command==='set_shortcut').at(-1).args.shortcut`), {code:'ControlRight',modifiers:0}, 'Use default persists Right Ctrl, never Fn');
    // Actual modifier-first sequences: never finalize a modifier keydown.
    await evaluate(`document.getElementById('change-shortcut').click()`);

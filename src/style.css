@@ -72,6 +72,8 @@ kbd { display: inline-block; max-width: 100%; background: var(--button); border:
 .preferences > h2 { margin-bottom: 4px; }
 .setting-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .setting-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.preferences .setting-row { padding-top: 7px; padding-bottom: 7px; }
+.preferences .setting-row:last-child { padding-bottom: 0; }
 .setting-row > div:first-child { flex: 1; min-width: 0; }
 .setting-row p { color: var(--muted); line-height: 1.6; margin: 4px 0 0; }
 .setting-row button { flex: none; }

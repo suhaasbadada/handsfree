@@ -35,6 +35,7 @@ private var pill: PillView?
 private var targetPID: pid_t = 0
 private var target: AXUIElement?
 private var targetFailure: PasteResult = .originalFocusUnavailable
+private var focusObserver: AXObserver?
 private var overlayGeneration = 0
 private var clipboardGeneration = 0
 private var restoreClipboard: (() -> Void)?
@@ -47,16 +48,85 @@ private var shortcutCode: Int64 = 63
 private var shortcutModifiers: UInt32 = 0
 private var captureUntil = Date.distantPast
 private var shortcutDown = false
+// Physical lifetime remains latched after cancellation, limit or HUD Finish.
+struct HoldGesture {
+    var held = false
+    private var active = false
+    private var cancelled = false
+    private(set) var token: UInt64 = 0
+    mutating func key(down: Bool, valid: Bool) -> Int32? {
+        if down {
+            guard !held else { return nil }
+            held = true
+            guard valid else { return nil }
+            token &+= 1; active = true; cancelled = false; return 1
+        }
+        held = false
+        return finish()
+    }
+    mutating func finish() -> Int32? {
+        guard active else { return nil }
+        active = false; return 2
+    }
+    mutating func interrupt() -> Int32? {
+        guard active && !cancelled else { return nil }
+        cancelled = true; return 3
+    }
+}
+private var holdGesture = HoldGesture()
+private var pushToTalk = false
+private var startGate: (@convention(c) (UInt64) -> Bool)?
+@_cdecl("hf_start_gate") public func configureStartGate(_ cb: @escaping @convention(c) (UInt64) -> Bool) { main { startGate = cb } }
+private var gestureCallback: (@convention(c) (Int32, Int32, UInt64) -> Void)?
+private var activationObserver: NSObjectProtocol?
+private func emitHold(_ edge: Int32?) {
+    if let edge { gestureCallback?(edge, 1, holdGesture.token) }
+}
+private func resetHold() {
+    emitHold(holdGesture.interrupt())
+    emitHold(holdGesture.finish())
+    holdGesture.held = CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(shortcutCode))
+}
+@_cdecl("hf_gesture_hook") public func gestureHook(_ cb: @escaping @convention(c) (Int32, Int32, UInt64) -> Void) { main { gestureCallback = cb } }
+@_cdecl("hf_mode") public func recordingMode(_ mode: Int32) -> Bool {
+    main { resetHold(); pushToTalk = mode == 1; callback?(6); return true }
+}
+private func holdEvent(_ type: CGEventType, _ event: CGEvent) {
+    let code = event.getIntegerValueField(.keyboardEventKeycode)
+    var mods: UInt32 = 0
+    for (flag, bit): (CGEventFlags, UInt32) in [(.maskControl, 1), (.maskAlternate, 2), (.maskShift, 4), (.maskCommand, 8)] {
+        if event.flags.contains(flag) { mods |= bit }
+    }
+    let fn = shortcutCode == 63
+    let primaryEvent = code == shortcutCode && (fn ? type == .flagsChanged : type == .keyDown || type == .keyUp)
+    if primaryEvent {
+        let down = fn ? event.flags.contains(.maskSecondaryFn) : type == .keyDown
+        let otherHeld = (0..<128).contains { key in
+            key != Int(shortcutCode) && ![54,55,56,57,58,59,60,61,62,63].contains(key) && CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(key))
+        }
+        let valid = mods == (fn ? 0 : shortcutModifiers) && !otherHeld && (fn || !event.flags.contains(.maskSecondaryFn)) && event.getIntegerValueField(.keyboardEventAutorepeat) == 0
+        emitHold(holdGesture.key(down: down, valid: valid))
+    } else if type == .flagsChanged && !fn && (mods & shortcutModifiers) != shortcutModifiers {
+        // Release of the first required modifier finishes, but primary stays latched.
+        emitHold(holdGesture.finish())
+    } else if type == .keyDown || type == .flagsChanged || type == .leftMouseDown || type == .rightMouseDown || type == .otherMouseDown || type == .scrollWheel {
+        // Native Finish/Cancel remain usable without first cancelling Finish.
+        if !(type == .leftMouseDown && panel?.isVisible == true && panel?.frame.contains(NSEvent.mouseLocation) == true) {
+            emitHold(holdGesture.interrupt())
+        }
+    }
+    if type == .keyDown && code == 53 { callback?(4) }
+}
 enum ShortcutPolicy {
     static func matches(code: Int64, modifiers: UInt32, expectedCode: Int64, expectedModifiers: UInt32, repeatEvent: Bool, alreadyDown: Bool) -> Bool {
         code == expectedCode && modifiers == expectedModifiers && !repeatEvent && !alreadyDown
     }
 }
 @_cdecl("hf_shortcut") public func configureShortcut(_ code: Int32, _ modifiers: UInt32) {
-    main { shortcutCode = Int64(code); shortcutModifiers = modifiers; shortcutDown = false; callback?(6) }
+    main { resetHold(); shortcutCode = Int64(code); shortcutModifiers = modifiers; resetHold(); shortcutDown = false; callback?(6) }
 }
 @_cdecl("hf_capture_shortcut") public func captureShortcut(_ active: Bool) {
-    main { captureUntil = active ? Date().addingTimeInterval(30) : .distantPast; shortcutDown = false; callback?(6) }
+    main { resetHold(); captureUntil = active ? Date().addingTimeInterval(30) : .distantPast; shortcutDown = false; callback?(6) }
 }
 
 // Shared geometry is exercised without displaying UI or capturing microphone audio.
@@ -208,7 +278,7 @@ class PillView: NSView {
         cancelButton.isHidden = value != 1
         finishButton.isHidden = value != 1
         setAccessibilityLabel(value == 1 ? "HandsFree listening" : value == 2 ? "Transcribing" : value == 4 ? "No speech" : value == 5 ? "Copied" : "HandsFree needs attention. Open settings")
-        setAccessibilityHelp(value == 2 ? "Press Escape or use Cancel in HandsFree to cancel dictation." : nil)
+        setAccessibilityHelp(value == 1 && pushToTalk ? "Release the shortcut to finish. Escape cancels." : value == 2 ? "Press Escape or use Cancel in HandsFree to cancel dictation." : nil)
     }
     override func draw(_ dirtyRect: NSRect) {
         let capsule = capsuleRect
@@ -287,6 +357,9 @@ class PillView: NSView {
 @_cdecl("hf_hook") public func hook(_ cb: @escaping @convention(c) (Int32) -> Void) -> Bool {
     main {
         callback = cb
+        if activationObserver == nil {
+            activationObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { _ in emitHold(holdGesture.interrupt()) }
+        }
         // A retained port is not proof of permission or a live event stream.
         // Updates/revocation can leave it invalid or disabled indefinitely.
         guard CGPreflightListenEventAccess() else { removeHook(); hookReason = 2; return false }
@@ -297,14 +370,19 @@ class PillView: NSView {
             }
             removeHook()
         }
-        let mask = (1 << CGEventType.flagsChanged.rawValue) | (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue)
+        resetHold()
+        let mask = (1 << CGEventType.flagsChanged.rawValue) | (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue) | (1 << CGEventType.leftMouseDown.rawValue) | (1 << CGEventType.rightMouseDown.rawValue) | (1 << CGEventType.otherMouseDown.rawValue) | (1 << CGEventType.scrollWheel.rawValue)
         tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .listenOnly, eventsOfInterest: CGEventMask(mask), callback: { _, type, event, _ in
             if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                resetHold()
                 shortcutDown = false
                 if let t = tap { CGEvent.tapEnable(tap: t, enable: true) }
                 callback?(6) // Reset a gesture whose release may have been lost.
             } else if Date() < captureUntil {
+                resetHold()
                 return Unmanaged.passUnretained(event)
+            } else if pushToTalk {
+                holdEvent(type, event)
             } else if type == .keyUp {
                 if event.getIntegerValueField(.keyboardEventKeycode) == shortcutCode { shortcutDown = false }
             } else if type == .flagsChanged && shortcutCode == 63 {
@@ -342,6 +420,7 @@ class PillView: NSView {
 }
 
 private func removeHook() {
+    resetHold()
     if let s = source { CFRunLoopRemoveSource(CFRunLoopGetMain(), s, .commonModes) }
     if let t = tap { CFMachPortInvalidate(t) }
     source = nil; tap = nil
@@ -401,7 +480,20 @@ private func fieldStatus(_ element: AXUIElement) -> PasteResult {
                        selectedTextWritable: canSetText)
 }
 private func clearTarget() {
+    if let observer = focusObserver { CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes) }
+    focusObserver = nil
     target = nil; targetPID = 0; targetFailure = .originalFocusUnavailable
+}
+private func observeTargetFocus() {
+    guard pushToTalk, targetPID != 0 else { return }
+    var observer: AXObserver?
+    guard AXObserverCreate(targetPID, { observer, _, _, _ in
+        guard let current = focusObserver, CFEqual(current, observer) else { return }
+        emitHold(holdGesture.interrupt())
+    }, &observer) == .success, let observer else { return }
+    guard AXObserverAddNotification(observer, AXUIElementCreateApplication(targetPID), kAXFocusedUIElementChangedNotification as CFString, nil) == .success else { return }
+    focusObserver = observer
+    CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
 }
 @_cdecl("hf_discard_target") public func discardTarget() { main { clearTarget() } }
 private func validateTarget() -> PasteResult {
@@ -433,6 +525,7 @@ private func validateTarget() -> PasteResult {
             default: targetFailure = .sent
             }
         }
+        observeTargetFocus()
         do {
             let r = try AudioCapture(generation: generation, epoch: epoch, sink: sink)
             guard allowed(epoch) else { clearTarget(); return false }
@@ -451,7 +544,7 @@ private func validateTarget() -> PasteResult {
             let cueLength = soundsEnabled ? (startPlayer?.duration ?? StartCue.duration) : 0
             let quietTail = soundsEnabled || previewWasPlaying ? 0.18 : 0
             func captureAllowed() -> Bool {
-                guard CuePolicy.canCapture(current: recorder === r, allowed: allowed(epoch)) else {
+                guard CuePolicy.canCapture(current: recorder === r, allowed: allowed(epoch) && (startGate?(generation) ?? true)) else {
                     if recorder === r { r.stop(); recorder = nil; audioBusy = false; cue?.stop(); clearTarget() }
                     return false
                 }

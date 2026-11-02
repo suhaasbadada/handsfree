@@ -80,7 +80,11 @@ fn play(profile: Profile, end: bool) -> bool {
         .as_bool()
     }
 }
-pub fn start(profile: Profile, epoch: u64, allowed: extern "C" fn(u64) -> bool) -> bool {
+pub fn start(
+    profile: Profile,
+    epoch: u64,
+    allowed: impl Fn(u64) -> bool + Send + Copy + 'static,
+) -> bool {
     cancel();
     while PLAYING.load(Ordering::Acquire) {
         std::thread::sleep(Duration::from_millis(5));

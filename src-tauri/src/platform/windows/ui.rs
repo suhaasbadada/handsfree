@@ -2,7 +2,7 @@
 use crate::control_tap::{is_right_control, ControlTap};
 use std::{
     sync::{
-        atomic::{AtomicBool, AtomicI32, Ordering},
+        atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering},
         mpsc, Mutex, OnceLock,
     },
     time::{Duration, Instant},
@@ -21,7 +21,41 @@ use windows::{
 };
 static CALLBACK: Mutex<Option<extern "C" fn(i32)>> = Mutex::new(None);
 static TAP: Mutex<ControlTap> = Mutex::new(ControlTap::new());
+type GestureCallback = extern "C" fn(i32, i32, u64);
+static GESTURE_CALLBACK: Mutex<Option<GestureCallback>> = Mutex::new(None);
+static HOLD: OnceLock<Mutex<crate::hold::Physical>> = OnceLock::new();
+static PUSH_TO_TALK: AtomicBool = AtomicBool::new(false);
+static BINDING: Mutex<(u32, u32, bool)> = Mutex::new((0xa3, 0, false));
+fn hold() -> &'static Mutex<crate::hold::Physical> {
+    HOLD.get_or_init(Default::default)
+}
+fn emit_hold(edge: Option<i32>, token: u64) {
+    if let (Some(edge), Some(cb)) = (edge, *GESTURE_CALLBACK.lock().unwrap()) {
+        cb(edge, 2, token);
+    }
+}
+fn interrupt_hold() {
+    let mut h = hold().lock().unwrap();
+    let edge = h.interrupt();
+    emit_hold(edge, h.token);
+}
+unsafe fn reset_hold(code: u32) {
+    let mut h = hold().lock().unwrap();
+    let edge = h.interrupt();
+    emit_hold(edge, h.token);
+    let edge = h.finish();
+    emit_hold(edge, h.token);
+    h.held = GetAsyncKeyState(code as i32) < 0;
+}
+pub fn gesture_hook(cb: GestureCallback) {
+    *GESTURE_CALLBACK.lock().unwrap() = Some(cb);
+}
+pub fn mode(value: bool) -> bool {
+    let (tx, rx) = mpsc::sync_channel(1);
+    send(Command::Mode(value, tx)) && rx.recv_timeout(Duration::from_secs(2)).unwrap_or(false)
+}
 static RIGHT_CONTROL: AtomicBool = AtomicBool::new(false);
+static HUD_WINDOW: AtomicUsize = AtomicUsize::new(0);
 static CLOCK: OnceLock<Instant> = OnceLock::new();
 pub static REASON: AtomicI32 = AtomicI32::new(0);
 pub static CAPTURING: AtomicBool = AtomicBool::new(false);
@@ -31,6 +65,7 @@ struct Owner {
     thread: u32,
 }
 enum Command {
+    Mode(bool, mpsc::SyncSender<bool>),
     Probe(mpsc::SyncSender<bool>),
     Bind(i32, u32, mpsc::SyncSender<bool>),
     Capture(bool),
@@ -122,7 +157,33 @@ unsafe extern "system" fn keyboard(code: i32, message: WPARAM, data: LPARAM) -> 
         );
         let injected =
             key.flags & (LLKHF_INJECTED | LLKHF_LOWER_IL_INJECTED) != KBDLLHOOKSTRUCT_FLAGS(0);
-        let trigger = {
+        if PUSH_TO_TALK.load(Ordering::Acquire) {
+            let (primary, mask, enabled) = *BINDING.lock().unwrap();
+            let is_primary = if primary == VK_RCONTROL.0 as u32 {
+                physical_right
+            } else {
+                key.vkCode == primary
+            };
+            let mut h = hold().lock().unwrap();
+            let edge = if injected {
+                h.interrupt()
+            } else if is_primary && (down || up) {
+                h.key(
+                    down,
+                    enabled && !CAPTURING.load(Ordering::Acquire) && hold_keys_match(primary, mask),
+                )
+            } else if up && modifier_bit(key.vkCode) & mask != 0 {
+                h.finish()
+            } else if down {
+                h.interrupt()
+            } else {
+                None
+            };
+            emit_hold(edge, h.token);
+        }
+        let trigger = if PUSH_TO_TALK.load(Ordering::Acquire) {
+            false
+        } else {
             let mut tap = TAP.lock().unwrap();
             if injected || !physical_right || !(down || up) {
                 tap.interrupt();
@@ -157,6 +218,37 @@ unsafe extern "system" fn keyboard(code: i32, message: WPARAM, data: LPARAM) -> 
     }
     CallNextHookEx(None, code, message, data)
 }
+fn modifier_bit(vk: u32) -> u32 {
+    match vk {
+        0x10 | 0xa0 | 0xa1 => 4,
+        0x11 | 0xa2 | 0xa3 => 1,
+        0x12 | 0xa4 | 0xa5 => 2,
+        0x5b | 0x5c => 8,
+        _ => 0,
+    }
+}
+unsafe fn hold_keys_match(primary: u32, expected: u32) -> bool {
+    // AltGr synthesizes Left Ctrl + Right Alt; never treat it as dictation.
+    if GetAsyncKeyState(VK_RMENU.0 as i32) < 0 && GetAsyncKeyState(VK_LCONTROL.0 as i32) < 0 {
+        return false;
+    }
+    let mut mask = 0;
+    for vk in 1..=254 {
+        if vk == primary as i32 || GetAsyncKeyState(vk) >= 0 {
+            continue;
+        }
+        // The generic Ctrl alias represents the default physical Right Ctrl.
+        if primary == VK_RCONTROL.0 as u32 && vk == VK_CONTROL.0 as i32 {
+            continue;
+        }
+        let bit = modifier_bit(vk as u32);
+        if bit == 0 {
+            return false;
+        }
+        mask |= bit;
+    }
+    mask == expected
+}
 // Async state is sampled before the current hook event changes it. Exclude the
 // generic Ctrl alias and the physical key itself, but NOT left Ctrl (AltGr).
 unsafe fn other_keys_held() -> bool {
@@ -170,6 +262,14 @@ unsafe fn reset_tap() {
         .reset(GetAsyncKeyState(VK_RCONTROL.0 as i32) < 0);
 }
 unsafe extern "system" fn mouse(code: i32, message: WPARAM, data: LPARAM) -> LRESULT {
+    if code >= 0 {
+        let event = &*(data.0 as *const MSLLHOOKSTRUCT);
+        let injected = event.flags & (LLMHF_INJECTED | LLMHF_LOWER_IL_INJECTED) != 0;
+        let hud = WindowFromPoint(event.pt).0 as usize == HUD_WINDOW.load(Ordering::Acquire);
+        if injected || (message.0 as u32 != WM_MOUSEMOVE && !hud) {
+            interrupt_hold();
+        }
+    }
     if code >= 0 && message.0 as u32 != WM_MOUSEMOVE {
         TAP.lock().unwrap().interrupt();
     }
@@ -184,7 +284,19 @@ unsafe extern "system" fn foreground(
     _: u32,
     _: u32,
 ) {
+    interrupt_hold();
     TAP.lock().unwrap().interrupt();
+}
+unsafe extern "system" fn field_focus(
+    _: HWINEVENTHOOK,
+    _: u32,
+    _: HWND,
+    _: i32,
+    _: i32,
+    _: u32,
+    _: u32,
+) {
+    interrupt_hold();
 }
 #[derive(Clone, Copy)]
 struct Hud {
@@ -239,6 +351,7 @@ unsafe fn run(receiver: mpsc::Receiver<Command>, ready: mpsc::SyncSender<u32>) {
         return;
     };
     SetWindowLongPtrW(hwnd, GWLP_USERDATA, (&mut *hud as *mut Hud) as isize);
+    HUD_WINDOW.store(hwnd.0 as usize, Ordering::Release);
     let hook = SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard), instance, 0).ok();
     let mouse_hook = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse), instance, 0).ok();
     let focus_hook = SetWinEventHook(
@@ -250,7 +363,17 @@ unsafe fn run(receiver: mpsc::Receiver<Command>, ready: mpsc::SyncSender<u32>) {
         0,
         WINEVENT_OUTOFCONTEXT,
     );
+    let field_focus_hook = SetWinEventHook(
+        EVENT_OBJECT_FOCUS,
+        EVENT_OBJECT_FOCUS,
+        None,
+        Some(field_focus),
+        0,
+        0,
+        WINEVENT_OUTOFCONTEXT,
+    );
     let tap_hooks_ready = mouse_hook.is_some() && !focus_hook.is_invalid();
+    let hold_hooks_ready = tap_hooks_ready && !field_focus_hook.is_invalid();
     let mut hooks_ready = hook.is_some() && tap_hooks_ready;
     RIGHT_CONTROL.store(hooks_ready, Ordering::Release);
     reset_tap();
@@ -260,12 +383,31 @@ unsafe fn run(receiver: mpsc::Receiver<Command>, ready: mpsc::SyncSender<u32>) {
     let _ = ready.send(GetCurrentThreadId());
     let mut message = MSG::default();
     'messages: while GetMessageW(&mut message, None, 0, 0).0 > 0 {
-        if message.message == WM_HOTKEY && registered && !CAPTURING.load(Ordering::Acquire) {
+        if message.message == WM_HOTKEY
+            && registered
+            && !CAPTURING.load(Ordering::Acquire)
+            && !PUSH_TO_TALK.load(Ordering::Acquire)
+        {
             dispatch(7);
         }
         if message.message == WM_APP {
             for command in receiver.try_iter() {
                 match command {
+                    Command::Mode(value, reply) => {
+                        reset_hold(binding.0);
+                        let accepted = !value || (hook.is_some() && hold_hooks_ready);
+                        if accepted {
+                            PUSH_TO_TALK.store(value, Ordering::Release);
+                        }
+                        hooks_ready = hook.is_some()
+                            && if value {
+                                hold_hooks_ready
+                            } else {
+                                binding.0 != VK_RCONTROL.0 as u32 || tap_hooks_ready
+                            };
+                        dispatch(6);
+                        let _ = reply.send(accepted);
+                    }
                     Command::Probe(reply) => {
                         let connected = hooks_ready
                             && (RIGHT_CONTROL.load(Ordering::Acquire)
@@ -279,15 +421,22 @@ unsafe fn run(receiver: mpsc::Receiver<Command>, ready: mpsc::SyncSender<u32>) {
                             let _ = UnregisterHotKey(None, 1);
                         }
                         binding = (code as u32, mask);
+                        reset_hold(binding.0);
                         reset_tap();
                         let right = binding == (VK_RCONTROL.0 as u32, 0);
-                        hooks_ready = hook.is_some() && (!right || tap_hooks_ready);
+                        hooks_ready = hook.is_some()
+                            && if PUSH_TO_TALK.load(Ordering::Acquire) {
+                                hold_hooks_ready
+                            } else {
+                                !right || tap_hooks_ready
+                            };
                         RIGHT_CONTROL.store(right && hooks_ready, Ordering::Release);
                         // Binding validation runs even while shortcut capture is
                         // active; immediately unregister a successful probe.
                         registered =
                             !right && RegisterHotKey(None, 1, modifiers(mask), code as u32).is_ok();
                         let accepted = (right || registered) && hooks_ready;
+                        *BINDING.lock().unwrap() = (binding.0, mask, accepted);
                         REASON.store(
                             if !hooks_ready {
                                 102
@@ -305,6 +454,7 @@ unsafe fn run(receiver: mpsc::Receiver<Command>, ready: mpsc::SyncSender<u32>) {
                         let _ = reply.send(accepted);
                     }
                     Command::Capture(value) => {
+                        reset_hold(binding.0);
                         reset_tap();
                         CAPTURING.store(value, Ordering::Release);
                         if registered {
@@ -326,6 +476,9 @@ unsafe fn run(receiver: mpsc::Receiver<Command>, ready: mpsc::SyncSender<u32>) {
                                 Ordering::Release,
                             );
                         }
+                        BINDING.lock().unwrap().2 = !value
+                            && hooks_ready
+                            && (binding.0 == VK_RCONTROL.0 as u32 || registered);
                     }
                     Command::Phase(phase) => {
                         // Cancellation/automatic finish must not let a Ctrl
@@ -374,6 +527,9 @@ unsafe fn run(receiver: mpsc::Receiver<Command>, ready: mpsc::SyncSender<u32>) {
                             );
                         }
                         let label = match phase {
+                            1 if PUSH_TO_TALK.load(Ordering::Acquire) => w!(
+                                "HandsFree listening. Release shortcut to finish. Escape cancels."
+                            ),
                             1 => w!("HandsFree listening. Cancel or finish dictation."),
                             2 => w!("HandsFree processing. Click or Escape cancels."),
                             4 => w!("HandsFree could not hear speech."),
@@ -397,9 +553,13 @@ unsafe fn run(receiver: mpsc::Receiver<Command>, ready: mpsc::SyncSender<u32>) {
     }
     REASON.store(103, Ordering::Release);
     RIGHT_CONTROL.store(false, Ordering::Release);
+    reset_hold(binding.0);
     reset_tap();
     if !focus_hook.is_invalid() {
         let _ = UnhookWinEvent(focus_hook);
+    }
+    if !field_focus_hook.is_invalid() {
+        let _ = UnhookWinEvent(field_focus_hook);
     }
     if let Some(hook) = mouse_hook {
         let _ = UnhookWindowsHookEx(hook);
@@ -408,6 +568,7 @@ unsafe fn run(receiver: mpsc::Receiver<Command>, ready: mpsc::SyncSender<u32>) {
         let _ = UnhookWindowsHookEx(hook);
     }
     let _ = DestroyWindow(hwnd);
+    HUD_WINDOW.store(0, Ordering::Release);
 }
 unsafe extern "system" fn window(
     hwnd: HWND,

@@ -1,4 +1,7 @@
 unsafe extern "C" {
+    pub fn hf_mode(mode: i32) -> bool;
+    pub fn hf_start_gate(callback: extern "C" fn(u64) -> bool);
+    pub fn hf_gesture_hook(callback: extern "C" fn(i32, i32, u64));
     pub fn hf_dashboard_visible(visible: bool) -> bool;
     pub fn hf_activation_policy() -> i32;
     pub fn hf_permissions() -> i32;

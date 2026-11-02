@@ -5,7 +5,7 @@ import './typography.css';
 import { defaultShortcut, ShortcutRecorder, shortcutLabel, type Shortcut } from './shortcut';
 import { phaseLabel, canCancel, formatTime, readiness, readinessDetail } from './presentation';
 
-type Status = { platform?: 'windows' | 'macos'; phase: string; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: 'clean' | 'warm'; recording_limit: number; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
+type Status = { platform?: 'windows' | 'macos'; phase: string; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: 'clean' | 'warm'; recording_limit: number; recording_mode?: 'toggle' | 'push_to_talk'; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
 const logo = new URL('../src-tauri/icons/icon.png', import.meta.url).href;
 document.querySelector('#app')!.innerHTML = `
 <div class="shell">
@@ -13,7 +13,7 @@ document.querySelector('#app')!.innerHTML = `
   <div class="header-right"><nav aria-label="Main navigation"><button id="nav-overview" class="nav active" aria-label="Overview" title="Overview" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-6v-6h-4v6H4Z"/></svg></button><button id="nav-settings" class="nav" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg></button></nav><section class="status" aria-label="App status"><span id="dot" aria-hidden="true"></span><strong id="phase" aria-live="polite">Connecting…</strong><button id="cancel" hidden aria-label="Cancel dictation" title="Cancel dictation">×</button></section></div></aside>
  <main>
  <section id="overview" aria-labelledby="overview-title">
-    <div class="hero"><h1 id="overview-title">Your activity</h1><p>Press <kbd id="overview-shortcut">…</kbd> to dictate</p></div>
+    <div class="hero"><h1 id="overview-title">Your activity</h1><p><span id="recording-action">Press</span> <kbd id="overview-shortcut">…</kbd> <span id="recording-instruction">to dictate</span></p></div>
     <section class="card readiness"><div><h2 id="ready-title">Finish setting up</h2><p id="ready-detail">Connecting to HandsFree…</p></div><button id="setup" class="primary" disabled>Open settings</button></section>
    <section id="overview-model" class="card readiness" hidden aria-label="English model"><div><h2>English model</h2><p id="overview-model-state">One-time download · Works offline afterward</p></div><button id="overview-download" class="primary" disabled>Download English model (~148 MB)</button></section>
    <div class="metrics" aria-label="Local usage since tracking began"><article><strong id="words">0</strong><span>Words</span></article><article><strong id="saved">0 sec</strong><span tabindex="0" title="Estimate per dictation: typing at 40 words/minute, minus recording time, never below zero. Not a productivity measurement.">Time saved<small>Estimated</small></span></article><article><strong id="count">0</strong><span>Dictations</span></article></div>
@@ -21,6 +21,7 @@ document.querySelector('#app')!.innerHTML = `
  <section id="settings" hidden aria-labelledby="settings-title">
   <div class="settings-intro"><h1 id="settings-title">Settings</h1></div>
    <section class="card preferences" aria-labelledby="preferences-title"><h2 id="preferences-title">Preferences</h2>
+    <div class="setting-row"><div><h3><label for="recording-mode">Recording mode</label></h3><p id="recording-mode-help" hidden>Hold the shortcut; release to finish. Other keys or focus changes cancel.</p></div><select id="recording-mode" aria-describedby="recording-mode-help"><option value="toggle">Toggle</option><option value="push_to_talk">Push to talk</option></select></div>
      <div class="setting-row shortcut-row"><div><h3>Shortcut</h3></div><div class="shortcut-value"><button id="change-shortcut" aria-label="Record shortcut" title="Record shortcut" aria-pressed="false" aria-describedby="shortcut-feedback"><span id="saved-shortcut">…</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/></svg></button><button id="stop-shortcut" hidden>Cancel</button><button id="shortcut-fn" class="text-action" hidden>Use default</button></div><p id="shortcut-feedback" role="status" hidden></p></div>
     <div class="setting-row"><div><h3><label for="recording-limit">Recording limit</label></h3></div><select id="recording-limit" title="Applies to the next recording"><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="240">4 minutes</option><option value="300">5 minutes</option></select></div>
     <div class="setting-row listening-row"><div><h3>Sound</h3></div><select id="sound-style" aria-label="Sound"><option value="clean">Clean</option><option value="warm">Warm</option></select><span id="sound-state" class="state">Off</span><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Recording sounds"><span aria-hidden="true"></span></label></div>
@@ -45,7 +46,7 @@ document.querySelector('#app')!.innerHTML = `
 const el = (id: string) => document.getElementById(id)!;
 const button = (id: string) => el(id) as HTMLButtonElement;
 // Avoid presenting native actions as ready before the first backend response.
-for (const id of ['change-shortcut', 'mic', 'permissions', 'download', 'reset', 'sounds', 'sound-style', 'sound-volume', 'recording-limit']) {
+for (const id of ['change-shortcut', 'mic', 'permissions', 'download', 'reset', 'sounds', 'sound-style', 'sound-volume', 'recording-limit', 'recording-mode']) {
   (el(id) as HTMLInputElement | HTMLButtonElement).disabled = true;
 }
 let current: Status | undefined;
@@ -55,6 +56,7 @@ let soundsPending = false;
 let stylePending = false;
 let volumePending = false;
 let limitPending = false;
+let modePending = false;
 let volumeEditing = false;
 let previewPending = false;
 let shortcutPending = false;
@@ -103,15 +105,33 @@ function shortcutFeedback(message: string) {
 }
 function renderShortcut() {
   recorder.setAttribute('aria-pressed', String(capturing));
-  recorder.disabled = shortcutPending || captureStopping || !canEditShortcut();
+  recorder.disabled = modePending || shortcutPending || captureStopping || !canEditShortcut();
+  renderMode();
   if (!shortcutPending) el('saved-shortcut').textContent = capturing ? 'Press shortcut…' : current ? displayShortcut(current) : '…';
   el('stop-shortcut').hidden = !capturing;
   button('stop-shortcut').disabled = shortcutPending;
   const fallback = defaultShortcut(current?.platform);
   el('shortcut-fn').hidden = capturing || !current || (current.shortcut.code === fallback.code && current.shortcut.modifiers === fallback.modifiers);
   el('shortcut-fn').textContent = current?.platform === 'windows' ? 'Use default' : 'Use Fn';
-  button('shortcut-fn').disabled = shortcutPending || captureStopping || !canEditShortcut();
+  button('shortcut-fn').disabled = modePending || shortcutPending || captureStopping || !canEditShortcut();
 }
+function renderMode() {
+  const select = el('recording-mode') as HTMLSelectElement;
+  select.disabled = modePending || capturing || captureStopping || shortcutPending || !canEditShortcut();
+  if (!modePending) select.value = current?.recording_mode ?? 'toggle';
+  const hold = current?.recording_mode === 'push_to_talk';
+  el('recording-mode-help').hidden = !hold;
+  el('recording-action').textContent = hold ? 'Hold' : 'Press';
+  el('recording-instruction').textContent = hold ? 'to dictate · Release to finish' : 'to dictate';
+}
+el('recording-mode').onchange = async () => {
+  if (modePending || capturing || captureStopping || shortcutPending || !canEditShortcut()) { renderMode(); return; }
+  const select = el('recording-mode') as HTMLSelectElement;
+  const mode = select.value;
+  modePending = true; renderShortcut();
+  await action('set_recording_mode', { mode });
+  modePending = false; renderShortcut();
+};
 async function stopCapture() {
   if (!capturing || captureStopping) return;
   const restoreFocus = document.activeElement === recorder;
@@ -137,7 +157,7 @@ async function saveShortcut(shortcut: Shortcut) {
 el('shortcut-fn').onclick = () => { if (current) void saveShortcut(defaultShortcut(current.platform)); };
 el('stop-shortcut').onclick = () => void stopCapture();
 recorder.onclick = async e => {
-  if (!canEditShortcut() || shortcutPending || capturing || captureStopping) return;
+  if (!canEditShortcut() || modePending || shortcutPending || capturing || captureStopping) return;
   capturing = true; captureGeneration++; recordedKeys.reset(); activationHeld = e.detail === 0; shortcutFeedback(''); renderShortcut(); recorder.focus();
   const generation = captureGeneration;
   try {

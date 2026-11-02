@@ -2,6 +2,7 @@
 mod cancellation;
 #[cfg(any(windows, test))]
 mod control_tap;
+mod hold;
 mod logic;
 mod platform;
 mod shortcut;
@@ -18,7 +19,7 @@ use std::{
     io::Read,
     path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicU32, Ordering},
+        atomic::{AtomicU32, AtomicU64, Ordering},
         Arc, Mutex, OnceLock,
     },
     time::{Duration, Instant},
@@ -44,6 +45,60 @@ static EXECUTABLE_HASH: OnceLock<String> = OnceLock::new();
 static PERMISSION_REQUESTS: AtomicU32 = AtomicU32::new(0);
 // Separate from Inner: native conversion callbacks must never acquire app state.
 static INGRESS: Mutex<streaming::Slot> = Mutex::new(streaming::Slot::new());
+static HOLDS: OnceLock<Mutex<hold::Coordinator>> = OnceLock::new();
+static SESSION_GENERATION: AtomicU64 = AtomicU64::new(0);
+static SHORTCUT_CAPTURE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+async fn configure(
+    action: impl FnOnce() -> Result<(), String> + Send + 'static,
+) -> Result<(), String> {
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    enqueue(Control::Configure(Box::new(move || {
+        let _ = sender.send(action());
+    })));
+    tauri::async_runtime::spawn_blocking(move || receiver.recv().map_err(|e| e.to_string())?)
+        .await
+        .map_err(|e| e.to_string())?
+}
+fn holds() -> &'static Mutex<hold::Coordinator> {
+    HOLDS.get_or_init(|| Mutex::new(hold::Coordinator::new()))
+}
+extern "C" fn capture_start_allowed(generation: u64) -> bool {
+    holds().lock().unwrap().can_start(generation)
+}
+extern "C" fn native_gesture(edge: i32, source: i32, token: u64) {
+    route_gesture(
+        edge,
+        hold::Key(source, token),
+        holds(),
+        &CANCELLATION,
+        &SESSION_GENERATION,
+        enqueue_at,
+    );
+}
+fn route_gesture(
+    edge: i32,
+    key: hold::Key,
+    coordinator: &Mutex<hold::Coordinator>,
+    cancellation: &cancellation::CancellationEpoch,
+    generation: &AtomicU64,
+    mut send: impl FnMut(Control, u64),
+) {
+    let mut holds = coordinator.lock().unwrap();
+    match edge {
+        1 => {
+            holds.press(key);
+            send(Control::Press(key), cancellation.current());
+        }
+        2 => {
+            holds.receipt_release(key);
+            send(Control::Release(key), cancellation.current());
+        }
+        3 if holds.cancel(key) == Some(generation.load(Ordering::Acquire)) => {
+            send(Control::Cancel, cancellation.cancel());
+        }
+        _ => (),
+    }
+}
 extern "C" fn capture_audio(generation: u64, epoch: u64, samples: *const f32, count: i32) {
     let Some(session) = INGRESS.lock().unwrap().get(generation, epoch) else {
         return;
@@ -67,6 +122,9 @@ extern "C" fn delivery_allowed(epoch: u64) -> bool {
     CANCELLATION.allows(epoch)
 }
 enum Control {
+    Press(hold::Key),
+    Release(hold::Key),
+    Configure(Box<dyn FnOnce() + Send>),
     Toggle,
     Cancel,
     Finish(Option<u64>),
@@ -103,6 +161,7 @@ struct Status {
     sound_volume: f32,
     sound_style: String,
     recording_limit: u32,
+    recording_mode: storage::RecordingMode,
     shortcut: shortcut::Shortcut,
     shortcut_label: String,
     stats: storage::Stats,
@@ -333,17 +392,65 @@ async fn set_recording_limit(seconds: u32) -> Result<(), String> {
 }
 #[tauri::command]
 async fn capture_shortcut(active: bool) -> Result<(), String> {
-    if active && !shortcut_edit_allowed(&state().inner.lock().unwrap().status.phase) {
-        return Err("Finish dictation before recording a shortcut.".into());
-    }
-    tauri::async_runtime::spawn_blocking(move || unsafe { hf_capture_shortcut(active) })
-        .await
-        .map_err(|e| e.to_string())
+    configure(move || {
+        if active && !shortcut_edit_allowed(&state().inner.lock().unwrap().status.phase) {
+            return Err("Finish dictation before recording a shortcut.".into());
+        }
+        CANCELLATION.cancel();
+        SHORTCUT_CAPTURE.store(active, Ordering::Release);
+        unsafe { hf_capture_shortcut(active) };
+        CANCELLATION.cancel();
+        Ok(())
+    })
+    .await
+}
+#[tauri::command]
+async fn set_recording_mode(mode: storage::RecordingMode) -> Result<(), String> {
+    configure(move || {
+        let s = state();
+        let inner = s.inner.lock().unwrap();
+        if !shortcut_edit_allowed(&inner.status.phase) || SHORTCUT_CAPTURE.load(Ordering::Acquire) {
+            return Err("Finish dictation and shortcut recording before changing the mode.".into());
+        }
+        let old = inner.store.recording_mode;
+        drop(inner);
+        CANCELLATION.cancel(); // Quarantine already-enqueued physical presses.
+        let apply =
+            |mode| unsafe { hf_mode(i32::from(mode == storage::RecordingMode::PushToTalk)) };
+        if !apply(mode) {
+            let restored = apply(old);
+            CANCELLATION.cancel();
+            return Err(if restored { "Shortcut monitoring is unavailable. Mode was not changed." } else { "Shortcut monitoring is unavailable and could not be restored. Your saved mode was not changed." }.into());
+        }
+        // Other preferences may have changed while waiting for the native owner.
+        // Merge against the fresh store, retaining the disk/state transaction.
+        let mut inner = s.inner.lock().unwrap();
+        if !shortcut_edit_allowed(&inner.status.phase) {
+            drop(inner);
+            apply(old);
+            CANCELLATION.cancel();
+            return Err("Please wait for the current operation before changing the mode.".into());
+        }
+        let mut updated = inner.store.clone();
+        updated.recording_mode = mode;
+        if let Err(error) = storage::save(&s.directory.join("usage.json"), &updated) {
+            drop(inner);
+            let restored = apply(old);
+            CANCELLATION.cancel();
+            return Err(if restored { error } else { format!("{error}. Shortcut monitoring could not be restored; your saved mode was not changed.") });
+        }
+        CANCELLATION.cancel();
+        inner.store = updated;
+        inner.status.recording_mode = mode;
+        inner.status.persistence_error.clear();
+        Ok(())
+    })
+    .await
 }
 #[tauri::command]
 async fn set_shortcut(shortcut: shortcut::Shortcut) -> Result<(), String> {
     shortcut.validate()?;
-    tauri::async_runtime::spawn_blocking(move || {
+    configure(move || {
         let s = state();
         let mut inner = s.inner.lock().unwrap();
         if !shortcut_edit_allowed(&inner.status.phase) {
@@ -366,6 +473,7 @@ async fn set_shortcut(shortcut: shortcut::Shortcut) -> Result<(), String> {
         inner.status.message = format!("Select a text field and press {}.", shortcut.label());
         inner.status.persistence_error.clear();
         drop(inner);
+        CANCELLATION.cancel();
         GESTURE
             .lock()
             .unwrap()
@@ -374,10 +482,10 @@ async fn set_shortcut(shortcut: shortcut::Shortcut) -> Result<(), String> {
         unsafe {
             hf_shortcut(shortcut.keycode().unwrap(), shortcut.modifiers);
         }
+        CANCELLATION.cancel();
         Ok(())
     })
     .await
-    .map_err(|e| e.to_string())?
 }
 #[tauri::command]
 async fn set_sound_style(style: String) -> Result<(), String> {
@@ -452,6 +560,66 @@ async fn preview_sound() -> Result<(), String> {
 }
 #[cfg(test)]
 mod sound_tests {
+    #[test]
+    fn hold_receipt_fifo_identity_cancel_and_configuration_barrier() {
+        use super::*;
+        let coordinator = Mutex::new(hold::Coordinator::new());
+        let cancellation = cancellation::CancellationEpoch::new();
+        let generation = AtomicU64::new(20);
+        let (tx, rx) = std::sync::mpsc::channel();
+        let event = |edge, key| {
+            route_gesture(
+                edge,
+                key,
+                &coordinator,
+                &cancellation,
+                &generation,
+                |control, epoch| {
+                    tx.send((control, epoch)).unwrap();
+                },
+            )
+        };
+        let a = hold::Key(1, 1);
+        event(1, a);
+        event(2, a);
+        let (Control::Press(key), epoch) = rx.try_recv().unwrap() else {
+            panic!("FIFO press missing")
+        };
+        assert_eq!(key, a);
+        assert!(cancellation.allows(epoch));
+        assert!(coordinator.lock().unwrap().accept(a, 20));
+        assert!(!coordinator.lock().unwrap().can_start(20));
+        assert!(matches!(rx.try_recv().unwrap().0, Control::Release(k) if k == a));
+        assert_eq!(coordinator.lock().unwrap().release(a), Some(20));
+        // A rejected press while another generation is processing never owns it.
+        let b = hold::Key(2, 1);
+        event(1, b);
+        event(3, b);
+        let (_, epoch) = rx.try_recv().unwrap();
+        assert!(cancellation.allows(epoch));
+        assert!(rx.try_recv().is_err());
+        assert!(!coordinator.lock().unwrap().accept(b, 20));
+        event(2, b);
+        rx.try_recv().unwrap();
+        coordinator.lock().unwrap().release(b);
+        // An accepted hold cancels immediately, before the FIFO can execute.
+        let c = hold::Key(1, 2);
+        event(1, c);
+        rx.try_recv().unwrap();
+        assert!(coordinator.lock().unwrap().accept(c, 20));
+        event(3, c);
+        assert!(!cancellation.allows(epoch));
+        assert!(matches!(rx.try_recv().unwrap().0, Control::Cancel));
+        generation.store(21, Ordering::Release);
+        event(3, c);
+        assert!(rx.try_recv().is_err());
+        // A mode/binding reset invalidates a queued press, not a newer session.
+        let d = hold::Key(1, 3);
+        event(1, d);
+        let (_, old_epoch) = rx.try_recv().unwrap();
+        cancellation.cancel();
+        assert!(!cancellation.allows(old_epoch));
+    }
     #[test]
     fn native_finish_inputs_share_fifo_and_cancel_revokes_pending_finish() {
         use super::*;
@@ -593,11 +761,23 @@ fn cancel_inner() {
     }
 }
 fn toggle_recording(finish: Option<Option<u64>>, epoch: u64) {
+    recording_command(finish, epoch, None);
+}
+fn recording_command(finish: Option<Option<u64>>, epoch: u64, press: Option<hold::Key>) {
     if !CANCELLATION.allows(epoch) {
         return;
     }
     let s = state();
     let mut inner = s.inner.lock().unwrap();
+    if let Some(key) = press {
+        if inner.store.recording_mode != storage::RecordingMode::PushToTalk
+            || SHORTCUT_CAPTURE.load(Ordering::Acquire)
+            || inner.status.phase == "recording"
+            || !holds().lock().unwrap().pending(key)
+        {
+            return;
+        }
+    }
     if !CANCELLATION.allows(epoch) {
         return;
     }
@@ -641,17 +821,31 @@ fn toggle_recording(finish: Option<Option<u64>>, epoch: u64) {
     inner.generation += 1;
     inner.session_epoch = epoch;
     let generation = inner.generation;
+    SESSION_GENERATION.store(generation, Ordering::Release);
+    if let Some(key) = press {
+        if !holds().lock().unwrap().accept(key, generation) {
+            return;
+        }
+    }
     let limit = inner.store.recording_limit;
     let session = Arc::new(streaming::Session::new(generation, epoch, limit));
     if !INGRESS.lock().unwrap().start(session.clone()) {
         return;
     }
     inner.status.phase = "recording".into();
-    inner.status.message = format!(
-        "Press {} to finish, Escape to cancel. Maximum {} minutes.",
-        inner.store.shortcut.label(),
-        limit / 60
-    );
+    inner.status.message = if inner.store.recording_mode == storage::RecordingMode::PushToTalk {
+        format!(
+            "Release {} to finish, Escape to cancel. Maximum {} minutes.",
+            inner.store.shortcut.label(),
+            limit / 60
+        )
+    } else {
+        format!(
+            "Press {} to finish, Escape to cancel. Maximum {} minutes.",
+            inner.store.shortcut.label(),
+            limit / 60
+        )
+    };
     drop(inner);
     let started = unsafe { hf_record(generation, epoch, delivery_allowed, capture_audio) };
     if started && CANCELLATION.allows(epoch) {
@@ -659,9 +853,13 @@ fn toggle_recording(finish: Option<Option<u64>>, epoch: u64) {
             hf_overlay(1);
         }
     } else {
-        session.finish(Some(
-            "Microphone could not start. Check permissions and your input device.".into(),
-        ));
+        session.finish(
+            if !capture_start_allowed(generation) && CANCELLATION.allows(epoch) {
+                None
+            } else {
+                Some("Microphone could not start. Check permissions and your input device.".into())
+            },
+        );
     }
     std::thread::spawn(move || transcribe(session));
 }
@@ -1041,6 +1239,7 @@ fn main() {
             set_sound_volume,
             set_sound_style,
             set_shortcut,
+            set_recording_mode,
             capture_shortcut,
             preview_sound,
             reset_stats
@@ -1067,6 +1266,11 @@ fn main() {
                 hf_sound_volume(store.sound_volume / 100.0);
                 hf_sound_style(if store.sound_style == "warm" { 1 } else { 0 });
                 hf_shortcut(store.shortcut.keycode().unwrap(), store.shortcut.modifiers);
+                hf_gesture_hook(native_gesture);
+                hf_start_gate(capture_start_allowed);
+                hf_mode(i32::from(
+                    store.recording_mode == storage::RecordingMode::PushToTalk,
+                ));
             }
             app.manage(AppState {
                 directory,
@@ -1092,6 +1296,7 @@ fn main() {
                         sound_volume: store.sound_volume,
                         sound_style: store.sound_style.clone(),
                         recording_limit: store.recording_limit,
+                        recording_mode: store.recording_mode,
                         shortcut: store.shortcut.clone(),
                         shortcut_label: store.shortcut.label(),
                         stats: store.stats.clone(),
@@ -1114,6 +1319,14 @@ fn main() {
             std::thread::spawn(move || {
                 for (control, epoch) in receiver {
                     match control {
+                        Control::Configure(action) => action(),
+                        Control::Press(key) => recording_command(None, epoch, Some(key)),
+                        Control::Release(key) => {
+                            let generation = holds().lock().unwrap().release(key);
+                            if let Some(generation) = generation {
+                                toggle_recording(Some(Some(generation)), epoch);
+                            }
+                        }
                         Control::Toggle => toggle_recording(None, epoch),
                         Control::Cancel => cancel_inner(),
                         Control::Finish(generation) => toggle_recording(Some(generation), epoch),
