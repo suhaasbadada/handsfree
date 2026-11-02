@@ -101,8 +101,8 @@ test('public Windows coordinates are verified while unavailable fixtures still f
   assert.equal(windowsRelease.appVersion, '0.1.1');
   assert.equal(publishedWindowsUrl(windowsRelease), windowsRelease.installerUrl);
   assert.equal(publishedWindowsUrl(windowsDisabled), null);
-  assert.equal(release.publicAvailable, true, 'Mac beta 4 availability is independent from Windows beta 3');
-  assert.equal(release.dmgUrl, 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.4/HandsFree-0.1.1-beta.4-macos-arm64.dmg');
+  assert.equal(release.publicAvailable, false, 'Unpublished Mac beta 5 stays disabled independently from live Windows beta 3');
+  assert.equal(release.dmgUrl, 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.5/HandsFree-0.1.1-beta.5-macos-arm64.dmg');
   for (const arch of ['unknown', 'intel', 'arm64']) {
     const state = downloadState({ os: 'windows', arch }, enabled, windowsDisabled);
     assert.equal(state.url, enabled.dmgUrl);

@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url';
 import { homebrewCommand } from '../site/install.js';
 import { release, windowsRelease } from '../site/release.js';
 
+// Static defaults retain the actual public release until candidate publication.
+const publishedMacUrl = 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.4/HandsFree-0.1.1-beta.4-macos-arm64.dmg';
+
 const root = new URL('../', import.meta.url);
 const html = readFileSync(new URL('site/index.html', root), 'utf8');
 const css = readFileSync(new URL('site/styles.css', root), 'utf8');
@@ -155,7 +158,8 @@ test('website is dependency-free with accessible, honest platform copy', () => {
   assert.match(html, /download the English model \(~148 MB\)/);
   assert.match(html, /<noscript>/);
   assert.equal([...html.matchAll(/class="button primary"/g)].length, 2, 'Hero and platform card offer the same Mac download');
-  assert.ok(html.includes(`href="${release.dmgUrl}"`), 'Static defaults match the activated Mac manifest');
+  assert.equal(release.publicAvailable, false, 'Do not deploy the staged candidate manifest');
+  assert.ok(html.includes(`href="${publishedMacUrl}"`), 'Static defaults retain the verified published Mac beta');
   assert.match(html, /MIT license does not relicense dependencies/);
 });
 
@@ -164,7 +168,7 @@ test('Mac platform card has a primary Apple download, with technical details dis
   assert.ok(card);
   const cta = card.match(/<a class="button primary"[\s\S]*?<\/a>/)?.[0];
   assert.ok(cta);
-  assert.ok(cta.includes(`href="${release.dmgUrl}"`), 'Static card matches the activated Mac manifest');
+  assert.ok(cta.includes(`href="${publishedMacUrl}"`), 'Static card retains the verified published Mac beta');
   assert.match(cta, /aria-label="Download for Mac \(Apple Silicon\)"/);
   assert.match(cta, /<svg class="apple-logo"[^>]*aria-hidden="true"[^>]*focusable="false"><path d="[^"]+"\/><\/svg><span>Download for Mac<\/span>/);
   assert.match(card, /Apple Silicon · macOS 14\+ · English/);

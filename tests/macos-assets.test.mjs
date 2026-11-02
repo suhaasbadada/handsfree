@@ -7,11 +7,23 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const assets = [
-  { name: 'current.js', bytes: Buffer.from('<h1>Your activity</h1>Recording mode <option value="toggle">Toggle</option><option value="push_to_talk">Push to talk</option> set_recording_mode') },
+  { name: 'current.js', bytes: Buffer.from('<h1>Your activity</h1>Recording mode <option value="toggle">Toggle</option><option value="push_to_talk">Push to talk</option> set_recording_mode Compatibility paste compatibility-paste set_compatibility_paste compatibility_paste the exact field cannot be verified') },
   { name: 'current.css', bytes: Buffer.from('.metrics { display: grid; }') },
 ];
 const cached = assets.map(asset => brotliCompressSync(asset.bytes));
 const executable = Buffer.concat([Buffer.from('Mach-O fixture _hf_gesture_complete'), ...cached]);
+for (const marker of ['Compatibility paste', 'compatibility-paste', 'set_compatibility_paste', 'compatibility_paste', 'the exact field cannot be verified']) {
+  test(`compiled Compatibility paste audit rejects missing ${marker} even when stale bytes are embedded`, () => {
+    const stale = [{ ...assets[0], bytes: Buffer.from(assets[0].bytes.toString().replaceAll(marker, 'old')) }, assets[1]];
+    const cache = stale.map(asset => brotliCompressSync(asset.bytes));
+    assert.throws(() => verifyEmbeddedFrontend(Buffer.concat(cache), stale, cache), /Missing compiled Compatibility paste UI/);
+  });
+}
+test('pre-feature stats/push-to-talk frontend cannot pass merely because it is embedded', () => {
+  const stale = [{ ...assets[0], bytes: Buffer.from(assets[0].bytes.toString().split(' Compatibility paste')[0]) }, assets[1]];
+  const cache = stale.map(asset => brotliCompressSync(asset.bytes));
+  assert.throws(() => verifyEmbeddedFrontend(Buffer.concat(cache), stale, cache), /Missing compiled Compatibility paste UI/);
+});
 test('asset audit proves exact compiled frontend bytes are in the executable', () => {
   assert.doesNotThrow(() => verifyEmbeddedFrontend(executable, assets, cached));
 });

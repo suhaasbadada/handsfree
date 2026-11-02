@@ -15,6 +15,9 @@ export function verifyEmbeddedFrontend(executable, assets, cached) {
   for (const marker of ['Recording mode', 'value="toggle"', 'value="push_to_talk"', 'Push to talk', 'set_recording_mode']) {
     requireThat(javascript.includes(marker), `Missing compiled push-to-talk UI: ${marker}`);
   }
+  for (const marker of ['Compatibility paste', 'compatibility-paste', 'set_compatibility_paste', 'compatibility_paste', 'the exact field cannot be verified']) {
+    requireThat(javascript.includes(marker), `Missing compiled Compatibility paste UI: ${marker}`);
+  }
   for (const asset of assets) {
     const embedded = cached.some(bytes => {
       let decoded;
@@ -42,7 +45,7 @@ export function verifyCompiledAssets(root, app) {
     requireThat(readFileSync(join(app, 'Contents/Resources/sounds', name)).equals(readFileSync(join(root, 'src-tauri/native/assets/sounds', name))), `Stale bundled cue: ${name}`);
   }
   requireThat(readFileSync(join(app, 'Contents/Resources/icon.icns')).equals(readFileSync(join(root, 'src-tauri/icons/icon.icns'))), 'Stale or missing bundled app icon');
-  console.log('PASS: current compiled stats dashboard/push-to-talk UI/CSS embedded in executable; native gesture completion ABI present; all four Clean/Warm cue bytes and app icon match source.');
+  console.log('PASS: current compiled stats dashboard/push-to-talk/Compatibility paste UI and CSS embedded in executable; native gesture completion ABI present; all four Clean/Warm cue bytes and app icon match source.');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

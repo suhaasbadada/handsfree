@@ -1,5 +1,14 @@
 # Release packaging
 
+Task-branch candidate: **v0.1.1-beta.5**, embedded version **0.1.1**. Packaging
+and audit scripts target the new immutable beta 5 path. The Mac candidate manifest
+stays `publicAvailable: false`; do not merge/deploy it as-is. README, install guide
+and static links still describe live beta 4. After local/CI gates, publication,
+anonymous byte checks and the Homebrew gate below, coordinate their activation
+in a follow-up. Windows beta 3 and historical beta 4 assets remain untouched.
+See [beta 5 candidate notes](releases/v0.1.1-beta.5.md) for explicit Settings opt-in
+and delivery limitations.
+
 Run on the existing Apple Silicon signing machine, with installed npm/Cargo dependencies, Rust documentation (runtime notices), and the existing local signing identity:
 
 ```sh
