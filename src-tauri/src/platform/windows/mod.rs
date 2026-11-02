@@ -66,6 +66,9 @@ fn capture_start_allowed(generation: u64) -> bool {
 pub unsafe fn hf_gesture_hook(callback: extern "C" fn(i32, i32, u64)) {
     ui::gesture_hook(callback);
 }
+pub unsafe fn hf_gesture_complete(token: u64) {
+    ui::gesture_complete(token);
+}
 pub unsafe fn hf_hook_state() -> i32 {
     if ui::REASON.load(Ordering::Acquire) == 1 {
         1

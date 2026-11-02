@@ -17,6 +17,27 @@ var quarantined = HoldGesture()
 quarantined.held = true
 precondition(quarantined.key(down: true, valid: true) == nil)
 precondition(quarantined.key(down: false, valid: true) == nil)
+
+// Focus surveillance is independent of primary release and rejected presses.
+var focusWatch = HoldFocusWatch()
+var processingHold = HoldGesture()
+precondition(processingHold.key(down: true, valid: true) == 1)
+let processingToken = processingHold.token
+focusWatch.press(processingToken)
+precondition(processingHold.key(down: false, valid: true) == 2)
+precondition(focusWatch.tokens == [processingToken]) // Away, then back: both observed.
+precondition(processingHold.key(down: true, valid: true) == 1)
+let rejectedToken = processingHold.token
+focusWatch.press(rejectedToken)
+focusWatch.complete(rejectedToken)
+precondition(focusWatch.tokens == [processingToken])
+focusWatch.complete(processingToken) // Actual session completion, not release.
+precondition(focusWatch.tokens.isEmpty)
+precondition(processingHold.key(down: false, valid: true) == 2)
+precondition(processingHold.key(down: true, valid: true) == 1)
+focusWatch.press(processingHold.token)
+focusWatch.complete(processingToken) // Old completion cannot retire a newer hold.
+precondition(focusWatch.tokens == [processingHold.token])
 precondition(quarantined.key(down: true, valid: false) == nil)
 precondition(quarantined.key(down: true, valid: true) == nil)
 precondition(quarantined.key(down: false, valid: true) == nil)

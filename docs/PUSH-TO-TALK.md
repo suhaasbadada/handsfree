@@ -12,6 +12,15 @@ changing foreground application cancels without paste. Escape and the native
 HUD's Cancel and Finish remain available. Target identity is still checked at
 delivery: focus changes never redirect output into a different field.
 
+Observed foreground-application and field-focus changes continue to cancel
+through processing and delivery, even after releasing the shortcut. Switching
+away and back does not re-enable delivery. Mac field-focus monitoring uses AX
+notifications where supported; Windows uses foreground/field-focus WinEvents.
+Final original-target validation remains the fallback for unobservable focus
+changes. After release, ordinary typing and mouse actions do not by themselves
+cancel processing; an observed focus change does. The non-activating native HUD
+does not change focus when Finish or Cancel is clicked.
+
 The trigger stays latched until its physical primary key is released, including
 after cancellation, automatic duration limits, failures, and HUD Finish. Repeats
 cannot restart recording. Already-held keys are quarantined when hooks, mode,
@@ -41,6 +50,10 @@ session. The coordinator maps accepted presses to actual session generations,
 not cancellation epochs. Releases are always queued, even before a start has
 executed. A receipt-time capture-start gate prevents an early release from
 opening the microphone after the cue; normal finish/drain semantics remain intact.
+Accepted identity and native focus surveillance survive release until actual
+session completion. `hf_gesture_complete(token)` retires exactly that native
+token without changing the physical held-key latch. Rejected presses are retired
+separately and cannot overwrite a processing session's cancellation identity.
 Mode/binding/capture barriers invalidate stale queued starts. The legacy toggle
 callback ABI and isolated-tap recognizers remain unchanged.
 

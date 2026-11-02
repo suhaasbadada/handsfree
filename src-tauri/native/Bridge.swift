@@ -74,15 +74,29 @@ struct HoldGesture {
     }
 }
 private var holdGesture = HoldGesture()
+struct HoldFocusWatch {
+    private(set) var tokens = Set<UInt64>()
+    mutating func press(_ token: UInt64) { tokens.insert(token) }
+    mutating func complete(_ token: UInt64) { tokens.remove(token) }
+}
+private var holdFocusWatch = HoldFocusWatch()
+private func interruptHoldFocus() {
+    for token in holdFocusWatch.tokens { gestureCallback?(3, 1, token) }
+}
+@_cdecl("hf_gesture_complete") public func gestureComplete(_ token: UInt64) {
+    main { holdFocusWatch.complete(token) }
+}
 private var pushToTalk = false
 private var startGate: (@convention(c) (UInt64) -> Bool)?
 @_cdecl("hf_start_gate") public func configureStartGate(_ cb: @escaping @convention(c) (UInt64) -> Bool) { main { startGate = cb } }
 private var gestureCallback: (@convention(c) (Int32, Int32, UInt64) -> Void)?
 private var activationObserver: NSObjectProtocol?
 private func emitHold(_ edge: Int32?) {
+    if edge == 1 { holdFocusWatch.press(holdGesture.token) }
     if let edge { gestureCallback?(edge, 1, holdGesture.token) }
 }
 private func resetHold() {
+    interruptHoldFocus()
     emitHold(holdGesture.interrupt())
     emitHold(holdGesture.finish())
     holdGesture.held = CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(shortcutCode))
@@ -358,7 +372,7 @@ class PillView: NSView {
     main {
         callback = cb
         if activationObserver == nil {
-            activationObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { _ in emitHold(holdGesture.interrupt()) }
+            activationObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { _ in interruptHoldFocus() }
         }
         // A retained port is not proof of permission or a live event stream.
         // Updates/revocation can leave it invalid or disabled indefinitely.
@@ -489,7 +503,7 @@ private func observeTargetFocus() {
     var observer: AXObserver?
     guard AXObserverCreate(targetPID, { observer, _, _, _ in
         guard let current = focusObserver, CFEqual(current, observer) else { return }
-        emitHold(holdGesture.interrupt())
+        interruptHoldFocus()
     }, &observer) == .success, let observer else { return }
     guard AXObserverAddNotification(observer, AXUIElementCreateApplication(targetPID), kAXFocusedUIElementChangedNotification as CFString, nil) == .success else { return }
     focusObserver = observer

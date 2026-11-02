@@ -4,8 +4,32 @@
 pub struct Key(pub i32, pub u64);
 #[derive(Default)]
 pub struct Coordinator {
-    entries: std::collections::HashMap<Key, (bool, Option<u64>, bool)>,
+    entries: std::collections::HashMap<Key, Entry>,
     closed: Option<u64>,
+}
+#[derive(Default)]
+struct Entry {
+    cancelled: bool,
+    generation: Option<u64>,
+    released: bool,
+    finished: bool,
+}
+/// Native focus surveillance outlives the physical key latch. A rejected second
+/// press must not overwrite the accepted session's still-processing token.
+#[cfg(any(windows, test))]
+#[derive(Default)]
+pub struct FocusWatch(std::collections::BTreeSet<u64>);
+#[cfg(any(windows, test))]
+impl FocusWatch {
+    pub fn press(&mut self, token: u64) {
+        self.0.insert(token);
+    }
+    pub fn complete(&mut self, token: u64) {
+        self.0.remove(&token);
+    }
+    pub fn tokens(&self) -> Vec<u64> {
+        self.0.iter().copied().collect()
+    }
 }
 #[cfg(any(windows, test))]
 #[derive(Default)]
@@ -55,67 +79,85 @@ impl Coordinator {
         Self::default()
     }
     pub fn press(&mut self, key: Key) {
-        self.entries.entry(key).or_insert((false, None, false));
+        self.entries.entry(key).or_default();
     }
     pub fn pending(&self, key: Key) -> bool {
         self.entries
             .get(&key)
-            .is_some_and(|(cancelled, generation, _)| !cancelled && generation.is_none())
+            .is_some_and(|entry| !entry.cancelled && entry.generation.is_none())
     }
     pub fn accept(&mut self, key: Key, generation: u64) -> bool {
         if !self.pending(key) {
             return false;
         }
         let entry = self.entries.get_mut(&key).unwrap();
-        entry.1 = Some(generation);
-        if entry.2 {
+        entry.generation = Some(generation);
+        if entry.released {
             self.closed = Some(generation);
         }
         true
     }
     pub fn cancel(&mut self, key: Key) -> Option<u64> {
         match self.entries.get_mut(&key) {
-            Some((cancelled, generation, _)) if !*cancelled => {
-                *cancelled = true;
-                if generation.is_some() {
-                    self.closed = *generation;
+            Some(entry) if !entry.cancelled => {
+                entry.cancelled = true;
+                if entry.generation.is_some() {
+                    self.closed = entry.generation;
                 }
-                *generation
+                entry.generation
             }
             _ => None,
         }
     }
     pub fn release(&mut self, key: Key) -> Option<u64> {
-        match self.entries.remove(&key) {
-            Some((cancelled, generation, _)) => {
-                if generation.is_some() {
-                    self.closed = generation;
-                }
-                if cancelled {
-                    None
-                } else {
-                    generation
-                }
-            }
-            _ => None,
+        let entry = self.entries.get_mut(&key)?;
+        if entry.generation.is_none() {
+            self.entries.remove(&key);
+            return None;
         }
+        if entry.finished {
+            return None;
+        }
+        entry.finished = true;
+        self.closed = entry.generation;
+        if entry.cancelled {
+            None
+        } else {
+            entry.generation
+        }
+    }
+    pub fn accepted(&self, key: Key) -> bool {
+        self.entries
+            .get(&key)
+            .is_some_and(|entry| entry.generation.is_some())
+    }
+    pub fn reject(&mut self, key: Key) {
+        self.entries.remove(&key);
+    }
+    pub fn complete(&mut self, generation: u64) -> Vec<Key> {
+        let keys: Vec<_> = self
+            .entries
+            .iter()
+            .filter_map(|(key, entry)| (entry.generation == Some(generation)).then_some(*key))
+            .collect();
+        for key in &keys {
+            self.entries.remove(key);
+        }
+        keys
     }
     pub fn receipt_release(&mut self, key: Key) {
         if let Some(entry) = self.entries.get_mut(&key) {
-            entry.2 = true;
-            if entry.1.is_some() {
-                self.closed = entry.1;
+            entry.released = true;
+            if entry.generation.is_some() {
+                self.closed = entry.generation;
             }
         }
     }
     pub fn can_start(&self, generation: u64) -> bool {
         self.closed != Some(generation)
-            && !self
-                .entries
-                .values()
-                .any(|(cancelled, accepted, released)| {
-                    *accepted == Some(generation) && (*cancelled || *released)
-                })
+            && !self.entries.values().any(|entry| {
+                entry.generation == Some(generation) && (entry.cancelled || entry.released)
+            })
     }
 }
 #[cfg(test)]
@@ -166,6 +208,8 @@ mod tests {
         assert!(!c.can_start(1));
         assert_eq!(c.release(a), Some(1));
         assert!(!c.can_start(1));
+        assert_eq!(c.release(a), None);
+        c.complete(1);
         // Rejected during processing: no generation ever gets mapped.
         assert_eq!(c.release(b), None);
         let d = Key(1, 3);
@@ -184,6 +228,7 @@ mod tests {
         c.press(a);
         assert!(c.accept(a, 10));
         assert_eq!(c.release(a), Some(10));
+        c.complete(10);
         c.press(b);
         assert!(c.accept(b, 11));
         assert_eq!(c.release(a), None);
@@ -200,5 +245,63 @@ mod tests {
         assert_eq!(c.release(a), None);
         c.press(Key(2, 2));
         assert_eq!(c.release(Key(2, 2)), None);
+    }
+    #[test]
+    fn released_session_observes_focus_away_and_back_until_completion() {
+        for source in [1, 2] {
+            let mut coordinator = Coordinator::new();
+            let mut watches = FocusWatch::default();
+            let mut physical = Physical::default();
+            assert_eq!(physical.key(true, true), Some(1));
+            let key = Key(source, physical.token);
+            watches.press(key.1);
+            coordinator.press(key);
+            assert!(coordinator.accept(key, 10));
+            assert_eq!(physical.key(false, true), Some(2));
+            coordinator.receipt_release(key);
+            assert_eq!(coordinator.release(key), Some(10));
+            assert_eq!(coordinator.release(key), None);
+            // Focus away is observed after release; returning cannot undo it.
+            for token in watches.tokens() {
+                assert_eq!(coordinator.cancel(Key(source, token)), Some(10));
+            }
+            for token in watches.tokens() {
+                assert_eq!(coordinator.cancel(Key(source, token)), None);
+            }
+            assert!(!coordinator.can_start(10));
+            assert_eq!(coordinator.complete(10), vec![key]);
+            watches.complete(key.1);
+            assert!(watches.tokens().is_empty());
+        }
+    }
+    #[test]
+    fn rejected_new_press_does_not_replace_processing_focus_identity() {
+        let mut c = Coordinator::new();
+        let mut watches = FocusWatch::default();
+        let old = Key(2, 1);
+        let rejected = Key(2, 2);
+        let new = Key(2, 3);
+        c.press(old);
+        watches.press(old.1);
+        assert!(c.accept(old, 10));
+        c.receipt_release(old);
+        assert_eq!(c.release(old), Some(10));
+        c.press(rejected);
+        watches.press(rejected.1);
+        c.reject(rejected);
+        watches.complete(rejected.1);
+        assert_eq!(watches.tokens(), vec![old.1]);
+        assert_eq!(c.cancel(old), Some(10));
+        c.complete(10);
+        watches.complete(old.1);
+        c.press(new);
+        watches.press(new.1);
+        assert!(c.accept(new, 11));
+        assert_eq!(c.cancel(old), None);
+        assert_eq!(c.release(old), None);
+        c.complete(10);
+        watches.complete(old.1); // Delayed old completion.
+        assert_eq!(watches.tokens(), vec![new.1]);
+        assert!(c.can_start(11));
     }
 }

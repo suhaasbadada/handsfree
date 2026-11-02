@@ -24,12 +24,28 @@ static TAP: Mutex<ControlTap> = Mutex::new(ControlTap::new());
 type GestureCallback = extern "C" fn(i32, i32, u64);
 static GESTURE_CALLBACK: Mutex<Option<GestureCallback>> = Mutex::new(None);
 static HOLD: OnceLock<Mutex<crate::hold::Physical>> = OnceLock::new();
+static FOCUS_WATCH: OnceLock<Mutex<crate::hold::FocusWatch>> = OnceLock::new();
+fn focus_watch() -> &'static Mutex<crate::hold::FocusWatch> {
+    FOCUS_WATCH.get_or_init(Default::default)
+}
+pub fn gesture_complete(token: u64) {
+    focus_watch().lock().unwrap().complete(token);
+}
+fn interrupt_focus() {
+    let tokens = focus_watch().lock().unwrap().tokens();
+    for token in tokens {
+        emit_hold(Some(3), token);
+    }
+}
 static PUSH_TO_TALK: AtomicBool = AtomicBool::new(false);
 static BINDING: Mutex<(u32, u32, bool)> = Mutex::new((0xa3, 0, false));
 fn hold() -> &'static Mutex<crate::hold::Physical> {
     HOLD.get_or_init(Default::default)
 }
 fn emit_hold(edge: Option<i32>, token: u64) {
+    if edge == Some(1) {
+        focus_watch().lock().unwrap().press(token);
+    }
     if let (Some(edge), Some(cb)) = (edge, *GESTURE_CALLBACK.lock().unwrap()) {
         cb(edge, 2, token);
     }
@@ -40,6 +56,7 @@ fn interrupt_hold() {
     emit_hold(edge, h.token);
 }
 unsafe fn reset_hold(code: u32) {
+    interrupt_focus();
     let mut h = hold().lock().unwrap();
     let edge = h.interrupt();
     emit_hold(edge, h.token);
@@ -284,6 +301,7 @@ unsafe extern "system" fn foreground(
     _: u32,
     _: u32,
 ) {
+    interrupt_focus();
     interrupt_hold();
     TAP.lock().unwrap().interrupt();
 }
@@ -296,7 +314,7 @@ unsafe extern "system" fn field_focus(
     _: u32,
     _: u32,
 ) {
-    interrupt_hold();
+    interrupt_focus();
 }
 #[derive(Clone, Copy)]
 struct Hud {

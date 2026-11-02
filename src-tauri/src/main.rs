@@ -561,6 +561,50 @@ async fn preview_sound() -> Result<(), String> {
 #[cfg(test)]
 mod sound_tests {
     #[test]
+    fn focus_after_release_revokes_processing_epoch_even_after_returning() {
+        use super::*;
+        for source in [1, 2] {
+            let coordinator = Mutex::new(hold::Coordinator::new());
+            let cancellation = cancellation::CancellationEpoch::new();
+            let generation = AtomicU64::new(10);
+            let (tx, rx) = std::sync::mpsc::channel();
+            let event = |edge, key| {
+                route_gesture(
+                    edge,
+                    key,
+                    &coordinator,
+                    &cancellation,
+                    &generation,
+                    |control, epoch| {
+                        tx.send((control, epoch)).unwrap();
+                    },
+                )
+            };
+            let key = hold::Key(source, 1);
+            event(1, key);
+            let (_, session_epoch) = rx.try_recv().unwrap();
+            assert!(coordinator.lock().unwrap().accept(key, 10));
+            event(2, key);
+            rx.try_recv().unwrap();
+            assert_eq!(coordinator.lock().unwrap().release(key), Some(10));
+            event(3, key); // Observed application/field focus away, during inference.
+            assert!(!cancellation.allows(session_epoch));
+            assert!(matches!(rx.try_recv().unwrap().0, Control::Cancel));
+            event(3, key); // Returning to the original field cannot restore the epoch.
+            assert!(rx.try_recv().is_err());
+            assert!(!cancellation.allows(session_epoch));
+            assert_eq!(coordinator.lock().unwrap().complete(10), vec![key]);
+            let new = hold::Key(source, 2);
+            generation.store(11, Ordering::Release);
+            event(1, new);
+            let (_, new_epoch) = rx.try_recv().unwrap();
+            assert!(coordinator.lock().unwrap().accept(new, 11));
+            event(3, key); // A late old native focus callback is inert.
+            assert!(rx.try_recv().is_err());
+            assert!(cancellation.allows(new_epoch));
+        }
+    }
+    #[test]
     fn hold_receipt_fifo_identity_cancel_and_configuration_barrier() {
         use super::*;
         let coordinator = Mutex::new(hold::Coordinator::new());
@@ -591,6 +635,7 @@ mod sound_tests {
         assert!(!coordinator.lock().unwrap().can_start(20));
         assert!(matches!(rx.try_recv().unwrap().0, Control::Release(k) if k == a));
         assert_eq!(coordinator.lock().unwrap().release(a), Some(20));
+        coordinator.lock().unwrap().complete(20);
         // A rejected press while another generation is processing never owns it.
         let b = hold::Key(2, 1);
         event(1, b);
@@ -1320,7 +1365,17 @@ fn main() {
                 for (control, epoch) in receiver {
                     match control {
                         Control::Configure(action) => action(),
-                        Control::Press(key) => recording_command(None, epoch, Some(key)),
+                        Control::Press(key) => {
+                            recording_command(None, epoch, Some(key));
+                            let mut coordinator = holds().lock().unwrap();
+                            if !coordinator.accepted(key) {
+                                coordinator.reject(key);
+                                drop(coordinator);
+                                unsafe {
+                                    hf_gesture_complete(key.1);
+                                }
+                            }
+                        }
                         Control::Release(key) => {
                             let generation = holds().lock().unwrap().release(key);
                             if let Some(generation) = generation {
@@ -1331,7 +1386,15 @@ fn main() {
                         Control::Cancel => cancel_inner(),
                         Control::Finish(generation) => toggle_recording(Some(generation), epoch),
                         Control::Complete(session, result) => {
-                            complete_transcription(session, result)
+                            let generation = session.generation;
+                            complete_transcription(session, result);
+                            let retired = holds().lock().unwrap().complete(generation);
+                            // No Inner/coordinator lock across a native owner call.
+                            for key in retired {
+                                unsafe {
+                                    hf_gesture_complete(key.1);
+                                }
+                            }
                         }
                     }
                 }
