@@ -12,6 +12,9 @@ export function verifyEmbeddedFrontend(executable, assets, cached) {
   requireThat(assets.some(asset => asset.name.endsWith('.css')), 'Missing built frontend CSS');
   const javascript = assets.filter(asset => asset.name.endsWith('.js')).map(asset => asset.bytes.toString()).join('\n');
   requireThat(javascript.includes('Your activity') && !/Last transcript|<details\b|<summary\b/i.test(javascript), 'Stale dashboard: expected stats-first UI without transcript/disclosures');
+  for (const marker of ['Recording mode', 'value="toggle"', 'value="push_to_talk"', 'Push to talk', 'set_recording_mode']) {
+    requireThat(javascript.includes(marker), `Missing compiled push-to-talk UI: ${marker}`);
+  }
   for (const asset of assets) {
     const embedded = cached.some(bytes => {
       let decoded;
@@ -31,13 +34,15 @@ export function verifyCompiledAssets(root, app) {
     const directory = join(build, name, 'out/tauri-codegen-assets');
     if (existsSync(directory)) for (const file of readdirSync(directory).filter(file => /\.(js|css)$/.test(file))) cached.push(readFileSync(join(directory, file)));
   }
-  verifyEmbeddedFrontend(readFileSync(join(app, 'Contents/MacOS/handsfree')), assets, cached);
+  const executable = readFileSync(join(app, 'Contents/MacOS/handsfree'));
+  verifyEmbeddedFrontend(executable, assets, cached);
+  requireThat(executable.includes(Buffer.from('_hf_gesture_complete')), 'Missing native push-to-talk completion ABI symbol');
   for (const profile of ['clean', 'warm']) for (const role of ['start', 'end']) {
     const name = `${profile}-${role}.wav`;
     requireThat(readFileSync(join(app, 'Contents/Resources/sounds', name)).equals(readFileSync(join(root, 'src-tauri/native/assets/sounds', name))), `Stale bundled cue: ${name}`);
   }
   requireThat(readFileSync(join(app, 'Contents/Resources/icon.icns')).equals(readFileSync(join(root, 'src-tauri/icons/icon.icns'))), 'Stale or missing bundled app icon');
-  console.log('PASS: current compiled stats dashboard/CSS embedded in executable; all four Clean/Warm cue bytes and app icon match source.');
+  console.log('PASS: current compiled stats dashboard/push-to-talk UI/CSS embedded in executable; native gesture completion ABI present; all four Clean/Warm cue bytes and app icon match source.');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

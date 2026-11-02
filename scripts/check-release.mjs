@@ -7,8 +7,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { verifyCompiledAssets } from './check-macos-assets.mjs';
 
-export const candidate = 'HandsFree-0.1.1-beta.3-macos-arm64.dmg';
-export const tag = 'v0.1.1-beta.3';
+export const candidate = 'HandsFree-0.1.1-beta.4-macos-arm64.dmg';
+export const tag = 'v0.1.1-beta.4';
 const names = [candidate, 'PROVENANCE.txt', 'SHA256SUMS'];
 const repo = 'suhaasbadada/handsfree';
 function requireThat(condition, message) { if (!condition) throw new Error(message); }

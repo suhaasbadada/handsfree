@@ -7,11 +7,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const assets = [
-  { name: 'current.js', bytes: Buffer.from('<h1>Your activity</h1>') },
+  { name: 'current.js', bytes: Buffer.from('<h1>Your activity</h1>Recording mode <option value="toggle">Toggle</option><option value="push_to_talk">Push to talk</option> set_recording_mode') },
   { name: 'current.css', bytes: Buffer.from('.metrics { display: grid; }') },
 ];
 const cached = assets.map(asset => brotliCompressSync(asset.bytes));
-const executable = Buffer.concat([Buffer.from('Mach-O fixture'), ...cached]);
+const executable = Buffer.concat([Buffer.from('Mach-O fixture _hf_gesture_complete'), ...cached]);
 test('asset audit proves exact compiled frontend bytes are in the executable', () => {
   assert.doesNotThrow(() => verifyEmbeddedFrontend(executable, assets, cached));
 });
@@ -21,6 +21,13 @@ test('fresh dist and cache beside stale executable cannot pass', () => {
 test('a stale frontend cache cannot pass against fresh dist', () => {
   assert.throws(() => verifyEmbeddedFrontend(executable, assets, [Buffer.from('old cache')]), /not embedded/);
 });
+for (const marker of ['Recording mode', 'value="toggle"', 'value="push_to_talk"', 'Push to talk', 'set_recording_mode']) {
+  test(`compiled push-to-talk audit rejects missing ${marker}`, () => {
+    const stale = [{ ...assets[0], bytes: Buffer.from(assets[0].bytes.toString().replace(marker, 'old')) }, assets[1]];
+    const cache = stale.map(asset => brotliCompressSync(asset.bytes));
+    assert.throws(() => verifyEmbeddedFrontend(Buffer.concat(cache), stale, cache), /Missing compiled push-to-talk UI/);
+  });
+}
 for (const text of ['Last transcript', 'Your activity Last transcript', 'Your activity <details>', 'Your activity <summary>']) {
   test(`stale dashboard is rejected: ${text}`, () => {
     const stale = [{ name: 'old.js', bytes: Buffer.from(text) }, assets[1]];
@@ -46,6 +53,9 @@ test('packaged app audit rejects old cue bytes or icon even with a fresh executa
     put('src-tauri/icons/icon.icns', 'current-icon');
     put('HandsFree.app/Contents/Resources/icon.icns', 'current-icon');
     assert.doesNotThrow(() => verifyCompiledAssets(root, app));
+    put('HandsFree.app/Contents/MacOS/handsfree', Buffer.concat(cached));
+    assert.throws(() => verifyCompiledAssets(root, app), /Missing native push-to-talk completion ABI symbol/);
+    put('HandsFree.app/Contents/MacOS/handsfree', executable);
     put('HandsFree.app/Contents/Resources/sounds/clean-start.wav', 'old-cue');
     assert.throws(() => verifyCompiledAssets(root, app), /Stale bundled cue: clean-start.wav/);
     put('HandsFree.app/Contents/Resources/sounds/clean-start.wav', 'clean-start-current');

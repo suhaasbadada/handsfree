@@ -1,8 +1,9 @@
-# Push to talk (unreleased source feature)
+# Push to talk (release planned)
 
 Settings → **Recording mode** offers **Toggle** (the unchanged default) and
 **Push to talk**. Selecting the latter is explicit; upgrades do not opt users in.
-No published release or download is changed by this source feature.
+Planned for Mac beta 4 and Windows beta 3. These candidates are not yet public;
+existing published downloads are unchanged until publication is verified.
 
 In Push to talk, hold the configured shortcut, speak, then release to finish.
 The default is Fn / Globe on Mac and physical Right Ctrl on Windows. Custom

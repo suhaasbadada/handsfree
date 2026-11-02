@@ -30,14 +30,14 @@ test('README, release notes, installer guide and filename disclose beta without 
   assert.match(read('docs/releases/v0.1.1-beta.2.md'), /# HandsFree v0\.1\.1-beta\.2/);
   assert.match(read('docs/releases/v0.1.1-beta.2.md'), /Prerelease · Beta testing/);
   assert.match(read('docs/INSTALL.md'), /# Install HandsFree \(Mac beta\)/);
-  assert.match(read('scripts/package-release.sh'), /NAME=HandsFree-0\.1\.1-beta\.3-macos-arm64/);
+  assert.match(read('scripts/package-release.sh'), /NAME=HandsFree-0\.1\.1-beta\.4-macos-arm64/);
   assert.match(read('scripts/package-release.sh'), /-volname 'HandsFree Beta — drag to Applications'/);
   const config = JSON.parse(read('src-tauri/tauri.conf.json'));
   assert.equal(config.productName, 'HandsFree');
   assert.equal(config.identifier, 'com.handsfree.local');
 });
 
-test('published beta 3 app, package, release manifest and audit versions stay coordinated', async () => {
+test('candidate beta 4 app, package, release manifest and audit versions stay coordinated', async () => {
   const { release } = await import('../site/release.js');
   const { candidate, tag } = await import('../scripts/check-release.mjs');
   const version = JSON.parse(read('package.json')).version;
@@ -47,8 +47,8 @@ test('published beta 3 app, package, release manifest and audit versions stay co
   assert.equal(JSON.parse(read('src-tauri/tauri.conf.json')).version, version);
   assert.ok(read('src-tauri/Cargo.toml').includes(`version = "${version}"`));
   assert.ok(read('src-tauri/Cargo.lock').includes(`name = "handsfree"\nversion = "${version}"`));
-  assert.equal(release.version, `${version}-beta.3`);
-  assert.equal(release.publicAvailable, true, 'Beta 3 public asset bytes have been verified before enabling availability');
+  assert.equal(release.version, `${version}-beta.4`);
+  assert.equal(release.publicAvailable, false, 'Candidate stays disabled until public asset verification');
   assert.equal(tag, `v${release.version}`);
   assert.equal(candidate, `HandsFree-${release.version}-macos-arm64.dmg`);
   assert.ok(read('scripts/package-release.sh').includes(`NAME=${candidate.slice(0, -4)}`));
@@ -59,7 +59,9 @@ test('published beta 3 app, package, release manifest and audit versions stay co
 });
 
 test('published Mac coordinates agree across README, installer guide and every static DMG link', async () => {
-  const { release } = await import('../site/release.js');
+  // Candidate manifest is task-branch-only; retain immutable published defaults
+  // until the separate verified-public activation commit.
+  const release = { version: '0.1.1-beta.3', dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.3/HandsFree-0.1.1-beta.3-macos-arm64.dmg' };
   for (const path of ['README.md', 'docs/INSTALL.md', 'site/index.html']) {
     const source = read(path);
     assert.ok(source.includes(release.dmgUrl), `${path} links the verified current Mac DMG`);
