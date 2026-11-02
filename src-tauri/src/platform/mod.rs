@@ -8,6 +8,10 @@ mod resample;
 pub use macos::*;
 pub const REQUIRED_PERMISSIONS: i32 = if cfg!(windows) { 1 } else { 7 };
 #[cfg(target_os = "windows")]
+pub fn focus_diagnostic() -> Option<serde_json::Value> {
+    None
+}
+#[cfg(target_os = "windows")]
 mod windows;
 #[cfg(target_os = "windows")]
 pub use windows::*;

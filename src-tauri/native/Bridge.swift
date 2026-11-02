@@ -451,10 +451,60 @@ private func removeHook() {
 }
 @_cdecl("hf_hook_reason") public func hookDiagnosticReason() -> Int32 { main { hookReason } }
 
-private func focused(_ pid: pid_t) -> AXUIElement? {
-    var value: CFTypeRef?
-    guard AXUIElementCopyAttributeValue(AXUIElementCreateApplication(pid), kAXFocusedUIElementAttribute as CFString, &value) == .success, let v = value, CFGetTypeID(v) == AXUIElementGetTypeID() else { return nil }
-    return (v as! AXUIElement)
+// Cached technical metadata only: no AX content, roles, identifiers or app names.
+// Target cleanup must preserve the start snapshot for subsequent diagnostics.
+private var focusDiagnostics: [String: [[String: Any]]] = [:]
+@_cdecl("hf_focus_diagnostic") public func focusDiagnostic(_ buffer: UnsafeMutablePointer<UInt8>?, _ capacity: Int32) -> Int32 {
+    main {
+        guard let buffer, let data = try? JSONSerialization.data(withJSONObject: focusDiagnostics),
+              data.count <= Int(capacity) else { return 0 }
+        data.copyBytes(to: buffer, count: data.count)
+        return Int32(data.count)
+    }
+}
+private func focused(_ pid: pid_t, stage: String) -> AXUIElement? {
+    var events: [[String: Any]] = []
+    defer { focusDiagnostics[stage] = events }
+    guard pid > 0, pid != ProcessInfo.processInfo.processIdentifier else {
+        events.append(["source": "guard", "outcome": "invalid_or_own_application", "trusted": AXIsProcessTrusted()]); return nil
+    }
+    return resolveFocus(trusted: { AXIsProcessTrusted() }, foregroundMatches: {
+        NSWorkspace.shared.frontmostApplication?.processIdentifier == pid
+    }, query: { systemwide in
+        var value: CFTypeRef?
+        let root = systemwide ? AXUIElementCreateSystemWide() : AXUIElementCreateApplication(pid)
+        let error = AXUIElementCopyAttributeValue(root, kAXFocusedUIElementAttribute as CFString, &value)
+        func failure(_ name: String) -> FocusLookup<AXUIElement> {
+            FocusLookup(element: nil, error: error.rawValue, classification: name)
+        }
+        guard error == .success else {
+            switch error {
+            case .apiDisabled: return failure("api_disabled")
+            case .noValue: return failure("no_value")
+            case .attributeUnsupported: return failure("attribute_unsupported")
+            case .cannotComplete: return failure("cannot_complete")
+            default: return failure("ax_error")
+            }
+        }
+        guard let value else { return failure("nil_value") }
+        guard CFGetTypeID(value) == AXUIElementGetTypeID() else { return failure("wrong_type") }
+        let element = value as! AXUIElement
+        var owner: pid_t = 0
+        let ownerError = AXUIElementGetPid(element, &owner)
+        guard ownerError == .success else {
+            return FocusLookup(element: nil, error: ownerError.rawValue, classification: "pid_query_failed")
+        }
+        guard owner == pid else { return failure("pid_mismatch") }
+        return FocusLookup(element: element, error: error.rawValue, classification: "valid")
+    }, equal: { CFEqual($0, $1) }, report: { source, lookup in
+        var event: [String: Any] = ["source": lookup == nil ? "guard" : source, "trusted": AXIsProcessTrusted()]
+        if let lookup {
+            event["ax_error"] = lookup.error; event["outcome"] = lookup.classification
+            if lookup.classification == "valid" { event["pid_matches"] = true }
+            if lookup.classification == "pid_mismatch" { event["pid_matches"] = false }
+        } else { event["outcome"] = source }
+        events.append(event)
+    })
 }
 private func attribute(_ element: AXUIElement, _ name: String) -> String? {
     var value: CFTypeRef?
@@ -511,11 +561,17 @@ private func observeTargetFocus() {
 }
 @_cdecl("hf_discard_target") public func discardTarget() { main { clearTarget() } }
 private func validateTarget() -> PasteResult {
-    if !AXIsProcessTrusted() { return .accessibilityDenied }
+    if !AXIsProcessTrusted() {
+        focusDiagnostics["current"] = [["source": "guard", "outcome": "untrusted", "trusted": false]]
+        return .accessibilityDenied
+    }
     if targetFailure != .sent { return targetFailure }
     guard targetPID != 0, let original = target else { return .originalFocusUnavailable }
-    guard NSWorkspace.shared.frontmostApplication?.processIdentifier == targetPID else { return .applicationChanged }
-    guard let now = focused(targetPID) else { return .currentFocusUnavailable }
+    guard NSWorkspace.shared.frontmostApplication?.processIdentifier == targetPID else {
+        focusDiagnostics["current"] = [["source": "guard", "outcome": "application_changed", "trusted": true]]
+        return .applicationChanged
+    }
+    guard let now = focused(targetPID, stage: "current") else { return .currentFocusUnavailable }
     // Do NOT fall back to PID, role, title, coordinates, or AXIdentifier: these
     // cannot establish that a recreated element is the original text field.
     guard CFEqual(original, now) else { return .fieldChanged }
@@ -527,8 +583,9 @@ private func validateTarget() -> PasteResult {
         guard allowed(epoch) else { return false }
         guard permissions() & 3 == 3, recorder == nil else { return false }
         clearTarget()
+        focusDiagnostics = [:]
         targetPID = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
-        target = focused(targetPID)
+        target = focused(targetPID, stage: "start")
         if targetPID == 0 { targetFailure = .noApplication }
         else if targetPID == ProcessInfo.processInfo.processIdentifier { targetFailure = .ownApplication }
         else if let original = target {

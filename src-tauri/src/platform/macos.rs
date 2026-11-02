@@ -1,4 +1,5 @@
 unsafe extern "C" {
+    fn hf_focus_diagnostic(buffer: *mut u8, capacity: i32) -> i32;
     pub fn hf_mode(mode: i32) -> bool;
     pub fn hf_start_gate(callback: extern "C" fn(u64) -> bool);
     pub fn hf_gesture_hook(callback: extern "C" fn(i32, i32, u64));
@@ -43,4 +44,14 @@ unsafe extern "C" {
         allowed: extern "C" fn(u64) -> bool,
     ) -> i32;
     pub fn hf_cleanup();
+}
+
+// Main-thread cached metadata only; no live AX requests on status polling.
+pub fn focus_diagnostic() -> Option<serde_json::Value> {
+    let mut buffer = [0u8; 4096];
+    let length = unsafe { hf_focus_diagnostic(buffer.as_mut_ptr(), buffer.len() as i32) };
+    if length <= 0 || length as usize > buffer.len() {
+        return None;
+    }
+    serde_json::from_slice(&buffer[..length as usize]).ok()
 }

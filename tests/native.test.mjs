@@ -44,7 +44,9 @@ test('native paste policy rejects secure/read-only targets and supports writable
     const binary = join(directory, 'policy-tests');
     execFileSync('swiftc', ['-sdk', sdk, '-Xcc', `-I${sdk}/usr/include`, '-swift-version', '5',
       join(root, 'src-tauri/native/PastePolicy.swift'), join(root, 'tests/native/main.swift'), '-o', binary]);
-    assert.match(execFileSync(binary, { encoding: 'utf8' }), /32 field policy combinations and 17 ABI codes passed/);
+    const output = execFileSync(binary, { encoding: 'utf8' });
+    assert.match(output, /32 field policy combinations and 17 ABI codes passed/);
+    assert.match(output, /Synthetic focus resolver: bounded fallback, identity conflicts, trust and foreground guards passed without AX/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -61,6 +63,7 @@ test('native paste/copy guard cancellation; fallback survives restore timers and
       join(root, 'tests/native-delivery/main.swift'), '-o', binary]);
     const output = execFileSync(binary, { encoding: 'utf8', timeout: 10000 });
     assert.match(output, /Native queued-main cancellation boundary passed/);
+    assert.match(output, /Native cached focus diagnostic bounded C ABI passed without AX/);
     assert.match(output, /Native lasting fallback copy, sent-paste restoration, stale timer\/quit and empty\/cancel guards passed/);
   } finally {
     rmSync(directory, { recursive: true, force: true });

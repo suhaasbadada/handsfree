@@ -279,7 +279,7 @@ fn write_diagnostic(
     hook_state: i32,
     hook_reason: i32,
 ) {
-    // Deliberately exclude transcript, usage, focus, and all audio. This file is
+    // Exclude transcript, usage, focus contents/identity, and all audio. This file is
     // readable without WebView/IPC and refreshed even when settings is hidden.
     let diagnostic = serde_json::json!({
         "schema": 1,
@@ -298,6 +298,7 @@ fn write_diagnostic(
         "hook_attempted": hook_reason != 0,
         "hook_connected": status.hotkey,
         "hook_state_bits": hook_state,
+        "focus_lookup": platform::focus_diagnostic(),
         "hook_reason": match hook_reason { 1 => "connected", 2 => "input_monitoring_preflight_denied", 3 => "event_tap_creation_failed", 4 => "run_loop_source_creation_failed", 5 => "event_tap_disabled", 101 => "windows_hotkey_registration_failed", 102 => "windows_escape_hook_failed", 103 => "windows_message_loop_failed", _ => "not_attempted" },
         "model_ready": status.model_ready,
         "model_path": model_path(s),

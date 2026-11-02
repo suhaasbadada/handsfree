@@ -67,3 +67,16 @@ precondition(publishCopy("cancel at publication", board: board, allowed: { check
 precondition(board.string(forType: .string) == "fallback transcript", "Final guard lost previous clipboard")
 print("Native queued-main cancellation boundary passed without permissions or delivery")
 print("Native lasting fallback copy, sent-paste restoration, stale timer/quit and empty/cancel guards passed")
+
+// The additive C ABI copies a bounded cached JSON snapshot, with no live AX read.
+var diagnosticBuffer = [UInt8](repeating: 0x7f, count: 4096)
+precondition(focusDiagnostic(nil, 4096) == 0)
+precondition(diagnosticBuffer.withUnsafeMutableBufferPointer { focusDiagnostic($0.baseAddress, -1) } == 0)
+precondition(diagnosticBuffer.withUnsafeMutableBufferPointer { focusDiagnostic($0.baseAddress, 1) } == 0)
+precondition(diagnosticBuffer.allSatisfy { $0 == 0x7f })
+let diagnosticLength = diagnosticBuffer.withUnsafeMutableBufferPointer { focusDiagnostic($0.baseAddress, Int32($0.count)) }
+precondition(diagnosticLength == 2)
+let diagnosticJSON = try JSONSerialization.jsonObject(with: Data(diagnosticBuffer.prefix(Int(diagnosticLength))))
+precondition((diagnosticJSON as? [String: Any])?.isEmpty == true)
+precondition(diagnosticBuffer[Int(diagnosticLength)] == 0x7f)
+print("Native cached focus diagnostic bounded C ABI passed without AX")
