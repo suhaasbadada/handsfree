@@ -1,13 +1,13 @@
 # Release packaging
 
-Task-branch candidate: **v0.1.1-beta.5**, embedded version **0.1.1**. Packaging
-and audit scripts target the new immutable beta 5 path. The Mac candidate manifest
-stays `publicAvailable: false`; do not merge/deploy it as-is. README, install guide
-and static links still describe live beta 4. After local/CI gates, publication,
-anonymous byte checks and the Homebrew gate below, coordinate their activation
-in a follow-up. Windows beta 3 and historical beta 4 assets remain untouched.
-See [beta 5 candidate notes](releases/v0.1.1-beta.5.md) for explicit Settings opt-in
-and delivery limitations.
+Current Mac distribution: **v0.1.1-beta.5**, embedded version **0.1.1**.
+Packaging and audit scripts target its immutable beta 5 path. Website activation
+is a separate follow-up, gated on CI, publication, anonymous public-byte checks
+and the Homebrew gate below; never deploy activation changes before those gates.
+For future candidates, stage a disabled manifest only on a preparation branch,
+keeping deployed downloads on the verified public version. Windows beta 3 and
+historical beta 4 assets remain untouched. See [beta 5 notes](releases/v0.1.1-beta.5.md)
+for explicit Settings opt-in and delivery limitations.
 
 Run on the existing Apple Silicon signing machine, with installed npm/Cargo dependencies, Rust documentation (runtime notices), and the existing local signing identity:
 
@@ -18,11 +18,11 @@ bash scripts/package-release.sh
 
 The script builds through **npm run build:local** (never initializes/replaces the certificate), verifies arm64, bundle ID/version/minimum OS, stages the signed app and an Applications shortcut, copies explicit public documentation/dependency sources, generates notices, and creates a compressed **DMG with `hdiutil`**. It signs the DMG using the same existing certificate, runs `hdiutil verify`, mounts it read-only with no auto-open, verifies the contained app and required files, and unmounts. It writes `release/SHA256SUMS` and `release/PROVENANCE.txt` (source commit and dirty-tree status). No Finder Automation permission is required; no custom Finder window arrangement is promised. It neither installs nor launches the app, downloads a model, nor publishes anything. Python **3.11+** is only a packaging dependency.
 
-The current published release label is `v0.1.1-beta.4`; embedded version is `0.1.1`. Its immutable `HandsFree-0.1.1-beta.4-macos-arm64.dmg` is already published: do not rebuild, replace, or re-upload it. Future releases require a new label and coordinated packaging/audit versions. **Do not distribute a user-install ZIP.** The visible DMG root contains only `HandsFree.app`, the Applications shortcut, `Install HandsFree.txt`, and `Licenses`. The install guide discloses experimental/self-signed status. Project LICENSE, full dependency notices, `THIRD_PARTY_SOURCES.tar.gz`, `PUBLICATION-NOTES.txt`, and maintainer documentation live under `Licenses`. The tarball is dependency source, not an installer. Notices remain outside the signed bundle. Keep the image with redistributions.
+The current release label is `v0.1.1-beta.5`; embedded version is `0.1.1`. Its immutable asset is `HandsFree-0.1.1-beta.5-macos-arm64.dmg`: do not rebuild, replace, or re-upload a published artifact. Future releases require a new label and coordinated packaging/audit versions. **Do not distribute a user-install ZIP.** The visible DMG root contains only `HandsFree.app`, the Applications shortcut, `Install HandsFree.txt`, and `Licenses`. The install guide discloses experimental/self-signed status. Project LICENSE, full dependency notices, `THIRD_PARTY_SOURCES.tar.gz`, `PUBLICATION-NOTES.txt`, and maintainer documentation live under `Licenses`. The tarball is dependency source, not an installer. Notices remain outside the signed bundle. Keep the image with redistributions.
 
-### Published beta 4 and future candidate staging
+### Beta 5 artifact source and future candidate staging
 
-Beta 4 was built from clean source `bfe0a3f874b496777ab0342e22cac59220ad390d`. [Mac CI run 41389813350](https://github.com/suhaasbadada/handsfree/actions/runs/41389813350) passed. Local, draft and public-byte audits passed before this website follow-up; the public DMG SHA-256 is `1fe3d0599b86b2074ca03afbdfc2d53e014010d13ea6cf660eb2daf2fe1a5c3c`. The public audit checked embedded frontend/cues, stable signatures, the exact release/tag source, and all three anonymously downloaded asset bytes. The Homebrew tap selects that same version and checksum. This website follow-up is not a new artifact source commit. Windows beta 3 is independent; see its [release evidence](releases/v0.1.1-windows-beta.3.md).
+Beta 5 was built from clean source `c5f00405b7b9ec8164e9f1f89c8e1f8ab3696028`, retaining the existing signing identity. [Mac CI build result](https://github.com/suhaasbadada/handsfree/actions/runs/41513549954). Local and draft-byte audits passed; DMG SHA-256 is `99c4399246a792b55fcc96dd624bf68a8972fd731c2e7898ef84349e4fd1a155`. Publication and the public-byte audit must precede committing/deploying this activation follow-up, and the Homebrew tap must select that same version and checksum. The public audit verifies embedded frontend/cues, stable signatures, exact release/tag source and all three anonymously downloaded asset bytes. This website follow-up is not a new artifact source commit. Windows beta 3 is independent and unchanged; see its [release evidence](releases/v0.1.1-windows-beta.3.md). Historical [beta 4 evidence](releases/v0.1.1-beta.4.md) remains intact.
 
 For future candidates, keep the disabled candidate manifest on a preparation branch, not deployed main. Leave existing public links live until the new version's public-byte audit passes. Only then enable the new manifest and update README, installer guidance, and static/no-JS links together. Preserve the clean-source audit cache and provenance; do not weaken the HEAD/source check to re-audit from a later website commit.
 

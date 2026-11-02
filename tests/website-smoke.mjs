@@ -219,7 +219,8 @@ try {
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
   for (const width of [320, 390, 768, 1280]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
-    assert.equal(await evaluate(`new Promise(resolve => requestAnimationFrame(() => resolve(document.documentElement.scrollWidth === innerWidth && document.getElementById('primary-download').getBoundingClientRect().bottom < innerHeight)))`), true, `Normal motion: visible download and no overflow at ${width}px`);
+    // Classic scrollbars reduce clientWidth; innerWidth includes their gutter.
+    assert.equal(await evaluate(`new Promise(resolve => requestAnimationFrame(() => resolve(document.documentElement.scrollWidth === document.documentElement.clientWidth && document.getElementById('primary-download').getBoundingClientRect().bottom < innerHeight)))`), true, `Normal motion: visible download and no overflow at ${width}px`);
   }
   await delay(100);
   assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'listening', 'Motion change starts automatic loop without a play action');
@@ -265,7 +266,7 @@ try {
   assert.equal(await evaluate(`!document.getElementById('demo-play') && document.getElementById('demo-pause').hidden && document.getElementById('demo-text').value === ${JSON.stringify(sample)}`), true, 'No-JS demo shows meaningful text and no inert control');
   for (const width of [320, 390, 768, 1280]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
-    assert.equal(await evaluate(`document.documentElement.scrollWidth === innerWidth && document.getElementById('primary-download').getBoundingClientRect().bottom < innerHeight`), true, `No JavaScript: visible download and no overflow at ${width}px`);
+    assert.equal(await evaluate(`document.documentElement.scrollWidth === document.documentElement.clientWidth && document.getElementById('primary-download').getBoundingClientRect().bottom < innerHeight`), true, `No JavaScript: visible download and no overflow at ${width}px`);
   }
   console.log('Dark mobile, automatic demo loop/pause, visibility cancellation, reduced motion, keyboard, no-JS fallback, and JavaScript errors: passed');
 } finally {

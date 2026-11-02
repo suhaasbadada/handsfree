@@ -1,5 +1,7 @@
 # Compatibility paste (macOS only)
 
+Available in [Mac beta 5](releases/v0.1.1-beta.5.md), off by default even after upgrading. Quit HandsFree, run `brew update` then `brew upgrade --cask suhaasbadada/handsfree/handsfree`, and reopen from Applications. Your model, settings and aggregate statistics are preserved.
+
 Strict insertion remains the default. It checks the original focused Accessibility field before submitting Command-V. Some apps expose a caret but hide that field, so strict delivery copies the transcript for manual paste instead.
 
 **Settings → Compatibility paste** is an explicit opt-in for those apps. For apps that hide their text field, it pastes once into the same active app/window; **the exact field cannot be verified**. Keep the intended non-password, editable field focused throughout dictation and processing. Moving the cursor inside the same window can change where text lands. This is not universal insertion support.

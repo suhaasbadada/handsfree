@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { homebrewCommand } from '../site/install.js';
 import { release, windowsRelease } from '../site/release.js';
 
-// Static defaults retain the actual public release until candidate publication.
-const publishedMacUrl = 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.4/HandsFree-0.1.1-beta.4-macos-arm64.dmg';
+// Static defaults and JavaScript must select the same verified public release.
+const publishedMacUrl = 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.5/HandsFree-0.1.1-beta.5-macos-arm64.dmg';
 
 const root = new URL('../', import.meta.url);
 const html = readFileSync(new URL('site/index.html', root), 'utf8');
@@ -158,7 +158,8 @@ test('website is dependency-free with accessible, honest platform copy', () => {
   assert.match(html, /download the English model \(~148 MB\)/);
   assert.match(html, /<noscript>/);
   assert.equal([...html.matchAll(/class="button primary"/g)].length, 2, 'Hero and platform card offer the same Mac download');
-  assert.equal(release.publicAvailable, false, 'Do not deploy the staged candidate manifest');
+  assert.equal(release.publicAvailable, true, 'Activated manifest selects the verified public Mac beta');
+  assert.equal(release.dmgUrl, publishedMacUrl);
   assert.ok(html.includes(`href="${publishedMacUrl}"`), 'Static defaults retain the verified published Mac beta');
   assert.match(html, /MIT license does not relicense dependencies/);
 });

@@ -7,7 +7,7 @@
 Say it while it’s clear. HandsFree turns your thoughts into text, without making typing the bottleneck.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-706b68.svg)](LICENSE)
-[![Mac beta: v0.1.1-beta.4](https://img.shields.io/badge/Mac_beta-v0.1.1--beta.4-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.4)
+[![Mac beta: v0.1.1-beta.5](https://img.shields.io/badge/Mac_beta-v0.1.1--beta.5-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.5)
 [![Platforms: Apple Silicon and Windows x64](https://img.shields.io/badge/Platforms-Apple_Silicon_%C2%B7_Windows_x64-706b68.svg)](#platforms)
 
 ## Download & install
@@ -24,7 +24,7 @@ Homebrew simplifies installation; macOS security prompts may still appear. This 
 
 Open **Applications → HandsFree**, allow Microphone, Accessibility, and Input Monitoring, then download the English model (~148 MB) in Settings → Overview. [Complete Mac setup, security prompts & existing-app guidance](docs/INSTALL.md).
 
-### [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.4/HandsFree-0.1.1-beta.4-macos-arm64.dmg)
+### [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.5/HandsFree-0.1.1-beta.5-macos-arm64.dmg)
 
 **DMG alternative:** drag HandsFree to Applications before opening it or granting permissions. Intel Macs are unsupported. See [Open Anyway and installation guidance](docs/INSTALL.md). No developer tools needed.
 
@@ -44,7 +44,7 @@ Mac beta and experimental Windows beta are available; Linux is planned.
 - **Your shortcut:** Fn / 🌐 on Mac, Right Ctrl on Windows, or a custom key combination. Toggle is the default; opt into **Settings → Recording mode → Push to talk** to hold and release. Existing saved shortcuts are preserved.
 - **Practical controls:** optional listening sounds and local usage totals. Dictation text stays out of the app window.
 - **Safer insertion:** checks the original app and field before submitting Paste; otherwise copies for manual paste.
-  Mac users can opt into **Settings → Compatibility paste** for apps that hide their text field. It requires the same verified active app/window, but cannot verify the exact field. It is off by default; see [delivery safeguards and limits](docs/COMPATIBILITY-PASTE.md).
+  Mac beta 5 users can opt into **Settings → Compatibility paste** for apps that hide their text field. It requires the same verified active app/window, but cannot verify the exact field. It is off by default, including upgrades; missing window proof or focus monitoring still requires manual paste. A submitted shortcut does not confirm insertion; no automatic retry or Enter is sent. See [delivery safeguards and limits](docs/COMPATIBILITY-PASTE.md).
 
 ## Use cases
 
@@ -59,7 +59,7 @@ No special integration is required: insertion depends on the focused field, with
 
 | Platform | Status |
 | --- | --- |
-| macOS 14+, Apple Silicon | [Mac beta 4 available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.4) · self-signed, not notarized |
+| macOS 14+, Apple Silicon | [Mac beta 5 available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.5) · self-signed, not notarized |
 | Intel Macs | Unsupported |
 | Windows 10/11, x64 | [Experimental Windows beta 3 available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-windows-beta.3) · unsigned, not yet hardware-tested |
 | Linux | Planned; no build or download available |
@@ -83,7 +83,7 @@ Focus a text field, briefly tap **Fn / 🌐**, speak, and tap again to finish. *
 
 **Optional push to talk (Mac beta 4 / Windows beta 3):** choose **Settings → Recording mode → Push to talk**. Hold Fn on Mac, Right Ctrl on Windows, or your custom combination; release to finish (the first required component released finishes a combination). Other keys, mouse actions during a hold, or observed focus changes cancel without paste. Toggle remains the default; updates preserve your preferences, model and statistics. See [behavior, focus limits and test notes](docs/PUSH-TO-TALK.md).
 
-[Full installation and troubleshooting guide](docs/INSTALL.md) · [Beta release notes](docs/releases/v0.1.1-beta.4.md)
+[Full installation and troubleshooting guide](docs/INSTALL.md) · [Beta release notes](docs/releases/v0.1.1-beta.5.md)
 
 **Homebrew updates:** quit HandsFree, run the following in Terminal, then reopen from Applications:
 
@@ -91,6 +91,9 @@ Focus a text field, briefly tap **Fn / 🌐**, speak, and tap again to finish. *
 brew update
 brew upgrade --cask suhaasbadada/handsfree/handsfree
 ```
+
+Updates preserve your model, settings and statistics. Compatibility paste stays off
+unless you enable it in Settings; the Windows beta 3 installer is unchanged.
 
 ## Build from source
 
