@@ -21,7 +21,7 @@ let originalChangeCount = NSPasteboard.general.changeCount
 private let waiting = DispatchSemaphore(value: 0)
 DispatchQueue.global().async {
     waiting.signal()
-    let code = "must never be delivered".withCString { paste($0, 7, permitted) }
+    let code = "must never be delivered".withCString { paste($0, 1, 7, permitted) }
     let copied = "must never be copied".withCString { copyFallback($0, 7, permitted) }
     resultLock.lock(); result = code; copyResult = copied; resultLock.unlock()
 }

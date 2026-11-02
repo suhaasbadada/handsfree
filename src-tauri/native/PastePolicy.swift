@@ -6,6 +6,51 @@ enum PasteResult: Int32 {
     case unsupportedField, disabledField, clipboardFailed, eventCreationFailed
     case originalSecureField, originalUnsupportedField, originalDisabledField, ownApplication
     case cancelled
+    case submissionUncertain
+}
+
+// Retained after target teardown: a duplicate/stale completion cannot send again.
+struct DeliverySession {
+    let generation: UInt64
+    let epoch: UInt64
+    let compatibility: Bool
+    var attempted = false
+    var interrupted = false
+    var watchingWindow = false
+    var originalFocusMissing = false
+    mutating func claim(generation: UInt64, epoch: UInt64) -> Bool {
+        guard self.generation == generation, self.epoch == epoch, !attempted else { return false }
+        attempted = true
+        return true
+    }
+}
+
+// Injectable adapter shared by production AX lookups and permission-free tests.
+// Querying AX may run application code, so repeat trust/foreground proofs after it.
+func resolveCompatibility<Window>(session: DeliverySession, failure: PasteResult,
+    originalWindow: Window?, trusted: () -> Bool, foregroundMatches: () -> Bool,
+    focusedWindow: () -> Window?, equal: (Window, Window) -> Bool,
+    secureInput: () -> Bool, currentField: () -> (PasteResult?, Bool)) -> Bool {
+    guard session.compatibility, !session.attempted, !session.interrupted,
+          failure == .originalFocusUnavailable || failure == .currentFocusUnavailable,
+          failure != .originalFocusUnavailable || session.originalFocusMissing,
+          trusted(), foregroundMatches(), !secureInput(), let originalWindow else { return false }
+    let (field, safelyMissing) = currentField()
+    guard field != nil || safelyMissing, let window = focusedWindow() else { return false }
+    return compatibilityPolicy(session: session, failure: failure, trusted: trusted(),
+        sameApplication: foregroundMatches(), sameWindow: equal(originalWindow, window),
+        secureInput: secureInput(), currentField: field)
+}
+
+// The adapter supplies live, PID-validated AX window identity, never titles or
+// WindowServer z-order guesses. All proofs must hold on every revalidation.
+func compatibilityPolicy(session: DeliverySession, failure: PasteResult,
+                         trusted: Bool, sameApplication: Bool, sameWindow: Bool,
+                         secureInput: Bool, currentField: PasteResult?) -> Bool {
+    session.compatibility && !session.attempted && !session.interrupted && session.watchingWindow
+        && (failure == .originalFocusUnavailable || failure == .currentFocusUnavailable)
+        && trusted && sameApplication && sameWindow && !secureInput
+        && (currentField == nil || currentField == .sent)
 }
 
 // Only explicit missing/transient attribute outcomes may try system-wide focus.

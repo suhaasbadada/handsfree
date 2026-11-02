@@ -2,6 +2,7 @@ import AppKit
 import AVFoundation
 import ApplicationServices
 import QuartzCore
+import Carbon
 
 // All AppKit / recorder / AX state is confined to the main thread.
 private func main<T>(_ body: () -> T) -> T {
@@ -35,6 +36,12 @@ private var pill: PillView?
 private var targetPID: pid_t = 0
 private var target: AXUIElement?
 private var targetFailure: PasteResult = .originalFocusUnavailable
+private var compatibilityEnabled = false
+private var deliverySession: DeliverySession?
+private var targetWindow: AXUIElement?
+@_cdecl("hf_compatibility") public func configureCompatibility(_ enabled: Bool) -> Bool {
+    main { compatibilityEnabled = enabled; return true }
+}
 private var focusObserver: AXObserver?
 private var overlayGeneration = 0
 private var clipboardGeneration = 0
@@ -372,7 +379,10 @@ class PillView: NSView {
     main {
         callback = cb
         if activationObserver == nil {
-            activationObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { _ in interruptHoldFocus() }
+            activationObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { _ in
+                interruptHoldFocus()
+                if deliverySession?.compatibility == true { deliverySession?.interrupted = true }
+            }
         }
         // A retained port is not proof of permission or a live event stream.
         // Updates/revocation can leave it invalid or disabled indefinitely.
@@ -454,6 +464,7 @@ private func removeHook() {
 // Cached technical metadata only: no AX content, roles, identifiers or app names.
 // Target cleanup must preserve the start snapshot for subsequent diagnostics.
 private var focusDiagnostics: [String: [[String: Any]]] = [:]
+private var safelyMissingFocus: [String: Bool] = [:]
 @_cdecl("hf_focus_diagnostic") public func focusDiagnostic(_ buffer: UnsafeMutablePointer<UInt8>?, _ capacity: Int32) -> Int32 {
     main {
         guard let buffer, let data = try? JSONSerialization.data(withJSONObject: focusDiagnostics),
@@ -464,8 +475,10 @@ private var focusDiagnostics: [String: [[String: Any]]] = [:]
 }
 private func focused(_ pid: pid_t, stage: String) -> AXUIElement? {
     var events: [[String: Any]] = []
-    defer { focusDiagnostics[stage] = events }
+    var safelyMissing = true
+    defer { focusDiagnostics[stage] = events; safelyMissingFocus[stage] = safelyMissing && !events.isEmpty }
     guard pid > 0, pid != ProcessInfo.processInfo.processIdentifier else {
+        safelyMissing = false
         events.append(["source": "guard", "outcome": "invalid_or_own_application", "trusted": AXIsProcessTrusted()]); return nil
     }
     return resolveFocus(trusted: { AXIsProcessTrusted() }, foregroundMatches: {
@@ -497,6 +510,8 @@ private func focused(_ pid: pid_t, stage: String) -> AXUIElement? {
         guard owner == pid else { return failure("pid_mismatch") }
         return FocusLookup(element: element, error: error.rawValue, classification: "valid")
     }, equal: { CFEqual($0, $1) }, report: { source, lookup in
+        if let lookup { if !lookup.mayFallback { safelyMissing = false } }
+        else { safelyMissing = false }
         var event: [String: Any] = ["source": lookup == nil ? "guard" : source, "trusted": AXIsProcessTrusted()]
         if let lookup {
             event["ax_error"] = lookup.error; event["outcome"] = lookup.classification
@@ -546,16 +561,35 @@ private func fieldStatus(_ element: AXUIElement) -> PasteResult {
 private func clearTarget() {
     if let observer = focusObserver { CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes) }
     focusObserver = nil
-    target = nil; targetPID = 0; targetFailure = .originalFocusUnavailable
+    target = nil; targetWindow = nil; targetPID = 0; targetFailure = .originalFocusUnavailable
+}
+private func focusedWindow(_ pid: pid_t) -> AXUIElement? {
+    guard pid > 0, pid != ProcessInfo.processInfo.processIdentifier, AXIsProcessTrusted(),
+          NSWorkspace.shared.frontmostApplication?.processIdentifier == pid else { return nil }
+    var value: CFTypeRef?
+    guard AXUIElementCopyAttributeValue(AXUIElementCreateApplication(pid), kAXFocusedWindowAttribute as CFString, &value) == .success,
+          let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
+    let window = value as! AXUIElement
+    var owner: pid_t = 0
+    guard AXUIElementGetPid(window, &owner) == .success, owner == pid,
+          attribute(window, kAXRoleAttribute) == kAXWindowRole else { return nil }
+    return window
 }
 private func observeTargetFocus() {
-    guard pushToTalk, targetPID != 0 else { return }
+    guard pushToTalk || deliverySession?.compatibility == true, targetPID != 0 else { return }
     var observer: AXObserver?
-    guard AXObserverCreate(targetPID, { observer, _, _, _ in
+    guard AXObserverCreate(targetPID, { observer, _, notification, _ in
         guard let current = focusObserver, CFEqual(current, observer) else { return }
-        interruptHoldFocus()
+        if notification as String == kAXFocusedWindowChangedNotification {
+            deliverySession?.interrupted = true
+        } else { interruptHoldFocus() }
     }, &observer) == .success, let observer else { return }
-    guard AXObserverAddNotification(observer, AXUIElementCreateApplication(targetPID), kAXFocusedUIElementChangedNotification as CFString, nil) == .success else { return }
+    let application = AXUIElementCreateApplication(targetPID)
+    if pushToTalk { _ = AXObserverAddNotification(observer, application, kAXFocusedUIElementChangedNotification as CFString, nil) }
+    if deliverySession?.compatibility == true {
+        let windowWatch = AXObserverAddNotification(observer, application, kAXFocusedWindowChangedNotification as CFString, nil) == .success
+        deliverySession?.watchingWindow = windowWatch && activationObserver != nil
+    }
     focusObserver = observer
     CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
 }
@@ -578,14 +612,38 @@ private func validateTarget() -> PasteResult {
     return fieldStatus(now)
 }
 
+private func validateDelivery() -> PasteResult {
+    let strict = validateTarget()
+    guard let session = deliverySession, session.compatibility,
+          strict == .originalFocusUnavailable || strict == .currentFocusUnavailable else { return strict }
+    let eligible = resolveCompatibility(session: session, failure: strict, originalWindow: targetWindow,
+        trusted: { AXIsProcessTrusted() }, foregroundMatches: {
+            targetPID > 0 && targetPID != ProcessInfo.processInfo.processIdentifier && NSWorkspace.shared.frontmostApplication?.processIdentifier == targetPID
+        }, focusedWindow: { focusedWindow(targetPID) }, equal: { CFEqual($0, $1) },
+        secureInput: { IsSecureEventInputEnabled() }, currentField: {
+            let current = focused(targetPID, stage: "current")
+            if let original = target, let current, !CFEqual(original, current) { return (.fieldChanged, false) }
+            return (current.map { fieldStatus($0) }, safelyMissingFocus["current"] == true)
+        })
+    // AX calls can service application/observer work. A value snapshot must not
+    // erase an interruption or session replacement observed during validation.
+    guard eligible, let live = deliverySession, live.generation == session.generation,
+          live.epoch == session.epoch, !live.interrupted, !live.attempted else { return strict }
+    return .sent
+}
+
 @_cdecl("hf_record") public func record(_ generation: UInt64, _ epoch: UInt64, _ allowed: @convention(c) (UInt64) -> Bool, _ sink: @escaping @convention(c) (UInt64, UInt64, UnsafePointer<Float>?, Int32) -> Void) -> Bool {
     return main {
         guard allowed(epoch) else { return false }
         guard permissions() & 3 == 3, recorder == nil else { return false }
+        guard deliverySession.map({ generation > $0.generation }) ?? true else { return false }
         clearTarget()
+        deliverySession = DeliverySession(generation: generation, epoch: epoch, compatibility: compatibilityEnabled)
         focusDiagnostics = [:]
         targetPID = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
+        if compatibilityEnabled { targetWindow = focusedWindow(targetPID) }
         target = focused(targetPID, stage: "start")
+        deliverySession?.originalFocusMissing = safelyMissingFocus["start"] == true
         if targetPID == 0 { targetFailure = .noApplication }
         else if targetPID == ProcessInfo.processInfo.processIdentifier { targetFailure = .ownApplication }
         else if let original = target {
@@ -596,6 +654,7 @@ private func validateTarget() -> PasteResult {
             default: targetFailure = .sent
             }
         }
+        if compatibilityEnabled && IsSecureEventInputEnabled() { targetFailure = .originalSecureField }
         observeTargetFocus()
         do {
             let r = try AudioCapture(generation: generation, epoch: epoch, sink: sink)
@@ -708,16 +767,22 @@ private func validateTarget() -> PasteResult {
     }
 }
 
-// Refuse to paste unless both app AND exact focused AX element still match.
+// Strict delivery requires exact AX field identity; opt-in compatibility only
+// relaxes missing-field proof, retaining actual app/window identity and guards.
 // Clipboard is restored only if nobody changed it during the paste interval.
-@_cdecl("hf_paste") public func paste(_ text: UnsafePointer<CChar>, _ epoch: UInt64, _ allowed: @convention(c) (UInt64) -> Bool) -> Int32 {
+@_cdecl("hf_paste_generation") public func paste(_ text: UnsafePointer<CChar>, _ generation: UInt64, _ epoch: UInt64, _ allowed: @convention(c) (UInt64) -> Bool) -> Int32 {
     let value = String(cString: text)
     return main {
-        defer { clearTarget() }
+        guard allowed(epoch) else { return PasteResult.cancelled.rawValue }
+        guard let session = deliverySession, session.generation == generation, session.epoch == epoch else { return PasteResult.cancelled.rawValue }
+        guard !session.attempted else { return PasteResult.submissionUncertain.rawValue }
+        defer {
+            if deliverySession?.generation == generation && deliverySession?.epoch == epoch { clearTarget() }
+        }
         // Lock-free Rust callback: cancellation is observable even when its
         // FIFO cleanup is blocked by inference's state lock / main.sync wait.
         guard allowed(epoch) else { return PasteResult.cancelled.rawValue }
-        let validation = validateTarget()
+        let validation = validateDelivery()
         guard validation == .sent else { return validation.rawValue }
         // Finish an earlier owned paste before saving a new clipboard snapshot.
         restoreClipboard?(); restoreClipboard = nil
@@ -731,7 +796,7 @@ private func validateTarget() -> PasteResult {
         } ?? []
         // Reading promised clipboard data can run another app. Revalidate after
         // snapshotting, before publishing the transcript or sending any event.
-        let revalidation = validateTarget()
+        let revalidation = validateDelivery()
         guard revalidation == .sent else { return revalidation.rawValue }
         guard allowed(epoch) else { return PasteResult.cancelled.rawValue }
         let cleared = board.clearContents()
@@ -743,25 +808,31 @@ private func validateTarget() -> PasteResult {
             board.clearContents(); board.writeObjects(saved)
             return PasteResult.clipboardFailed.rawValue
         }
-        let generation = board.changeCount
+        let clipboardVersion = board.changeCount
         guard let down = CGEvent(keyboardEventSource: nil, virtualKey: 9, keyDown: true), let up = CGEvent(keyboardEventSource: nil, virtualKey: 9, keyDown: false) else {
-            if board.changeCount == generation { board.clearContents(); board.writeObjects(saved) }
+            if board.changeCount == clipboardVersion { board.clearContents(); board.writeObjects(saved) }
             return PasteResult.eventCreationFailed.rawValue
         }
-        let finalValidation = validateTarget()
+        let finalValidation = validateDelivery()
         guard finalValidation == .sent else {
-            if board.changeCount == generation { board.clearContents(); board.writeObjects(saved) }
+            if board.changeCount == clipboardVersion { board.clearContents(); board.writeObjects(saved) }
             return finalValidation.rawValue
         }
         down.flags = .maskCommand; up.flags = .maskCommand
         guard allowed(epoch) else {
-            if board.changeCount == generation { board.clearContents(); board.writeObjects(saved) }
+            if board.changeCount == clipboardVersion { board.clearContents(); board.writeObjects(saved) }
             return PasteResult.cancelled.rawValue
         }
         // Target the validated PID, not a global event that could reach a newly
         // frontmost app. Focus within that app still requires manual verification.
-        down.postToPid(targetPID); up.postToPid(targetPID)
-        schedulePasteRestore(board: board, saved: saved, generation: generation, token: token)
+        guard deliverySession?.claim(generation: generation, epoch: epoch) == true else {
+            if board.changeCount == clipboardVersion { board.clearContents(); board.writeObjects(saved) }
+            return PasteResult.submissionUncertain.rawValue
+        }
+        down.postToPid(targetPID)
+        // Always release the key, even if cancellation arrives after key-down.
+        up.postToPid(targetPID)
+        schedulePasteRestore(board: board, saved: saved, generation: clipboardVersion, token: token)
         return PasteResult.sent.rawValue
     }
 }

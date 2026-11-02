@@ -5,7 +5,7 @@ import './typography.css';
 import { defaultShortcut, ShortcutRecorder, shortcutLabel, type Shortcut } from './shortcut';
 import { phaseLabel, canCancel, formatTime, readiness, readinessDetail } from './presentation';
 
-type Status = { platform?: 'windows' | 'macos'; phase: string; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: 'clean' | 'warm'; recording_limit: number; recording_mode?: 'toggle' | 'push_to_talk'; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
+type Status = { platform?: 'windows' | 'macos'; compatibility_paste?: boolean; phase: string; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: 'clean' | 'warm'; recording_limit: number; recording_mode?: 'toggle' | 'push_to_talk'; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
 const logo = new URL('../src-tauri/icons/icon.png', import.meta.url).href;
 document.querySelector('#app')!.innerHTML = `
 <div class="shell">
@@ -22,6 +22,7 @@ document.querySelector('#app')!.innerHTML = `
   <div class="settings-intro"><h1 id="settings-title">Settings</h1></div>
    <section class="card preferences" aria-labelledby="preferences-title"><h2 id="preferences-title">Preferences</h2>
     <div class="setting-row"><div><h3><label for="recording-mode">Recording mode</label></h3><p id="recording-mode-help" hidden>Hold the shortcut; release to finish. Other keys or focus changes cancel.</p></div><select id="recording-mode" aria-describedby="recording-mode-help"><option value="toggle">Toggle</option><option value="push_to_talk">Push to talk</option></select></div>
+    <div id="compatibility-row" class="setting-row" hidden><div><h3>Compatibility paste</h3><p id="compatibility-help">For apps that hide their text field. Pastes once into the same active app/window; the exact field cannot be verified.</p></div><label class="switch"><input id="compatibility-paste" type="checkbox" role="switch" aria-label="Compatibility paste" aria-describedby="compatibility-help"><span aria-hidden="true"></span></label></div>
      <div class="setting-row shortcut-row"><div><h3>Shortcut</h3></div><div class="shortcut-value"><button id="change-shortcut" aria-label="Record shortcut" title="Record shortcut" aria-pressed="false" aria-describedby="shortcut-feedback"><span id="saved-shortcut">…</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/></svg></button><button id="stop-shortcut" hidden>Cancel</button><button id="shortcut-fn" class="text-action" hidden>Use default</button></div><p id="shortcut-feedback" role="status" hidden></p></div>
     <div class="setting-row"><div><h3><label for="recording-limit">Recording limit</label></h3></div><select id="recording-limit" title="Applies to the next recording"><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="240">4 minutes</option><option value="300">5 minutes</option></select></div>
     <div class="setting-row listening-row"><div><h3>Sound</h3></div><select id="sound-style" aria-label="Sound"><option value="clean">Clean</option><option value="warm">Warm</option></select><span id="sound-state" class="state">Off</span><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Recording sounds"><span aria-hidden="true"></span></label></div>
@@ -119,6 +120,10 @@ function renderMode() {
   const select = el('recording-mode') as HTMLSelectElement;
   select.disabled = modePending || capturing || captureStopping || shortcutPending || !canEditShortcut();
   if (!modePending) select.value = current?.recording_mode ?? 'toggle';
+  el('compatibility-row').hidden = current?.platform !== 'macos';
+  const compatibility = el('compatibility-paste') as HTMLInputElement;
+  compatibility.disabled = select.disabled;
+  if (!modePending) compatibility.checked = current?.compatibility_paste ?? false;
   const hold = current?.recording_mode === 'push_to_talk';
   el('recording-mode-help').hidden = !hold;
   el('recording-action').textContent = hold ? 'Hold' : 'Press';
@@ -130,6 +135,13 @@ el('recording-mode').onchange = async () => {
   const mode = select.value;
   modePending = true; renderShortcut();
   await action('set_recording_mode', { mode });
+  modePending = false; renderShortcut();
+};
+el('compatibility-paste').onchange = async () => {
+  if (current?.platform !== 'macos' || modePending || capturing || captureStopping || shortcutPending || !canEditShortcut()) { renderMode(); return; }
+  const enabled = (el('compatibility-paste') as HTMLInputElement).checked;
+  modePending = true; renderShortcut();
+  await action('set_compatibility_paste', { enabled });
   modePending = false; renderShortcut();
 };
 async function stopCapture() {

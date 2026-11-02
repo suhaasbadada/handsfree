@@ -46,6 +46,8 @@ test('native paste policy rejects secure/read-only targets and supports writable
       join(root, 'src-tauri/native/PastePolicy.swift'), join(root, 'tests/native/main.swift'), '-o', binary]);
     const output = execFileSync(binary, { encoding: 'utf8' });
     assert.match(output, /32 field policy combinations and 17 ABI codes passed/);
+    assert.match(output, /Compatibility policy: consent, window, secure input, interruptions and once-only generation guards passed/);
+    assert.match(output, /Synthetic compatibility adapter: original AXWindow identity, live proofs, missing-only errors and stale completion passed without AX or events/);
     assert.match(output, /Synthetic focus resolver: bounded fallback, identity conflicts, trust and foreground guards passed without AX/);
   } finally {
     rmSync(directory, { recursive: true, force: true });

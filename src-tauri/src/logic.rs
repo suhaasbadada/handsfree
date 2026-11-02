@@ -194,7 +194,7 @@ pub fn copied_message(paste_code: i32) -> String {
 #[cfg(not(windows))]
 pub fn paste_message(code: i32) -> String {
     if code == 0 {
-        return "Paste shortcut sent to your original field (insertion not confirmed).".into();
+        return "Paste shortcut sent (insertion not confirmed).".into();
     }
     if code == 17 {
         return "Paste submission uncertain [finish:partial-input]. Check the original field before copying or trying again; no automatic retry was made.".into();
@@ -202,9 +202,9 @@ pub fn paste_message(code: i32) -> String {
     let (reason, action) = match code {
         1 => ("accessibility-denied", "Accessibility access is unavailable. Enable HandsFree in Privacy & Security → Accessibility, then restart the same app copy."),
         2 => ("no-original-app", "No original app was available. Select a text field in another app before tapping Fn."),
-        3 => ("no-original-focus", "The app did not expose a focused Accessibility element when recording started. Click inside its text field before tapping Fn; custom editors may not support Accessibility."),
+        3 => ("no-original-focus", "The app did not expose a focused Accessibility element when recording started. Click inside its text field before tapping Fn; custom editors may not support Accessibility. Optional Compatibility paste requires a verifiable, unchanged app/window."),
         4 => ("app-changed", "The frontmost app changed. Stay in the original app until transcription finishes."),
-        5 => ("no-current-focus", "The app no longer exposes its focused field. Keep the original text field focused until transcription finishes."),
+        5 => ("no-current-focus", "The app no longer exposes its focused field. Keep the original text field focused until transcription finishes. Optional Compatibility paste requires a verifiable, unchanged app/window."),
         6 => ("field-changed", "The focused Accessibility element changed or was recreated by the app. Keep the same field focused until transcription finishes."),
         7 | 12 => ("secure-field", "Password/secure fields cannot receive dictation. Choose a non-password text field before starting."),
         8 | 13 => ("unsupported-field", "The field does not expose supported text editing through Accessibility. Select an editable text field before starting."),

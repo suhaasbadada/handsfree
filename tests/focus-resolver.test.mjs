@@ -14,8 +14,13 @@ test('focus adapter is read-only, PID-checked and shared by snapshot and all pas
   assert.match(bridge, /let now = focused\(targetPID, stage: "current"\)/);
   assert.match(bridge, /guard CFEqual\(original, now\)/);
   assert.match(bridge, /return fieldStatus\(now\)/);
-  const paste = bridge.slice(bridge.indexOf('@_cdecl("hf_paste")'), bridge.indexOf('func schedulePasteRestore'));
-  assert.equal((paste.match(/validateTarget\(\)/g) || []).length, 3);
+  const paste = bridge.slice(bridge.indexOf('@_cdecl("hf_paste_generation")'), bridge.indexOf('func schedulePasteRestore'));
+  assert.equal((paste.match(/validateDelivery\(\)/g) || []).length, 3);
+  const delivery = bridge.slice(bridge.indexOf('private func validateDelivery()'), bridge.indexOf('@_cdecl("hf_record")'));
+  assert.match(delivery, /let strict = validateTarget\(\)/);
+  assert.match(delivery, /resolveCompatibility/);
+  assert.match(paste, /session.generation == generation, session.epoch == epoch/);
+  assert.ok(paste.indexOf('claim(generation:') < paste.indexOf('down.postToPid'));
   const clear = bridge.slice(bridge.indexOf('private func clearTarget()'), bridge.indexOf('private func observeTargetFocus()'));
   assert.doesNotMatch(clear, /focusDiagnostics/);
   const diagnostic = bridge.slice(bridge.indexOf('@_cdecl("hf_focus_diagnostic")'), bridge.indexOf('private func focused('));

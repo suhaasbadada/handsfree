@@ -1,0 +1,13 @@
+# Compatibility paste (macOS only)
+
+Strict insertion remains the default. It checks the original focused Accessibility field before submitting Command-V. Some apps expose a caret but hide that field, so strict delivery copies the transcript for manual paste instead.
+
+**Settings → Compatibility paste** is an explicit opt-in for those apps. For apps that hide their text field, it pastes once into the same active app/window; **the exact field cannot be verified**. Keep the intended non-password, editable field focused throughout dictation and processing. Moving the cursor inside the same window can change where text lands. This is not universal insertion support.
+
+The recording snapshots the setting, original app PID and actual focused Accessibility window before the cue. The fallback is eligible only when the original or current field is missing, not when a known field is secure, read-only, disabled, unsupported or changed. It requires fresh Accessibility trust, no system secure-input mode, a PID-validated AXWindow with unchanged identity, and working app/window focus monitoring. An observed app or window switch invalidates compatibility delivery even after switching back. If the app hides its window too, or window-change notifications are unavailable, it fails closed and copies for manual paste. There is no PID-only, title, coordinate or WindowServer z-order guess.
+
+Command-V is submitted at most once per recording generation. Native bookkeeping marks the attempt **before** posting key-down and survives target cleanup. Sending the shortcut does not confirm insertion; an app can ignore it. HandsFree never checks whether a text box looks empty, never automatically retries after submission, never presses Enter, and never activates another app. Check the result before manually pasting again. Uncertain submissions do not trigger clipboard fallback.
+
+Cancellation checks, owned-clipboard restoration and no-transcript-on-cancel rules remain in place. No text-field values are read to infer success, and no transcript is stored in usage statistics. Existing preferences and usage remain intact; upgrades do not enable this setting. Changing it is blocked during recording, processing and shortcut capture. Windows delivery is unchanged and has no compatibility toggle.
+
+Permission-free native fixtures exercise the production compatibility adapter with synthetic window/field/trust proofs and once-only generation state. They do not post keys, activate apps, request permissions or record audio. These tests cannot establish support for every real editor; real-device insertion still needs user verification.

@@ -75,6 +75,8 @@ impl Stats {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(default)]
 pub struct Store {
+    #[serde(deserialize_with = "read_compatibility_paste")]
+    pub compatibility_paste: bool,
     #[serde(deserialize_with = "read_recording_mode")]
     pub recording_mode: RecordingMode,
     #[serde(deserialize_with = "read_shortcut")]
@@ -86,6 +88,9 @@ pub struct Store {
     #[serde(deserialize_with = "read_recording_limit")]
     pub recording_limit: u32,
     pub stats: Stats,
+}
+fn read_compatibility_paste<'de, D: serde::Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
+    Ok(serde_json::Value::deserialize(d)?.as_bool() == Some(true))
 }
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -140,6 +145,7 @@ fn read_shortcut<'de, D: serde::Deserializer<'de>>(
 impl Default for Store {
     fn default() -> Self {
         Self {
+            compatibility_paste: false,
             recording_mode: RecordingMode::default(),
             shortcut: crate::shortcut::Shortcut::default(),
             sound_style: "clean".into(),
@@ -214,6 +220,30 @@ pub fn validate_recording_limit(seconds: u32) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn compatibility_is_explicit_opt_in_and_preserves_existing_preferences() {
+        let original = serde_json::json!({"recording_mode":"push_to_talk", "shortcut":{"code":"Space","modifiers":5}, "sound_style":"warm", "sounds":true,"sound_volume":73,"recording_limit":300,"stats":{"words":123,"transcriptions":7}});
+        let baseline: super::Store = serde_json::from_value(original.clone()).unwrap();
+        assert!(!baseline.compatibility_paste);
+        for value in [
+            serde_json::json!(false),
+            serde_json::json!(null),
+            serde_json::json!("true"),
+            serde_json::json!(true),
+        ] {
+            let mut saved = original.clone();
+            saved["compatibility_paste"] = value.clone();
+            let mut loaded: super::Store = serde_json::from_value(saved).unwrap();
+            assert_eq!(loaded.compatibility_paste, value == serde_json::json!(true));
+            assert_eq!(
+                serde_json::from_str::<super::Store>(&serde_json::to_string(&loaded).unwrap())
+                    .unwrap(),
+                loaded
+            );
+            loaded.compatibility_paste = false;
+            assert_eq!(loaded, baseline);
+        }
+    }
     #[test]
     fn recording_mode_is_opt_in_tolerant_and_preserves_saved_data() {
         for mode in [None, Some("unknown"), Some("toggle"), Some("push_to_talk")] {

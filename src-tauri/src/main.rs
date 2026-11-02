@@ -162,6 +162,7 @@ struct Status {
     sound_style: String,
     recording_limit: u32,
     recording_mode: storage::RecordingMode,
+    compatibility_paste: bool,
     shortcut: shortcut::Shortcut,
     shortcut_label: String,
     stats: storage::Stats,
@@ -401,6 +402,53 @@ async fn capture_shortcut(active: bool) -> Result<(), String> {
         SHORTCUT_CAPTURE.store(active, Ordering::Release);
         unsafe { hf_capture_shortcut(active) };
         CANCELLATION.cancel();
+        Ok(())
+    })
+    .await
+}
+#[tauri::command]
+async fn set_compatibility_paste(enabled: bool) -> Result<(), String> {
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = enabled;
+        Err("Compatibility paste is available only on macOS.".into())
+    }
+    #[cfg(target_os = "macos")]
+    configure(move || {
+        let s = state();
+        let inner = s.inner.lock().unwrap();
+        if !shortcut_edit_allowed(&inner.status.phase) || SHORTCUT_CAPTURE.load(Ordering::Acquire) {
+            return Err("Finish dictation and shortcut recording before changing delivery.".into());
+        }
+        let old = inner.store.compatibility_paste;
+        drop(inner);
+        CANCELLATION.cancel();
+        if !unsafe { hf_compatibility(enabled) } {
+            return Err("Delivery mode could not be changed.".into());
+        }
+        let mut inner = s.inner.lock().unwrap();
+        if !shortcut_edit_allowed(&inner.status.phase) || SHORTCUT_CAPTURE.load(Ordering::Acquire) {
+            drop(inner);
+            unsafe {
+                hf_compatibility(old);
+            }
+            CANCELLATION.cancel();
+            return Err("Please wait for the current operation before changing delivery.".into());
+        }
+        let mut updated = inner.store.clone();
+        updated.compatibility_paste = enabled;
+        if let Err(error) = storage::save(&s.directory.join("usage.json"), &updated) {
+            drop(inner);
+            unsafe {
+                hf_compatibility(old);
+            }
+            CANCELLATION.cancel();
+            return Err(error);
+        }
+        CANCELLATION.cancel();
+        inner.store = updated;
+        inner.status.compatibility_paste = enabled;
+        inner.status.persistence_error.clear();
         Ok(())
     })
     .await
@@ -972,7 +1020,16 @@ fn complete_transcription(session: Arc<streaming::Session>, result: Result<Strin
         Ok(text) => {
             drop(inner);
             let result = match cstring(&text) {
-                Ok(p) => unsafe { hf_paste(p.as_ptr(), epoch, delivery_allowed) },
+                Ok(p) => unsafe {
+                    #[cfg(target_os = "macos")]
+                    {
+                        hf_paste_generation(p.as_ptr(), generation, epoch, delivery_allowed)
+                    }
+                    #[cfg(windows)]
+                    {
+                        hf_paste(p.as_ptr(), epoch, delivery_allowed)
+                    }
+                },
                 Err(_) => {
                     unsafe { hf_discard_target() };
                     -1
@@ -1286,6 +1343,7 @@ fn main() {
             set_sound_style,
             set_shortcut,
             set_recording_mode,
+            set_compatibility_paste,
             capture_shortcut,
             preview_sound,
             reset_stats
@@ -1309,6 +1367,8 @@ fn main() {
             };
             unsafe {
                 hf_sounds(store.sounds);
+                #[cfg(target_os = "macos")]
+                hf_compatibility(store.compatibility_paste);
                 hf_sound_volume(store.sound_volume / 100.0);
                 hf_sound_style(if store.sound_style == "warm" { 1 } else { 0 });
                 hf_shortcut(store.shortcut.keycode().unwrap(), store.shortcut.modifiers);
@@ -1343,6 +1403,7 @@ fn main() {
                         sound_style: store.sound_style.clone(),
                         recording_limit: store.recording_limit,
                         recording_mode: store.recording_mode,
+                        compatibility_paste: store.compatibility_paste,
                         shortcut: store.shortcut.clone(),
                         shortcut_label: store.shortcut.label(),
                         stats: store.stats.clone(),

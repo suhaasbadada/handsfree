@@ -1,4 +1,5 @@
 unsafe extern "C" {
+    pub fn hf_compatibility(enabled: bool) -> bool;
     fn hf_focus_diagnostic(buffer: *mut u8, capacity: i32) -> i32;
     pub fn hf_mode(mode: i32) -> bool;
     pub fn hf_start_gate(callback: extern "C" fn(u64) -> bool);
@@ -32,8 +33,9 @@ unsafe extern "C" {
     pub fn hf_cancel_audio();
     pub fn hf_discard_target();
     pub fn hf_overlay(phase: i32);
-    pub fn hf_paste(
+    pub fn hf_paste_generation(
         text: *const std::ffi::c_char,
+        generation: u64,
         epoch: u64,
         allowed: extern "C" fn(u64) -> bool,
     ) -> i32;

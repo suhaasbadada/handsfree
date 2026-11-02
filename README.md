@@ -44,6 +44,7 @@ Mac beta and experimental Windows beta are available; Linux is planned.
 - **Your shortcut:** Fn / 🌐 on Mac, Right Ctrl on Windows, or a custom key combination. Toggle is the default; opt into **Settings → Recording mode → Push to talk** to hold and release. Existing saved shortcuts are preserved.
 - **Practical controls:** optional listening sounds and local usage totals. Dictation text stays out of the app window.
 - **Safer insertion:** checks the original app and field before submitting Paste; otherwise copies for manual paste.
+  Mac users can opt into **Settings → Compatibility paste** for apps that hide their text field. It requires the same verified active app/window, but cannot verify the exact field. It is off by default; see [delivery safeguards and limits](docs/COMPATIBILITY-PASTE.md).
 
 ## Use cases
 

@@ -27,6 +27,71 @@ for (index, code) in codes.enumerated() {
     precondition(code.rawValue == Int32(index), "Paste result ABI changed")
 }
 print("32 field policy combinations and 17 ABI codes passed")
+precondition(PasteResult.submissionUncertain.rawValue == 17)
+
+// Real delivery policy with synthetic proofs only; no live AX or key events.
+for code in 0...17 {
+    for enabled in [false, true] {
+        for sameApp in [false, true] {
+            for sameWindow in [false, true] {
+                var session = DeliverySession(generation: 4, epoch: 9, compatibility: enabled)
+                session.watchingWindow = true
+                func eligible(_ s: DeliverySession, trusted: Bool = true, secure: Bool = false, field: PasteResult? = nil) -> Bool {
+                    compatibilityPolicy(session: s, failure: PasteResult(rawValue: Int32(code))!, trusted: trusted,
+                        sameApplication: sameApp, sameWindow: sameWindow, secureInput: secure, currentField: field)
+                }
+                let expected = enabled && sameApp && sameWindow && [3, 5].contains(code)
+                precondition(eligible(session) == expected)
+                precondition(!eligible(session, trusted: false))
+                precondition(!eligible(session, secure: true))
+                for refusal: PasteResult in [.secureField, .disabledField, .unsupportedField] {
+                    precondition(!eligible(session, field: refusal))
+                }
+                session.interrupted = true
+                precondition(!eligible(session))
+                session.interrupted = false; session.watchingWindow = false
+                precondition(!eligible(session))
+                session.watchingWindow = true
+                precondition(!session.claim(generation: 3, epoch: 9))
+                precondition(!session.claim(generation: 4, epoch: 8))
+                precondition(session.claim(generation: 4, epoch: 9))
+                precondition(!eligible(session))
+                precondition(!session.claim(generation: 4, epoch: 9))
+            }
+        }
+    }
+}
+print("Compatibility policy: consent, window, secure input, interruptions and once-only generation guards passed")
+
+var adapterSession = DeliverySession(generation: 12, epoch: 34, compatibility: true)
+adapterSession.watchingWindow = true; adapterSession.originalFocusMissing = true
+func adapter(_ original: Int? = 10, window: Int? = 10, missing: Bool = true,
+             field: PasteResult? = nil, trust: [Bool] = [true], foreground: [Bool] = [true]) -> Bool {
+    var t = 0, f = 0
+    return resolveCompatibility(session: adapterSession, failure: .originalFocusUnavailable,
+        originalWindow: original, trusted: { defer { t += 1 }; return trust[min(t, trust.count - 1)] },
+        foregroundMatches: { defer { f += 1 }; return foreground[min(f, foreground.count - 1)] },
+        focusedWindow: { window }, equal: { $0 == $1 }, secureInput: { false },
+        currentField: { (field, missing) })
+}
+precondition(adapter()) // app hides focus but exposes its real focused AXWindow
+precondition(!adapter(nil))
+precondition(!adapter(window: nil))
+precondition(!adapter(window: 11))
+precondition(!adapter(missing: false)) // AX denied, wrong type/PID, conflicting elements
+precondition(!adapter(field: .fieldChanged))
+precondition(!adapter(field: .secureField))
+precondition(!adapter(trust: [true, false]))
+precondition(!adapter(foreground: [true, false]))
+adapterSession.interrupted = true
+precondition(!adapter()) // away then back cannot regain eligibility
+adapterSession.interrupted = false
+precondition(adapterSession.claim(generation: 12, epoch: 34))
+precondition(!adapter()) // no retry even if app ignored the shortcut
+let oldSession = adapterSession
+adapterSession = DeliverySession(generation: 13, epoch: 35, compatibility: false)
+precondition(!adapterSession.claim(generation: oldSession.generation, epoch: oldSession.epoch))
+print("Synthetic compatibility adapter: original AXWindow identity, live proofs, missing-only errors and stale completion passed without AX or events")
 
 // Synthetic lookups only: exercise production selection/control flow without AX.
 func valid(_ value: Int = 10) -> FocusLookup<Int> {
