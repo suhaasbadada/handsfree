@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { candidate, tag, validateMetadata, validateDraft, validatePublic, validateAvailability, auditOptions } from '../scripts/check-release.mjs';
-import { release } from '../site/release.js';
+import { candidateRelease as release, release as publishedRelease } from '../site/release.js';
 
 const commit = 'a'.repeat(40), tree = 'b'.repeat(40);
 const digest = text => createHash('sha256').update(text).digest('hex');
@@ -33,6 +33,11 @@ for (const [label, mutate, message] of [
 
 const sizes = { [candidate]: 123, 'PROVENANCE.txt': 456, SHA256SUMS: 789 };
 test('draft audit requires the matching website manifest to remain unavailable', () => {
+  assert.equal(tag, 'v0.1.1-beta.6');
+  assert.equal(candidate, 'HandsFree-0.1.1-beta.6-macos-arm64.dmg');
+  assert.equal(release.publicAvailable, false);
+  assert.throws(() => validateAvailability(publishedRelease), /manifest disabled/);
+  assert.throws(() => validateAvailability(publishedRelease, true), /manifest disabled/);
   assert.doesNotThrow(() => validateAvailability({ ...release, publicAvailable: false }));
   for (const change of [{ publicAvailable: true }, { version: '0.1.0' }, { dmgUrl: release.dmgUrl.replace('.dmg', '.zip') }]) {
     assert.throws(() => validateAvailability({ ...release, ...change }), /manifest disabled/);

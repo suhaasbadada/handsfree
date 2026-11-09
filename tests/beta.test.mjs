@@ -30,15 +30,15 @@ test('README, release notes, installer guide and filename disclose beta without 
   assert.match(read('docs/releases/v0.1.1-beta.2.md'), /# HandsFree v0\.1\.1-beta\.2/);
   assert.match(read('docs/releases/v0.1.1-beta.2.md'), /Prerelease · Beta testing/);
   assert.match(read('docs/INSTALL.md'), /# Install HandsFree \(Mac beta\)/);
-  assert.match(read('scripts/package-release.sh'), /NAME=HandsFree-0\.1\.1-beta\.5-macos-arm64/);
+  assert.match(read('scripts/package-release.sh'), /NAME=HandsFree-0\.1\.1-beta\.6-macos-arm64/);
   assert.match(read('scripts/package-release.sh'), /-volname 'HandsFree Beta — drag to Applications'/);
   const config = JSON.parse(read('src-tauri/tauri.conf.json'));
   assert.equal(config.productName, 'HandsFree');
   assert.equal(config.identifier, 'com.handsfree.local');
 });
 
-test('Mac beta 5 app, package, activated manifest and audit versions stay coordinated', async () => {
-  const { release } = await import('../site/release.js');
+test('Mac beta 6 candidate package and audit coordinate without changing published beta 5 or embedded version', async () => {
+  const { release, candidateRelease } = await import('../site/release.js');
   const { candidate, tag } = await import('../scripts/check-release.mjs');
   const version = JSON.parse(read('package.json')).version;
   assert.equal(version, '0.1.1');
@@ -49,13 +49,34 @@ test('Mac beta 5 app, package, activated manifest and audit versions stay coordi
   assert.ok(read('src-tauri/Cargo.lock').includes(`name = "handsfree"\nversion = "${version}"`));
   assert.equal(release.version, `${version}-beta.5`);
   assert.equal(release.publicAvailable, true, 'Activation follows publication and public asset verification');
-  assert.equal(tag, `v${release.version}`);
-  assert.equal(candidate, `HandsFree-${release.version}-macos-arm64.dmg`);
+  assert.equal(candidateRelease.version, `${version}-beta.6`);
+  assert.equal(candidateRelease.publicAvailable, false, 'Candidate must not activate public downloads');
+  assert.equal(tag, `v${candidateRelease.version}`);
+  assert.equal(candidate, `HandsFree-${candidateRelease.version}-macos-arm64.dmg`);
+  assert.ok(candidateRelease.dmgUrl.endsWith(`/releases/download/${tag}/${candidate}`));
   assert.ok(read('scripts/package-release.sh').includes(`NAME=${candidate.slice(0, -4)}`));
   assert.ok(read('scripts/package-release.sh').includes(`== ${version} ]]`));
   assert.ok(read('src/main.ts').includes(`<span id="app-version">${version}</span>`));
   assert.match(read('src/main.ts'), /getVersion\(\)\.then/);
   assert.ok(read(`docs/releases/${tag}.md`).includes(`Internal app version: **${version}**`));
+});
+
+test('beta 6 preparation packages practice guidance and keeps publication evidence honest', () => {
+  const packager = read('scripts/package-release.sh');
+  const audit = read('scripts/check-release.mjs');
+  for (const name of ['practice.md', 'COMPATIBILITY-PASTE.md']) {
+    assert.ok(packager.includes(`docs/${name}`));
+    assert.ok(packager.includes(`Licenses/Documentation/${name}`));
+    assert.ok(audit.includes(`Documentation/${name}`));
+  }
+  assert.ok(packager.includes('docs/releases/v0.1.1-beta.6.md'));
+  assert.match(audit, /validateAvailability\([^\n]*\.candidateRelease, publicMode\)/);
+  const notes = read('docs/releases/v0.1.1-beta.6.md');
+  assert.match(notes, /Unpublished candidate/);
+  assert.match(notes, /not a shortcut test/);
+  assert.match(notes, /does not copy to the clipboard/);
+  assert.match(notes, /count toward usage/);
+  assert.doesNotMatch(notes, /\b[a-f0-9]{40,64}\b|actions\/runs\/\d+/);
 });
 
 test('Mac beta 5 activation coordinates current docs and all static download links', async () => {

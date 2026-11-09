@@ -70,7 +70,9 @@ temporary field without paste, clipboard changes, normal-transcript replacement,
 or usage tracking. Cancel, Clear, leaving Overview, and window focus loss clear it.
 This tests microphone capture and the model, not shortcuts or external insertion.
 See [practice behavior and safeguards](practice.md). The published beta 5 binary
-is unchanged; this feature requires a new build.
+is unchanged; this feature requires a new build. The unpublished beta 6 candidate
+packages this feature with the same embedded app version (`0.1.1`); it does not
+activate public downloads. See [release preparation](RELEASING.md).
 
 ## Dashboard, sounds, and local usage
 

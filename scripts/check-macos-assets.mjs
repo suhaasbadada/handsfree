@@ -18,6 +18,9 @@ export function verifyEmbeddedFrontend(executable, assets, cached) {
   for (const marker of ['Compatibility paste', 'compatibility-paste', 'set_compatibility_paste', 'compatibility_paste', 'the exact field cannot be verified']) {
     requireThat(javascript.includes(marker), `Missing compiled Compatibility paste UI: ${marker}`);
   }
+  for (const marker of ['Try your voice', 'Start practice', 'Temporary practice field', 'Nothing is pasted or copied.', 'practice_start', 'practice_finish', 'practice_cancel', 'practice_status']) {
+    requireThat(javascript.includes(marker), `Missing compiled practice UI: ${marker}`);
+  }
   for (const asset of assets) {
     const embedded = cached.some(bytes => {
       let decoded;
@@ -40,12 +43,16 @@ export function verifyCompiledAssets(root, app) {
   const executable = readFileSync(join(app, 'Contents/MacOS/handsfree'));
   verifyEmbeddedFrontend(executable, assets, cached);
   requireThat(executable.includes(Buffer.from('_hf_gesture_complete')), 'Missing native push-to-talk completion ABI symbol');
+  // Native-only error text cannot be supplied by embedded frontend assets.
+  for (const marker of ['Keep the HandsFree window visible and focused to practice.']) {
+    requireThat(executable.includes(Buffer.from(marker)), `Missing compiled practice backend: ${marker}`);
+  }
   for (const profile of ['clean', 'warm']) for (const role of ['start', 'end']) {
     const name = `${profile}-${role}.wav`;
     requireThat(readFileSync(join(app, 'Contents/Resources/sounds', name)).equals(readFileSync(join(root, 'src-tauri/native/assets/sounds', name))), `Stale bundled cue: ${name}`);
   }
   requireThat(readFileSync(join(app, 'Contents/Resources/icon.icns')).equals(readFileSync(join(root, 'src-tauri/icons/icon.icns'))), 'Stale or missing bundled app icon');
-  console.log('PASS: current compiled stats dashboard/push-to-talk/Compatibility paste UI and CSS embedded in executable; native gesture completion ABI present; all four Clean/Warm cue bytes and app icon match source.');
+  console.log('PASS: current compiled stats dashboard/push-to-talk/Compatibility paste/practice UI and CSS embedded in executable; practice backend and native gesture completion ABI present; all four Clean/Warm cue bytes and app icon match source.');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

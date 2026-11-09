@@ -7,11 +7,24 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const assets = [
-  { name: 'current.js', bytes: Buffer.from('<h1>Your activity</h1>Recording mode <option value="toggle">Toggle</option><option value="push_to_talk">Push to talk</option> set_recording_mode Compatibility paste compatibility-paste set_compatibility_paste compatibility_paste the exact field cannot be verified') },
+  { name: 'current.js', bytes: Buffer.from('<h1>Your activity</h1>Recording mode <option value="toggle">Toggle</option><option value="push_to_talk">Push to talk</option> set_recording_mode Compatibility paste compatibility-paste set_compatibility_paste compatibility_paste the exact field cannot be verified Try your voice Start practice Temporary practice field Nothing is pasted or copied. practice_start practice_finish practice_cancel practice_status') },
   { name: 'current.css', bytes: Buffer.from('.metrics { display: grid; }') },
 ];
 const cached = assets.map(asset => brotliCompressSync(asset.bytes));
-const executable = Buffer.concat([Buffer.from('Mach-O fixture _hf_gesture_complete'), ...cached]);
+const backendMarker = 'Keep the HandsFree window visible and focused to practice.';
+const executable = Buffer.concat([Buffer.from(`Mach-O fixture _hf_gesture_complete ${backendMarker}`), ...cached]);
+for (const marker of ['Try your voice', 'Start practice', 'Temporary practice field', 'Nothing is pasted or copied.', 'practice_start', 'practice_finish', 'practice_cancel', 'practice_status']) {
+  test(`compiled practice audit rejects missing ${marker} even when stale bytes are embedded`, () => {
+    const stale = [{ ...assets[0], bytes: Buffer.from(assets[0].bytes.toString().replaceAll(marker, 'old')) }, assets[1]];
+    const cache = stale.map(asset => brotliCompressSync(asset.bytes));
+    assert.throws(() => verifyEmbeddedFrontend(Buffer.concat(cache), stale, cache), /Missing compiled practice UI/);
+  });
+}
+test('pre-practice Compatibility paste frontend cannot pass merely because it is embedded', () => {
+  const stale = [{ ...assets[0], bytes: Buffer.from(assets[0].bytes.toString().split(' Try your voice')[0]) }, assets[1]];
+  const cache = stale.map(asset => brotliCompressSync(asset.bytes));
+  assert.throws(() => verifyEmbeddedFrontend(Buffer.concat(cache), stale, cache), /Missing compiled practice UI/);
+});
 for (const marker of ['Compatibility paste', 'compatibility-paste', 'set_compatibility_paste', 'compatibility_paste', 'the exact field cannot be verified']) {
   test(`compiled Compatibility paste audit rejects missing ${marker} even when stale bytes are embedded`, () => {
     const stale = [{ ...assets[0], bytes: Buffer.from(assets[0].bytes.toString().replaceAll(marker, 'old')) }, assets[1]];
@@ -67,6 +80,8 @@ test('packaged app audit rejects old cue bytes or icon even with a fresh executa
     assert.doesNotThrow(() => verifyCompiledAssets(root, app));
     put('HandsFree.app/Contents/MacOS/handsfree', Buffer.concat(cached));
     assert.throws(() => verifyCompiledAssets(root, app), /Missing native push-to-talk completion ABI symbol/);
+    put('HandsFree.app/Contents/MacOS/handsfree', Buffer.concat([Buffer.from('Mach-O fixture _hf_gesture_complete'), ...cached]));
+    assert.throws(() => verifyCompiledAssets(root, app), /Missing compiled practice backend/);
     put('HandsFree.app/Contents/MacOS/handsfree', executable);
     put('HandsFree.app/Contents/Resources/sounds/clean-start.wav', 'old-cue');
     assert.throws(() => verifyCompiledAssets(root, app), /Stale bundled cue: clean-start.wav/);

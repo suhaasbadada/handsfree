@@ -7,8 +7,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { verifyCompiledAssets } from './check-macos-assets.mjs';
 
-export const candidate = 'HandsFree-0.1.1-beta.5-macos-arm64.dmg';
-export const tag = 'v0.1.1-beta.5';
+export const candidate = 'HandsFree-0.1.1-beta.6-macos-arm64.dmg';
+export const tag = 'v0.1.1-beta.6';
 const names = [candidate, 'PROVENANCE.txt', 'SHA256SUMS'];
 const repo = 'suhaasbadada/handsfree';
 function requireThat(condition, message) { if (!condition) throw new Error(message); }
@@ -129,7 +129,7 @@ export async function main(args = process.argv.slice(2), { onInterrupt } = {}) {
   requireThat(process.platform === 'darwin' && process.arch === 'arm64', 'Apple Silicon macOS required for signature/payload audit');
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const directory = resolve(inputDirectory ?? join(root, 'release'));
-  validateAvailability((await import(pathToFileURL(join(root, 'site/release.js')).href)).release, publicMode);
+  validateAvailability((await import(pathToFileURL(join(root, 'site/release.js')).href)).candidateRelease, publicMode);
   const git = (...args) => run('git', args, { cwd: root });
   const commit = git('rev-parse', 'HEAD');
   const hashes = Object.fromEntries(await Promise.all(names.map(async name => [name, await hash(join(directory, name))])));
@@ -159,7 +159,7 @@ export async function main(args = process.argv.slice(2), { onInterrupt } = {}) {
     requireThat(readlinkSync(join(mount, 'Applications')) === '/Applications', 'Applications shortcut missing');
     const visible = readdirSync(mount).filter(name => !name.startsWith('.')).sort();
     requireThat(JSON.stringify(visible) === JSON.stringify(['Applications', 'HandsFree.app', 'Install HandsFree.txt', 'Licenses']), 'Unexpected visible disk-image root');
-    for (const name of ['LICENSE', 'PUBLICATION-NOTES.txt', 'THIRD_PARTY_NOTICES/inventory.json', 'THIRD_PARTY_SOURCES.tar.gz', 'Documentation/README.md', 'Documentation/RELEASING.md', 'Documentation/release-readiness.md']) {
+    for (const name of ['LICENSE', 'PUBLICATION-NOTES.txt', 'THIRD_PARTY_NOTICES/inventory.json', 'THIRD_PARTY_SOURCES.tar.gz', 'Documentation/README.md', 'Documentation/RELEASING.md', 'Documentation/release-readiness.md', 'Documentation/practice.md', 'Documentation/COMPATIBILITY-PASTE.md', `Documentation/releases/${tag}.md`]) {
       requireThat(statSync(join(mount, 'Licenses', name)).size > 0, `Missing license/documentation: ${name}`);
     }
     requireThat(readFileSync(join(mount, 'Install HandsFree.txt'), 'utf8').includes('Experimental beta — self-signed and not notarized'), 'Install guide must disclose experimental signing status');

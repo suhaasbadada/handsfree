@@ -8,6 +8,16 @@ export const release = Object.freeze({
   dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.5/HandsFree-0.1.1-beta.5-macos-arm64.dmg',
 });
 
+// Preparation/audit coordinates only; the website continues to use release above.
+// Keep disabled through the clean-source public-byte audit, then activate separately.
+export const candidateRelease = Object.freeze({
+  schemaVersion: 1,
+  version: '0.1.1-beta.6',
+  publicAvailable: false,
+  status: 'Unpublished Mac beta 6 candidate. Explicit-button in-app practice; self-signed, not notarized.',
+  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.6/HandsFree-0.1.1-beta.6-macos-arm64.dmg',
+});
+
 // Historical coordinates only. Windows development and public promotion are paused.
 // Distribution tag differs from the embedded application/installer version (0.1.1).
 export const windowsRelease = Object.freeze({
