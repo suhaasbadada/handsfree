@@ -5,7 +5,7 @@ Settings → **Recording mode** offers **Toggle** (the unchanged default) and
 Available in the current Mac beta (introduced in Mac beta 4). Current product
 and development focus is Mac-only: Apple Silicon, macOS 14+. Windows work is
 paused; Linux is not supported. Neither port has a promised release date.
-See the [Mac release notes](releases/v0.1.1-beta.5.md). The earlier
+See the [Mac release notes](releases/v0.1.1-beta.6.md). The earlier
 [Windows implementation](WINDOWS.md) remains a historical record only.
 
 In Push to talk, hold the configured shortcut, speak, then release to finish.

@@ -1,5 +1,9 @@
 # Practice in Overview
 
+Available in [Mac beta 6](releases/v0.1.1-beta.6.md) (embedded app version `0.1.1`).
+Live microphone practice acceptance and separate-Mac QA have not been performed;
+automated checks and local installation do not establish hardware acceptance.
+
 On Apple Silicon Macs running macOS 14 or later, finish the existing microphone,
 permissions and English-model setup, then use **Start practice**, speak, and choose
 **Finish**. The editable temporary field tests microphone capture and local English

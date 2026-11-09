@@ -2,19 +2,19 @@
 // The embedded app version is 0.1.1; this is the distribution label.
 export const release = Object.freeze({
   schemaVersion: 1,
-  version: '0.1.1-beta.5',
+  version: '0.1.1-beta.6',
   publicAvailable: true,
-  status: 'Experimental Mac beta 5 available. Optional Compatibility paste, off by default; self-signed, not notarized.',
-  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.5/HandsFree-0.1.1-beta.5-macos-arm64.dmg',
+  status: 'Experimental Mac beta 6 available. Explicit-button in-app practice; self-signed, not notarized.',
+  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.6/HandsFree-0.1.1-beta.6-macos-arm64.dmg',
 });
 
 // Preparation/audit coordinates only; the website continues to use release above.
-// Keep disabled through the clean-source public-byte audit, then activate separately.
+// Retain these disabled audit inputs from the immutable beta 6 artifact source.
 export const candidateRelease = Object.freeze({
   schemaVersion: 1,
   version: '0.1.1-beta.6',
   publicAvailable: false,
-  status: 'Unpublished Mac beta 6 candidate. Explicit-button in-app practice; self-signed, not notarized.',
+  status: 'Mac beta 6 artifact audit coordinates only; not the public availability switch.',
   dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.6/HandsFree-0.1.1-beta.6-macos-arm64.dmg',
 });
 

@@ -2,18 +2,16 @@
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
 
-Current public Mac distribution: **v0.1.1-beta.5**, embedded version **0.1.1**.
-Unpublished candidate: **v0.1.1-beta.6**, also embedded version **0.1.1**.
-Packaging and audit scripts target the new immutable beta 6 path. Website activation
-is a separate follow-up, gated on CI, publication, anonymous public-byte checks
-and the Homebrew gate below; never deploy activation changes before those gates.
-The separate disabled `candidateRelease` export in `site/release.js` is used only
-by the candidate auditor. The active `release` export and static downloads stay
-on verified public beta 5. Windows beta 3 and
-historical beta 4 assets remain untouched. See [beta 5 notes](releases/v0.1.1-beta.5.md)
-for explicit Settings opt-in and delivery limitations. See [beta 6 candidate
-notes](releases/v0.1.1-beta.6.md) and [practice](practice.md) for the explicit-button
-flow, which is not a shortcut/insertion test.
+Current public Mac distribution: **v0.1.1-beta.6**, embedded version **0.1.1**.
+CI, publication and anonymous public-byte verification passed for the exact clean
+artifact source; see [beta 6 evidence](releases/v0.1.1-beta.6.md). The active
+`release` export and static downloads select verified beta 6. The separate disabled
+`candidateRelease` export retains the artifact-source audit coordinates, not a
+second availability switch. Website deployment and the cross-repository Homebrew
+gate below remain distinct checks; do not claim either from artifact verification.
+Windows beta 3 and historical Mac assets remain untouched. See
+[practice](practice.md) for the explicit-button flow, not a shortcut/insertion test,
+and [Compatibility paste](COMPATIBILITY-PASTE.md) for unchanged opt-in safeguards.
 
 Run on the existing Apple Silicon signing machine, with installed npm/Cargo dependencies, Rust documentation (runtime notices), and the existing local signing identity:
 
@@ -24,13 +22,31 @@ bash scripts/package-release.sh
 
 The script builds through **npm run build:local** (never initializes/replaces the certificate), verifies arm64, bundle ID/version/minimum OS, stages the signed app and an Applications shortcut, copies explicit public documentation/dependency sources, generates notices, and creates a compressed **DMG with `hdiutil`**. It signs the DMG using the same existing certificate, runs `hdiutil verify`, mounts it read-only with no auto-open, verifies the contained app and required files, and unmounts. It writes `release/SHA256SUMS` and `release/PROVENANCE.txt` (source commit and dirty-tree status). No Finder Automation permission is required; no custom Finder window arrangement is promised. It neither installs nor launches the app, downloads a model, nor publishes anything. Python **3.11+** is only a packaging dependency.
 
-The candidate release label is `v0.1.1-beta.6`; embedded version is `0.1.1`. Its new immutable asset is `HandsFree-0.1.1-beta.6-macos-arm64.dmg`. Public beta 5 remains unchanged: do not rebuild, replace, or re-upload a published artifact. Future releases require a new label and coordinated packaging/audit versions. **Do not distribute a user-install ZIP.** The visible DMG root contains only `HandsFree.app`, the Applications shortcut, `Install HandsFree.txt`, and `Licenses`. The install guide discloses experimental/self-signed status. Project LICENSE, full dependency notices, `THIRD_PARTY_SOURCES.tar.gz`, `PUBLICATION-NOTES.txt`, and maintainer documentation live under `Licenses`. The tarball is dependency source, not an installer. Notices remain outside the signed bundle. Keep the image with redistributions.
+The published release label is `v0.1.1-beta.6`; embedded version is `0.1.1`. Its immutable asset is `HandsFree-0.1.1-beta.6-macos-arm64.dmg`. Public beta 5 remains unchanged: do not rebuild, replace, or re-upload a published artifact. Future releases require a new label and coordinated packaging/audit versions. **Do not distribute a user-install ZIP.** The visible DMG root contains only `HandsFree.app`, the Applications shortcut, `Install HandsFree.txt`, and `Licenses`. The install guide discloses experimental/self-signed status. Project LICENSE, full dependency notices, `THIRD_PARTY_SOURCES.tar.gz`, `PUBLICATION-NOTES.txt`, and maintainer documentation live under `Licenses`. The tarball is dependency source, not an installer. Notices remain outside the signed bundle. Keep the image with redistributions.
 
-### Beta 5 artifact source and future candidate staging
+### Historical beta 5 artifact source
 
-Beta 5 was built from clean source `c5f00405b7b9ec8164e9f1f89c8e1f8ab3696028`, retaining the existing signing identity. [Mac CI build result](https://github.com/suhaasbadada/handsfree/actions/runs/41513549954). Local and draft-byte audits passed; DMG SHA-256 is `99c4399246a792b55fcc96dd624bf68a8972fd731c2e7898ef84349e4fd1a155`. Publication and the public-byte audit must precede committing/deploying this activation follow-up, and the Homebrew tap must select that same version and checksum. The public audit verifies embedded frontend/cues, stable signatures, exact release/tag source and all three anonymously downloaded asset bytes. This website follow-up is not a new artifact source commit. Windows beta 3 is independent and unchanged; see its [release evidence](releases/v0.1.1-windows-beta.3.md). Historical [beta 4 evidence](releases/v0.1.1-beta.4.md) remains intact.
+Beta 5 was built from clean source `c5f00405b7b9ec8164e9f1f89c8e1f8ab3696028`, retaining the existing signing identity. [Mac CI build result](https://github.com/suhaasbadada/handsfree/actions/runs/41513549954). DMG SHA-256 is `99c4399246a792b55fcc96dd624bf68a8972fd731c2e7898ef84349e4fd1a155`. Its archived [release notes](releases/v0.1.1-beta.5.md) and published assets remain unchanged. Windows beta 3 is independent and unchanged; see its [release evidence](releases/v0.1.1-windows-beta.3.md). Historical [beta 4 evidence](releases/v0.1.1-beta.4.md) remains intact.
 
-For beta 6, keep `candidateRelease.publicAvailable` false through local, draft and public audits. All modes select this exact candidate export, never the active beta 5 manifest. Public mode accepts the still-disabled matching candidate so the same immutable clean source can verify publication before activation; version, URL, source, tag and byte checks remain mandatory. Leave existing public links live until the new version's public-byte audit passes. Only then promote its coordinates into the active `release` export and update README, installer guidance, and static/no-JS links together. Preserve the clean-source audit cache and provenance; do not weaken the HEAD/source check to re-audit from a later website commit. No beta 6 build, checksum, CI or hardware outcome is asserted by this preparation guide.
+### Beta 6 artifact source and activation
+
+Beta 6 was built from clean source `cfd6854ed8875e612b10673513d7199bb5c8124a`.
+[Mac CI](https://github.com/suhaasbadada/handsfree/actions/runs/42556991615) passed;
+DMG SHA-256 is `56994da40e32922f16e3561daac12fa2ab3c4025cbc3a0f0d2b71719e67d5b1e`.
+Publication and the exact-source `npm run release:check -- --public` passed,
+including signatures, mounted practice payload and anonymous GET comparisons of
+all three asset bytes. The existing Mac's installed executable matched, signing
+requirement and permission grants were retained, and model/settings/usage hashes
+were preserved after launch. Live microphone practice acceptance and separate-Mac
+QA were not performed. These docs are a later activation follow-up, not a rebuild.
+
+Keep `candidateRelease.publicAvailable` false. All audit modes select that exact
+preparation export, never the active manifest. Public mode accepts the disabled
+matching coordinates so immutable clean source can verify publication before
+activation; version, URL, source, tag and byte checks remain mandatory. Preserve
+the clean-source audit cache and provenance; do not weaken the HEAD/source check
+to re-audit from a later website commit. Do not rebuild published beta 6 to refresh
+its bundled preparation-era docs; use the current online release notes instead.
 
 Packaging now refuses dirty source before building. The shared `windows-source-state.py --platform macos` guard snapshots exact manifest bytes, allows only Tauri CLI's known addition of the already Mac-target-enabled `macos-private-api` to common features, verifies all remaining TOML fields/source revision/status, and restores only those original bytes (also after a failed build). Any additional change aborts rather than hiding it and preserves `release/.mac-source-state.json` for investigation; do not remove that receipt until the source changes are understood. The Mac target feature and signing scripts/identity remain unchanged. The Windows default guard retains its existing behavior.
 
@@ -48,7 +64,7 @@ The candidate auditor also cleans its exact temporary mount/directory on SIGINT 
 
 ## Release checklist (maintainer, manual)
 
-1. Review the recorded experimental distribution decision and upstream evidence below. Tests and metadata are not legal approval. Keep `site/release.js` `candidateRelease.publicAvailable: false` until anonymous asset verification; do not disable the verified public beta 5 `release` export.
+1. Review the recorded experimental distribution decision and upstream evidence below. Tests and metadata are not legal approval. Retain `site/release.js` `candidateRelease.publicAvailable: false` as audit coordinates; preserve the verified public `release` export until a replacement passes all gates.
 2. Review the intended source changes; ensure GitHub **Checks** passes. Run `npm ci`, `npm test`, `npm run build`, Rust fmt/test/clippy from the PR template on the intended commit. Never promote candidate coordinates into active downloads before the publication gates. CI uses a macOS arm64 host and no signing secrets. It does not publish or install.
 3. From a clean reviewed commit on the existing signing machine, run `bash scripts/package-release.sh`. Confirm `PROVENANCE.txt` source commit/clean status, verify checksums, and independently inspect the mounted payload. Never initialize a new signing identity for a routine build.
 4. With explicit user permission, validate installation on a separate Apple Silicon Mac: Gatekeeper behavior, drag to Applications, permissions, shortcut, microphone, inference, cancellation, paste fallback, and manual update. Record actual results; do not infer these from CI. No clean-machine results are claimed yet. This remains a candid experimental-beta risk, not a claim of release certification or a veto on the owner's requested experimental publication.

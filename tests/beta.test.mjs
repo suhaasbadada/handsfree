@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -26,7 +27,7 @@ test('landing Beta is a small superscript, not a full-size wordmark or pill', ()
 });
 
 test('README, release notes, installer guide and filename disclose beta without renaming the app', () => {
-  assert.match(read('README.md'), /!\[Mac beta: v0\.1\.1-beta\.5\]\(https:\/\/img.shields.io\/badge\/Mac_beta-v0\.1\.1--beta\.5-a64a45.svg\)/);
+  assert.match(read('README.md'), /!\[Mac beta: v0\.1\.1-beta\.6\]\(https:\/\/img.shields.io\/badge\/Mac_beta-v0\.1\.1--beta\.6-a64a45.svg\)/);
   assert.match(read('docs/releases/v0.1.1-beta.2.md'), /# HandsFree v0\.1\.1-beta\.2/);
   assert.match(read('docs/releases/v0.1.1-beta.2.md'), /Prerelease · Beta testing/);
   assert.match(read('docs/INSTALL.md'), /# Install HandsFree \(Mac beta\)/);
@@ -37,7 +38,7 @@ test('README, release notes, installer guide and filename disclose beta without 
   assert.equal(config.identifier, 'com.handsfree.local');
 });
 
-test('Mac beta 6 candidate package and audit coordinate without changing published beta 5 or embedded version', async () => {
+test('Mac beta 6 activation and disabled artifact audit coordinates agree without changing embedded version', async () => {
   const { release, candidateRelease } = await import('../site/release.js');
   const { candidate, tag } = await import('../scripts/check-release.mjs');
   const version = JSON.parse(read('package.json')).version;
@@ -47,10 +48,11 @@ test('Mac beta 6 candidate package and audit coordinate without changing publish
   assert.equal(JSON.parse(read('src-tauri/tauri.conf.json')).version, version);
   assert.ok(read('src-tauri/Cargo.toml').includes(`version = "${version}"`));
   assert.ok(read('src-tauri/Cargo.lock').includes(`name = "handsfree"\nversion = "${version}"`));
-  assert.equal(release.version, `${version}-beta.5`);
+  assert.equal(release.version, `${version}-beta.6`);
   assert.equal(release.publicAvailable, true, 'Activation follows publication and public asset verification');
   assert.equal(candidateRelease.version, `${version}-beta.6`);
   assert.equal(candidateRelease.publicAvailable, false, 'Candidate must not activate public downloads');
+  assert.equal(release.dmgUrl, candidateRelease.dmgUrl, 'Activation uses the exact audited artifact coordinates');
   assert.equal(tag, `v${candidateRelease.version}`);
   assert.equal(candidate, `HandsFree-${candidateRelease.version}-macos-arm64.dmg`);
   assert.ok(candidateRelease.dmgUrl.endsWith(`/releases/download/${tag}/${candidate}`));
@@ -61,7 +63,7 @@ test('Mac beta 6 candidate package and audit coordinate without changing publish
   assert.ok(read(`docs/releases/${tag}.md`).includes(`Internal app version: **${version}**`));
 });
 
-test('beta 6 preparation packages practice guidance and keeps publication evidence honest', () => {
+test('beta 6 packages practice guidance and records publication evidence without hardware acceptance claims', () => {
   const packager = read('scripts/package-release.sh');
   const audit = read('scripts/check-release.mjs');
   for (const name of ['practice.md', 'COMPATIBILITY-PASTE.md']) {
@@ -72,20 +74,27 @@ test('beta 6 preparation packages practice guidance and keeps publication eviden
   assert.ok(packager.includes('docs/releases/v0.1.1-beta.6.md'));
   assert.match(audit, /validateAvailability\([^\n]*\.candidateRelease, publicMode\)/);
   const notes = read('docs/releases/v0.1.1-beta.6.md');
-  assert.match(notes, /Unpublished candidate/);
+  assert.match(notes, /Published experimental Mac beta/);
   assert.match(notes, /not a shortcut test/);
   assert.match(notes, /does not copy to the clipboard/);
   assert.match(notes, /count toward usage/);
-  assert.doesNotMatch(notes, /\b[a-f0-9]{40,64}\b|actions\/runs\/\d+/);
+  assert.ok(notes.includes('cfd6854ed8875e612b10673513d7199bb5c8124a'));
+  assert.ok(notes.includes('56994da40e32922f16e3561daac12fa2ab3c4025cbc3a0f0d2b71719e67d5b1e'));
+  assert.ok(notes.includes('/actions/runs/42556991615'));
+  assert.match(notes, /npm run release:check -- --public/);
+  assert.match(notes, /live microphone practice acceptance and separate-Mac QA were \*\*not performed\*\*/);
+  assert.doesNotMatch(notes, /Unpublished candidate|Current verified public download remains/);
+  assert.match(read('docs/practice.md'), /Available in \[Mac beta 6\]/);
+  assert.doesNotMatch(read('docs/DEVELOPMENT.md'), /Practice field \(development builds\)|unpublished beta 6 candidate/);
 });
 
-test('Mac beta 5 activation coordinates current docs and all static download links', async () => {
+test('Mac beta 6 activation coordinates current docs and all static download links', async () => {
   const { release } = await import('../site/release.js');
-  assert.equal(release.version, '0.1.1-beta.5');
+  assert.equal(release.version, '0.1.1-beta.6');
   for (const path of ['README.md', 'docs/INSTALL.md', 'site/index.html']) {
     const source = read(path);
     assert.ok(source.includes(release.dmgUrl), `${path} links the verified current Mac DMG`);
-    assert.doesNotMatch(source, /v0\.1\.1-beta\.[234]|HandsFree-0\.1\.1-beta\.[234]|Mac_beta-v0\.1\.1--beta\.[234]/, `${path} must not advertise a stale Mac beta`);
+    assert.doesNotMatch(source, /v0\.1\.1-beta\.[2345]|HandsFree-0\.1\.1-beta\.[2345]|Mac_beta-v0\.1\.1--beta\.[2345]/, `${path} must not advertise a stale Mac beta`);
   }
   const links = [...read('site/index.html').matchAll(/href="([^"]+\.dmg)"/g)].map(match => match[1]);
   assert.equal(links.length, 2, 'Primary and platform-card Mac links have no-JS defaults');
@@ -105,6 +114,7 @@ test('Mac Compatibility paste release guidance discloses opt-in and once-only de
     assert.doesNotMatch(source, /Not yet published|prerelease candidate|After this release is published/);
   }
   const notes = read('docs/releases/v0.1.1-beta.5.md');
+  assert.equal(createHash('sha256').update(notes).digest('hex'), 'b254a7804074989882c016b6161227a189a54a1f41bdcf9aefa681b6bed3525c', 'Historical beta 5 notes remain byte-identical');
   assert.ok(notes.includes('c5f00405b7b9ec8164e9f1f89c8e1f8ab3696028'));
   assert.ok(notes.includes('99c4399246a792b55fcc96dd624bf68a8972fd731c2e7898ef84349e4fd1a155'));
   assert.ok(notes.includes('/actions/runs/41513549954'));
