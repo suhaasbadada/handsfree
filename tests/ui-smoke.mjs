@@ -319,10 +319,21 @@ try {
   assert.equal(await evaluate(`document.activeElement.id`),'updates-title','Reopening does not remember the previously focused Close button');
   await evaluate(`document.getElementById('updates-check').click()`);
   await until(`!document.getElementById('updates-install').hidden`);
+  assert.equal(await evaluate(`document.getElementById('updates-check').hidden`),true,'Available updates replace Check instead of awkwardly wrapping a third action');
+  for (const width of [320,390,400,560,980]) {
+    await send('Emulation.setDeviceMetricsOverride', {width,height:820,deviceScaleFactor:1,mobile:false});
+    assert.equal(await evaluate(`(()=>{const d=document.getElementById('updates-dialog');const buttons=[...d.querySelectorAll('.dialog-actions button')].filter(b=>!b.hidden);return buttons.length===2 && d.scrollWidth<=d.clientWidth && buttons.every(b=>b.getBoundingClientRect().right<=d.getBoundingClientRect().right);})()`),true,`Two contained update actions at ${width}px`);
+    if(width>=390) assert.equal(await evaluate(`document.getElementById('updates-close').getBoundingClientRect().top===document.getElementById('updates-install').getBoundingClientRect().top`),true,'Normal dialog keeps both actions on one row');
+  }
+  await send('Emulation.setDeviceMetricsOverride', {width:980,height:820,deviceScaleFactor:1,mobile:false});
   assert.equal(await evaluate(`document.getElementById('installed-release').textContent`),'0.1.1-beta.7','Available release must not be shown as already installed');
   assert.equal(await evaluate(`!window.updateInjected && !document.querySelector('#updates-notes img') && document.getElementById('updates-notes').textContent.includes('<img')`),true,'Release notes remain plain text');
   await evaluate(`document.getElementById('updates-install').click()`);
   assert.equal(await evaluate(`document.getElementById('update-confirm-dialog').open`),true);
+  assert.equal(await evaluate(`document.activeElement.id==='update-confirm-title' && getComputedStyle(document.activeElement).outlineStyle==='none'`),true,'Confirmation focuses its heading, not Not now or the install action');
+  await send('Input.dispatchKeyEvent', {type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+  await send('Input.dispatchKeyEvent', {type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+  assert.equal(await evaluate(`document.getElementById('update-confirm-dialog').open && !window.calls.some(c=>c.command==='install_update')`),true,'Enter on the initial heading never confirms installation');
   assert.equal(await evaluate(`window.calls.some(c=>c.command==='install_update')`),false,'A download offer is not installation consent');
   await evaluate(`document.getElementById('update-keep').click()`);
   await until(`!document.getElementById('update-confirm-dialog').open`);
@@ -332,6 +343,7 @@ try {
   await until(`!document.getElementById('updates-install').disabled`);
   await evaluate(`document.getElementById('updates-install').click();document.getElementById('update-confirm').click()`);
   await until(`document.getElementById('updates-message').textContent.includes('Signature verification failed')`);
+  assert.equal(await evaluate(`document.getElementById('updates-check').hidden`),false,'Failures restore the explicit Check retry action');
   assert.deepEqual(await evaluate(`window.calls.filter(c=>c.command==='install_update').map(c=>c.args)`),[{version:'0.1.1-beta.8'}],'Only the explicitly confirmed version is sent to native installation');
   await evaluate(`document.getElementById('updates-close').click()`);
   for (const theme of ['light','dark']) {

@@ -4,8 +4,39 @@ Introduced in [published Mac beta 7](releases/v0.1.1-beta.7.md), not a retroacti
 change to beta 6. Beta 6 and earlier need one initial DMG/Homebrew bootstrap
 upgrade. [Beta 8](releases/v0.1.1-beta.8.md) fixes initial Updates dialog focus and
 provides the first forward OTA test opportunity. Actual replacement/restart is
-still pending user acceptance. Publication, feed deployment and OTA acceptance
+not completed. The first beta 7 → beta 8 attempt failed before installation;
+see the repair evidence below. Publication, feed deployment and OTA acceptance
 are separate gates.
+
+## First forward-update failure and repair
+
+The actual beta 7 → beta 8 attempt reported “The update operation stopped
+unexpectedly.” The installed executable remained beta 7. A fresh-process Rust
+regression reproduced a panic in the updater's reqwest 0.13 client: no rustls
+crypto provider was configured. HandsFree restores already-validated metadata
+instead of calling the plugin's network `check()`; that skipped the plugin's
+provider initialization. Signature-only artifact tests did not exercise this.
+
+The repaired builder explicitly initializes the already-selected ring provider
+before restoring metadata, preserving any provider already set by the process.
+The regression now passes, and an explicit acceptance test downloads the public
+signed archive with the real plugin, verifies it, installs into a test-owned
+temporary app bundle, verifies its signature/executable, and removes that bundle.
+It never replaces or launches `/Applications/HandsFree.app` or reads user data.
+Run it explicitly against the retained app for the live feed version:
+
+```sh
+HANDSFREE_UPDATER_REFERENCE_APP="$PWD/release/updater/HandsFree.app" \
+  cargo test --manifest-path src-tauri/Cargo.toml --locked \
+  updater::tests::public_download_and_isolated_install -- --ignored --exact
+```
+
+This is isolated installer evidence, **not** an actual installed-app restart or
+dictation acceptance. Published beta 7 and beta 8 contain the client-side defect;
+their immutable binaries/feed signatures are not replaced. A new corrected,
+signed distribution requires one authorized manual bootstrap before its updater
+can perform future upgrades. Merely retrying or upgrading manually to the old
+published beta 8 does not repair the defect.
 
 ## User flow
 

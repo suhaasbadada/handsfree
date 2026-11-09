@@ -66,9 +66,9 @@ document.body.insertAdjacentHTML('beforeend', `<dialog id="updates-dialog" aria-
  <p>Checks contact the HandsFree release server only when you ask. Updates are signature-verified. Your model, settings and usage totals are kept.</p>
  <div class="dialog-actions"><button id="updates-close">Close</button><button id="updates-check">Check for updates</button><button id="updates-install" class="primary" hidden>Download &amp; restart…</button></div>
  </dialog>
- <dialog id="update-confirm-dialog" aria-labelledby="update-confirm-title"><h2 id="update-confirm-title">Update HandsFree?</h2>
+ <dialog id="update-confirm-dialog" aria-labelledby="update-confirm-title"><h2 id="update-confirm-title" tabindex="-1" autofocus>Update HandsFree?</h2>
  <p id="update-confirm-detail"></p><p>HandsFree will download, verify, install and restart. Finish dictation first. macOS may ask for administrator approval. Unsaved last-transcript text is not retained across restart.</p>
- <div class="dialog-actions"><button id="update-keep" autofocus>Not now</button><button id="update-confirm" class="primary">Download &amp; restart</button></div></dialog>`);
+ <div class="dialog-actions"><button id="update-keep">Not now</button><button id="update-confirm" class="primary">Download &amp; restart</button></div></dialog>`);
 // Avoid presenting native actions as ready before the first backend response.
 for (const id of ['change-shortcut', 'mic', 'permissions', 'download', 'reset', 'sounds', 'sound-style', 'sound-volume', 'recording-limit', 'recording-mode']) {
   (el(id) as HTMLInputElement | HTMLButtonElement).disabled = true;
@@ -164,6 +164,7 @@ function renderUpdates() {
   el('updates-notes').hidden = !view.notes;
   el('updates-notes').textContent = view.notes;
   button('updates-check').disabled = updateBusy(view) || updateConfirmDialog.open;
+  el('updates-check').hidden = view.phase === 'available' || ['downloading', 'installing'].includes(view.phase);
   el('updates-install').hidden = view.phase !== 'available';
   button('updates-install').disabled = !canInstallUpdate();
   button('update-confirm').disabled = !canInstallUpdate() || view.phase !== 'available' || confirmedUpdate !== view.available_version;

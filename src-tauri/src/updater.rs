@@ -358,14 +358,7 @@ async fn check() -> Result<(), String> {
     let raw = fetch_feed().await?;
     let (feed, newer) = validate_feed(&raw, &installed_version())?;
     let update = if newer {
-        let installed = Version::parse(&installed_version()).unwrap();
-        let updater = crate::APP
-            .get()
-            .unwrap()
-            .updater_builder()
-            .target(TARGET)
-            .version_comparator(move |_, release| release.version > installed)
-            .configure_client(|client| client.https_only(true))
+        let updater = signed_updater_builder(crate::APP.get().unwrap())
             .build()
             .map_err(|e| format!("Cannot initialize the signed updater: {e}"))?;
         let mut update = updater
@@ -389,6 +382,22 @@ async fn check() -> Result<(), String> {
     }
     .into();
     Ok(())
+}
+fn signed_updater_builder<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> tauri_plugin_updater::UpdaterBuilder {
+    // restore_update deliberately avoids a second network check. The plugin's
+    // check() normally installs this provider, but restore_update does not.
+    // reqwest 0.13 rustls-no-provider panics when building a download client
+    // without it. Preserve any provider already chosen by the host process.
+    if rustls::crypto::CryptoProvider::get_default().is_none() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    }
+    let installed = Version::parse(&installed_version()).unwrap();
+    app.updater_builder()
+        .target(TARGET)
+        .version_comparator(move |_, release| release.version > installed)
+        .configure_client(|client| client.https_only(true))
 }
 #[tauri::command]
 pub async fn check_for_updates() -> View {
@@ -489,6 +498,63 @@ pub async fn install_update(version: String) -> View {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn restored_update_download_initializes_tls_in_a_fresh_process() {
+        const CHILD: &str = "HANDSFREE_TLS_REGRESSION_CHILD";
+        if std::env::var_os(CHILD).is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "updater::tests::restored_update_download_initializes_tls_in_a_fresh_process",
+                    "--nocapture",
+                ])
+                .env(CHILD, "1")
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
+        // Building the metadata client's older reqwest stack is not enough to
+        // initialize the download client's process-wide provider.
+        let _metadata_client = reqwest::Client::builder().https_only(true).build().unwrap();
+        assert!(rustls::crypto::CryptoProvider::get_default().is_none());
+        // Restore metadata, exactly as production does, without updater.check().
+        // A closed loopback port gives a bounded network error, never an install
+        // or an external request. Client construction must not panic first.
+        let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = port.local_addr().unwrap();
+        drop(port);
+        let mut context = tauri::test::mock_context(tauri::test::noop_assets());
+        context.config_mut().plugins.0.insert(
+            "updater".into(),
+            serde_json::json!({"pubkey":"unused-no-install"}),
+        );
+        let app = tauri::test::mock_builder()
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .build(context)
+            .unwrap();
+        let updater = signed_updater_builder(app.handle())
+            .target(TARGET)
+            .endpoints(vec![FEED.parse().unwrap()])
+            .unwrap()
+            .version_comparator(|_, _| true)
+            .timeout(Duration::from_secs(2))
+            .no_proxy()
+            .build()
+            .unwrap();
+        let mut raw = feed("0.1.1-beta.9");
+        raw["platforms"][TARGET]["url"] = format!("https://{address}/closed-loopback-only").into();
+        let update = updater.restore_update(raw).unwrap().unwrap();
+        let result = tauri::async_runtime::block_on(update.download(|_, _| {}, || {}));
+        assert!(
+            result.is_err(),
+            "Closed loopback port must fail without changing any app"
+        );
+    }
     fn signature(version: &str) -> String {
         // Structurally valid fixture, deliberately NOT a cryptographic signature.
         // Never installed. Real signature acceptance is a packaging gate.
@@ -699,6 +765,69 @@ mod tests {
         assert!(
             key.verify(&bytes, &tampered, true).is_err(),
             "The trusted version must be authenticated, not merely parsed"
+        );
+    }
+
+    #[test]
+    #[ignore = "explicit public download and isolated temporary-bundle install; never replaces or launches the installed app"]
+    fn public_download_and_isolated_install() {
+        let reference =
+            std::path::PathBuf::from(std::env::var("HANDSFREE_UPDATER_REFERENCE_APP").unwrap());
+        assert!(reference.is_absolute());
+        let temporary = tempfile::tempdir().unwrap();
+        let target = temporary
+            .path()
+            .canonicalize()
+            .unwrap()
+            .join("HandsFree.app");
+        assert!(target.starts_with(temporary.path().canonicalize().unwrap()));
+        std::fs::create_dir_all(target.join("Contents/MacOS")).unwrap();
+        std::fs::write(target.join("previous-bundle-marker"), b"old test bundle").unwrap();
+        let mut context = tauri::test::mock_context(tauri::test::noop_assets());
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.macos.conf.json")).unwrap();
+        context
+            .config_mut()
+            .plugins
+            .0
+            .insert("updater".into(), config["plugins"]["updater"].clone());
+        let app = tauri::test::mock_builder()
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .build(context)
+            .unwrap();
+        let raw = tauri::async_runtime::block_on(fetch_feed()).unwrap();
+        validate_feed(&raw, "0.1.1-beta.7").unwrap();
+        let updater = signed_updater_builder(app.handle())
+            .version_comparator(|_, _| true)
+            .executable_path(target.join("Contents/MacOS/handsfree"))
+            .timeout(Duration::from_secs(120))
+            .build()
+            .unwrap();
+        let update = updater.restore_update(raw).unwrap().unwrap();
+        let mut downloaded = 0;
+        let bytes =
+            tauri::async_runtime::block_on(update.download(|chunk, _| downloaded += chunk, || {}))
+                .unwrap();
+        assert_eq!(downloaded, bytes.len());
+        update.verify(&bytes).unwrap();
+        update.install(bytes).unwrap();
+        assert!(!target.join("previous-bundle-marker").exists());
+        assert_eq!(
+            std::fs::read(target.join("Contents/MacOS/handsfree")).unwrap(),
+            std::fs::read(reference.join("Contents/MacOS/handsfree")).unwrap()
+        );
+        assert!(std::process::Command::new("/usr/bin/codesign")
+            .args(["--verify", "--deep", "--strict"])
+            .arg(&target)
+            .status()
+            .unwrap()
+            .success());
+        // tempfile removes only this test-owned bundle, including on failure.
+        let temporary_path = temporary.path().to_path_buf();
+        drop(temporary);
+        assert!(
+            !temporary_path.exists(),
+            "Isolated install left test artifacts"
         );
     }
 }
