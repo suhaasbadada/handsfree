@@ -15,6 +15,11 @@ export function retainPreparedApp(stagedApp, output) {
   requireThat(!outputExists(destination), 'Prepared app output already exists');
   renameSync(stagedApp, destination);
 }
+export function archiveUpdaterApp(app, archive) {
+  // macOS copyfile metadata uses extra ._ entries even with --no-xattrs.
+  // Updater archives contain only the sealed bundle, never AppleDouble files.
+  run('/usr/bin/tar', ['--no-xattrs', '--no-mac-metadata', '-czf', archive, '-C', dirname(app), 'HandsFree.app']);
+}
 export function updaterFeed(version, signature, notes = '') {
   requireThat(/^\d+\.\d+\.\d+(?:-beta\.[1-9]\d*)?$/.test(version), 'Expected a stable or numbered beta distribution version');
   requireThat(typeof signature === 'string' && signature.length > 0 && !/\s/.test(signature), 'Expected the signature file contents, not a path');
@@ -99,7 +104,7 @@ export function main(args = process.argv.slice(2)) {
     const archive = join(temporary, name);
     // The app has already received the stable macOS signature. Creating this
     // archive during tauri build would archive the earlier ad-hoc signature.
-    run('/usr/bin/tar', ['--no-xattrs', '-czf', archive, '-C', temporary, 'HandsFree.app']);
+    archiveUpdaterApp(stagedApp, archive);
     const env = { ...process.env, TAURI_SIGNING_PRIVATE_KEY_PATH: key, TAURI_SIGNING_PRIVATE_KEY_PASSWORD: '' };
     delete env.TAURI_SIGNING_PRIVATE_KEY;
     // The signer may print key-related diagnostics; never forward its output.

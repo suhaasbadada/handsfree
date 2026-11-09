@@ -1,9 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { updaterFeed, buildReviewedSource, retainPreparedApp } from '../scripts/package-updater.mjs';
+import { updaterFeed, buildReviewedSource, retainPreparedApp, archiveUpdaterApp } from '../scripts/package-updater.mjs';
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, symlinkSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+
+test('Mac updater archives omit AppleDouble metadata while retaining bundle file bytes', { skip: process.platform !== 'darwin' }, () => {
+  const temporary = mkdtempSync(join(tmpdir(), 'handsfree-archive-metadata-'));
+  try {
+    const app = join(temporary, 'HandsFree.app'), archive = join(temporary, 'update.tar.gz');
+    mkdirSync(app);
+    writeFileSync(join(app, 'executable'), 'sealed app fixture');
+    execFileSync('/usr/bin/xattr', ['-w', 'com.handsfree.test', 'metadata fixture', app]);
+    archiveUpdaterApp(app, archive);
+    const members = execFileSync('/usr/bin/tar', ['-tzf', archive], { encoding: 'utf8' }).trim().split('\n');
+    assert.deepEqual(members.sort(), ['HandsFree.app/', 'HandsFree.app/executable']);
+    assert.equal(execFileSync('/usr/bin/tar', ['-xOzf', archive, 'HandsFree.app/executable'], { encoding: 'utf8' }), 'sealed app fixture');
+  } finally { rmSync(temporary, { recursive: true, force: true }); }
+});
 
 test('retaining the final prepared app preserves exact staged bytes and refuses existing or dangling outputs', () => {
   const temporary = mkdtempSync(join(tmpdir(), 'handsfree-retain-app-'));
