@@ -158,3 +158,7 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .practice textarea:focus { outline: 2px solid #a95450; outline-offset: 2px; }
 .practice-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .practice-sample { color: #8d4946; }
+.update-notes { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow-y: auto; }
+#updates-dialog .dialog-actions { flex-wrap: wrap; }
+#updates-dialog strong, #updates-version { overflow-wrap: anywhere; }
+#updates-open { min-height: 24px; height: auto; padding: 0 6px; background: transparent; color: var(--muted); }

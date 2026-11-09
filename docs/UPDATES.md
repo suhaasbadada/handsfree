@@ -1,0 +1,88 @@
+# Signed in-app updates (upcoming beta 7)
+
+This is new build functionality, not a retroactive change to the published beta 6
+binary. Beta 6 needs one initial DMG/Homebrew upgrade to an updater-enabled
+release. Do not advertise beta 7 as published until the release gates below pass.
+
+## User flow
+
+On Apple Silicon macOS, choose **Updates** in the footer. The installed release is
+read from metadata embedded in the executable, not the latest release feed or the
+shared internal app version `0.1.1`. **Check for updates** explicitly contacts
+`https://suhaasbadada.github.io/handsfree/updates/macos-arm64.json`.
+Opening the dialog, starting the app, and status polling do not check online.
+These requests disclose ordinary connection metadata to GitHub, never audio,
+transcripts, model files, settings, or usage totals.
+
+An available update offers **Download & restart…**, followed by confirmation of
+the exact distribution version. No automatic installation, downgrade, or silent
+restart is performed. A native idle barrier refuses updates during recording,
+transcription, practice, shortcut capture, model download, or an unpasted result.
+While downloading/installing, new work and quitting are blocked. The official
+Tauri installer verifies the artifact signature and authenticated version before
+replacement, then HandsFree restarts. macOS may request administrator approval.
+Only the normal `/Applications/HandsFree.app` is eligible; symlinked,
+translocated and unknown app copies are refused.
+
+The model, preferences and usage file are outside the app and are not rewritten
+by the updater. Unsaved in-memory last-transcript text does not survive restart;
+copy anything important first. Offline/404/malformed-feed/signature/installation
+failures are shown explicitly, not reported as “up to date.” An install failure
+requires another explicit check before retrying. The new feed is intentionally
+absent until a compatible signed release exists; do not invent beta 6 updater
+metadata or point it at the DMG.
+
+## Trust and key custody
+
+The official Mac-only `tauri-plugin-updater` verifies a dedicated updater
+signature, with `requireSignedVersion: true`. Feed versions use strict semantic
+ordering of the embedded distribution (for example beta 8 > beta 7), not the
+stable internal version. The only accepted target is `darwin-aarch64`; URLs must
+be the exact canonical versioned HandsFree GitHub `.app.tar.gz` asset. Metadata
+expires after ten minutes and is revalidated against the confirmed version.
+
+The updater public key is in `src-tauri/tauri.macos.conf.json`. Its private key is
+kept at `~/Library/Application Support/HandsFree Updater Signing/handsfree-updater.key`
+with owner-only file/directory access, outside Git. It is separate from, and does
+not replace, the existing macOS code-signing identity. Never print, upload, commit,
+or pass private key contents/passwords as command arguments. This local key is
+filesystem-protected; keep a secure offline backup before depending on it for
+public updates. Never overwrite/regenerate it for an ordinary release. Losing it
+requires a separately authorized bootstrap/key-rotation plan for installed users.
+
+## Release integration
+
+1. Advance `src-tauri/distribution.json` for every new binary distribution. Keep
+   the release tag, DMG label, updater archive and active public download version
+   coordinated. Published version paths and signatures are immutable.
+2. Use clean reviewed source. Do not enable
+   Tauri's automatic pre-signing updater archive: the local signing helper applies
+   the stable macOS identity after the Tauri build. Archive only that final app.
+3. Run `node scripts/package-updater.mjs [output-directory]`. This builds with
+   **`npm run build:local`** inside a guarded clean-source transaction, never
+   trusting an earlier cached app. It verifies the
+   existing macOS signature, current embedded frontend and distribution; stages
+   dependency notices and corresponding source inside the updater's app (because
+   OTA users do not mount the DMG); re-seals that copy with the same macOS identity;
+   archives the signed bundle; signs with the dedicated key and `--app-version`; runs the
+   real minisign verifier against the artifact, corrupt bytes and a tampered
+   authenticated version; and writes provenance, checksums and a feed candidate.
+   It never creates keys, installs, uploads or activates anything. Outputs refuse
+   overwrite. Preserve the generated archive, `.sig`, checksums and provenance.
+4. Follow the existing DMG/notices/clean-source CI and publication audits. Publish
+   the additional canonical `.app.tar.gz` and `.app.tar.gz.sig` assets under the
+   **same exact clean-source tag**. Keep project/dependency notices and sources
+   available with that release; the DMG remains the complete redistribution image.
+   Verify anonymous download bytes and signatures before activating the feed.
+5. Only then publish the generated `macos-arm64.json` at `site/updates/`, with
+   plain-text release notes if desired, and deploy Pages. Preserve its exact
+   version/target/URL/signature. Update and verify Homebrew and the website's DMG
+   links separately; they must select the same distribution. Never use GitHub's
+   `/releases/latest`, which omits prereleases.
+6. Validate a real authorized upgrade from the previous updater-enabled build:
+   explicit confirmation, current signature/identity, retained permissions and
+   model/settings/usage, restart/readiness, and representative dictation. Unit
+   tests or a generated signature alone do not establish this acceptance gate.
+
+No beta 7 release, OTA installation/restart acceptance, or separate-Mac QA is
+claimed by this implementation document. Windows work remains paused.

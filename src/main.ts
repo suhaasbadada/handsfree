@@ -6,6 +6,7 @@ import './typography.css';
 import { defaultShortcut, ShortcutRecorder, shortcutLabel, type Shortcut } from './shortcut';
 import { phaseLabel, canCancel, formatTime, readiness, readinessDetail } from './presentation';
 import { Practice } from './practice';
+import { Updates, updateBusy } from './updates';
 
 type Status = { platform?: 'windows' | 'macos'; compatibility_paste?: boolean; phase: string; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: 'clean' | 'warm'; recording_limit: number; recording_mode?: 'toggle' | 'push_to_talk'; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
 const logo = new URL('../src-tauri/icons/icon.png', import.meta.url).href;
@@ -53,11 +54,21 @@ document.querySelector('#app')!.innerHTML = `
  <p id="message" class="status-detail" aria-live="polite" hidden></p>
  <p id="feedback" class="feedback" role="status" hidden></p><p id="storage-error" class="feedback" role="status" hidden></p>
   </main>
-  <footer><span class="footer-brand">HandsFree <span id="app-version">0.1.1</span> <span class="beta-badge">BETA</span></span><span>English · On-device transcription</span></footer>
+  <footer><span class="footer-brand">HandsFree <span id="app-version">0.1.1</span> <span class="beta-badge">BETA</span></span><button id="updates-open" class="text-action" hidden>Updates</button><span>English · On-device transcription</span></footer>
 </div>
 <dialog id="reset-dialog" aria-labelledby="reset-title"><h2 id="reset-title">Reset usage totals?</h2><p>Totals will return to zero. Your preferences and language model won’t change.</p><div class="dialog-actions"><button id="keep-stats" autofocus>Keep totals</button><button id="confirm-reset" class="danger">Reset totals</button></div></dialog>`;
 const el = (id: string) => document.getElementById(id)!;
 const button = (id: string) => el(id) as HTMLButtonElement;
+document.body.insertAdjacentHTML('beforeend', `<dialog id="updates-dialog" aria-labelledby="updates-title">
+ <h2 id="updates-title">App updates</h2><p>Installed release: <strong id="installed-release">Connecting…</strong></p>
+ <p id="updates-message" role="status" aria-live="polite"></p><p id="updates-version" hidden></p>
+ <p id="updates-notes" class="update-notes" hidden></p><progress id="updates-progress" max="100" hidden aria-label="Update download progress"></progress>
+ <p>Checks contact the HandsFree release server only when you ask. Updates are signature-verified. Your model, settings and usage totals are kept.</p>
+ <div class="dialog-actions"><button id="updates-close">Close</button><button id="updates-check">Check for updates</button><button id="updates-install" class="primary" hidden>Download &amp; restart…</button></div>
+ </dialog>
+ <dialog id="update-confirm-dialog" aria-labelledby="update-confirm-title"><h2 id="update-confirm-title">Update HandsFree?</h2>
+ <p id="update-confirm-detail"></p><p>HandsFree will download, verify, install and restart. Finish dictation first. macOS may ask for administrator approval. Unsaved last-transcript text is not retained across restart.</p>
+ <div class="dialog-actions"><button id="update-keep" autofocus>Not now</button><button id="update-confirm" class="primary">Download &amp; restart</button></div></dialog>`);
 // Avoid presenting native actions as ready before the first backend response.
 for (const id of ['change-shortcut', 'mic', 'permissions', 'download', 'reset', 'sounds', 'sound-style', 'sound-volume', 'recording-limit', 'recording-mode']) {
   (el(id) as HTMLInputElement | HTMLButtonElement).disabled = true;
@@ -79,8 +90,9 @@ let captureTimer: ReturnType<typeof setTimeout> | undefined;
 let captureStart: Promise<unknown> | undefined;
 let captureStopping = false;
 let activationHeld = false;
-const canEditShortcut = () => ['idle', 'copied', 'setup_required', 'not_pasted', 'error'].includes(current?.phase ?? '');
-const isIdle = () => ['idle', 'copied'].includes(current?.phase ?? '');
+const installingUpdate = () => ['downloading', 'installing'].includes(updates.view.phase);
+const canEditShortcut = () => !installingUpdate() && ['idle', 'copied', 'setup_required', 'not_pasted', 'error'].includes(current?.phase ?? '');
+const isIdle = () => !installingUpdate() && ['idle', 'copied'].includes(current?.phase ?? '');
 let seenPermissionRequests = 0;
 function navigate(tab: 'overview' | 'settings') {
   if (tab !== 'overview') void practice.clear();
@@ -136,6 +148,47 @@ window.addEventListener('pagehide', () => { void practice.clear(); });
 window.addEventListener('focus', () => renderPractice());
 // WebKit does not always dispatch pagehide when a native window is hidden.
 void listen('practice-cleared', () => { void practice.clear(); }).catch(() => { /* Browser-only preview has no native events. */ });
+const updatesDialog = el('updates-dialog') as HTMLDialogElement;
+const updateConfirmDialog = el('update-confirm-dialog') as HTMLDialogElement;
+let confirmedUpdate: string | undefined;
+const canInstallUpdate = () => current?.platform === 'macos'
+  && ['idle', 'copied', 'setup_required', 'error'].includes(current.phase)
+  && practice.view.phase === 'idle' && !capturing && !captureStopping && !shortcutPending && !downloadPending && !modePending;
+const updates = new Updates(invoke, () => { renderUpdates(); renderPractice(); renderShortcut(); }, canInstallUpdate);
+function renderUpdates() {
+  const view = updates.view;
+  el('installed-release').textContent = view.installed_version || 'Connecting…';
+  el('updates-message').textContent = view.message;
+  el('updates-version').hidden = !view.available_version;
+  el('updates-version').textContent = view.available_version ? `Available release: ${view.available_version}` : '';
+  el('updates-notes').hidden = !view.notes;
+  el('updates-notes').textContent = view.notes;
+  button('updates-check').disabled = updateBusy(view) || updateConfirmDialog.open;
+  el('updates-install').hidden = view.phase !== 'available';
+  button('updates-install').disabled = !canInstallUpdate();
+  button('update-confirm').disabled = !canInstallUpdate() || view.phase !== 'available' || confirmedUpdate !== view.available_version;
+  const progress = el('updates-progress') as HTMLProgressElement;
+  progress.hidden = !['downloading', 'installing'].includes(view.phase);
+  if (view.total_bytes && view.total_bytes > 0) progress.value = Math.min(100, view.downloaded_bytes / view.total_bytes * 100);
+  else progress.removeAttribute('value');
+}
+el('updates-open').onclick = () => { if (current?.platform !== 'macos') return; updatesDialog.showModal(); renderUpdates(); void updates.refresh(); };
+el('updates-close').onclick = () => updatesDialog.close();
+el('updates-check').onclick = () => { if (!updateConfirmDialog.open && current?.platform === 'macos') void updates.check(); };
+el('updates-install').onclick = () => {
+  if (!canInstallUpdate() || updates.view.phase !== 'available') return;
+  confirmedUpdate = updates.view.available_version;
+  el('update-confirm-detail').textContent = `Install ${confirmedUpdate}?`;
+  updateConfirmDialog.showModal(); renderUpdates();
+};
+el('update-keep').onclick = () => updateConfirmDialog.close();
+updateConfirmDialog.onclose = () => { confirmedUpdate = undefined; renderUpdates(); };
+el('update-confirm').onclick = () => {
+  const version = confirmedUpdate;
+  if (!version || !canInstallUpdate() || version !== updates.view.available_version) return;
+  updateConfirmDialog.close(); confirmedUpdate = undefined;
+  void updates.install(version);
+};
 el('mic').onclick = () => void action('request_microphone');
 el('permissions').onclick = () => { if (current && current.platform !== 'windows') void action('request_permissions'); };
 const recorder = button('change-shortcut');
@@ -322,6 +375,8 @@ async function refreshStatus() {
   try {
      current = await invoke<Status>('status');
      const windows = current.platform === 'windows';
+     el('updates-open').hidden = current.platform !== 'macos';
+     if (updatesDialog.open) { renderUpdates(); void updates.refresh(); void updates.progress(); }
      button('setup').disabled = false;
     button('reset').disabled = false;
     if (!soundsPending) sounds.disabled = false;

@@ -22,6 +22,10 @@ unicode-segmentation = "1.13"
 tokio = { version = "1", features = ["fs", "io-util", "time"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+tauri-plugin-updater = "=2.14.1"
+semver = "1"
+base64 = "0.23"
+minisign-verify = "0.3"
 tauri = { version = "2", features = ["macos-private-api"] }
 whisper-rs = { version = "0.16", features = ["metal"] }
 

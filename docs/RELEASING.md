@@ -64,6 +64,12 @@ The candidate auditor also cleans its exact temporary mount/directory on SIGINT 
 
 ## Release checklist (maintainer, manual)
 
+For updater-enabled releases, also follow [the signed updater packaging and feed
+gates](UPDATES.md#release-integration). The updater archive must be generated
+**after** stable macOS signing, with a version-bound signature. The current
+published beta 6 assets and feed availability must not be changed merely by
+building the upcoming beta 7 implementation.
+
 1. Review the recorded experimental distribution decision and upstream evidence below. Tests and metadata are not legal approval. Retain `site/release.js` `candidateRelease.publicAvailable: false` as audit coordinates; preserve the verified public `release` export until a replacement passes all gates.
 2. Review the intended source changes; ensure GitHub **Checks** passes. Run `npm ci`, `npm test`, `npm run build`, Rust fmt/test/clippy from the PR template on the intended commit. Never promote candidate coordinates into active downloads before the publication gates. CI uses a macOS arm64 host and no signing secrets. It does not publish or install.
 3. From a clean reviewed commit on the existing signing machine, run `bash scripts/package-release.sh`. Confirm `PROVENANCE.txt` source commit/clean status, verify checksums, and independently inspect the mounted payload. Never initialize a new signing identity for a routine build.

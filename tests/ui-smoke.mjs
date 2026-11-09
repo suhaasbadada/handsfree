@@ -299,6 +299,28 @@ try {
   await evaluate(`window.dispatchEvent(new Event('blur'))`);
   await until(`document.getElementById('practice-text').value==='' && document.getElementById('practice-finish').disabled`);
   assert.equal(await evaluate(`localStorage.length===0 && sessionStorage.length===0 && window.calls.filter(c=>c.command==='copy_transcript').length===0`),true,'Practice does not persist or request normal clipboard actions');
+  // Opening Updates reads local installed metadata, never a network check. The
+  // test boundary stands in for native IPC; actual signatures are tested in Rust.
+  await evaluate(`window.updateFixture={installed_version:'0.1.1-beta.7',phase:'idle',notes:'',downloaded_bytes:0,message:'Choose Check for updates.'};const priorUpdates=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(['update_status','check_for_updates','install_update'].includes(command)){window.calls.push({command,args});if(command==='check_for_updates')window.updateFixture={...window.updateFixture,phase:'available',available_version:'0.1.1-beta.8',notes:'<img src=x onerror="window.updateInjected=true">',message:'Update available.'};if(command==='install_update')window.updateFixture={...window.updateFixture,phase:'error',message:'Signature verification failed. Check again.'};return structuredClone(window.updateFixture);}return priorUpdates(command,args);};document.getElementById('updates-open').click()`);
+  await until(`document.getElementById('installed-release').textContent==='0.1.1-beta.7'`);
+  assert.equal(await evaluate(`window.calls.some(c=>c.command==='check_for_updates'||c.command==='install_update')`),false,'Opening never checks online or installs');
+  await evaluate(`document.getElementById('updates-check').click()`);
+  await until(`!document.getElementById('updates-install').hidden`);
+  assert.equal(await evaluate(`document.getElementById('installed-release').textContent`),'0.1.1-beta.7','Available release must not be shown as already installed');
+  assert.equal(await evaluate(`!window.updateInjected && !document.querySelector('#updates-notes img') && document.getElementById('updates-notes').textContent.includes('<img')`),true,'Release notes remain plain text');
+  await evaluate(`document.getElementById('updates-install').click()`);
+  assert.equal(await evaluate(`document.getElementById('update-confirm-dialog').open`),true);
+  assert.equal(await evaluate(`window.calls.some(c=>c.command==='install_update')`),false,'A download offer is not installation consent');
+  await evaluate(`document.getElementById('update-keep').click()`);
+  await until(`!document.getElementById('update-confirm-dialog').open`);
+  await evaluate(`window.fixture.phase='recording'`);
+  await until(`document.getElementById('updates-install').disabled`);
+  await evaluate(`window.fixture.phase='idle'`);
+  await until(`!document.getElementById('updates-install').disabled`);
+  await evaluate(`document.getElementById('updates-install').click();document.getElementById('update-confirm').click()`);
+  await until(`document.getElementById('updates-message').textContent.includes('Signature verification failed')`);
+  assert.deepEqual(await evaluate(`window.calls.filter(c=>c.command==='install_update').map(c=>c.args)`),[{version:'0.1.1-beta.8'}],'Only the explicitly confirmed version is sent to native installation');
+  await evaluate(`document.getElementById('updates-close').click()`);
   for (const theme of ['light','dark']) {
     await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-color-scheme',value:theme}]});
     assert.deepEqual(await evaluate(`({scheme:getComputedStyle(document.documentElement).colorScheme,bg:getComputedStyle(document.documentElement).backgroundColor,text:getComputedStyle(document.documentElement).color})`), {scheme:'light',bg:'rgb(247, 246, 243)',text:'rgb(48, 46, 45)'}, 'The app stays intentionally light even on a dark system');

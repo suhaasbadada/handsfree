@@ -10,6 +10,8 @@ mod shortcut;
 mod storage;
 mod streaming;
 mod transcript;
+#[cfg(target_os = "macos")]
+mod updater;
 use futures_util::StreamExt;
 use platform::*;
 use serde::Serialize;
@@ -55,19 +57,58 @@ async fn configure<T: Send + 'static>(
 ) -> Result<T, String> {
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
     enqueue(Control::Configure(Box::new(move || {
+        #[cfg(target_os = "macos")]
+        if let Err(error) = updater::ensure_not_busy() {
+            let _ = sender.send(Err(error));
+            return;
+        }
         let _ = sender.send(action());
     })));
     tauri::async_runtime::spawn_blocking(move || receiver.recv().map_err(|e| e.to_string())?)
         .await
         .map_err(|e| e.to_string())?
 }
+#[cfg(target_os = "macos")]
+async fn acquire_update_idle() -> Result<updater::InstallLease, String> {
+    configure(|| {
+        let s = state();
+        let inner = s.inner.lock().unwrap();
+        if !updater::idle_allowed(
+            &inner.status.phase,
+            inner.practice.is_some() || PRACTICE.lock().unwrap().active.is_some(),
+            SHORTCUT_CAPTURE.load(Ordering::Acquire),
+            INGRESS.lock().unwrap().current().is_some(),
+        ) {
+            return Err("Finish dictation, practice, shortcut capture or the model download before updating. No work has been interrupted.".into());
+        }
+        // Keep Inner locked until the independent busy lease is acquired. The
+        // model downloader checks the lease under Inner, and recording/config
+        // starts share this FIFO. No lock survives this closure or native calls.
+        let lease = updater::InstallLease::acquire()?;
+        drop(inner);
+        // A tap held before confirmation must never fire after a failed update.
+        GESTURE.lock().unwrap().event_with_epoch(6, Instant::now(), CANCELLATION.current());
+        Ok(lease)
+    }).await
+}
 fn holds() -> &'static Mutex<hold::Coordinator> {
     HOLDS.get_or_init(|| Mutex::new(hold::Coordinator::new()))
 }
 extern "C" fn capture_start_allowed(generation: u64) -> bool {
+    #[cfg(target_os = "macos")]
+    if updater::busy() {
+        return false;
+    }
     holds().lock().unwrap().can_start(generation)
 }
 extern "C" fn native_gesture(edge: i32, source: i32, token: u64) {
+    #[cfg(target_os = "macos")]
+    if updater::busy() {
+        if edge == 1 {
+            unsafe { hf_gesture_complete(token) };
+        }
+        return;
+    }
     // Release the gate before any synchronous AppKit dispatch.
     let practicing = PRACTICE.lock().unwrap().generation.is_some();
     if practicing {
@@ -223,6 +264,10 @@ fn verified_model(path: &Path) -> bool {
     format!("{:x}", hash.finalize()) == MODEL_HASH
 }
 extern "C" fn native_event(event: i32) {
+    #[cfg(target_os = "macos")]
+    if updater::busy() {
+        return;
+    }
     let (practice, generation) = {
         let gate = PRACTICE.lock().unwrap();
         (gate.active.is_some(), gate.generation)
@@ -417,6 +462,8 @@ fn practice_window_ready() -> bool {
 }
 #[tauri::command]
 async fn practice_start(token: u64) -> Result<u64, String> {
+    #[cfg(target_os = "macos")]
+    updater::ensure_not_busy()?;
     if !PRACTICE.lock().unwrap().reserve(token) {
         return Err("Practice request is stale or already active.".into());
     }
@@ -505,6 +552,8 @@ async fn set_sounds(enabled: bool) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let s = state();
         let mut inner = s.inner.lock().unwrap();
+        #[cfg(target_os = "macos")]
+        updater::ensure_not_busy()?;
         let mut updated = inner.store.clone();
         updated.sounds = enabled;
         storage::save(&s.directory.join("usage.json"), &updated)?;
@@ -526,6 +575,8 @@ async fn set_recording_limit(seconds: u32) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let s = state();
         let mut inner = s.inner.lock().unwrap();
+        #[cfg(target_os = "macos")]
+        updater::ensure_not_busy()?;
         let mut updated = inner.store.clone();
         updated.recording_limit = seconds;
         storage::save(&s.directory.join("usage.json"), &updated)?;
@@ -687,6 +738,8 @@ async fn set_sound_style(style: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let s = state();
         let mut inner = s.inner.lock().unwrap();
+        #[cfg(target_os = "macos")]
+        updater::ensure_not_busy()?;
         if !preview_allowed(&inner.status.phase) {
             return Err("Finish dictation before changing the sound.".into());
         }
@@ -711,6 +764,8 @@ async fn set_sound_volume(volume: f32) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let s = state();
         let mut inner = s.inner.lock().unwrap();
+        #[cfg(target_os = "macos")]
+        updater::ensure_not_busy()?;
         let mut updated = inner.store.clone();
         updated.sound_volume = volume;
         storage::save(&s.directory.join("usage.json"), &updated)?;
@@ -738,6 +793,8 @@ fn shortcut_edit_allowed(phase: &str) -> bool {
 #[tauri::command]
 async fn preview_sound() -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(|| {
+        #[cfg(target_os = "macos")]
+        updater::ensure_not_busy()?;
         if !preview_allowed(&state().inner.lock().unwrap().status.phase) {
             return Err("Preview is available only while idle.".into());
         }
@@ -947,6 +1004,8 @@ async fn reset_stats(confirmed: bool) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(|| {
         let s = state();
         let mut inner = s.inner.lock().unwrap();
+        #[cfg(target_os = "macos")]
+        updater::ensure_not_busy()?;
         let mut updated = inner.store.clone();
         updated.stats = storage::Stats::default();
         storage::save(&s.directory.join("usage.json"), &updated)?;
@@ -1016,6 +1075,10 @@ fn recording_command_with_route(
     }
     let s = state();
     let mut inner = s.inner.lock().unwrap();
+    #[cfg(target_os = "macos")]
+    if updater::busy() {
+        return;
+    }
     if practice.is_none() && (inner.practice.is_some() || PRACTICE.lock().unwrap().active.is_some())
     {
         // Only a generation-scoped native limit/failure may finish practice.
@@ -1421,6 +1484,8 @@ async fn download_model() -> Result<(), String> {
     {
         let s = state();
         let mut inner = s.inner.lock().unwrap();
+        #[cfg(target_os = "macos")]
+        updater::ensure_not_busy()?;
         if inner.status.model_ready {
             return Ok(());
         }
@@ -1429,8 +1494,12 @@ async fn download_model() -> Result<(), String> {
         }
         inner.status.phase = "downloading".into();
         inner.status.progress = 0.;
-        inner.status.message =
-            "Downloading from Hugging Face. This is the only network operation.".into();
+        inner.status.message = if cfg!(target_os = "macos") {
+            "Downloading the speech model from Hugging Face."
+        } else {
+            "Downloading from Hugging Face. This is the only network operation."
+        }
+        .into();
     }
     let result = download().await;
     let s = state();
@@ -1531,6 +1600,12 @@ fn main() {
             handle_permission_args(app, &args);
         }))
         .invoke_handler(tauri::generate_handler![
+            #[cfg(target_os = "macos")]
+            updater::update_status,
+            #[cfg(target_os = "macos")]
+            updater::check_for_updates,
+            #[cfg(target_os = "macos")]
+            updater::install_update,
             status,
             permissions_diagnostic,
             request_microphone,
@@ -1555,6 +1630,9 @@ fn main() {
             reset_stats
         ])
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())?;
             // The initial dashboard is visible; LSUIElement remains the quiet
             // background default after its window is closed.
             unsafe { hf_dashboard_visible(true) };
@@ -1739,6 +1817,12 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("Could not start HandsFree");
     app.run(|app, event| {
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::ExitRequested { api, code, .. } = &event {
+            if !updater::accept_exit_code(*code) {
+                api.prevent_exit();
+            }
+        }
         if let tauri::RunEvent::Exit = event {
             unsafe {
                 hf_cleanup();

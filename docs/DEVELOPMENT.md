@@ -55,6 +55,11 @@ The certificate must be kept for future rebuilds; re-running initialization refu
 
 ## First run (explicit actions only)
 
+Upcoming beta 7 adds [signed in-app updates](UPDATES.md) via the footer's
+**Updates** dialog. Opening it reads the embedded distribution locally;
+**Check for updates** is the separate explicit network action. Published beta 6
+and its installed copies do not gain this feature until a bootstrap upgrade.
+
 1. Open **Settings** in the dashboard. Click **Allow** for Microphone. If denied, enable HandsFree under System Settings → Privacy & Security → Microphone.
 2. Click **Open settings** for Accessibility / Input Monitoring and enable HandsFree in **both** Privacy & Security panes. Accessibility is needed to inspect the original text field and post Paste; Input Monitoring is needed for the global Fn event tap. Quit/relaunch after changing grants. The app never changes preferences itself.
 3. Click **Download English model (~148 MB)** on Overview (or **Download** in Settings → Setup) to explicitly fetch **Whisper base.en (147,964,211 bytes)** from `huggingface.co/ggerganov/whisper.cpp`. SHA-256 is pinned and verified before atomic installation. No model download happens on launch. Subsequent dictation works offline. Retry a failed download; partial files are discarded rather than resumed.
