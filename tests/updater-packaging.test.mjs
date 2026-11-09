@@ -1,6 +1,29 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { updaterFeed, buildReviewedSource } from '../scripts/package-updater.mjs';
+import { updaterFeed, buildReviewedSource, retainPreparedApp } from '../scripts/package-updater.mjs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, symlinkSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+test('retaining the final prepared app preserves exact staged bytes and refuses existing or dangling outputs', () => {
+  const temporary = mkdtempSync(join(tmpdir(), 'handsfree-retain-app-'));
+  try {
+    const output = join(temporary, 'output'), staged = join(temporary, 'staged.app');
+    mkdirSync(output); mkdirSync(staged);
+    const bytes = Buffer.from('final sealed bundle fixture, not the raw build cache');
+    writeFileSync(join(staged, 'executable'), bytes);
+    retainPreparedApp(staged, output);
+    assert.equal(existsSync(staged), false);
+    assert.deepEqual(readFileSync(join(output, 'HandsFree.app/executable')), bytes);
+    mkdirSync(staged);
+    assert.throws(() => retainPreparedApp(staged, output), /already exists/);
+    assert.deepEqual(readFileSync(join(output, 'HandsFree.app/executable')), bytes);
+    rmSync(join(output, 'HandsFree.app'), { recursive: true });
+    symlinkSync(join(temporary, 'missing'), join(output, 'HandsFree.app'));
+    assert.throws(() => retainPreparedApp(staged, output), /already exists/);
+    assert.equal(existsSync(staged), true);
+  } finally { rmSync(temporary, { recursive: true, force: true }); }
+});
 
 test('generated updater metadata selects exactly the canonical Apple Silicon release artifact', () => {
   assert.deepEqual(updaterFeed('0.1.1-beta.8', 'signed-value', 'User-visible notes'), {

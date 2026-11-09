@@ -1,7 +1,7 @@
 // Explicit maintainer action. Builds and packages a locally-signed app; never
 // creates keys, installs, uploads, changes trust, or activates the public feed.
 import { execFileSync } from 'node:child_process';
-import { constants, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { constants, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -9,6 +9,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const requireThat = (condition, message) => { if (!condition) throw new Error(message); };
+const outputExists = path => { try { lstatSync(path); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; } };
+export function retainPreparedApp(stagedApp, output) {
+  const destination = join(output, 'HandsFree.app');
+  requireThat(!outputExists(destination), 'Prepared app output already exists');
+  renameSync(stagedApp, destination);
+}
 export function updaterFeed(version, signature, notes = '') {
   requireThat(/^\d+\.\d+\.\d+(?:-beta\.[1-9]\d*)?$/.test(version), 'Expected a stable or numbered beta distribution version');
   requireThat(typeof signature === 'string' && signature.length > 0 && !/\s/.test(signature), 'Expected the signature file contents, not a path');
@@ -47,9 +53,9 @@ export function main(args = process.argv.slice(2)) {
   requireThat(realpathSync(output) === output, 'Refusing a symlinked output directory');
   const name = `HandsFree-${version}-macos-arm64.app.tar.gz`;
   const names = [name, `${name}.sig`, 'macos-arm64.json', 'SHA256SUMS', 'PROVENANCE.txt'];
-  requireThat(names.every(name => !existsSync(join(output, name))), 'Updater output already exists; preserve it and choose another output directory');
+  requireThat([...names, 'HandsFree.app'].every(name => !outputExists(join(output, name))), 'Updater output already exists; preserve it and choose another output directory');
   const receipt = join(output, '.mac-source-state.json');
-  requireThat(!existsSync(receipt), 'A previous source receipt exists; investigate it before another build');
+  requireThat(!outputExists(receipt), 'A previous source receipt exists; investigate it before another build');
   const source = () => ({
     commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
     status: execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }),
@@ -110,6 +116,9 @@ export function main(args = process.argv.slice(2)) {
     const finalSource = source();
     requireThat(finalSource.commit === commit && !finalSource.status.trim(), 'Source changed during updater packaging');
     for (const name of names) copyFileSync(join(temporary, name), join(output, name), constants.COPYFILE_EXCL);
+    // Preserve the exact final signed bundle, not the earlier raw build cache.
+    // DMG packaging and authorized bootstrap installation must reuse this copy.
+    retainPreparedApp(stagedApp, output);
     console.log(`Verified signed updater artifacts: ${output}. Not uploaded, installed, or activated.`);
   } finally { rmSync(temporary, { recursive: true, force: true }); }
 }

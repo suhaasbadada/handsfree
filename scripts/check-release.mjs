@@ -6,10 +6,13 @@ import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { verifyCompiledAssets } from './check-macos-assets.mjs';
+import { updaterFeed } from './package-updater.mjs';
 
-export const candidate = 'HandsFree-0.1.1-beta.6-macos-arm64.dmg';
-export const tag = 'v0.1.1-beta.6';
-const names = [candidate, 'PROVENANCE.txt', 'SHA256SUMS'];
+export const candidate = 'HandsFree-0.1.1-beta.7-macos-arm64.dmg';
+export const tag = 'v0.1.1-beta.7';
+export const archiveName = 'HandsFree-0.1.1-beta.7-macos-arm64.app.tar.gz';
+export const payloadNames = [candidate, 'PROVENANCE.txt', archiveName, `${archiveName}.sig`, 'UPDATER-PROVENANCE.txt', 'macos-arm64.json'];
+export const names = [...payloadNames, 'SHA256SUMS'];
 const repo = 'suhaasbadada/handsfree';
 function requireThat(condition, message) { if (!condition) throw new Error(message); }
 
@@ -19,15 +22,23 @@ export function validateMetadata({ provenance, checksums, hashes, commit, tree, 
   requireThat(provenance.startsWith(`Candidate: ${candidate}\nSource commit: ${commit}\nSource tree: ${tree}\n`), 'Candidate/source commit/tree mismatch');
   requireThat(provenance.includes('Working tree status at packaging (empty means clean):\n\nWorking tree status after packaging (empty means clean):\n\nBuilt on: '), 'Dirty or missing packaging provenance; rebuild from a clean commit');
   const lines = checksums.trim().split('\n');
-  requireThat(lines.length === 2, 'Checksum manifest must cover exactly DMG and provenance');
+  requireThat(lines.length === payloadNames.length, 'Checksum manifest must cover exactly the six public payload files');
   const seen = new Set();
   for (const line of lines) {
     const match = /^([a-f0-9]{64})  ([^/\\]+)$/.exec(line);
-    requireThat(match && [candidate, 'PROVENANCE.txt'].includes(match[2]) && !seen.has(match[2]), 'Invalid checksum filename, duplicate, or format');
+    requireThat(match && payloadNames.includes(match[2]) && !seen.has(match[2]), 'Invalid checksum filename, duplicate, or format');
     seen.add(match[2]);
     requireThat(hashes[match[2]] === match[1], `SHA-256 mismatch: ${match[2]}`);
   }
   return commit;
+}
+
+export function validateUpdaterMetadata(feed, signature, provenance, commit, executableHash) {
+  const expected = updaterFeed(tag.slice(1), signature);
+  requireThat(feed.version === expected.version && Object.keys(feed.platforms ?? {}).length === 1 &&
+    feed.platforms?.['darwin-aarch64']?.url === expected.platforms['darwin-aarch64'].url &&
+    feed.platforms['darwin-aarch64'].signature === signature, 'Updater feed version/target/canonical URL/signature mismatch');
+  requireThat(provenance.startsWith(`Distribution: ${tag.slice(1)}\nSource commit: ${commit}\nApp executable SHA-256: ${executableHash}\n`), 'Updater source/version/executable provenance mismatch');
 }
 
 export function validateDraft(draft, commit, sizes) {
@@ -48,6 +59,7 @@ function validateAssets(draft, commit, sizes) {
     requireThat(matches.length === 1 && matches[0].state === 'uploaded' && matches[0].size === sizes[name], `Missing/incomplete/wrong-size draft asset: ${name}`);
   }
   requireThat(!assets.some(asset => /\.(dmg|zip)$/i.test(asset.name) && asset.name !== candidate), 'Remove superseded installer assets from the draft');
+  requireThat(assets.length === names.length && assets.every(asset => names.includes(asset.name)), 'Expected exactly seven versioned public assets');
 }
 
 export function validateAvailability(release, publicMode = false) {
@@ -156,6 +168,27 @@ export async function main(args = process.argv.slice(2), { onInterrupt } = {}) {
     run('/usr/bin/hdiutil', ['attach', '-readonly', '-nobrowse', '-noautoopen', '-mountpoint', mount, dmg]);
     verifyApp(join(mount, 'HandsFree.app'), fingerprint);
     verifyCompiledAssets(root, join(mount, 'HandsFree.app'));
+    run('cargo', ['test', '--manifest-path', 'src-tauri/Cargo.toml', '--locked', 'updater::tests::signed_artifact_rejects_tampering_and_version_replay', '--', '--ignored', '--exact'],
+      { cwd: root, env: { ...process.env, HANDSFREE_UPDATER_TEST_ARCHIVE: join(directory, archiveName) } });
+    const extracted = join(temporary, 'updater');
+    run('python3', [join(root, 'scripts/check-updater-archive.py'), join(directory, archiveName), extracted]);
+    const archivedApp = join(extracted, 'HandsFree.app');
+    const preparedApp = join(directory, 'updater/HandsFree.app');
+    const executableHash = await hash(join(archivedApp, 'Contents/MacOS/handsfree'));
+    for (const app of [archivedApp, preparedApp]) {
+      verifyApp(app, fingerprint);
+      verifyCompiledAssets(root, app);
+      for (const name of ['LICENSE', 'UPDATES.md', 'THIRD_PARTY_NOTICES/inventory.json', 'THIRD_PARTY_SOURCES.tar.gz']) {
+        requireThat(statSync(join(app, 'Contents/Resources/licenses', name)).size > 0, `Missing bundled updater notice: ${name}`);
+      }
+      // Compare the entire sealed bundle, not only a shared executable version.
+      run('/usr/bin/diff', ['-qr', join(mount, 'HandsFree.app'), app]);
+      requireThat(await hash(join(app, 'Contents/MacOS/handsfree')) === executableHash, 'Updater/DMG/prepared executable mismatch');
+    }
+    requireThat(await hash(join(mount, 'HandsFree.app/Contents/MacOS/handsfree')) === executableHash, 'DMG executable mismatch');
+    validateUpdaterMetadata(JSON.parse(readFileSync(join(directory, 'macos-arm64.json'), 'utf8')),
+      readFileSync(join(directory, `${archiveName}.sig`), 'utf8').trim(),
+      readFileSync(join(directory, 'UPDATER-PROVENANCE.txt'), 'utf8'), commit, executableHash);
     requireThat(readlinkSync(join(mount, 'Applications')) === '/Applications', 'Applications shortcut missing');
     const visible = readdirSync(mount).filter(name => !name.startsWith('.')).sort();
     requireThat(JSON.stringify(visible) === JSON.stringify(['Applications', 'HandsFree.app', 'Install HandsFree.txt', 'Licenses']), 'Unexpected visible disk-image root');
@@ -183,7 +216,7 @@ export async function main(args = process.argv.slice(2), { onInterrupt } = {}) {
         for (let depth = 0; object.type === 'tag' && depth < 5; depth++) object = api(`git/tags/${object.sha}`).object;
         requireThat(object.type === 'commit' && object.sha === commit, 'Existing remote tag points at different source code');
       }
-      // Size/metadata alone cannot prove bytes: download all three draft assets.
+      // Size/metadata alone cannot prove bytes: download all seven assets.
       if (publicMode) {
         // No gh/token/header/cookie credentials: independently prove anonymous
         // public GET access and compare all downloaded bytes, not only HEAD/size.
@@ -193,6 +226,7 @@ export async function main(args = process.argv.slice(2), { onInterrupt } = {}) {
       validateRelease(api(`releases/${draft.id}`), commit, sizes);
     }
     scope.assertActive();
+    requireThat(git('rev-parse', 'HEAD') === commit && !git('status', '--short', '--untracked-files=normal'), 'Source changed during release audit');
     console.log(`PASS: ${commit} — checksums, clean provenance, stable signatures, arm64/macOS 14 bundle and DMG contents.${local ? '\nLOCAL ONLY: release target/tag/assets were NOT checked.' : publicMode ? '\nPublic prerelease target/tag and anonymous GET asset bytes match exactly.' : '\nDraft target/tag and downloaded asset bytes match exactly.'}\nArtifact audit only: no legal certification, Apple approval, or separate-Mac QA is implied.`);
   } finally {
     scope.cleanup();

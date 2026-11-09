@@ -58,7 +58,8 @@ requires a separately authorized bootstrap/key-rotation plan for installed users
 2. Use clean reviewed source. Do not enable
    Tauri's automatic pre-signing updater archive: the local signing helper applies
    the stable macOS identity after the Tauri build. Archive only that final app.
-3. Run `node scripts/package-updater.mjs [output-directory]`. This builds with
+3. Run `bash scripts/package-release.sh` for coordinated DMG/updater preparation.
+   It calls `node scripts/package-updater.mjs release/updater`, which builds with
    **`npm run build:local`** inside a guarded clean-source transaction, never
    trusting an earlier cached app. It verifies the
    existing macOS signature, current embedded frontend and distribution; stages
@@ -68,10 +69,17 @@ requires a separately authorized bootstrap/key-rotation plan for installed users
    real minisign verifier against the artifact, corrupt bytes and a tampered
    authenticated version; and writes provenance, checksums and a feed candidate.
    It never creates keys, installs, uploads or activates anything. Outputs refuse
-   overwrite. Preserve the generated archive, `.sig`, checksums and provenance.
+   overwrite. It retains the final sealed `release/updater/HandsFree.app` for the
+   DMG and authorized bootstrap installation; never substitute the raw build cache.
+   Standalone updater preparation also accepts an explicit output directory.
+   Preserve the generated archive, `.sig`, checksums and provenance.
 4. Follow the existing DMG/notices/clean-source CI and publication audits. Publish
    the additional canonical `.app.tar.gz` and `.app.tar.gz.sig` assets under the
-   **same exact clean-source tag**. Keep project/dependency notices and sources
+   **same exact clean-source tag**, with `UPDATER-PROVENANCE.txt` and
+   `macos-arm64.json`. The root manifest covers all six public payload files;
+   `SHA256SUMS` is the seventh public asset. The auditor verifies the real minisign
+   signature without installing and compares the complete signed bundles in the
+   archive, DMG and retained app. Keep project/dependency notices and sources
    available with that release; the DMG remains the complete redistribution image.
    Verify anonymous download bytes and signatures before activating the feed.
 5. Only then publish the generated `macos-arm64.json` at `site/updates/`, with

@@ -6,12 +6,59 @@ Current public Mac distribution: **v0.1.1-beta.6**, embedded version **0.1.1**.
 CI, publication and anonymous public-byte verification passed for the exact clean
 artifact source; see [beta 6 evidence](releases/v0.1.1-beta.6.md). The active
 `release` export and static downloads select verified beta 6. The separate disabled
-`candidateRelease` export retains the artifact-source audit coordinates, not a
+`candidateRelease` export now selects **beta 7 preparation**, not a
 second availability switch. Website deployment and the cross-repository Homebrew
 gate below remain distinct checks; do not claim either from artifact verification.
 Windows beta 3 and historical Mac assets remain untouched. See
 [practice](practice.md) for the explicit-button flow, not a shortcut/insertion test,
 and [Compatibility paste](COMPATIBILITY-PASTE.md) for unchanged opt-in safeguards.
+
+## Beta 7 preparation (not publication evidence)
+
+The new target is `v0.1.1-beta.7`, embedded app version `0.1.1`. Active beta 6
+website/README/install links remain unchanged until anonymous beta 7 byte checks
+pass. Historical notes and assets are immutable. No beta 7 source SHA, checksum,
+CI, installation or OTA acceptance result is claimed here; see
+[candidate notes](releases/v0.1.1-beta.7.md).
+
+`package-release.sh` calls `node scripts/package-updater.mjs release/updater`.
+That helper owns the guarded clean-source `npm run build:local` build, stages
+notices and corresponding source inside the app, re-seals with the existing
+macOS identity, signs the version-bound updater archive and exercises the real
+minisign verifier. It retains **`release/updater/HandsFree.app`**, the final signed
+bundle used unchanged by the DMG and authorized bootstrap installation. Never
+substitute `src-tauri/target/release/bundle/macos/HandsFree.app`: that earlier
+cache lacks the final resources/signature. No independent second build is used.
+An unexpected source change preserves `release/updater/.mac-source-state.json`;
+investigate that recovery receipt rather than deleting it or hiding changes.
+
+Seven public assets must share the exact clean-source tag:
+
+- `HandsFree-0.1.1-beta.7-macos-arm64.dmg`
+- `PROVENANCE.txt` (exact clean source commit/tree)
+- `SHA256SUMS` (exactly six payload entries, excluding itself)
+- `HandsFree-0.1.1-beta.7-macos-arm64.app.tar.gz`
+- `HandsFree-0.1.1-beta.7-macos-arm64.app.tar.gz.sig`
+- `UPDATER-PROVENANCE.txt` (same source and final executable hash)
+- `macos-arm64.json` (exact version/target/canonical URL/uploaded signature)
+
+The audit validates safe archive extraction, bundled notices, pinned signatures,
+real minisign tamper/version-replay rejection without installing, and complete
+bundle/executable equality across archive, mounted DMG and retained final app.
+All seven remote assets must match local bytes; public mode uses anonymous GETs.
+Default draft and explicit `--local` safety remain. Every mode still requires
+HEAD to equal the artifact source, not a later rollout/website commit. Keep the
+retained app and clean build cache for re-audit. Output refusal/receipt retention
+and mount cleanup are not bypassed. These beta 7 requirements supersede the
+historical beta 6 three-asset instructions below.
+
+Only after exact-source publication verification may the primary maintainer
+activate website/README/install links, publish the exact generated feed to Pages,
+and coordinate the matching Homebrew URL/version/checksum. Preserve model,
+settings, usage and permissions during authorized bootstrap installation.
+Actual readiness/dictation and OTA replacement/restart acceptance remain separate
+gates, not consequences of a successful artifact audit. Beta 6 requires a first
+DMG/Homebrew upgrade; it cannot exercise the updater itself.
 
 Run on the existing Apple Silicon signing machine, with installed npm/Cargo dependencies, Rust documentation (runtime notices), and the existing local signing identity:
 
@@ -20,9 +67,9 @@ npm test
 bash scripts/package-release.sh
 ```
 
-The script builds through **npm run build:local** (never initializes/replaces the certificate), verifies arm64, bundle ID/version/minimum OS, stages the signed app and an Applications shortcut, copies explicit public documentation/dependency sources, generates notices, and creates a compressed **DMG with `hdiutil`**. It signs the DMG using the same existing certificate, runs `hdiutil verify`, mounts it read-only with no auto-open, verifies the contained app and required files, and unmounts. It writes `release/SHA256SUMS` and `release/PROVENANCE.txt` (source commit and dirty-tree status). No Finder Automation permission is required; no custom Finder window arrangement is promised. It neither installs nor launches the app, downloads a model, nor publishes anything. Python **3.11+** is only a packaging dependency.
+The script delegates **npm run build:local** and final app preparation to the updater helper (never initializes/replaces the certificate), verifies arm64, bundle ID/version/minimum OS, stages that retained signed app and an Applications shortcut, copies explicit public documentation/dependency sources, generates notices, and creates a compressed **DMG with `hdiutil`**. It signs the DMG using the same existing certificate, runs `hdiutil verify`, mounts it read-only with no auto-open, verifies the contained app and required files, and unmounts. It writes the seven assets and six-entry manifest listed above. No Finder Automation permission is required; no custom Finder window arrangement is promised. It neither installs nor launches the app, downloads a model, nor publishes anything. Python **3.11+** is only a packaging dependency.
 
-The published release label is `v0.1.1-beta.6`; embedded version is `0.1.1`. Its immutable asset is `HandsFree-0.1.1-beta.6-macos-arm64.dmg`. Public beta 5 remains unchanged: do not rebuild, replace, or re-upload a published artifact. Future releases require a new label and coordinated packaging/audit versions. **Do not distribute a user-install ZIP.** The visible DMG root contains only `HandsFree.app`, the Applications shortcut, `Install HandsFree.txt`, and `Licenses`. The install guide discloses experimental/self-signed status. Project LICENSE, full dependency notices, `THIRD_PARTY_SOURCES.tar.gz`, `PUBLICATION-NOTES.txt`, and maintainer documentation live under `Licenses`. The tarball is dependency source, not an installer. Notices remain outside the signed bundle. Keep the image with redistributions.
+The published release label is still `v0.1.1-beta.6`; embedded version is `0.1.1`. Its immutable asset is `HandsFree-0.1.1-beta.6-macos-arm64.dmg`. Beta 6 and older remain unchanged: do not rebuild, replace, or re-upload a published artifact. **Do not distribute a user-install ZIP.** The visible beta 7 DMG root contains only `HandsFree.app`, the Applications shortcut, `Install HandsFree.txt`, and `Licenses`. The install guide discloses experimental/self-signed status. Project LICENSE, full dependency notices, `THIRD_PARTY_SOURCES.tar.gz`, `PUBLICATION-NOTES.txt`, and maintainer documentation live under `Licenses`. That source tarball is not an installer. Beta 7 also seals notices and corresponding source inside the app for OTA recipients. Keep the image with redistributions.
 
 ### Historical beta 5 artifact source
 
@@ -48,7 +95,7 @@ the clean-source audit cache and provenance; do not weaken the HEAD/source check
 to re-audit from a later website commit. Do not rebuild published beta 6 to refresh
 its bundled preparation-era docs; use the current online release notes instead.
 
-Packaging now refuses dirty source before building. The shared `windows-source-state.py --platform macos` guard snapshots exact manifest bytes, allows only Tauri CLI's known addition of the already Mac-target-enabled `macos-private-api` to common features, verifies all remaining TOML fields/source revision/status, and restores only those original bytes (also after a failed build). Any additional change aborts rather than hiding it and preserves `release/.mac-source-state.json` for investigation; do not remove that receipt until the source changes are understood. The Mac target feature and signing scripts/identity remain unchanged. The Windows default guard retains its existing behavior.
+Packaging refuses dirty source before building. The shared `windows-source-state.py --platform macos` guard snapshots exact manifest bytes, allows only Tauri CLI's known addition of the already Mac-target-enabled `macos-private-api` to common features, verifies all remaining TOML fields/source revision/status, and restores only those original bytes (also after a failed build). Any additional change aborts rather than hiding it and preserves `release/updater/.mac-source-state.json` for investigation; do not remove that receipt until the source changes are understood. The Mac target feature and signing scripts/identity remain unchanged. The Windows default guard retains its existing behavior.
 
 `check-macos-assets.mjs` checks the built app and mounted DMG: current Vite JavaScript/CSS must match Tauri's generated embedded bytes **inside the actual executable**, the JavaScript must contain `Your activity` without the old transcript/disclosure UI, and all four bundled Clean/Warm cues must byte-match committed source. A fresh `dist` beside an old executable is not sufficient. Re-audits need the ignored `dist` and `src-tauri/target/release/build` cache from this clean-source build; missing evidence fails closed. The only allowed WAV files are these four exact bundled cue resources, not recordings.
 
@@ -74,8 +121,8 @@ building the upcoming beta 7 implementation.
 2. Review the intended source changes; ensure GitHub **Checks** passes. Run `npm ci`, `npm test`, `npm run build`, Rust fmt/test/clippy from the PR template on the intended commit. Never promote candidate coordinates into active downloads before the publication gates. CI uses a macOS arm64 host and no signing secrets. It does not publish or install.
 3. From a clean reviewed commit on the existing signing machine, run `bash scripts/package-release.sh`. Confirm `PROVENANCE.txt` source commit/clean status, verify checksums, and independently inspect the mounted payload. Never initialize a new signing identity for a routine build.
 4. With explicit user permission, validate installation on a separate Apple Silicon Mac: Gatekeeper behavior, drag to Applications, permissions, shortcut, microphone, inference, cancellation, paste fallback, and manual update. Record actual results; do not infer these from CI. No clean-machine results are claimed yet. This remains a candid experimental-beta risk, not a claim of release certification or a veto on the owner's requested experimental publication.
-5. Update the draft release with **DMG**, `SHA256SUMS`, `PROVENANCE.txt`, and honest release notes. Set its target to the **full exact clean source SHA**, never an older commit or moving branch. Any existing tag must resolve to that same commit. Remove superseded installer ZIP/DMG assets, not the required source archive inside the image. Run `npm run release:check` to verify local checksums/provenance, pinned signatures, mounted contents, draft target/tag, uploaded asset sizes, and downloaded draft bytes. `npm run release:check -- --local` skips only GitHub for a pre-upload audit. The manifest covers both DMG and provenance. No audit uploads, installs or publishes. Artifact integrity checks must pass; see [the readiness record](release-readiness.md).
-6. Under the owner's explicit experimental-publication authorization, publish the prerelease manually. Run `npm run release:check -- --public` from the same clean source commit before any website follow-up commit. This requires draft=false, prerelease=true, exact source target and existing tag resolving to that commit, and uses credential-free HTTPS GETs to compare all three public asset bytes. Default mode still rejects public releases; `--local` and `--public` cannot be combined. There is no `/releases/latest` dependency: GitHub excludes prereleases there. All modes still require HEAD to equal the packaged clean source commit; return to that dedicated source checkout to re-audit later rather than weakening identity checks.
+5. Update the draft release with **all seven assets listed above** and honest release notes. Set its target to the **full exact clean source SHA**, never an older commit or moving branch. Any existing tag must resolve to that same commit. Remove superseded installer ZIP/DMG assets, not the required source archive inside the image. Run `npm run release:check` to verify six payload checksums/provenance, pinned signatures, the updater feed and real minisign signature, equality of the archive/DMG/retained app, draft target/tag, uploaded asset sizes, and downloaded bytes. `npm run release:check -- --local` skips only GitHub for a pre-upload audit. No audit uploads, installs or publishes. Artifact integrity checks must pass; see [the readiness record](release-readiness.md).
+6. Under the owner's explicit experimental-publication authorization, publish the prerelease manually. Run `npm run release:check -- --public` from the same clean source commit before any website follow-up commit. This requires draft=false, prerelease=true, exact source target and existing tag resolving to that commit, and uses credential-free HTTPS GETs to compare all seven public asset bytes. Default mode still rejects public releases; `--local` and `--public` cannot be combined. There is no `/releases/latest` dependency: GitHub excludes prereleases there. All modes still require HEAD to equal the packaged clean source commit; return to that dedicated source checkout to re-audit later rather than weakening identity checks.
 7. Only then update the active `site/release.js` `release` export to `publicAvailable: true` with the verified version and exact DMG URL. Update README, release notes, installer guidance, and static/no-JS page availability together, run tests, and deploy Pages. For Mac browsers, this enables a direct, one-click DMG CTA, not a scroll/release-page detour. Never automatically start a download. Mac builds do not gain Intel or non-Mac support from a download link.
 8. **Mandatory cross-repository Homebrew gate:** update `suhaasbadada/homebrew-handsfree`'s cask distribution version, exact DMG URL, and SHA-256 to match the same anonymously verified public artifact. Review and publish that tap change before claiming that the recommended Homebrew command delivers the latest customer download. Verify the remote cask contents; app bundle version `0.1.1` alone cannot identify the distribution beta. Existing Homebrew users use `brew update` then `brew upgrade --cask suhaasbadada/handsfree/handsfree`. Preserve models/settings/statistics: no `--zap`, data deletion, or totals reset. Cask metadata checks do not imply an actual installed-app upgrade or onboarding test; perform those only with explicit permission. Do not change quarantine or global Gatekeeper policy.
 9. Check the public page and download after deployment, and confirm both direct DMG and Homebrew paths select the same release. To withdraw availability, set the manifest false and update static copy and the tap as appropriate. Never point users at a draft, removed asset, or a Windows/Linux placeholder.

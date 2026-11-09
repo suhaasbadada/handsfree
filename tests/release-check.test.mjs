@@ -2,18 +2,43 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { candidate, tag, validateMetadata, validateDraft, validatePublic, validateAvailability, auditOptions } from '../scripts/check-release.mjs';
+import { candidate, tag, archiveName, payloadNames, names, validateUpdaterMetadata, validateMetadata, validateDraft, validatePublic, validateAvailability, auditOptions } from '../scripts/check-release.mjs';
+import { updaterFeed } from '../scripts/package-updater.mjs';
 import { candidateRelease as release, release as publishedRelease } from '../site/release.js';
 
 const commit = 'a'.repeat(40), tree = 'b'.repeat(40);
 const digest = text => createHash('sha256').update(text).digest('hex');
 function fixture() {
   const provenance = `Candidate: ${candidate}\nSource commit: ${commit}\nSource tree: ${tree}\nWorking tree status at packaging (empty means clean):\n\nWorking tree status after packaging (empty means clean):\n\nBuilt on: 15.0\n`;
-  const hashes = { [candidate]: digest('disk image'), 'PROVENANCE.txt': digest(provenance) };
+  const hashes = Object.fromEntries(payloadNames.map(name => [name, digest(name === 'PROVENANCE.txt' ? provenance : `payload ${name}`)]));
   return { provenance, hashes, checksums: Object.entries(hashes).map(([name, hash]) => `${hash}  ${name}\n`).join(''), commit, tree, status: '' };
 }
-test('clean candidate has exact source commit/tree and both verified checksums', () => {
+test('clean candidate has exact source commit/tree and six verified payload checksums', () => {
+  assert.deepEqual(payloadNames, ['HandsFree-0.1.1-beta.7-macos-arm64.dmg', 'PROVENANCE.txt', 'HandsFree-0.1.1-beta.7-macos-arm64.app.tar.gz', 'HandsFree-0.1.1-beta.7-macos-arm64.app.tar.gz.sig', 'UPDATER-PROVENANCE.txt', 'macos-arm64.json']);
   assert.equal(validateMetadata(fixture()), commit);
+});
+for (const name of payloadNames) test(`manifest rejects altered ${name} bytes`, () => {
+  const f = fixture();
+  f.hashes[name] = digest('altered');
+  assert.throws(() => validateMetadata(f), /SHA-256 mismatch/);
+});
+test('updater feed and provenance bind exact target, source, signature and executable', () => {
+  assert.equal(archiveName, 'HandsFree-0.1.1-beta.7-macos-arm64.app.tar.gz');
+  const signature = 'uploaded-signature';
+  const executableHash = digest('sealed executable');
+  const provenance = `Distribution: 0.1.1-beta.7\nSource commit: ${commit}\nApp executable SHA-256: ${executableHash}\n`;
+  const verify = feed => validateUpdaterMetadata(feed, signature, provenance, commit, executableHash);
+  const fresh = () => updaterFeed('0.1.1-beta.7', signature);
+  assert.doesNotThrow(() => verify(fresh()));
+  for (const mutate of [
+    f => { f.version = '0.1.1-beta.6'; },
+    f => { f.platforms['darwin-x86_64'] = f.platforms['darwin-aarch64']; },
+    f => { f.platforms['darwin-aarch64'].url += '?download'; },
+    f => { f.platforms['darwin-aarch64'].url = f.platforms['darwin-aarch64'].url.replace('.app.tar.gz', '.dmg'); },
+    f => { f.platforms['darwin-aarch64'].signature = 'other'; },
+  ]) { const feed = fresh(); mutate(feed); assert.throws(() => verify(feed), /feed/); }
+  assert.throws(() => validateUpdaterMetadata(fresh(), signature, provenance, 'c'.repeat(40), executableHash), /provenance/);
+  assert.throws(() => validateUpdaterMetadata(fresh(), signature, provenance, commit, digest('earlier app')), /provenance/);
 });
 for (const [label, mutate, message] of [
   ['dirty current tree', f => { f.status = ' M src/main.ts'; }, /working tree is dirty/],
@@ -26,18 +51,18 @@ for (const [label, mutate, message] of [
   ['bad DMG bytes', f => { f.hashes[candidate] = digest('other image'); }, /SHA-256 mismatch/],
   ['bad provenance bytes', f => { f.hashes['PROVENANCE.txt'] = digest('other provenance'); }, /SHA-256 mismatch/],
   ['missing provenance checksum', f => { f.checksums = f.checksums.split('\n')[0]; }, /exactly/],
-  ['duplicate checksum', f => { f.checksums = `${f.checksums.split('\n')[0]}\n`.repeat(2); }, /duplicate/],
+  ['duplicate checksum', f => { f.checksums = `${f.checksums.split('\n')[0]}\n`.repeat(6); }, /duplicate/],
   ['path traversal', f => { f.checksums = f.checksums.replace('PROVENANCE.txt', '../PROVENANCE.txt'); }, /Invalid checksum/],
   ['extra checksum', f => { f.checksums += `${digest('x')}  other.dmg\n`; }, /exactly/],
 ]) test(`release audit rejects ${label}`, () => { const f = fixture(); mutate(f); assert.throws(() => validateMetadata(f), message); });
 
-const sizes = { [candidate]: 123, 'PROVENANCE.txt': 456, SHA256SUMS: 789 };
+const sizes = Object.fromEntries(names.map((name, index) => [name, 123 + index]));
 test('draft audit requires the matching website manifest to remain unavailable', () => {
-  assert.equal(tag, 'v0.1.1-beta.6');
-  assert.equal(candidate, 'HandsFree-0.1.1-beta.6-macos-arm64.dmg');
+  assert.equal(tag, 'v0.1.1-beta.7');
+  assert.equal(candidate, 'HandsFree-0.1.1-beta.7-macos-arm64.dmg');
   assert.equal(release.publicAvailable, false);
   assert.throws(() => validateAvailability(publishedRelease), /manifest disabled/);
-  assert.doesNotThrow(() => validateAvailability(publishedRelease, true), 'Activated exact beta 6 coordinates pass only explicit public mode');
+  assert.throws(() => validateAvailability(publishedRelease, true), /manifest disabled/, 'Published beta 6 cannot substitute for target beta 7');
   const historicalBeta5 = { ...publishedRelease, version: '0.1.1-beta.5', dmgUrl: publishedRelease.dmgUrl.replaceAll('beta.6', 'beta.5') };
   for (const publicMode of [false, true]) {
     assert.throws(() => validateAvailability(historicalBeta5, publicMode), /manifest disabled/, 'Historical beta 5 cannot substitute for the beta 6 artifact');
@@ -75,6 +100,7 @@ for (const [label, mutate, message] of [
   ['duplicate asset', d => { d.assets.push(d.assets[0]); }, /Missing\/incomplete/],
   ['old ZIP', d => { d.assets.push({ name: 'HandsFree-old.zip' }); }, /superseded/],
   ['old DMG', d => { d.assets.push({ name: 'HandsFree-old.dmg' }); }, /superseded/],
+  ['extra updater archive', d => { d.assets.push({ name: 'HandsFree-old.app.tar.gz' }); }, /exactly seven/],
 ]) test(`draft audit rejects ${label}`, () => { const d = draft(); mutate(d); assert.throws(() => validateDraft(d, commit, sizes), message); });
 
 test('first-install actions stay visible, offline-aware and explicitly initiated', () => {
