@@ -63,7 +63,9 @@ Then explicitly check, choose **Download & restart…** when a newer release is
 offered, and confirm its version. Opening the dialog never checks online.
 See [beta 7 evidence](releases/v0.1.1-beta.7.md) for verified manual bootstrap and
 preservation, and [beta 8 evidence](releases/v0.1.1-beta.8.md) for the dialog focus
-fix and first forward update opportunity. Actual forward OTA replacement/restart,
+fix and the failed first forward attempt. [Beta 9](releases/v0.1.1-beta.9.md)
+repairs the download TLS initialization; manual bootstrap preservation and native
+readiness are verified. Actual forward OTA replacement/restart,
 live audio and separate-Mac QA remain unperformed. Feed deployment is a separate
 operational check.
 

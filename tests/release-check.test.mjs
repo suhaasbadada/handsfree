@@ -62,9 +62,9 @@ test('draft audit requires the matching website manifest to remain unavailable',
   assert.equal(candidate, 'HandsFree-0.1.1-beta.9-macos-arm64.dmg');
   assert.equal(release.publicAvailable, false);
   assert.throws(() => validateAvailability(publishedRelease), /manifest disabled/);
-  assert.throws(() => validateAvailability(publishedRelease, true), /manifest disabled/, 'Public beta 8 cannot substitute for candidate beta 9');
+  assert.doesNotThrow(() => validateAvailability(publishedRelease, true), 'Public mode accepts matching beta 9 coordinates');
   for (const version of ['beta.5', 'beta.6', 'beta.7', 'beta.8']) {
-    const historical = { ...publishedRelease, version: `0.1.1-${version}`, dmgUrl: publishedRelease.dmgUrl.replaceAll('beta.8', version) };
+    const historical = { ...publishedRelease, version: `0.1.1-${version}`, dmgUrl: publishedRelease.dmgUrl.replaceAll('beta.9', version) };
     for (const publicMode of [false, true]) {
       assert.throws(() => validateAvailability(historical, publicMode), /manifest disabled/, 'Historical versions cannot substitute for the beta 9 artifact');
     }

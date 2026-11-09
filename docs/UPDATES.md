@@ -10,6 +10,11 @@ are separate gates.
 
 ## First forward-update failure and repair
 
+[Beta 9](releases/v0.1.1-beta.9.md) is the published correction. The authorized
+manual bootstrap completed with unchanged model/settings/usage hashes and signing
+requirement, and fresh native readiness was verified. The signed beta 9 feed is
+live; HTTP 200 and exact audited bytes were checked independently of installation.
+
 The actual beta 7 → beta 8 attempt reported “The update operation stopped
 unexpectedly.” The installed executable remained beta 7. A fresh-process Rust
 regression reproduced a panic in the updater's reqwest 0.13 client: no rustls
@@ -63,8 +68,8 @@ by the updater. Unsaved in-memory last-transcript text does not survive restart;
 copy anything important first. Offline/404/malformed-feed/signature/installation
 failures are shown explicitly, not reported as “up to date.” An install failure
 requires another explicit check before retrying. The exact anonymously verified
-beta 8 feed is checked in for Pages deployment. Verify live HTTP 200 and exact
-audited bytes separately. A 404 is an explicit failure, not an up-to-date result. Do not
+beta 9 feed is live on Pages with HTTP 200 and exact audited bytes verified.
+A 404 is an explicit failure, not an up-to-date result. Do not
 invent beta 6 updater metadata or point the feed at the DMG.
 
 ## Trust and key custody

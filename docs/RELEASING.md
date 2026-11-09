@@ -2,17 +2,18 @@
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
 
-Current public Mac distribution: **v0.1.1-beta.8**, embedded version **0.1.1**.
+Current public Mac distribution: **v0.1.1-beta.9**, embedded version **0.1.1**.
 CI, publication and anonymous public-byte verification passed for the exact clean
-artifact source; see [beta 8 evidence](releases/v0.1.1-beta.8.md). The active
-`release` export and static downloads select verified beta 8. The separate disabled
-`candidateRelease` export retains **beta 8 audit coordinates**. The exact artifact
-source is `5d5e8b151fa1877a6f8965f6fb0255dacb3e8823`, with
-[passing CI](https://github.com/suhaasbadada/handsfree/actions/runs/42695055468).
-Beta 7 outputs are preserved under `release/history/beta7-before-beta8-7h1coa6i/`.
-Never replace historical assets or manually replace installed beta 7 to simulate
-an in-app upgrade. Beta 8 fixes initial Updates dialog focus; OTA acceptance is
-pending the user's explicit update, not implied by publication.
+artifact source; see [beta 9 evidence](releases/v0.1.1-beta.9.md). The active
+`release` export and static downloads select verified beta 9. The separate disabled
+`candidateRelease` export retains **beta 9 audit coordinates**. The exact artifact
+source is `a828c0e4603e771695b99ce554edcc2630951f77`, with
+[passing CI](https://github.com/suhaasbadada/handsfree/actions/runs/42707503693).
+Beta 8 outputs are preserved under `release/history/beta8-before-beta9-38tada9u/`.
+The beta 7 → beta 8 attempt failed because the old client skipped TLS provider
+initialization. Beta 9 repairs it; the owner-authorized manual bootstrap preserved
+model/settings/usage hashes and signing identity and verified native readiness.
+Do not describe this as a successful OTA restart. Historical assets stay immutable.
 Website deployment and the cross-repository Homebrew
 gate below remain distinct checks; do not claim either from artifact verification.
 Windows beta 3 and historical Mac assets remain untouched. See
@@ -48,11 +49,11 @@ investigate that recovery receipt rather than deleting it or hiding changes.
 
 Seven public assets must share the exact clean-source tag:
 
-- `HandsFree-0.1.1-beta.8-macos-arm64.dmg`
+- `HandsFree-0.1.1-beta.9-macos-arm64.dmg`
 - `PROVENANCE.txt` (exact clean source commit/tree)
 - `SHA256SUMS` (exactly six payload entries, excluding itself)
-- `HandsFree-0.1.1-beta.8-macos-arm64.app.tar.gz`
-- `HandsFree-0.1.1-beta.8-macos-arm64.app.tar.gz.sig`
+- `HandsFree-0.1.1-beta.9-macos-arm64.app.tar.gz`
+- `HandsFree-0.1.1-beta.9-macos-arm64.app.tar.gz.sig`
 - `UPDATER-PROVENANCE.txt` (same source and final executable hash)
 - `macos-arm64.json` (exact version/target/canonical URL/uploaded signature)
 

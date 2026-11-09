@@ -27,7 +27,7 @@ test('landing Beta is a small superscript, not a full-size wordmark or pill', ()
 });
 
 test('README, release notes, installer guide and filename disclose beta without renaming the app', () => {
-  assert.match(read('README.md'), /!\[Mac beta: v0\.1\.1-beta\.8\]\(https:\/\/img.shields.io\/badge\/Mac_beta-v0\.1\.1--beta\.8-a64a45.svg\)/);
+  assert.match(read('README.md'), /!\[Mac beta: v0\.1\.1-beta\.9\]\(https:\/\/img.shields.io\/badge\/Mac_beta-v0\.1\.1--beta\.9-a64a45.svg\)/);
   assert.match(read('docs/releases/v0.1.1-beta.2.md'), /# HandsFree v0\.1\.1-beta\.2/);
   assert.match(read('docs/releases/v0.1.1-beta.2.md'), /Prerelease · Beta testing/);
   assert.match(read('docs/INSTALL.md'), /# Install HandsFree \(Mac beta\)/);
@@ -38,7 +38,7 @@ test('README, release notes, installer guide and filename disclose beta without 
   assert.equal(config.identifier, 'com.handsfree.local');
 });
 
-test('published Mac beta 8 and beta 9 candidate keep embedded version unchanged', async () => {
+test('published Mac beta 9 and disabled audit coordinates keep embedded version unchanged', async () => {
   const { release, candidateRelease } = await import('../site/release.js');
   const { candidate, tag } = await import('../scripts/check-release.mjs');
   const version = JSON.parse(read('package.json')).version;
@@ -48,11 +48,11 @@ test('published Mac beta 8 and beta 9 candidate keep embedded version unchanged'
   assert.equal(JSON.parse(read('src-tauri/tauri.conf.json')).version, version);
   assert.ok(read('src-tauri/Cargo.toml').includes(`version = "${version}"`));
   assert.ok(read('src-tauri/Cargo.lock').includes(`name = "handsfree"\nversion = "${version}"`));
-  assert.equal(release.version, `${version}-beta.8`);
+  assert.equal(release.version, `${version}-beta.9`);
   assert.equal(release.publicAvailable, true, 'Activation follows publication and public asset verification');
   assert.equal(candidateRelease.version, `${version}-beta.9`);
   assert.equal(candidateRelease.publicAvailable, false, 'Candidate must not activate public downloads');
-  assert.notEqual(release.dmgUrl, candidateRelease.dmgUrl, 'Candidate preparation does not activate public downloads');
+  assert.equal(release.dmgUrl, candidateRelease.dmgUrl, 'Activated downloads match disabled audit coordinates');
   assert.equal(JSON.parse(read('src-tauri/distribution.json')).version, candidateRelease.version);
   assert.equal(tag, `v${candidateRelease.version}`);
   assert.equal(candidate, `HandsFree-${candidateRelease.version}-macos-arm64.dmg`);
@@ -89,13 +89,13 @@ test('beta 8 retains practice guidance; beta 6 publication evidence remains hist
   assert.doesNotMatch(read('docs/DEVELOPMENT.md'), /Practice field \(development builds\)|unpublished beta 6 candidate/);
 });
 
-test('Mac beta 8 activation coordinates current docs and all static download links', async () => {
+test('Mac beta 9 activation coordinates current docs and all static download links', async () => {
   const { release } = await import('../site/release.js');
-  assert.equal(release.version, '0.1.1-beta.8');
+  assert.equal(release.version, '0.1.1-beta.9');
   for (const path of ['README.md', 'docs/INSTALL.md', 'site/index.html']) {
     const source = read(path);
     assert.ok(source.includes(release.dmgUrl), `${path} links the verified current Mac DMG`);
-    assert.doesNotMatch(source, /v0\.1\.1-beta\.[234567]|HandsFree-0\.1\.1-beta\.[234567]|Mac_beta-v0\.1\.1--beta\.[234567]/, `${path} must not advertise a stale Mac beta`);
+    assert.doesNotMatch(source, /v0\.1\.1-beta\.[2345678]|HandsFree-0\.1\.1-beta\.[2345678]|Mac_beta-v0\.1\.1--beta\.[2345678]/, `${path} must not advertise a stale Mac beta`);
   }
   const links = [...read('site/index.html').matchAll(/href="([^"]+\.dmg)"/g)].map(match => match[1]);
   assert.equal(links.length, 2, 'Primary and platform-card Mac links have no-JS defaults');
