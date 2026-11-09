@@ -62,6 +62,16 @@ The certificate must be kept for future rebuilds; re-running initialization refu
 
 Close settings to keep the app in the menu bar. Left-click its waveform icon for settings / last transcript; right-click for the menu, cancel, or quit. There is no login-item auto-start in v1.
 
+### Practice field (development builds)
+
+Overview now includes **Try your voice**: explicitly start a practice recording,
+speak the sample phrase, then choose **Finish**. Results appear in an editable,
+temporary field without paste, clipboard changes, normal-transcript replacement,
+or usage tracking. Cancel, Clear, leaving Overview, and window focus loss clear it.
+This tests microphone capture and the model, not shortcuts or external insertion.
+See [practice behavior and safeguards](practice.md). The published beta 5 binary
+is unchanged; this feature requires a new build.
+
 ## Dashboard, sounds, and local usage
 
 **Historical Windows beta 2 shortcut (paused):** new/missing

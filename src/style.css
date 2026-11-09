@@ -151,3 +151,10 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
   .dialog-actions { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+.practice { display: grid; gap: 12px; margin-top: 24px; }
+.practice p { margin: 0; }
+.practice label { font-weight: 600; }
+.practice textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 100px; padding: 12px; border: 1px solid var(--line, #dcd5cf); border-radius: 10px; background: #fffcf9; color: inherit; font: inherit; }
+.practice textarea:focus { outline: 2px solid #a95450; outline-offset: 2px; }
+.practice-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.practice-sample { color: #8d4946; }

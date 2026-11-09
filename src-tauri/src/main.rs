@@ -5,6 +5,7 @@ mod control_tap;
 mod hold;
 mod logic;
 mod platform;
+mod practice;
 mod shortcut;
 mod storage;
 mod streaming;
@@ -27,7 +28,7 @@ use std::{
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Manager,
+    Emitter, Manager,
 };
 use tokio::io::AsyncWriteExt;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
@@ -48,9 +49,10 @@ static INGRESS: Mutex<streaming::Slot> = Mutex::new(streaming::Slot::new());
 static HOLDS: OnceLock<Mutex<hold::Coordinator>> = OnceLock::new();
 static SESSION_GENERATION: AtomicU64 = AtomicU64::new(0);
 static SHORTCUT_CAPTURE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-async fn configure(
-    action: impl FnOnce() -> Result<(), String> + Send + 'static,
-) -> Result<(), String> {
+static PRACTICE: Mutex<practice::Gate> = Mutex::new(practice::Gate::new());
+async fn configure<T: Send + 'static>(
+    action: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
     enqueue(Control::Configure(Box::new(move || {
         let _ = sender.send(action());
@@ -66,6 +68,16 @@ extern "C" fn capture_start_allowed(generation: u64) -> bool {
     holds().lock().unwrap().can_start(generation)
 }
 extern "C" fn native_gesture(edge: i32, source: i32, token: u64) {
+    // Release the gate before any synchronous AppKit dispatch.
+    let practicing = PRACTICE.lock().unwrap().generation.is_some();
+    if practicing {
+        if edge == 1 {
+            unsafe {
+                hf_gesture_complete(token);
+            }
+        }
+        return;
+    }
     route_gesture(
         edge,
         hold::Key(source, token),
@@ -173,6 +185,7 @@ struct Inner {
     status: Status,
     generation: u64,
     session_epoch: u64,
+    practice: Option<u64>, // Immutable destination snapshot for this generation.
     store: storage::Store,
 }
 struct AppState {
@@ -210,7 +223,23 @@ fn verified_model(path: &Path) -> bool {
     format!("{:x}", hash.finalize()) == MODEL_HASH
 }
 extern "C" fn native_event(event: i32) {
-    route_native_event(event, &GESTURE, &CANCELLATION, enqueue_at);
+    let (practice, generation) = {
+        let gate = PRACTICE.lock().unwrap();
+        (gate.active.is_some(), gate.generation)
+    };
+    route_native_event(event, &GESTURE, &CANCELLATION, |control, epoch| {
+        // The capsule's Finish button must finish only the practice generation
+        // visible at receipt, never toggle or restart a later recording.
+        if practice && matches!(control, Control::Finish(None)) {
+            if let Some(generation) = generation {
+                enqueue_at(Control::Finish(Some(generation)), epoch);
+            }
+            return;
+        }
+        if !practice || matches!(control, Control::Cancel) {
+            enqueue_at(control, epoch);
+        }
+    });
 }
 fn route_native_event(
     event: i32,
@@ -354,6 +383,122 @@ async fn open_keyboard() {
 #[tauri::command]
 async fn cancel() {
     enqueue(Control::Cancel);
+}
+fn revoke_practice(token: u64) {
+    let mut gate = PRACTICE.lock().unwrap();
+    let epoch = gate.revoke(token);
+    // Revoke the epoch before releasing the lease lock: completion/new normal
+    // ingress cannot overtake a delayed practice cancel and inherit its epoch.
+    let cancelled = epoch
+        .filter(|epoch| CANCELLATION.allows(*epoch))
+        .map(|_| CANCELLATION.cancel());
+    drop(gate);
+    if let Some(epoch) = cancelled {
+        enqueue_at(Control::Cancel, epoch);
+    }
+}
+fn close_practice() {
+    let token = PRACTICE.lock().unwrap().active;
+    if let Some(token) = token {
+        revoke_practice(token);
+    }
+}
+#[tauri::command]
+async fn practice_cancel(token: u64) {
+    // Receipt-time revocation also tombstones a start not yet acknowledged.
+    revoke_practice(token);
+}
+fn practice_window_ready() -> bool {
+    APP.get()
+        .and_then(|app| app.get_webview_window("main"))
+        .is_some_and(|window| {
+            window.is_visible().unwrap_or(false) && window.is_focused().unwrap_or(false)
+        })
+}
+#[tauri::command]
+async fn practice_start(token: u64) -> Result<u64, String> {
+    if !PRACTICE.lock().unwrap().reserve(token) {
+        return Err("Practice request is stale or already active.".into());
+    }
+    let result = configure(move || {
+        if !cfg!(target_os = "macos") || !practice_window_ready() {
+            return Err("Keep the HandsFree window visible and focused to practice.".into());
+        }
+        let permissions = unsafe { hf_permissions() };
+        let s = state();
+        let inner = s.inner.lock().unwrap();
+        if !shortcut_edit_allowed(&inner.status.phase)
+            || inner.practice.is_some()
+            || SHORTCUT_CAPTURE.load(Ordering::Acquire)
+            || INGRESS.lock().unwrap().current().is_some()
+        {
+            return Err("Finish the current operation before practicing.".into());
+        }
+        if !inner.status.model_ready || permissions & REQUIRED_PERMISSIONS != REQUIRED_PERMISSIONS {
+            return Err("Finish microphone, permissions and model setup first.".into());
+        }
+        drop(inner);
+        let epoch = CANCELLATION.current();
+        {
+            let mut gate = PRACTICE.lock().unwrap();
+            if gate.active != Some(token) {
+                return Err("Practice was cancelled.".into());
+            }
+            gate.epoch = Some(epoch);
+        }
+        recording_command_with_route(None, epoch, None, Some(token));
+        let inner = s.inner.lock().unwrap();
+        if inner.practice != Some(token) || !CANCELLATION.allows(epoch) {
+            return Err("Practice was cancelled before recording started.".into());
+        }
+        Ok(inner.generation)
+    })
+    .await;
+    if result.is_err() {
+        revoke_practice(token);
+    }
+    result
+}
+#[tauri::command]
+async fn practice_finish(token: u64, generation: u64) -> Result<(), String> {
+    configure(move || {
+        if !practice_window_ready() {
+            revoke_practice(token);
+            return Err("Practice lost focus.".into());
+        }
+        if !PRACTICE.lock().unwrap().can_finish(token, generation) {
+            return Err("Practice is no longer recording.".into());
+        }
+        let epoch = state().inner.lock().unwrap().session_epoch;
+        recording_command_with_route(Some(Some(generation)), epoch, None, Some(token));
+        Ok(())
+    })
+    .await
+}
+#[derive(Serialize)]
+struct PracticeStatus {
+    generation: Option<u64>,
+    phase: String,
+    text: String,
+}
+#[tauri::command]
+async fn practice_status(token: u64) -> PracticeStatus {
+    if !practice_window_ready() {
+        close_practice();
+    }
+    let gate = PRACTICE.lock().unwrap();
+    if gate.active != Some(token) {
+        return PracticeStatus {
+            generation: None,
+            phase: "cancelled".into(),
+            text: String::new(),
+        };
+    }
+    PracticeStatus {
+        generation: gate.generation,
+        phase: gate.phase.clone(),
+        text: gate.text.clone(),
+    }
 }
 #[tauri::command]
 async fn set_sounds(enabled: bool) -> Result<(), String> {
@@ -858,11 +1003,37 @@ fn toggle_recording(finish: Option<Option<u64>>, epoch: u64) {
     recording_command(finish, epoch, None);
 }
 fn recording_command(finish: Option<Option<u64>>, epoch: u64, press: Option<hold::Key>) {
+    recording_command_with_route(finish, epoch, press, None);
+}
+fn recording_command_with_route(
+    finish: Option<Option<u64>>,
+    epoch: u64,
+    press: Option<hold::Key>,
+    practice: Option<u64>,
+) {
     if !CANCELLATION.allows(epoch) {
         return;
     }
     let s = state();
     let mut inner = s.inner.lock().unwrap();
+    if practice.is_none() && (inner.practice.is_some() || PRACTICE.lock().unwrap().active.is_some())
+    {
+        // Only a generation-scoped native limit/failure may finish practice.
+        if !(inner.practice.is_some() && finish == Some(Some(inner.generation))) {
+            return;
+        }
+    }
+    if let Some(token) = practice {
+        if PRACTICE.lock().unwrap().active != Some(token) {
+            return;
+        }
+        if finish.is_none() && (inner.status.phase == "recording" || inner.practice.is_some()) {
+            return;
+        }
+        if finish.is_some() && inner.practice != Some(token) {
+            return;
+        }
+    }
     if let Some(key) = press {
         if inner.store.recording_mode != storage::RecordingMode::PushToTalk
             || SHORTCUT_CAPTURE.load(Ordering::Acquire)
@@ -881,6 +1052,9 @@ fn recording_command(finish: Option<Option<u64>>, epoch: u64, press: Option<hold
         }
     }
     if inner.status.phase == "recording" {
+        if inner.practice.is_some() {
+            PRACTICE.lock().unwrap().phase = "processing".into();
+        }
         inner.status.phase = "processing".into();
         inner.status.message = "Transcribing locally…".into();
         drop(inner);
@@ -915,6 +1089,12 @@ fn recording_command(finish: Option<Option<u64>>, epoch: u64, press: Option<hold
     inner.generation += 1;
     inner.session_epoch = epoch;
     let generation = inner.generation;
+    if let Some(token) = practice {
+        if !PRACTICE.lock().unwrap().bind(token, generation) {
+            return;
+        }
+    }
+    inner.practice = practice;
     SESSION_GENERATION.store(generation, Ordering::Release);
     if let Some(key) = press {
         if !holds().lock().unwrap().accept(key, generation) {
@@ -994,11 +1174,33 @@ fn complete_transcription(session: Arc<streaming::Session>, result: Result<Strin
         .and(result)
         .map(|text| transcript::clean(&text));
     let seconds = session.seconds();
+    let practice_destination = s.inner.lock().unwrap().practice.is_some();
+    let focused = !practice_destination || practice_window_ready();
     let mut inner = s.inner.lock().unwrap();
     if inner.generation != generation {
         return;
     }
     INGRESS.lock().unwrap().release(generation, epoch);
+    if let Some(token) = inner.practice.take() {
+        // This destination was fixed before native capture. Never fall through
+        // to native delivery, clipboard, normal transcript, or usage persistence.
+        let mut gate = PRACTICE.lock().unwrap();
+        gate.complete(
+            token,
+            generation,
+            CANCELLATION.allows(epoch) && focused,
+            result,
+        );
+        inner.status.phase = "idle".into();
+        inner.status.message = "Practice finished. No text was pasted or saved.".into();
+        drop(gate);
+        drop(inner);
+        unsafe {
+            hf_discard_target();
+            hf_overlay(0);
+        }
+        return;
+    }
     if !CANCELLATION.allows(epoch) {
         inner.status.phase = "idle".into();
         inner.status.message = "Cancelled.".into();
@@ -1336,6 +1538,10 @@ fn main() {
             open_keyboard,
             download_model,
             cancel,
+            practice_start,
+            practice_finish,
+            practice_cancel,
+            practice_status,
             copy_transcript,
             set_sounds,
             set_recording_limit,
@@ -1383,6 +1589,7 @@ fn main() {
                 inner: Mutex::new(Inner {
                     generation: 0,
                     session_epoch: CANCELLATION.current(),
+                    practice: None,
                     status: Status {
                         platform: std::env::consts::OS,
                         phase: "idle".into(),
@@ -1510,6 +1717,17 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            if window.label() == "main"
+                && matches!(
+                    event,
+                    tauri::WindowEvent::Focused(false)
+                        | tauri::WindowEvent::CloseRequested { .. }
+                        | tauri::WindowEvent::Destroyed
+                )
+            {
+                close_practice();
+                let _ = window.emit("practice-cleared", ());
+            }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 let _ = window.hide();

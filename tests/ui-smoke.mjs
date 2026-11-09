@@ -272,6 +272,33 @@ try {
   await evaluate(`window.fixture.transcript='A little less typing. A little more room to think.'; document.getElementById('feedback').hidden=true;`);
   await delay(900);
   assert.equal(await evaluate(`document.body.textContent.includes(window.fixture.transcript)`), false);
+  // Practice uses its own IPC result, never the ordinary transcript fixture.
+  await evaluate(`window.fixture.platform='macos';window.practiceGeneration=0;window.practiceResult={phase:'recording',text:''};const beforePractice=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='practice_start'){window.calls.push({command,args});if(window.practiceReject)throw 'Practice busy';if(window.practiceDelay)await new Promise(r=>window.practiceAck=r);return ++window.practiceGeneration;}if(command==='practice_finish'){window.calls.push({command,args});window.practiceResult.phase='processing';return;}if(command==='practice_status'){return {...window.practiceResult,generation:window.practiceGeneration};}if(command==='practice_cancel'){window.calls.push({command,args});return;}return beforePractice(command,args);};document.getElementById('nav-overview').click()`);
+  await until(`!document.getElementById('practice').hidden && !document.getElementById('practice-start').disabled`);
+  assert.ok((await send('Accessibility.getFullAXTree')).nodes.some(n=>n.role?.value==='textbox' && n.name?.value==='Temporary practice field'));
+  await evaluate(`document.getElementById('practice-start').click();document.getElementById('practice-start').click()`);
+  await until(`!document.getElementById('practice-finish').disabled`);
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='practice_start').length`),1);
+  await evaluate(`document.getElementById('practice-finish').click();document.getElementById('practice-finish').click();window.practiceResult={phase:'complete',text:'<img src=x onerror="window.practiceInjected=true"> & hello'}`);
+  await until(`document.getElementById('practice-text').value.includes('<img')`);
+  assert.equal(await evaluate(`!window.practiceInjected && !document.querySelector('#practice-text img') && !document.body.textContent.includes(window.fixture.transcript)`),true,'Practice payload is a textarea value, not HTML or normal transcript');
+  await evaluate(`document.getElementById('practice-text').value='My edits';document.getElementById('practice-text').dispatchEvent(new Event('input'))`);
+  await delay(950);
+  assert.equal(await evaluate(`document.getElementById('practice-text').value`),'My edits');
+  await evaluate(`document.getElementById('practice-clear').click()`);
+  await until(`document.getElementById('practice-text').value==='' && !document.getElementById('practice-start').disabled`);
+  await evaluate(`window.practiceDelay=true;document.getElementById('practice-start').click();document.getElementById('nav-settings').click();window.practiceAck()`);
+  await delay(950);
+  assert.equal(await evaluate(`document.getElementById('practice-text').value==='' && document.getElementById('practice-finish').disabled`),true,'Late acknowledgement after navigation stays cancelled');
+  await evaluate(`window.practiceDelay=false;window.practiceReject=true;document.getElementById('nav-overview').click();document.getElementById('practice-start').click()`);
+  await until(`document.getElementById('practice-message').textContent.includes('Practice busy')`);
+  await evaluate(`window.practiceReject=false;document.getElementById('practice-clear').click()`);
+  await until(`!document.getElementById('practice-start').disabled`);
+  await evaluate(`document.getElementById('practice-start').click()`);
+  await until(`!document.getElementById('practice-finish').disabled`);
+  await evaluate(`window.dispatchEvent(new Event('blur'))`);
+  await until(`document.getElementById('practice-text').value==='' && document.getElementById('practice-finish').disabled`);
+  assert.equal(await evaluate(`localStorage.length===0 && sessionStorage.length===0 && window.calls.filter(c=>c.command==='copy_transcript').length===0`),true,'Practice does not persist or request normal clipboard actions');
   for (const theme of ['light','dark']) {
     await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-color-scheme',value:theme}]});
     assert.deepEqual(await evaluate(`({scheme:getComputedStyle(document.documentElement).colorScheme,bg:getComputedStyle(document.documentElement).backgroundColor,text:getComputedStyle(document.documentElement).color})`), {scheme:'light',bg:'rgb(247, 246, 243)',text:'rgb(48, 46, 45)'}, 'The app stays intentionally light even on a dark system');

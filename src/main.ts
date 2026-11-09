@@ -1,9 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getVersion } from '@tauri-apps/api/app';
+import { listen } from '@tauri-apps/api/event';
 import './style.css';
 import './typography.css';
 import { defaultShortcut, ShortcutRecorder, shortcutLabel, type Shortcut } from './shortcut';
 import { phaseLabel, canCancel, formatTime, readiness, readinessDetail } from './presentation';
+import { Practice } from './practice';
 
 type Status = { platform?: 'windows' | 'macos'; compatibility_paste?: boolean; phase: string; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: 'clean' | 'warm'; recording_limit: number; recording_mode?: 'toggle' | 'push_to_talk'; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
 const logo = new URL('../src-tauri/icons/icon.png', import.meta.url).href;
@@ -17,6 +19,16 @@ document.querySelector('#app')!.innerHTML = `
     <section class="card readiness"><div><h2 id="ready-title">Finish setting up</h2><p id="ready-detail">Connecting to HandsFree…</p></div><button id="setup" class="primary" disabled>Open settings</button></section>
    <section id="overview-model" class="card readiness" hidden aria-label="English model"><div><h2>English model</h2><p id="overview-model-state">One-time download · Works offline afterward</p></div><button id="overview-download" class="primary" disabled>Download English model (~148 MB)</button></section>
    <div class="metrics" aria-label="Local usage since tracking began"><article><strong id="words">0</strong><span>Words</span></article><article><strong id="saved">0 sec</strong><span tabindex="0" title="Estimate per dictation: typing at 40 words/minute, minus recording time, never below zero. Not a productivity measurement.">Time saved<small>Estimated</small></span></article><article><strong id="count">0</strong><span>Dictations</span></article></div>
+   <section id="practice" class="card practice" aria-labelledby="practice-title" hidden>
+    <h2 id="practice-title">Try your voice</h2>
+    <p>Test your microphone and English model here. This does not test the shortcut or insertion into another app.</p>
+    <p class="practice-sample">Try saying: “Hello HandsFree, this is my first practice dictation.”</p>
+    <label for="practice-text">Temporary practice field</label>
+    <textarea id="practice-text" rows="4" autocomplete="off" spellcheck="false" aria-describedby="practice-privacy" placeholder="Your practice words appear here. You can also type and edit."></textarea>
+    <p id="practice-privacy" class="subtle">Not saved or counted in usage. Cleared when you leave Overview or this window loses focus. Nothing is pasted or copied.</p>
+    <div class="practice-actions"><button id="practice-start" class="primary" disabled>Start practice</button><button id="practice-finish" disabled>Finish</button><button id="practice-cancel" disabled>Cancel</button><button id="practice-clear">Clear / try again</button><button id="practice-setup">Setup help</button></div>
+    <p id="practice-message" role="status" aria-live="polite"></p>
+   </section>
  </section>
  <section id="settings" hidden aria-labelledby="settings-title">
   <div class="settings-intro"><h1 id="settings-title">Settings</h1></div>
@@ -71,6 +83,7 @@ const canEditShortcut = () => ['idle', 'copied', 'setup_required', 'not_pasted',
 const isIdle = () => ['idle', 'copied'].includes(current?.phase ?? '');
 let seenPermissionRequests = 0;
 function navigate(tab: 'overview' | 'settings') {
+  if (tab !== 'overview') void practice.clear();
   if (capturing && tab !== 'settings') void stopCapture();
   for (const name of ['overview', 'settings']) {
     el(name).hidden = name !== tab;
@@ -78,6 +91,7 @@ function navigate(tab: 'overview' | 'settings') {
     if (name === tab) el(`nav-${name}`).setAttribute('aria-current', 'page');
     else el(`nav-${name}`).removeAttribute('aria-current');
   }
+  renderPractice();
 }
 function feedback(message: string) {
   el('feedback').hidden = !message; el('feedback').textContent = message;
@@ -96,6 +110,32 @@ el('setup').onclick = () => {
   target.scrollIntoView({ block: 'center' });
   target.setAttribute('tabindex', '-1'); target.focus();
 };
+const practiceField = el('practice-text') as HTMLTextAreaElement;
+const practiceVisible = () => !el('overview').hidden && !document.hidden && document.hasFocus();
+const practice = new Practice(invoke, view => {
+  // Assign a value, never HTML; no normal dictation payload is read here.
+  if (practiceField.value !== view.text) practiceField.value = view.text;
+  el('practice-message').textContent = view.message;
+  renderPractice();
+}, practiceVisible);
+function renderPractice() {
+  el('practice').hidden = current?.platform !== 'macos';
+  const active = ['starting', 'recording', 'processing'].includes(practice.view.phase);
+  button('practice-start').disabled = !current || !readiness(current) || !canEditShortcut() || capturing || captureStopping || shortcutPending || modePending || downloadPending || !practiceVisible() || !['idle', 'error'].includes(practice.view.phase);
+  button('practice-finish').disabled = practice.view.phase !== 'recording';
+  button('practice-cancel').disabled = !active;
+}
+practiceField.oninput = () => practice.edit(practiceField.value);
+el('practice-start').onclick = () => { if (!button('practice-start').disabled) void practice.start(); };
+el('practice-finish').onclick = () => void practice.finish();
+el('practice-cancel').onclick = () => void practice.clear();
+el('practice-clear').onclick = () => void practice.clear();
+el('practice-setup').onclick = () => button('setup').click();
+window.addEventListener('blur', () => { void practice.clear(); });
+window.addEventListener('pagehide', () => { void practice.clear(); });
+window.addEventListener('focus', () => renderPractice());
+// WebKit does not always dispatch pagehide when a native window is hidden.
+void listen('practice-cleared', () => { void practice.clear(); }).catch(() => { /* Browser-only preview has no native events. */ });
 el('mic').onclick = () => void action('request_microphone');
 el('permissions').onclick = () => { if (current && current.platform !== 'windows') void action('request_permissions'); };
 const recorder = button('change-shortcut');
@@ -328,7 +368,9 @@ async function refreshStatus() {
     }
      el('overview-shortcut').textContent = displayShortcut(current);
     if (capturing && !canEditShortcut() && !shortcutPending) void stopCapture();
-    renderShortcut();
+     renderShortcut();
+    renderPractice();
+    void practice.poll();
     if (!volumePending && !volumeEditing) { volume.value = String(current.sound_volume); showVolume(); }
     if (!stylePending) soundStyle.value = current.sound_style;
     soundStyle.disabled = !isIdle() || stylePending || previewPending;
@@ -350,4 +392,4 @@ async function refreshStatus() {
 void refresh();
 void getVersion().then(version => { el('app-version').textContent = version; }).catch(() => { /* Packaged version fallback for browser previews. */ });
 setInterval(() => { if (!document.hidden) void refresh(); }, 800);
-document.addEventListener('visibilitychange', () => { if (document.hidden && capturing) void stopCapture(); else if (!document.hidden) void refresh(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { void practice.clear(); if (capturing) void stopCapture(); } else void refresh(); });
