@@ -168,6 +168,11 @@ impl FnGesture {
     }
 }
 
+/// Cancellation only applies to a live recording or its processing/teardown.
+pub fn can_cancel(phase: &str) -> bool {
+    matches!(phase, "recording" | "processing")
+}
+
 /// Explicit overlay/timeout finish can never toggle an idle session back on.
 pub fn can_finish(phase: &str, current: u64, requested: Option<u64>) -> bool {
     phase == "recording" && requested.is_none_or(|generation| generation == current)

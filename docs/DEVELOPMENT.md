@@ -55,6 +55,11 @@ The certificate must be kept for future rebuilds; re-running initialization refu
 
 ## First run (explicit actions only)
 
+For lifecycle changes, start with [state ownership and transition contracts](STATE-MACHINES.md)
+and the source-linked [machine inventory](state-machines.json). UI phase policies
+are observations, not native command authorization; shared Node/Rust fixtures
+protect existing eligibility while domain owners retain their own guards.
+
 Published beta 7 adds [signed in-app updates](UPDATES.md) via the footer's
 **Updates** dialog. Opening it reads the embedded distribution locally;
 **Check for updates** is the separate explicit network action. Published beta 6

@@ -1,8 +1,9 @@
 // This controller owns only ephemeral practice text. It never reads the normal
 // transcript or uses storage, clipboard, telemetry, or native dictation toggles.
+import type { PracticePhase } from './state.ts';
 type Invoke = <T>(command: string, args: Record<string, unknown>) => Promise<T>;
-type Result = { generation: number | null; phase: string; text: string };
-export type PracticeView = { phase: string; text: string; message: string };
+type Result = { generation: number | null; phase: 'starting' | 'recording' | 'processing' | 'complete' | 'empty' | 'error' | 'cancelled'; text: string };
+export type PracticeView = { phase: PracticePhase; text: string; message: string };
 let nextToken = Date.now() * 1000;
 export class Practice {
   private token?: number;
@@ -18,7 +19,7 @@ export class Practice {
   constructor(invoke: Invoke, render: (view: PracticeView) => void, allowed: () => boolean) {
     this.invoke = invoke; this.render = render; this.allowed = allowed;
   }
-  private show(phase: string, message: string) {
+  private show(phase: PracticePhase, message: string) {
     this.view = { ...this.view, phase, message }; this.render(this.view);
   }
   edit(text: string) { this.edited = true; this.view.text = text; }

@@ -1,0 +1,11 @@
+[
+  {"phase":"idle","editConfiguration":true,"previewSound":true,"cancel":false,"installUpdate":true},
+  {"phase":"setup_required","editConfiguration":true,"previewSound":false,"cancel":false,"installUpdate":true},
+  {"phase":"recording","editConfiguration":false,"previewSound":false,"cancel":true,"installUpdate":false},
+  {"phase":"processing","editConfiguration":false,"previewSound":false,"cancel":true,"installUpdate":false},
+  {"phase":"downloading","editConfiguration":false,"previewSound":false,"cancel":false,"installUpdate":false},
+  {"phase":"copied","editConfiguration":true,"previewSound":true,"cancel":false,"installUpdate":true},
+  {"phase":"not_pasted","editConfiguration":true,"previewSound":false,"cancel":false,"installUpdate":false},
+  {"phase":"error","editConfiguration":true,"previewSound":false,"cancel":false,"installUpdate":true},
+  {"phase":"unknown","editConfiguration":false,"previewSound":false,"cancel":false,"installUpdate":false}
+]

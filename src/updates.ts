@@ -1,6 +1,7 @@
+import { isUpdatePhase, updatePhaseBusy, acceptsUpdateProgress, type UpdatePhase } from './state.ts';
 export type UpdateView = {
   installed_version: string;
-  phase: 'idle' | 'checking' | 'available' | 'up_to_date' | 'downloading' | 'installing' | 'error';
+  phase: UpdatePhase;
   available_version?: string;
   notes: string;
   downloaded_bytes: number;
@@ -8,7 +9,7 @@ export type UpdateView = {
   message: string;
 };
 type Invoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
-export const updateBusy = (view: UpdateView) => ['checking', 'downloading', 'installing'].includes(view.phase);
+export const updateBusy = (view: UpdateView) => updatePhaseBusy(view.phase);
 export class Updates {
   view: UpdateView = { installed_version: '', phase: 'idle', notes: '', downloaded_bytes: 0, message: 'Choose Check for updates to contact the release server.' };
   private revision = 0;
@@ -21,7 +22,7 @@ export class Updates {
     this.invoke = invoke; this.render = render; this.canInstall = canInstall;
   }
   private accept(view: UpdateView) {
-    if (!view || typeof view.installed_version !== 'string' || typeof view.phase !== 'string') throw new Error('Update status is unavailable. Reopen this window to retry.');
+    if (!view || typeof view.installed_version !== 'string' || !isUpdatePhase(view.phase) || (view.phase === 'available' && (typeof view.available_version !== 'string' || !view.available_version))) throw new Error('Update status is unavailable. Reopen this window to retry.');
     this.view = view; this.render(view);
   }
   private error(error: unknown) {
@@ -60,7 +61,7 @@ export class Updates {
     this.polling = true;
     try {
       const view = await this.invoke<UpdateView>('update_status');
-      if (revision === this.revision && this.pending && ['downloading', 'installing'].includes(view?.phase)) this.accept(view);
+      if (revision === this.revision && this.pending && acceptsUpdateProgress(this.view.phase, view?.phase)) this.accept(view);
     } catch { /* The active invoke reports a final failure; a missed poll must not re-enable installation. */ }
     finally { this.polling = false; }
   }

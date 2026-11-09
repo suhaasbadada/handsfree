@@ -812,6 +812,35 @@ async fn preview_sound() -> Result<(), String> {
 #[cfg(test)]
 mod sound_tests {
     #[test]
+    fn phase_policy_matches_shared_frontend_contract() {
+        let rows: Vec<serde_json::Value> =
+            serde_json::from_str(include_str!("../../tests/fixtures/action-policy.json")).unwrap();
+        for row in rows {
+            let phase = row["phase"].as_str().unwrap();
+            assert_eq!(
+                super::shortcut_edit_allowed(phase),
+                row["editConfiguration"].as_bool().unwrap(),
+                "configuration: {phase}"
+            );
+            assert_eq!(
+                super::preview_allowed(phase),
+                row["previewSound"].as_bool().unwrap(),
+                "preview: {phase}"
+            );
+            assert_eq!(
+                super::logic::can_cancel(phase),
+                row["cancel"].as_bool().unwrap(),
+                "cancel: {phase}"
+            );
+            #[cfg(target_os = "macos")]
+            assert_eq!(
+                super::updater::idle_allowed(phase, false, false, false),
+                row["installUpdate"].as_bool().unwrap(),
+                "install: {phase}"
+            );
+        }
+    }
+    #[test]
     fn focus_after_release_revokes_processing_epoch_even_after_returning() {
         use super::*;
         for source in [1, 2] {
@@ -1043,7 +1072,7 @@ fn cancel_inner() {
     if CANCELLATION.allows(inner.session_epoch) {
         return;
     }
-    if !["recording", "processing"].contains(&inner.status.phase.as_str()) {
+    if !logic::can_cancel(&inner.status.phase) {
         return;
     }
     inner.status.phase = "processing".into();

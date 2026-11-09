@@ -1,8 +1,10 @@
+import { isDictationPhase, phasePolicy, type DictationPhase } from './state.ts';
+const phaseLabels: Record<DictationPhase, string> = { idle: 'Ready', copied: 'Copied', setup_required: 'Setup needed', not_pasted: 'Not pasted', recording: 'Listening', processing: 'Processing', downloading: 'Downloading', error: 'Needs attention' };
 export function phaseLabel(phase: string): string {
-  return ({ idle: 'Ready', copied: 'Copied', setup_required: 'Setup needed', not_pasted: 'Not pasted', recording: 'Listening', processing: 'Processing', downloading: 'Downloading', error: 'Needs attention' } as Record<string,string>)[phase] ?? 'Connecting';
+  return isDictationPhase(phase) ? phaseLabels[phase] : 'Connecting';
 }
 export function canCancel(phase: string): boolean {
-  return ['recording', 'processing'].includes(phase);
+  return phasePolicy(phase).cancel;
 }
 export function formatTime(seconds: number): string {
   const safe = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;

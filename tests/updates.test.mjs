@@ -65,3 +65,27 @@ test('offline checks and installation failures stay visible and permit an explic
   responses.set('check_for_updates', view('up_to_date')); await u.check(); assert.equal(u.view.phase, 'up_to_date');
   assert.equal(calls.filter(c => c.command === 'check_for_updates').length, 3);
 });
+
+test('delayed download progress never moves an installing UI backwards', async () => {
+  const {updates:u,responses} = fixture();
+  responses.set('check_for_updates', available()); await u.check();
+  const pending = deferred(); responses.set('install_update', pending.promise);
+  const installing = u.install('0.1.1-beta.8');
+  responses.set('update_status', view('installing', {message:'Installing the verified update.'})); await u.progress();
+  assert.equal(u.view.phase, 'installing');
+  responses.set('update_status', view('downloading', {downloaded_bytes:50,total_bytes:100})); await u.progress();
+  assert.equal(u.view.phase, 'installing');
+  pending.resolve(view('error', {message:'Install failed; check again.'})); await installing;
+  assert.equal(u.view.phase, 'error', 'The owning command still reports a terminal failure');
+});
+
+test('unknown or incomplete native update snapshots fail closed', async () => {
+  for (const invalid of [view('unrecognized'), view('available'), view('available', {available_version: 1})]) {
+    const {updates:u,responses,calls} = fixture();
+    responses.set('update_status', invalid); await u.refresh();
+    assert.equal(u.view.phase, 'error');
+    assert.match(u.view.message, /unavailable/);
+    await u.install('0.1.1-beta.8');
+    assert.equal(calls.some(c => c.command === 'install_update'), false);
+  }
+});

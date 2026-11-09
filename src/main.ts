@@ -7,8 +7,9 @@ import { defaultShortcut, ShortcutRecorder, shortcutLabel, type Shortcut } from 
 import { phaseLabel, canCancel, formatTime, readiness, readinessDetail } from './presentation';
 import { Practice } from './practice';
 import { Updates, updateBusy } from './updates';
+import { phasePolicy, updateInstalling, type DictationPhase } from './state.ts';
 
-type Status = { platform?: 'windows' | 'macos'; compatibility_paste?: boolean; phase: string; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: 'clean' | 'warm'; recording_limit: number; recording_mode?: 'toggle' | 'push_to_talk'; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
+type Status = { platform?: 'windows' | 'macos'; compatibility_paste?: boolean; phase: DictationPhase; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: 'clean' | 'warm'; recording_limit: number; recording_mode?: 'toggle' | 'push_to_talk'; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
 const logo = new URL('../src-tauri/icons/icon.png', import.meta.url).href;
 document.querySelector('#app')!.innerHTML = `
 <div class="shell">
@@ -90,9 +91,9 @@ let captureTimer: ReturnType<typeof setTimeout> | undefined;
 let captureStart: Promise<unknown> | undefined;
 let captureStopping = false;
 let activationHeld = false;
-const installingUpdate = () => ['downloading', 'installing'].includes(updates.view.phase);
-const canEditShortcut = () => !installingUpdate() && ['idle', 'copied', 'setup_required', 'not_pasted', 'error'].includes(current?.phase ?? '');
-const isIdle = () => !installingUpdate() && ['idle', 'copied'].includes(current?.phase ?? '');
+const installingUpdate = () => updateInstalling(updates.view.phase);
+const canEditShortcut = () => !installingUpdate() && phasePolicy(current?.phase).editConfiguration;
+const isIdle = () => !installingUpdate() && phasePolicy(current?.phase).previewSound;
 let seenPermissionRequests = 0;
 function navigate(tab: 'overview' | 'settings') {
   if (tab !== 'overview') void practice.clear();
@@ -152,7 +153,7 @@ const updatesDialog = el('updates-dialog') as HTMLDialogElement;
 const updateConfirmDialog = el('update-confirm-dialog') as HTMLDialogElement;
 let confirmedUpdate: string | undefined;
 const canInstallUpdate = () => current?.platform === 'macos'
-  && ['idle', 'copied', 'setup_required', 'error'].includes(current.phase)
+  && phasePolicy(current.phase).installUpdate
   && practice.view.phase === 'idle' && !capturing && !captureStopping && !shortcutPending && !downloadPending && !modePending;
 const updates = new Updates(invoke, () => { renderUpdates(); renderPractice(); renderShortcut(); }, canInstallUpdate);
 function renderUpdates() {
