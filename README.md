@@ -7,7 +7,7 @@
 Say it while it’s clear. HandsFree turns your thoughts into text, without making typing the bottleneck.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-706b68.svg)](LICENSE)
-[![Mac beta: v0.1.1-beta.6](https://img.shields.io/badge/Mac_beta-v0.1.1--beta.6-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.6)
+[![Mac beta: v0.1.1-beta.7](https://img.shields.io/badge/Mac_beta-v0.1.1--beta.7-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.7)
 [![Platform: Apple Silicon Mac](https://img.shields.io/badge/Platform-Apple_Silicon_Mac-706b68.svg)](#platforms)
 
 ## Download & install
@@ -24,7 +24,7 @@ Homebrew simplifies installation; macOS security prompts may still appear. This 
 
 Open **Applications → HandsFree**, allow Microphone, Accessibility, and Input Monitoring, then download the English model (~148 MB) in Settings → Overview. [Complete Mac setup, security prompts & existing-app guidance](docs/INSTALL.md).
 
-### [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.6/HandsFree-0.1.1-beta.6-macos-arm64.dmg)
+### [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.7/HandsFree-0.1.1-beta.7-macos-arm64.dmg)
 
 **DMG alternative:** drag HandsFree to Applications before opening it or granting permissions. Intel Macs are unsupported. See [Open Anyway and installation guidance](docs/INSTALL.md). No developer tools needed.
 
@@ -41,7 +41,8 @@ Current product and development focus is **Mac-only: Apple Silicon, macOS 14+**.
 - **Your shortcut:** Fn / 🌐 or a custom key combination. Toggle is the default; opt into **Settings → Recording mode → Push to talk** to hold and release. Existing saved shortcuts are preserved.
 - **Practical controls:** optional listening sounds and local usage totals. Dictation text stays out of the app window.
 - **Safer insertion:** checks the original app and field before submitting Paste; otherwise copies for manual paste.
-  Mac beta 6 users can opt into **Settings → Compatibility paste** for apps that hide their text field. It requires the same verified active app/window, but cannot verify the exact field. It is off by default, including upgrades; missing window proof or focus monitoring still requires manual paste. A submitted shortcut does not confirm insertion; no automatic retry or Enter is sent. See [delivery safeguards and limits](docs/COMPATIBILITY-PASTE.md).
+  Mac users can opt into **Settings → Compatibility paste** for apps that hide their text field. It requires the same verified active app/window, but cannot verify the exact field. It is off by default, including upgrades; missing window proof or focus monitoring still requires manual paste. A submitted shortcut does not confirm insertion; no automatic retry or Enter is sent. See [delivery safeguards and limits](docs/COMPATIBILITY-PASTE.md).
+- **Explicit signed updates (beta 7 onward):** footer **Updates → Check for updates**, then confirm **Download & restart…** when offered. No startup checks or automatic downloads. [Privacy, safeguards and acceptance limits](docs/UPDATES.md).
 
 ## Use cases
 
@@ -56,7 +57,7 @@ No special integration is required: insertion depends on the focused field, with
 
 | Platform | Status |
 | --- | --- |
-| macOS 14+, Apple Silicon | [Mac beta 6 available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.6) · self-signed, not notarized |
+| macOS 14+, Apple Silicon | [Mac beta 7 available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.7) · self-signed, not notarized |
 | Intel Macs | Unsupported |
 | Windows | Paused; historical experimental implementation, not currently supported |
 | Linux | Not supported; no build or download available |
@@ -76,9 +77,15 @@ Focus a text field, briefly tap **Fn / 🌐**, speak, and tap again to finish. *
 
 **Optional push to talk:** choose **Settings → Recording mode → Push to talk**. Hold Fn or your custom combination; release to finish (the first required component released finishes a combination). Other keys, mouse actions during a hold, or observed focus changes cancel without paste. Toggle remains the default; updates preserve your preferences, model and statistics. See [behavior, focus limits and test notes](docs/PUSH-TO-TALK.md).
 
-[Full installation and troubleshooting guide](docs/INSTALL.md) · [Beta release notes](docs/releases/v0.1.1-beta.6.md)
+[Full installation and troubleshooting guide](docs/INSTALL.md) · [Beta release notes](docs/releases/v0.1.1-beta.7.md)
 
-**Homebrew updates:** quit HandsFree, run the following in Terminal, then reopen from Applications:
+**Updates (beta 7 onward):** choose footer **Updates → Check for updates**, then
+confirm **Download & restart…** when a newer version is offered. Opening the
+dialog is local; explicit checks share ordinary connection metadata with GitHub,
+never audio, transcripts, settings or usage. Forward OTA replacement/restart has
+not yet been exercised (no beta 8 exists); see the release notes.
+
+**Optional manual Homebrew updates, or beta 6-and-earlier bootstrap:** quit HandsFree, run the following in Terminal, then reopen from Applications:
 
 ```sh
 brew update

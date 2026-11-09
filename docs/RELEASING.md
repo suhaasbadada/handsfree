@@ -2,24 +2,32 @@
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
 
-Current public Mac distribution: **v0.1.1-beta.6**, embedded version **0.1.1**.
+Current public Mac distribution: **v0.1.1-beta.7**, embedded version **0.1.1**.
 CI, publication and anonymous public-byte verification passed for the exact clean
-artifact source; see [beta 6 evidence](releases/v0.1.1-beta.6.md). The active
-`release` export and static downloads select verified beta 6. The separate disabled
-`candidateRelease` export now selects **beta 7 preparation**, not a
+artifact source; see [beta 7 evidence](releases/v0.1.1-beta.7.md). The active
+`release` export and static downloads select verified beta 7. The separate disabled
+`candidateRelease` export retains **beta 7 audit coordinates**, not a
 second availability switch. Website deployment and the cross-repository Homebrew
 gate below remain distinct checks; do not claim either from artifact verification.
 Windows beta 3 and historical Mac assets remain untouched. See
 [practice](practice.md) for the explicit-button flow, not a shortcut/insertion test,
 and [Compatibility paste](COMPATIBILITY-PASTE.md) for unchanged opt-in safeguards.
 
-## Beta 7 preparation (not publication evidence)
+## Beta 7 artifact source and publication
 
-The new target is `v0.1.1-beta.7`, embedded app version `0.1.1`. Active beta 6
-website/README/install links remain unchanged until anonymous beta 7 byte checks
-pass. Historical notes and assets are immutable. No beta 7 source SHA, checksum,
-CI, installation or OTA acceptance result is claimed here; see
-[candidate notes](releases/v0.1.1-beta.7.md).
+Published tag `v0.1.1-beta.7` uses embedded app version `0.1.1` and exact clean
+artifact source `95367c953fe0e229de236009a6cbaaef04f70f2e`.
+[Mac CI passed](https://github.com/suhaasbadada/handsfree/actions/runs/42572677818).
+The exact-source public audit passed for all seven anonymously downloaded assets,
+including signatures, bundle equality and real minisign version/tamper rejection.
+DMG SHA-256: `4cf304dfad49c68dbc7e0fd415fd35b0d1c0de634bc5bb3a610aa34930338a87`.
+Updater archive SHA-256: `4b1818f5b547c194da1d8296af38ea1b141dd95a69629346049c594ba226eff6`.
+The authorized manual bootstrap preserved the complete installed bundle, signing
+requirement, readiness and model/settings/usage hashes after launch. See
+[published notes and limitations](releases/v0.1.1-beta.7.md). Activation commits
+are later website/docs changes, not artifact source. Forward OTA restart, live
+audio and separate-Mac QA remain unperformed; live feed/website/Homebrew rollout
+must be verified separately. Historical notes and assets remain immutable.
 
 `package-release.sh` calls `node scripts/package-updater.mjs release/updater`.
 That helper owns the guarded clean-source `npm run build:local` build, stages
@@ -69,13 +77,13 @@ bash scripts/package-release.sh
 
 The script delegates **npm run build:local** and final app preparation to the updater helper (never initializes/replaces the certificate), verifies arm64, bundle ID/version/minimum OS, stages that retained signed app and an Applications shortcut, copies explicit public documentation/dependency sources, generates notices, and creates a compressed **DMG with `hdiutil`**. It signs the DMG using the same existing certificate, runs `hdiutil verify`, mounts it read-only with no auto-open, verifies the contained app and required files, and unmounts. It writes the seven assets and six-entry manifest listed above. No Finder Automation permission is required; no custom Finder window arrangement is promised. It neither installs nor launches the app, downloads a model, nor publishes anything. Python **3.11+** is only a packaging dependency.
 
-The published release label is still `v0.1.1-beta.6`; embedded version is `0.1.1`. Its immutable asset is `HandsFree-0.1.1-beta.6-macos-arm64.dmg`. Beta 6 and older remain unchanged: do not rebuild, replace, or re-upload a published artifact. **Do not distribute a user-install ZIP.** The visible beta 7 DMG root contains only `HandsFree.app`, the Applications shortcut, `Install HandsFree.txt`, and `Licenses`. The install guide discloses experimental/self-signed status. Project LICENSE, full dependency notices, `THIRD_PARTY_SOURCES.tar.gz`, `PUBLICATION-NOTES.txt`, and maintainer documentation live under `Licenses`. That source tarball is not an installer. Beta 7 also seals notices and corresponding source inside the app for OTA recipients. Keep the image with redistributions.
+The published release label is `v0.1.1-beta.7`; embedded version is `0.1.1`. Its immutable asset is `HandsFree-0.1.1-beta.7-macos-arm64.dmg`. Beta 6 and older remain unchanged: do not rebuild, replace, or re-upload a published artifact. **Do not distribute a user-install ZIP.** The visible beta 7 DMG root contains only `HandsFree.app`, the Applications shortcut, `Install HandsFree.txt`, and `Licenses`. The install guide discloses experimental/self-signed status. Project LICENSE, full dependency notices, `THIRD_PARTY_SOURCES.tar.gz`, `PUBLICATION-NOTES.txt`, and maintainer documentation live under `Licenses`. That source tarball is not an installer. Beta 7 also seals notices and corresponding source inside the app for OTA recipients. Keep the image with redistributions.
 
 ### Historical beta 5 artifact source
 
 Beta 5 was built from clean source `c5f00405b7b9ec8164e9f1f89c8e1f8ab3696028`, retaining the existing signing identity. [Mac CI build result](https://github.com/suhaasbadada/handsfree/actions/runs/41513549954). DMG SHA-256 is `99c4399246a792b55fcc96dd624bf68a8972fd731c2e7898ef84349e4fd1a155`. Its archived [release notes](releases/v0.1.1-beta.5.md) and published assets remain unchanged. Windows beta 3 is independent and unchanged; see its [release evidence](releases/v0.1.1-windows-beta.3.md). Historical [beta 4 evidence](releases/v0.1.1-beta.4.md) remains intact.
 
-### Beta 6 artifact source and activation
+### Historical beta 6 artifact source and activation
 
 Beta 6 was built from clean source `cfd6854ed8875e612b10673513d7199bb5c8124a`.
 [Mac CI](https://github.com/suhaasbadada/handsfree/actions/runs/42556991615) passed;
@@ -114,8 +122,9 @@ The candidate auditor also cleans its exact temporary mount/directory on SIGINT 
 For updater-enabled releases, also follow [the signed updater packaging and feed
 gates](UPDATES.md#release-integration). The updater archive must be generated
 **after** stable macOS signing, with a version-bound signature. The current
-published beta 6 assets and feed availability must not be changed merely by
-building the upcoming beta 7 implementation.
+published beta 7 assets and feed availability must not be changed merely by
+building a future updater release. Preserve exact-source CI/public audit gates;
+never weaken them to accept a later activation HEAD.
 
 1. Review the recorded experimental distribution decision and upstream evidence below. Tests and metadata are not legal approval. Retain `site/release.js` `candidateRelease.publicAvailable: false` as audit coordinates; preserve the verified public `release` export until a replacement passes all gates.
 2. Review the intended source changes; ensure GitHub **Checks** passes. Run `npm ci`, `npm test`, `npm run build`, Rust fmt/test/clippy from the PR template on the intended commit. Never promote candidate coordinates into active downloads before the publication gates. CI uses a macOS arm64 host and no signing secrets. It does not publish or install.

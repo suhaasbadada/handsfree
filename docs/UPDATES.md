@@ -1,8 +1,9 @@
-# Signed in-app updates (upcoming beta 7)
+# Signed in-app updates (Mac beta 7 onward)
 
-This is new build functionality, not a retroactive change to the published beta 6
-binary. Beta 6 needs one initial DMG/Homebrew upgrade to an updater-enabled
-release. Do not advertise beta 7 as published until the release gates below pass.
+Available in [published Mac beta 7](releases/v0.1.1-beta.7.md), not a retroactive
+change to beta 6. Beta 6 and earlier need one initial DMG/Homebrew bootstrap
+upgrade. A real forward OTA replacement/restart remains untested: no beta 8
+exists yet. Publication, feed deployment and OTA acceptance are separate gates.
 
 ## User flow
 
@@ -28,9 +29,10 @@ The model, preferences and usage file are outside the app and are not rewritten
 by the updater. Unsaved in-memory last-transcript text does not survive restart;
 copy anything important first. Offline/404/malformed-feed/signature/installation
 failures are shown explicitly, not reported as “up to date.” An install failure
-requires another explicit check before retrying. The new feed is intentionally
-absent until a compatible signed release exists; do not invent beta 6 updater
-metadata or point it at the DMG.
+requires another explicit check before retrying. The exact anonymously verified
+beta 7 feed is live on Pages; HTTP 200 and exact audited bytes were verified
+(see the release evidence). A 404 is an explicit failure, not an up-to-date result. Do not
+invent beta 6 updater metadata or point the feed at the DMG.
 
 ## Trust and key custody
 
@@ -92,5 +94,7 @@ requires a separately authorized bootstrap/key-rotation plan for installed users
    model/settings/usage, restart/readiness, and representative dictation. Unit
    tests or a generated signature alone do not establish this acceptance gate.
 
-No beta 7 release, OTA installation/restart acceptance, or separate-Mac QA is
-claimed by this implementation document. Windows work remains paused.
+Beta 7 publication, artifact verification and authorized manual bootstrap
+installation are recorded in the release notes. Forward OTA installation/restart,
+live audio acceptance and separate-Mac QA have not been performed. Windows work
+remains paused.
