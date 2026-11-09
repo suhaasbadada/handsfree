@@ -169,6 +169,7 @@ for text in ["No speech", "Copied"] {
     precondition(size.width <= 132 && size.height <= 14, "Single-line status text must fit the centered 14 pt height")
 }
 for phase: Int32 in [1, 2, 3, 4, 5, 1] {
+    let previousFrame = app.windows.first { $0 is NSPanel }?.frame
     overlay(phase)
     if phase == 1 || phase == 2 { precondition(!previewSound(), "No playback during capture or processing") }
     let panel = app.windows.first { $0 is NSPanel }!
@@ -188,8 +189,15 @@ for phase: Int32 in [1, 2, 3, 4, 5, 1] {
     }
     if phase == 4 { precondition(view.accessibilityLabel() == "No speech") }
     if phase == 5 { precondition(view.accessibilityLabel() == "Copied") }
-    let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main!
-    precondition(abs(panel.frame.midX - screen.visibleFrame.midX) < 0.01)
+    if phase == 2, let previousFrame = previousFrame {
+        // Processing deliberately stays on the recording screen. Sampling the
+        // live pointer after the 300 ms run-loop wait races real mouse movement
+        // between monitors and incorrectly rejects this required behavior.
+        precondition(panel.frame.origin == previousFrame.origin, "Processing must preserve the recording screen")
+    } else {
+        let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main!
+        precondition(abs(panel.frame.midX - screen.visibleFrame.midX) < 0.01, "Capsule must be centered on the current screen")
+    }
     // Exercise drawing and text layout for every state without starting capture.
     let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
     view.cacheDisplay(in: view.bounds, to: bitmap)
