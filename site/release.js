@@ -2,19 +2,19 @@
 // The embedded app version is 0.1.1; this is the distribution label.
 export const release = Object.freeze({
   schemaVersion: 1,
-  version: '0.1.1-beta.7',
+  version: '0.1.1-beta.8',
   publicAvailable: true,
-  status: 'Experimental Mac beta 7 available. Explicit signed in-app updates; self-signed, not notarized.',
-  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.7/HandsFree-0.1.1-beta.7-macos-arm64.dmg',
+  status: 'Experimental Mac beta 8 available. Updates dialog focus fix; self-signed, not notarized.',
+  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.8/HandsFree-0.1.1-beta.8-macos-arm64.dmg',
 });
 
 // Preparation/audit coordinates only; the website continues to use release above.
-// Beta 8 preparation only; beta 7 remains available until publication is verified.
+// Retained exact beta 8 audit coordinates; not a second availability switch.
 export const candidateRelease = Object.freeze({
   schemaVersion: 1,
   version: '0.1.1-beta.8',
   publicAvailable: false,
-  status: 'Mac beta 8 preparation only; public availability is controlled above.',
+  status: 'Mac beta 8 immutable artifact audit coordinates; public availability is controlled above.',
   dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.8/HandsFree-0.1.1-beta.8-macos-arm64.dmg',
 });
 

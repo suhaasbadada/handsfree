@@ -29,20 +29,20 @@ Homebrew simplifies installation; macOS security prompts may still appear. Trust
 Already have a manually installed `/Applications/HandsFree.app`? Homebrew may report that the app already exists. You can keep using your current manual installation. If you choose to switch and Homebrew asks you to resolve that conflict, quit HandsFree and move the existing app copy to a safe backup location before retrying the install. Keep the backup until the new copy works; do not delete your models, settings, statistics, or other user data. Permissions may need reauthorization.
 
 For optional manual Homebrew-managed updates, or the required beta 6-and-earlier
-bootstrap to beta 7, quit HandsFree, then run:
+bootstrap to the current beta, quit HandsFree, then run:
 
 ```sh
 brew update
 brew upgrade --cask suhaasbadada/handsfree/handsfree
 ```
 
-Reopen the Applications copy afterward. The current Mac distribution is `0.1.1-beta.7` (the embedded app version remains `0.1.1`); Homebrew selects upgrades using the cask's distribution version. Beta updates are reviewed manually, not promised on a schedule. Its documented online-audit prerelease policy finding is intentional, not a claim that the beta meets Homebrew’s stable-release policy.
+Reopen the Applications copy afterward. The current Mac distribution is `0.1.1-beta.8` (the embedded app version remains `0.1.1`); Homebrew selects upgrades using the cask's distribution version. Beta updates are reviewed manually, not promised on a schedule. Its documented online-audit prerelease policy finding is intentional, not a claim that the beta meets Homebrew’s stable-release policy.
 
 Normal updates preserve your existing model, settings, and usage totals; they do not restart onboarding or reset permissions. Do not use `--zap`, delete HandsFree's data folders, or reset totals to update. Existing permissions may still need reauthorization if macOS requests it. No installed-app upgrade or clean-machine onboarding test is implied by the release's artifact checks.
 
 ## DMG alternative
 
-Download the [Mac DMG](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.7/HandsFree-0.1.1-beta.7-macos-arm64.dmg). Open it and drag **HandsFree.app** onto **Applications**. Keep the disk image: its `Licenses` folder (project license, dependency notices and corresponding sources) accompanies redistributions. No ZIP extraction or developer tools are needed. Eject the image after copying. Do not launch the copy inside the disk image.
+Download the [Mac DMG](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.8/HandsFree-0.1.1-beta.8-macos-arm64.dmg). Open it and drag **HandsFree.app** onto **Applications**. Keep the disk image: its `Licenses` folder (project license, dependency notices and corresponding sources) accompanies redistributions. No ZIP extraction or developer tools are needed. Eject the image after copying. Do not launch the copy inside the disk image.
 
 For optional manual DMG updates, quit HandsFree, replace the Applications copy,
 then reopen. Beta 6 and earlier need this or Homebrew as a one-time bootstrap.
@@ -58,8 +58,9 @@ transcripts, model files, settings or usage. Copy important fallback text before
 restarting: in-memory results do not survive restart. Updates require an idle,
 normal `/Applications/HandsFree.app`; errors including HTTP 404 are shown, not
 reported as up to date. Model/settings/usage remain outside the replaced bundle.
-Actual forward OTA replacement/restart remains unperformed (no beta 8 exists).
-See [trust and safeguards](UPDATES.md) and [beta 7 evidence](releases/v0.1.1-beta.7.md).
+Beta 8 is available to test a real forward OTA replacement/restart; acceptance
+remains pending until the installed beta 7 app completes that flow.
+See [trust and safeguards](UPDATES.md) and [beta 8 evidence](releases/v0.1.1-beta.8.md).
 
 ## First launch — both install methods
 
@@ -74,7 +75,7 @@ Focus a text field, tap your shortcut to speak, and tap again to transcribe. Esc
 speak, then **Finish**. The temporary editable result does not paste, change the
 clipboard or count toward usage. This is not a shortcut or external-insertion
 test. See [practice safeguards](practice.md) and the
-[release evidence and unperformed hardware checks](releases/v0.1.1-beta.7.md).
+[release evidence and unperformed hardware checks](releases/v0.1.1-beta.8.md).
 
 **Toggle remains the default.** For optional hold-to-record behavior, select
 **Settings → Recording mode → Push to talk**: hold Fn / Globe or your saved

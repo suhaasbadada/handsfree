@@ -1,9 +1,11 @@
 # Signed in-app updates (Mac beta 7 onward)
 
-Available in [published Mac beta 7](releases/v0.1.1-beta.7.md), not a retroactive
+Introduced in [published Mac beta 7](releases/v0.1.1-beta.7.md), not a retroactive
 change to beta 6. Beta 6 and earlier need one initial DMG/Homebrew bootstrap
-upgrade. A real forward OTA replacement/restart remains untested: no beta 8
-exists yet. Publication, feed deployment and OTA acceptance are separate gates.
+upgrade. [Beta 8](releases/v0.1.1-beta.8.md) fixes initial Updates dialog focus and
+provides the first forward OTA test opportunity. Actual replacement/restart is
+still pending user acceptance. Publication, feed deployment and OTA acceptance
+are separate gates.
 
 ## User flow
 
@@ -30,8 +32,8 @@ by the updater. Unsaved in-memory last-transcript text does not survive restart;
 copy anything important first. Offline/404/malformed-feed/signature/installation
 failures are shown explicitly, not reported as “up to date.” An install failure
 requires another explicit check before retrying. The exact anonymously verified
-beta 7 feed is live on Pages; HTTP 200 and exact audited bytes were verified
-(see the release evidence). A 404 is an explicit failure, not an up-to-date result. Do not
+beta 8 feed is checked in for Pages deployment. Verify live HTTP 200 and exact
+audited bytes separately. A 404 is an explicit failure, not an up-to-date result. Do not
 invent beta 6 updater metadata or point the feed at the DMG.
 
 ## Trust and key custody

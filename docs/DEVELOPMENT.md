@@ -61,9 +61,11 @@ Published beta 7 adds [signed in-app updates](UPDATES.md) via the footer's
 and its installed copies do not gain this feature until a bootstrap upgrade.
 Then explicitly check, choose **Download & restart…** when a newer release is
 offered, and confirm its version. Opening the dialog never checks online.
-See [beta 7 evidence](releases/v0.1.1-beta.7.md): manual bootstrap and preservation
-were verified; forward OTA replacement/restart, live audio and separate-Mac QA
-remain unperformed. Feed deployment is a separate operational check.
+See [beta 7 evidence](releases/v0.1.1-beta.7.md) for verified manual bootstrap and
+preservation, and [beta 8 evidence](releases/v0.1.1-beta.8.md) for the dialog focus
+fix and first forward update opportunity. Actual forward OTA replacement/restart,
+live audio and separate-Mac QA remain unperformed. Feed deployment is a separate
+operational check.
 
 1. Open **Settings** in the dashboard. Click **Allow** for Microphone. If denied, enable HandsFree under System Settings → Privacy & Security → Microphone.
 2. Click **Open settings** for Accessibility / Input Monitoring and enable HandsFree in **both** Privacy & Security panes. Accessibility is needed to inspect the original text field and post Paste; Input Monitoring is needed for the global Fn event tap. Quit/relaunch after changing grants. The app never changes preferences itself.
