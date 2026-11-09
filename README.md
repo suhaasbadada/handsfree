@@ -8,7 +8,7 @@ Say it while it’s clear. HandsFree turns your thoughts into text, without maki
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-706b68.svg)](LICENSE)
 [![Mac beta: v0.1.1-beta.5](https://img.shields.io/badge/Mac_beta-v0.1.1--beta.5-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.5)
-[![Platforms: Apple Silicon and Windows x64](https://img.shields.io/badge/Platforms-Apple_Silicon_%C2%B7_Windows_x64-706b68.svg)](#platforms)
+[![Platform: Apple Silicon Mac](https://img.shields.io/badge/Platform-Apple_Silicon_Mac-706b68.svg)](#platforms)
 
 ## Download & install
 
@@ -28,20 +28,16 @@ Open **Applications → HandsFree**, allow Microphone, Accessibility, and Input 
 
 **DMG alternative:** drag HandsFree to Applications before opening it or granting permissions. Intel Macs are unsupported. See [Open Anyway and installation guidance](docs/INSTALL.md). No developer tools needed.
 
-### [Download for Windows (.exe)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-windows-beta.3/HandsFree-0.1.1-windows-x64-setup.exe)
-
-**Experimental · Windows 10/11 x64 (Intel/AMD) · CPU · English.** Unsigned; not yet hardware-tested. Windows ARM and 32-bit Windows are unsupported. [Windows install guide & SmartScreen guidance](docs/WINDOWS.md). No developer tools or account needed.
-
 [Website](https://suhaasbadada.github.io/handsfree/) · [Releases](https://github.com/suhaasbadada/handsfree/releases) · [Report a bug](https://github.com/suhaasbadada/handsfree/issues)
 
 HandsFree is an open-source, local-first dictation companion. Tap a shortcut, speak, and get text in the field you started in. No account, paid API, telemetry, or cloud transcription service.
-Mac beta and experimental Windows beta are available; Linux is planned.
+Current product and development focus is **Mac-only: Apple Silicon, macOS 14+**. Windows work is paused; Linux is not supported. There are no commitments or release dates for either port.
 
 ## Features
 
-- **Private by design:** Whisper runs locally with Apple Silicon Metal on Mac or CPU inference on Windows. Download the model once; dictate offline afterward. Windows CPU transcription may be slower.
+- **Private by design:** Whisper runs locally with Apple Silicon Metal. Download the model once; dictate offline afterward.
 - **Stay in flow:** a compact recording capsule, live mic meter, and Escape to cancel.
-- **Your shortcut:** Fn / 🌐 on Mac, Right Ctrl on Windows, or a custom key combination. Toggle is the default; opt into **Settings → Recording mode → Push to talk** to hold and release. Existing saved shortcuts are preserved.
+- **Your shortcut:** Fn / 🌐 or a custom key combination. Toggle is the default; opt into **Settings → Recording mode → Push to talk** to hold and release. Existing saved shortcuts are preserved.
 - **Practical controls:** optional listening sounds and local usage totals. Dictation text stays out of the app window.
 - **Safer insertion:** checks the original app and field before submitting Paste; otherwise copies for manual paste.
   Mac beta 5 users can opt into **Settings → Compatibility paste** for apps that hide their text field. It requires the same verified active app/window, but cannot verify the exact field. It is off by default, including upgrades; missing window proof or focus monitoring still requires manual paste. A submitted shortcut does not confirm insertion; no automatic retry or Enter is sent. See [delivery safeguards and limits](docs/COMPATIBILITY-PASTE.md).
@@ -61,16 +57,12 @@ No special integration is required: insertion depends on the focused field, with
 | --- | --- |
 | macOS 14+, Apple Silicon | [Mac beta 5 available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.5) · self-signed, not notarized |
 | Intel Macs | Unsupported |
-| Windows 10/11, x64 | [Experimental Windows beta 3 available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-windows-beta.3) · unsigned, not yet hardware-tested |
-| Linux | Planned; no build or download available |
+| Windows | Paused; historical experimental implementation, not currently supported |
+| Linux | Not supported; no build or download available |
 
-Windows ARM and 32-bit Windows are unsupported. Linux has no release date.
+The Tauri 2, Rust, TypeScript and Swift stack retains shared application code and a platform facade for possible future ports, not a promise of cross-platform support. [Historical Windows implementation records](docs/WINDOWS.md) remain available; published release history is unchanged.
 
 ## Install
-
-**Windows:** run the [EXE above](#download-for-windows-exe), then follow the [Windows guide](docs/WINDOWS.md): allow desktop microphone access in Windows Settings, explicitly download the English model (~148 MB), and briefly tap **Right Ctrl** to start, then again to finish. Mac Accessibility/Input Monitoring permissions do not apply. Review the experimental limitations before testing.
-
-**Upgrading Windows?** Quit HandsFree and run the new installer; models, settings and statistics are retained. Existing saved shortcuts, including Ctrl+Shift+Space, are preserved: choose **Settings → Use default** to switch to **Right Ctrl**. In default Toggle mode, release within 400 ms; holds, chords and AltGr cancel the tap gesture. Push to talk is a separate opt-in below. This is not a promise of universal conflict-free behavior. [Windows beta 3 notes and build evidence](docs/releases/v0.1.1-windows-beta.3.md).
 
 ### Mac
 
@@ -81,7 +73,7 @@ Windows ARM and 32-bit Windows are unsupported. Linux has no release date.
 
 Focus a text field, briefly tap **Fn / 🌐**, speak, and tap again to finish. **Escape** cancels. Choose a different shortcut in Settings if Fn conflicts with macOS or your keyboard. If insertion is unavailable, paste the copied transcript yourself. **Review important text:** speech recognition can make mistakes.
 
-**Optional push to talk (Mac beta 4 / Windows beta 3):** choose **Settings → Recording mode → Push to talk**. Hold Fn on Mac, Right Ctrl on Windows, or your custom combination; release to finish (the first required component released finishes a combination). Other keys, mouse actions during a hold, or observed focus changes cancel without paste. Toggle remains the default; updates preserve your preferences, model and statistics. See [behavior, focus limits and test notes](docs/PUSH-TO-TALK.md).
+**Optional push to talk:** choose **Settings → Recording mode → Push to talk**. Hold Fn or your custom combination; release to finish (the first required component released finishes a combination). Other keys, mouse actions during a hold, or observed focus changes cancel without paste. Toggle remains the default; updates preserve your preferences, model and statistics. See [behavior, focus limits and test notes](docs/PUSH-TO-TALK.md).
 
 [Full installation and troubleshooting guide](docs/INSTALL.md) · [Beta release notes](docs/releases/v0.1.1-beta.5.md)
 
@@ -93,11 +85,11 @@ brew upgrade --cask suhaasbadada/handsfree/handsfree
 ```
 
 Updates preserve your model, settings and statistics. Compatibility paste stays off
-unless you enable it in Settings; the Windows beta 3 installer is unchanged.
+unless you enable it in Settings.
 
 ## Build from source
 
-For the Mac build: requires Apple Silicon, macOS 14+, Node 22.18+ (24 recommended), Rust stable, CMake, and Xcode Command Line Tools with Swift and a macOS SDK. For experimental Windows x64 builds and tester acceptance checks, see [Windows beta](docs/WINDOWS.md).
+The current development target requires Apple Silicon, macOS 14+, Node 22.18+ (24 recommended), Rust stable, CMake, and Xcode Command Line Tools with Swift and a macOS SDK. Keep shared logic behind the existing platform facade; Windows implementation records are historical, not an active development or release track.
 
 ```sh
 git clone https://github.com/suhaasbadada/handsfree.git

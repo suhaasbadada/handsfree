@@ -1,6 +1,8 @@
-# Experimental Windows beta
+# Windows beta — paused / historical
 
-**[Download for Windows (.exe)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-windows-beta.3/HandsFree-0.1.1-windows-x64-setup.exe)**
+> **Historical implementation and release record, not current install or support guidance.** Current product and development focus is Mac-only: Apple Silicon, macOS 14+. Windows work is paused; Linux is not supported. There is no commitment or release date for either port. Prior artifacts and evidence remain unchanged. Instructions, pending checklists and publication behavior below describe the earlier experimental Windows track, not authorization to resume or promote it.
+
+**[Historical Windows beta 3 artifact (.exe)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-windows-beta.3/HandsFree-0.1.1-windows-x64-setup.exe)**
 
 **Experimental · Windows 10/11 x64 · CPU · English.** Public beta
 [`v0.1.1-windows-beta.3`](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-windows-beta.3)
@@ -267,10 +269,10 @@ This public experimental release permits deliberate early testing; the unchecked
 hardware cases above remain outstanding, not waived or marked passed. Never
 replace or hide the working Mac download to announce a Windows beta.
 
-## Website publication checklist (maintainers)
+## Historical website publication checklist (not current guidance)
 
-The public distribution label is `v0.1.1-windows-beta.3`; the embedded app and
-installer version is `0.1.1`. `site/release.js` has
+The historical public distribution label is `v0.1.1-windows-beta.3`; the embedded app and
+installer version is `0.1.1`. At publication, `site/release.js` had
 `windowsRelease.publicAvailable: true` after anonymous public asset verification.
 Never use GitHub's `latest` endpoint for this prerelease.
 

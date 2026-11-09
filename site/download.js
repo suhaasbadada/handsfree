@@ -1,4 +1,4 @@
-import { release, windowsRelease } from './release.js';
+import { release } from './release.js';
 
 // MacIntel and an "Intel Mac OS X" UA also occur on Apple Silicon.
 // Only explicit UA Client Hints may establish Mac architecture; Windows ARM UAs are explicit too.
@@ -21,18 +21,12 @@ export function detectPlatform({ userAgent = '', platform = '', maxTouchPoints =
   return { os, arch };
 }
 
-export function downloadState(platform, manifest, windowsManifest = windowsRelease) {
-  const windowsUrl = publishedWindowsUrl(windowsManifest);
-  if (platform.os === 'windows' && ['intel', 'unknown'].includes(platform.arch) && windowsUrl) {
-    return { label: 'Download for Windows', detail: 'For Windows 10/11 x64 · CPU · English',
-      note: '', url: windowsUrl, target: 'windows' };
-  }
+export function downloadState(platform, manifest) {
   const url = publishedUrl(manifest);
   const note = platform.os === 'mac' && platform.arch === 'intel' ? 'Intel Macs are not supported. Download only for another, Apple Silicon Mac.'
-    : platform.os === 'windows' ? `${windowsUrl ? 'Windows beta is x64 only.' : 'Windows beta in testing. No verified installer available yet.'} ${platform.arch === 'arm64' ? 'Windows ARM is unsupported. ' : platform.arch === 'x86_32' ? '32-bit Windows is unsupported. ' : ''}Target: Windows 10/11 x64. This download is for an Apple Silicon Mac.`
-    : platform.os === 'linux' ? 'Linux planned. This download is for an Apple Silicon Mac.'
-    : platform.os === 'mobile' ? 'Mobile devices are unsupported. This download is for an Apple Silicon Mac.' : '';
-  return { label: url ? (platform.os === 'mac' ? 'Download for Mac' : 'Get Mac beta') : 'Mac beta coming soon',
+    : platform.os === 'mac' ? ''
+    : `${platform.os === 'windows' ? 'Windows is not supported; Windows development is paused.' : platform.os === 'linux' ? 'Linux is not supported.' : platform.os === 'mobile' ? 'Mobile devices are not supported.' : 'Your device could not be identified as a supported Mac.'} Download only for another device: an Apple Silicon Mac running macOS 14+.`;
+  return { label: url ? (platform.os === 'mac' ? 'Download for Mac' : 'Download for another Mac') : 'Mac download unavailable',
     detail: 'For Apple Silicon Mac · macOS 14+ · English', note, url, target: 'mac' };
 }
 
@@ -70,33 +64,16 @@ function setDownloadLink(cta, url, label) {
   }
 }
 
-export function renderDownload(document, platform, manifest, windowsManifest = windowsRelease) {
-  const state = downloadState(platform, manifest, windowsManifest);
+export function renderDownload(document, platform, manifest) {
+  const state = downloadState(platform, manifest);
   const macUrl = publishedUrl(manifest);
-  const windowsUrl = publishedWindowsUrl(windowsManifest);
-  const isWindows = state.target === 'windows';
   const brew = document.getElementById('hero-homebrew');
   if (brew) brew.hidden = platform.os !== 'mac' || platform.arch === 'intel' || !macUrl;
   setDownloadLink(document.getElementById('primary-download'), state.url,
-    state.url ? (isWindows ? 'Download for Windows (x64 EXE)' : 'Download for Mac (Apple Silicon)') : state.label);
+    state.url ? 'Download for Mac (Apple Silicon)' : state.label);
   document.getElementById('download-label').textContent = state.label;
-  for (const [id, hidden] of [['primary-apple-icon', isWindows], ['primary-windows-icon', !isWindows]]) {
-    const icon = document.getElementById(id);
-    if (hidden) icon.setAttribute('hidden', '');
-    else icon.removeAttribute('hidden');
-  }
-  const secondary = document.getElementById('secondary-mac-download');
-  setDownloadLink(secondary, macUrl, macUrl ? 'Download for Mac (Apple Silicon)' : 'Mac beta coming soon');
-  secondary.hidden = !isWindows;
   setDownloadLink(document.getElementById('mac-card-download'), macUrl,
-    macUrl ? 'Download for Mac (Apple Silicon)' : 'Mac beta coming soon');
-  setDownloadLink(document.getElementById('windows-card-download'), windowsUrl,
-    windowsUrl ? 'Download for Windows (x64 EXE)' : 'Build verification pending');
-  document.getElementById('windows-download-label').textContent = windowsUrl ? 'Download for Windows' : 'Build verification pending';
-  document.getElementById('windows-release-badge').textContent = windowsUrl ? 'Experimental · x64' : 'In testing';
-  document.getElementById('windows-release-status').textContent = windowsUrl
-    ? `Windows beta v${windowsManifest.version} · EXE · Unsigned · Not yet hardware-tested.`
-    : 'Windows beta in testing. Test installer pending verification; no public Windows download yet.';
+    macUrl ? 'Download for Mac (Apple Silicon)' : 'Mac download unavailable');
   document.getElementById('download-requirements').textContent = state.detail;
   document.getElementById('download-platform-note').textContent = state.note;
   document.getElementById('release-status').textContent = publishedUrl(manifest)
@@ -105,11 +82,11 @@ export function renderDownload(document, platform, manifest, windowsManifest = w
   return state;
 }
 
-export async function initializeDownload(document, navigator, manifest = release, windowsManifest = windowsRelease) {
+export async function initializeDownload(document, navigator, manifest = release) {
   let hints = {};
   try { hints = await navigator.userAgentData?.getHighEntropyValues?.(['architecture', 'bitness']) || {}; }
   catch { /* Browsers may withhold hints; never infer Intel from a Mac UA. */ }
-  return renderDownload(document, detectPlatform(navigator, hints), manifest, windowsManifest);
+  return renderDownload(document, detectPlatform(navigator, hints), manifest);
 }
 
 if (typeof document !== 'undefined') void initializeDownload(document, navigator);

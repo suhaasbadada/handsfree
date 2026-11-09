@@ -2,12 +2,14 @@
 
 Settings → **Recording mode** offers **Toggle** (the unchanged default) and
 **Push to talk**. Selecting the latter is explicit; upgrades do not opt users in.
-Available in Mac beta 4 and experimental Windows beta 3. See the
-[Mac release notes](releases/v0.1.1-beta.4.md) and
-[Windows release notes](releases/v0.1.1-windows-beta.3.md).
+Available in the current Mac beta (introduced in Mac beta 4). Current product
+and development focus is Mac-only: Apple Silicon, macOS 14+. Windows work is
+paused; Linux is not supported. Neither port has a promised release date.
+See the [Mac release notes](releases/v0.1.1-beta.5.md). The earlier
+[Windows implementation](WINDOWS.md) remains a historical record only.
 
 In Push to talk, hold the configured shortcut, speak, then release to finish.
-The default is Fn / Globe on Mac and physical Right Ctrl on Windows. Custom
+The default is Fn / Globe. Custom
 combinations require the exact saved modifiers; releasing the primary key or
 the first required modifier finishes. Pressing other keys, mouse actions, or
 changing foreground application cancels without paste. Escape and the native
@@ -17,7 +19,7 @@ delivery: focus changes never redirect output into a different field.
 Observed foreground-application and field-focus changes continue to cancel
 through processing and delivery, even after releasing the shortcut. Switching
 away and back does not re-enable delivery. Mac field-focus monitoring uses AX
-notifications where supported; Windows uses foreground/field-focus WinEvents.
+notifications where supported.
 Final original-target validation remains the fallback for unobservable focus
 changes. After release, ordinary typing and mouse actions do not by themselves
 cancel processing; an observed focus change does. The non-activating native HUD
@@ -26,12 +28,9 @@ does not change focus when Finish or Cancel is clicked.
 The trigger stays latched until its physical primary key is released, including
 after cancellation, automatic duration limits, failures, and HUD Finish. Repeats
 cannot restart recording. Already-held keys are quarantined when hooks, mode,
-binding, or shortcut capture reset. Windows AltGr and injected input cannot
-start a hold; injected input cancels an active hold. Fn chords may briefly begin
-the normal start cue before the second key cancels. No Fn/Ctrl events are
-consumed or remapped; normal OS key functions still run. Custom Windows
-shortcuts retain checked RegisterHotKey ownership, while physical low-level
-edges, not WM_HOTKEY, drive holds. Mac remains listen-only and does not claim
+binding, or shortcut capture reset. Fn chords may briefly begin
+the normal start cue before the second key cancels. Fn events are not
+consumed or remapped; normal OS key functions still run. Mac remains listen-only and does not claim
 exclusive registration. Choose a conflict-free shortcut.
 
 Mode changes are disabled while recording, processing, downloading, or recording
@@ -63,12 +62,14 @@ Rust tests exercise physical lifetime, repeat/chord/reset latching, cancellation
 early-release gating, rejected presses, and stale generation protection. Swift
 native tests exercise the production hold recognizer without installing hooks,
 recording or playback. Browser fixtures cover mode persistence/rollback, pending
-polls, busy/capture disabling, actual Windows labels, and compact layouts.
+polls, busy/capture disabling, and compact layouts. Preserved Windows label
+fixtures and Win32 gesture handling are historical port coverage, not a current
+Windows support claim; see [native implementation records](WINDOWS-NATIVE.md).
 
-Hardware acceptance still requires an authorized Mac and Windows session:
-Fn/Right Ctrl/custom holds longer than the old tap deadline, fast press-release
-during the cue, modifier-first release, Fn+arrows/Delete and Ctrl shortcuts,
-AltGr/injection, focus/mouse cancellation, permission/hook loss, duration limit
+Current hardware acceptance still requires an authorized Apple Silicon Mac session:
+Fn/custom holds longer than the old tap deadline, fast press-release
+during the cue, modifier-first release, Fn+arrows/Delete and custom shortcuts,
+focus/mouse cancellation, permission/hook loss, duration limit
 while held, and native HUD Finish/Cancel. Verify one delivery to the original
 field, no restart while held, no cancelled paste, and no cue in captured audio.
 Automated tests do not establish microphone, device timing, or global-hook

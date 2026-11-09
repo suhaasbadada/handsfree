@@ -1,12 +1,18 @@
 # HandsFree
 
+**Current scope: Mac-only, Apple Silicon, macOS 14+.** Windows development is paused; Linux is not supported. Neither port has a promised scope or release date. Windows references below describe preserved implementation history, not current support or acceptance requirements.
+
+## Architecture and portability boundary
+
+Keep the existing **Tauri 2 / Rust / TypeScript / Swift** stack: TypeScript UI and shared Rust application logic remain reusable, while `src-tauri/src/platform` selects native behavior. Swift implements Mac capture, shortcuts, permissions, overlay and delivery. Keep OS APIs and dependencies target-specific behind that facade; do not spread Mac assumptions through shared orchestration or remove the retained Windows backend to narrow product focus. Those seams make future ports possible, not supported today. See [paused Windows implementation records](WINDOWS-NATIVE.md).
+
 Developer reference. For the prebuilt beta, see [the main README](../README.md). Commands below run from the repository root. See also [release packaging](RELEASING.md).
 
 A native macOS menu-bar dictation app for Apple Silicon (macOS 14+). Tap **Fn / 🌐** to record, tap again to transcribe locally and paste into the original text field. **Escape** cancels. The compact **150 × 44 pt** bottom-center capsule is an AppKit **non-activating NSPanel**, not a web window; it does not take keyboard focus. Its off-white surface has graphite text/controls and muted-red recording bars. While recording, its circular **×** cancels, its graphite **✓** finishes, and its red bars respond to actual microphone power. Processing shrinks over 220 ms to a text-free **54 × 28 pt** capsule with three softly breathing graphite dots; Reduce Motion skips the shrink and keeps the dots static. The transparent backing panel remains fixed to avoid clipping and passes clicks through during processing. Escape and the dashboard's Cancel still work, and the native accessibility label is “Transcribing.” Silence shows **“No speech”** briefly on a single centered line, while detailed errors remain in the dashboard.
 
 ## Build and launch
 
-Requires Apple Silicon, Node **22.18+** (24 recommended), Rust stable, CMake, and current Xcode Command Line Tools with Swift and a macOS SDK. No Python runtime, account, paid API, or cloud transcription service is needed. Full Xcode may be needed if your Command Line Tools lack the Metal toolchain.
+Requires Apple Silicon, macOS **14+**, Node **22.18+** (24 recommended), Rust stable, CMake, and current Xcode Command Line Tools with Swift and a macOS SDK. No Python runtime, account, paid API, or cloud transcription service is needed. Full Xcode may be needed if your Command Line Tools lack the Metal toolchain.
 
 ```sh
 # From your checkout of this repository:
@@ -58,7 +64,7 @@ Close settings to keep the app in the menu bar. Left-click its waveform icon for
 
 ## Dashboard, sounds, and local usage
 
-**Windows beta 2 shortcut:** new/missing
+**Historical Windows beta 2 shortcut (paused):** new/missing
 preferences and **Use default** select Right Ctrl alone, released within 400 ms.
 The recorder waits for its keyup; modifier-first custom combinations still save
 on the combination keydown. All existing saved bindings, including Ctrl+Shift+Space,

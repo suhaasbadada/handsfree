@@ -1,6 +1,6 @@
 # Install HandsFree (Mac beta)
 
-Requires **Apple Silicon (M-series), macOS 14+, English**. In Apple menu → About This Mac, check that **Chip** names an Apple M-series chip. Intel Macs, Windows, Linux, and mobile are not supported by this build.
+Requires **Apple Silicon (M-series), macOS 14+, English**. This is the only current product and development target. In Apple menu → About This Mac, check that **Chip** names an Apple M-series chip. Intel Macs, Windows, Linux, and mobile are not currently supported. Windows work is paused; no Windows or Linux port or release date is promised.
 
 **Experimental beta — self-signed and not notarized.** Separate-Mac installation testing is not yet verified. See `Licenses/PUBLICATION-NOTES.txt` and `Licenses/Documentation/release-readiness.md` for the distribution decision, upstream caveat and testing limitations. No paid account, Apple Developer membership, payment, or certificate installation is required.
 

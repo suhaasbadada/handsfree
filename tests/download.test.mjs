@@ -44,7 +44,8 @@ test('published manifest permits a direct DMG; unavailable manifests remain disa
   }
   for (const os of ['windows', 'linux', 'mobile', 'unknown']) {
     assert.equal(downloadState({ os, arch: 'arm64' }, enabled).url, enabled.dmgUrl);
-    assert.equal(downloadState({ os, arch: 'arm64' }, enabled).label, 'Get Mac beta');
+    assert.equal(downloadState({ os, arch: 'arm64' }, enabled).label, 'Download for another Mac');
+    assert.match(downloadState({ os, arch: 'arm64' }, enabled).note, /Download only for another device: an Apple Silicon Mac running macOS 14\+/);
   }
   assert.match(downloadState({ os: 'mac', arch: 'intel' }, enabled).note, /Intel Macs are not supported/);
   assert.equal(downloadState({ os: 'mac', arch: 'intel' }, enabled).url, enabled.dmgUrl);
@@ -54,7 +55,8 @@ test('bad version, paths, schemas and truthy availability fail closed', () => {
   for (const os of ['mac', 'windows', 'linux', 'mobile', 'unknown']) {
     const platform = { os, arch: 'unknown' };
     for (const manifest of [null, {}, { ...enabled, publicAvailable: false }, { ...enabled, schemaVersion: 2 }, { ...enabled, publicAvailable: 'true' },
-      { ...enabled, version: '../escape' }, { ...enabled, dmgUrl: 'javascript:alert(1)' },
+      { ...enabled, version: '../escape' }, { ...enabled, version: ['0.1.1-beta.5'] },
+      { ...enabled, version: Symbol('invalid') }, { ...enabled, dmgUrl: 'javascript:alert(1)' },
       { ...enabled, dmgUrl: enabled.dmgUrl.replace('.dmg', '.zip') },
       { ...enabled, dmgUrl: `${enabled.dmgUrl}?token=secret` },
       { ...enabled, dmgUrl: enabled.dmgUrl.replace('github.com/', 'github.com.evil/') }]) {
@@ -91,50 +93,42 @@ test('rendering transitions remove stale links and disabled state without click 
   assert.equal(cta.getAttribute('aria-label'), 'Download for Mac (Apple Silicon)');
   renderDownload(document, { os: 'windows', arch: 'unknown' }, enabled, windowsDisabled);
   assert.equal(cta.href, enabled.dmgUrl);
-  assert.equal(document.getElementById('download-label').textContent, 'Get Mac beta');
-  assert.match(document.getElementById('download-platform-note').textContent, /Windows beta in testing/);
+  assert.equal(document.getElementById('download-label').textContent, 'Download for another Mac');
+  assert.match(document.getElementById('download-platform-note').textContent, /Windows is not supported; Windows development is paused/);
 });
 
-test('public Windows coordinates are verified while unavailable fixtures still fail closed', () => {
-  assert.equal(windowsRelease.publicAvailable, true);
+test('historical Windows coordinates are retained but public availability is paused', () => {
+  assert.equal(windowsRelease.publicAvailable, false);
   assert.equal(windowsRelease.version, '0.1.1-windows-beta.3');
   assert.equal(windowsRelease.appVersion, '0.1.1');
-  assert.equal(publishedWindowsUrl(windowsRelease), windowsRelease.installerUrl);
+  assert.equal(publishedWindowsUrl(windowsRelease), null);
   assert.equal(publishedWindowsUrl(windowsDisabled), null);
-  assert.equal(release.publicAvailable, true, 'Mac beta 5 activation does not change live Windows beta 3');
+  assert.equal(release.publicAvailable, true, 'Mac beta 5 remains available');
   assert.equal(release.dmgUrl, 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.5/HandsFree-0.1.1-beta.5-macos-arm64.dmg');
   for (const arch of ['unknown', 'intel', 'arm64']) {
     const state = downloadState({ os: 'windows', arch }, enabled, windowsDisabled);
     assert.equal(state.url, enabled.dmgUrl);
-    assert.equal(state.label, 'Get Mac beta');
-    assert.match(state.note, /No verified installer available yet/);
-    assert.match(state.note, /Windows 10\/11 x64/);
-    assert.match(state.note, /This download is for an Apple Silicon Mac/);
-    if (arch === 'arm64') assert.match(state.note, /Windows ARM is unsupported/);
+    assert.equal(state.label, 'Download for another Mac');
+    assert.match(state.note, /Windows is not supported; Windows development is paused/);
+    assert.match(state.note, /Download only for another device: an Apple Silicon Mac/);
   }
 });
 
-test('independent Mac/Windows availability matrix with explicit cross-platform fallbacks', () => {
+test('Mac-only availability ignores even a stale enabled Windows manifest', () => {
   for (const macAvailable of [false, true]) for (const winAvailable of [false, true]) {
     const macManifest = { ...release, publicAvailable: macAvailable };
     const winManifest = { ...windowsRelease, publicAvailable: winAvailable };
     for (const os of ['mac', 'windows', 'linux', 'mobile', 'unknown']) for (const arch of ['intel', 'arm64', 'unknown']) {
-      const winPrimary = os === 'windows' && arch !== 'arm64' && winAvailable;
       const state = downloadState({ os, arch }, macManifest, winManifest);
-      assert.equal(state.target, winPrimary ? 'windows' : 'mac');
-      assert.equal(state.url, winPrimary ? winManifest.installerUrl : macAvailable ? release.dmgUrl : null);
-      if (winPrimary) {
-        assert.equal(state.label, 'Download for Windows');
-        assert.match(state.detail, /Windows 10\/11 x64 · CPU · English/);
-      }
-      if (os === 'windows' && arch === 'arm64') assert.match(state.note, /Windows ARM is unsupported/);
+      assert.equal(state.target, 'mac');
+      assert.equal(state.url, macAvailable ? release.dmgUrl : null);
+      assert.match(state.detail, /Apple Silicon Mac · macOS 14\+/);
+      if (os !== 'mac') assert.match(state.note, /Download only for another device/);
       const document = fixtureDocument();
       renderDownload(document, { os, arch }, macManifest, winManifest);
       assert.equal(document.getElementById('mac-card-download').href, macAvailable ? release.dmgUrl : undefined);
-      assert.equal(document.getElementById('windows-card-download').href, winAvailable ? windowsRelease.installerUrl : undefined);
-      assert.equal(document.getElementById('secondary-mac-download').hidden, !winPrimary);
-      assert.equal(document.getElementById('primary-apple-icon').getAttribute('hidden'), winPrimary ? '' : undefined);
-      assert.equal(document.getElementById('primary-windows-icon').getAttribute('hidden'), winPrimary ? undefined : '');
+      assert.equal(document.getElementById('windows-card-download').href, undefined);
+      assert.equal(document.getElementById('primary-download').href, macAvailable ? release.dmgUrl : undefined);
     }
   }
 });
@@ -177,17 +171,17 @@ test('explicit 32-bit Windows hints do not promote an unsupported installer', ()
   assert.equal(platform.arch, 'x86_32');
   const state = downloadState(platform, release, { ...windowsRelease, publicAvailable: true });
   assert.equal(state.target, 'mac');
-  assert.match(state.note, /32-bit Windows is unsupported/);
+  assert.match(state.note, /Windows is not supported/);
 });
 
-test('availability revocation strips stale Windows and Mac hrefs from every control', () => {
+test('availability revocation strips stale Mac hrefs from every download control', () => {
   const document = fixtureDocument();
   const platform = { os: 'windows', arch: 'unknown' };
   renderDownload(document, platform, release, { ...windowsRelease, publicAvailable: true });
-  assert.equal(document.getElementById('primary-download').href, windowsRelease.installerUrl);
-  assert.equal(document.getElementById('primary-download').getAttribute('aria-label'), 'Download for Windows (x64 EXE)');
+  assert.equal(document.getElementById('primary-download').href, release.dmgUrl);
+  assert.equal(document.getElementById('primary-download').getAttribute('aria-label'), 'Download for Mac (Apple Silicon)');
   renderDownload(document, platform, { ...release, publicAvailable: false }, windowsDisabled);
-  for (const id of ['primary-download', 'mac-card-download', 'secondary-mac-download', 'windows-card-download']) {
+  for (const id of ['primary-download', 'mac-card-download']) {
     const cta = document.getElementById(id);
     assert.equal(cta.href, undefined, id);
     assert.equal(cta.getAttribute('aria-disabled'), 'true', id);

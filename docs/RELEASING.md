@@ -1,5 +1,7 @@
 # Release packaging
 
+**Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
+
 Current Mac distribution: **v0.1.1-beta.5**, embedded version **0.1.1**.
 Packaging and audit scripts target its immutable beta 5 path. Website activation
 is a separate follow-up, gated on CI, publication, anonymous public-byte checks
@@ -46,7 +48,7 @@ The candidate auditor also cleans its exact temporary mount/directory on SIGINT 
 8. **Mandatory cross-repository Homebrew gate:** update `suhaasbadada/homebrew-handsfree`'s cask distribution version, exact DMG URL, and SHA-256 to match the same anonymously verified public artifact. Review and publish that tap change before claiming that the recommended Homebrew command delivers the latest customer download. Verify the remote cask contents; app bundle version `0.1.1` alone cannot identify the distribution beta. Existing Homebrew users use `brew update` then `brew upgrade --cask suhaasbadada/handsfree/handsfree`. Preserve models/settings/statistics: no `--zap`, data deletion, or totals reset. Cask metadata checks do not imply an actual installed-app upgrade or onboarding test; perform those only with explicit permission. Do not change quarantine or global Gatekeeper policy.
 9. Check the public page and download after deployment, and confirm both direct DMG and Homebrew paths select the same release. To withdraw availability, set the manifest false and update static copy and the tap as appropriate. Never point users at a draft, removed asset, or a Windows/Linux placeholder.
 
-Future releases must update app/Cargo/npm versions together as appropriate and use a new release label/asset path. Never replace an already published binary under an existing version. Windows EXE packaging has its own independent workflow; Windows and Linux installers are not outputs of this script.
+Future releases must update app/Cargo/npm versions together as appropriate and use a new release label/asset path. Never replace an already published binary under an existing version. Historical Windows EXE packaging is retained but paused; Windows and Linux installers are not outputs of this script.
 
 ## License inventory
 

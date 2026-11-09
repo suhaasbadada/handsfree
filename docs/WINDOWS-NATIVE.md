@@ -1,6 +1,8 @@
-# Windows native beta backend
+# Windows native beta backend — paused / historical
 
-The [experimental Windows x64 beta is public](WINDOWS.md), not yet
+> **Preserved implementation record, not an active development or support track.** Current product and development focus is Mac-only: Apple Silicon, macOS 14+. Windows work is paused; Linux is not supported. Neither port has a promised scope or release date. The platform facade and backend remain for possible future ports. All Windows build evidence and pending hardware checks below are historical; they do not establish current support.
+
+The [historical experimental Windows x64 beta](WINDOWS.md) was published, not yet
 hardware-tested. Windows 10/11 x64, desktop microphone access and WebView2 are
 required. Hosted MSVC compilation, native tests, NSIS packaging and real-model
 CPU transcription passed; live microphone/editor/installer acceptance is pending.

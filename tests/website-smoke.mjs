@@ -76,8 +76,10 @@ try {
     await evaluate(`window.downloadModule.renderDownload(document,{os:${JSON.stringify(os)},arch:'unknown'},{...window.releaseModule.release,publicAvailable:true},{...window.releaseModule.windowsRelease,publicAvailable:false})`);
     const href = await evaluate(`document.getElementById('primary-download').getAttribute('href')`);
     assert.equal(href, dmgUrl, `${os}: Mac DMG remains available to every visitor`);
+    assert.equal(await evaluate(`document.querySelectorAll('a[href*=".exe"], #windows-card-download').length`), 0, `${os}: no Windows download promotion`);
+    if (os !== 'mac') assert.match(await evaluate(`document.getElementById('download-platform-note').textContent`), /Download only for another device: an Apple Silicon Mac running macOS 14\+/);
     assert.deepEqual(await evaluate(`({label:document.getElementById('download-label').textContent, name:document.getElementById('primary-download').getAttribute('aria-label'),icons:document.querySelectorAll('#primary-download svg.apple-logo[aria-hidden="true"] path').length})`),
-      {label:os === 'mac' ? 'Download for Mac' : 'Get Mac beta', name:'Download for Mac (Apple Silicon)',icons:1});
+      {label:os === 'mac' ? 'Download for Mac' : 'Download for another Mac', name:'Download for Mac (Apple Silicon)',icons:1});
     for (const manifest of ['{...window.releaseModule.release,publicAvailable:false}', '{...window.releaseModule.release,dmgUrl:"https://evil.invalid/bad.dmg"}']) {
       await evaluate(`window.downloadModule.renderDownload(document,{os:${JSON.stringify(os)},arch:'unknown'},${manifest},{...window.releaseModule.windowsRelease,publicAvailable:false})`);
       assert.equal(await evaluate(`document.getElementById('primary-download').hasAttribute('href')`), false, `${os}: unavailable/corrupt manifests fail closed`);

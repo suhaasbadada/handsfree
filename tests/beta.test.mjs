@@ -67,8 +67,8 @@ test('Mac beta 5 activation coordinates current docs and all static download lin
     assert.doesNotMatch(source, /v0\.1\.1-beta\.[234]|HandsFree-0\.1\.1-beta\.[234]|Mac_beta-v0\.1\.1--beta\.[234]/, `${path} must not advertise a stale Mac beta`);
   }
   const links = [...read('site/index.html').matchAll(/href="([^"]+\.dmg)"/g)].map(match => match[1]);
-  assert.equal(links.length, 3, 'Primary, secondary and platform-card Mac links have no-JS defaults');
-  assert.deepEqual(links, [release.dmgUrl, release.dmgUrl, release.dmgUrl]);
+  assert.equal(links.length, 2, 'Primary and platform-card Mac links have no-JS defaults');
+  assert.deepEqual(links, [release.dmgUrl, release.dmgUrl]);
   assert.ok(read('README.md').includes(`docs/releases/v${release.version}.md`));
   assert.ok(read('docs/INSTALL.md').includes(`\`${release.version}\``));
 });
@@ -99,12 +99,28 @@ test('release checklist gates the recommended Homebrew path on matching publishe
   assert.match(source, /no `--zap`, data deletion, or totals reset/);
 });
 
-test('activation coordinates Windows downloads and opt-in push-to-talk guidance without changing historical notes', async () => {
+test('Mac-only scope pauses Windows promotion while preserving historical release guidance', async () => {
   const { windowsRelease } = await import('../site/release.js');
   assert.equal(windowsRelease.version, '0.1.1-windows-beta.3');
-  for (const path of ['README.md', 'docs/WINDOWS.md', 'site/index.html', 'docs/releases/v0.1.1-windows-beta.3.md']) {
+  assert.equal(windowsRelease.publicAvailable, false);
+  assert.match(windowsRelease.status, /paused/i);
+  for (const path of ['README.md', 'CONTRIBUTING.md', 'SECURITY.md', 'docs/INSTALL.md', 'docs/DEVELOPMENT.md', 'docs/RELEASING.md', 'docs/WEBSITE.md', 'site/index.html']) {
     const source = read(path);
-    assert.ok(source.includes(windowsRelease.installerUrl), `${path} links the current versioned Windows installer`);
+    assert.doesNotMatch(source, /https:\/\/[^\s"<>)]*\.exe/, `${path} must not promote Windows installers`);
+    assert.doesNotMatch(source, /Linux (?:is )?planned|Linux coming soon|Download for Windows/i);
+    assert.match(source, /Mac[- ]only|only current product/i, `${path} states the current scope`);
+  }
+  for (const path of ['docs/WINDOWS.md', 'docs/WINDOWS-NATIVE.md', 'docs/WINDOWS-PLAN.md']) {
+    assert.match(read(path).split('\n').slice(0, 6).join('\n'), /paused.*historical|historical.*paused/i, `${path} is clearly archived`);
+  }
+  assert.match(read('.github/ISSUE_TEMPLATE/bug_report.yml'), /Apple Silicon Mac beta \(macOS 14\+\)/);
+  assert.doesNotMatch(read('.github/ISSUE_TEMPLATE/bug_report.yml'), /Mac or experimental Windows beta|Windows \(x64 experimental beta\)/);
+  assert.match(read('.github/ISSUE_TEMPLATE/feature_request.yml'), /Mac-only/);
+  assert.doesNotMatch(read('.github/ISSUE_TEMPLATE/feature_request.yml'), /Windows and Linux are planned/);
+  assert.match(read('.github/pull_request_template.md'), /Windows CI is manual-only, not a routine gate/);
+  for (const path of ['docs/WINDOWS.md', 'docs/releases/v0.1.1-windows-beta.3.md']) {
+    const source = read(path);
+    assert.ok(source.includes(windowsRelease.installerUrl), `${path} retains the historical versioned installer coordinates`);
     assert.match(source, /Push to talk/);
     assert.match(source, /Toggle/);
     assert.match(source, /not yet (?:live )?hardware-tested/i);

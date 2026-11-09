@@ -1,5 +1,7 @@
 # Compatibility paste (macOS only)
 
+Current product and development scope is Apple Silicon, macOS 14+ only. Windows work is paused; references to its preserved delivery implementation below are historical, not current support. No Windows or Linux port or release date is promised.
+
 Available in [Mac beta 5](releases/v0.1.1-beta.5.md), off by default even after upgrading. Quit HandsFree, run `brew update` then `brew upgrade --cask suhaasbadada/handsfree/handsfree`, and reopen from Applications. Your model, settings and aggregate statistics are preserved.
 
 Strict insertion remains the default. It checks the original focused Accessibility field before submitting Command-V. Some apps expose a caret but hide that field, so strict delivery copies the transcript for manual paste instead.

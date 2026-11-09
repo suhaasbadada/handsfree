@@ -1,8 +1,10 @@
-# Windows beta plan
+# Windows beta plan — paused / historical
+
+> **Archived plan and implementation record, not a current roadmap.** Current product and development focus is Mac-only: Apple Silicon, macOS 14+. Windows work is paused; Linux is not supported. No port or release date is promised. Milestones, pending acceptance and delivery instructions below record the former Windows effort and do not authorize new work, publication or promotion. Preserve the shared code/platform facade for possible future ports.
 
 ## Scope
 
-The experimental Windows x64 beta is [public](WINDOWS.md): existing dashboard/settings,
+The historical experimental Windows x64 beta was [published](WINDOWS.md): existing dashboard/settings,
 local English transcription, Right Ctrl alone or a custom global shortcut,
 default Toggle and opt-in push to talk in beta 3
 (existing saved shortcuts are preserved; Settings → Use default changes only the shortcut),
@@ -54,7 +56,7 @@ of scope. Fn remains a macOS-only option.
   Supply the tester with a short, explicit manual acceptance checklist.
 - No signing purchase, security bypass, automatic startup or elevated install.
 
-## Delivery
+## Historical delivery process (inactive)
 
 Commit and push validated milestones. Record exact CI/build results and remaining
 testing in `docs/WINDOWS.md`. Website/README must distinguish source support,

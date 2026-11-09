@@ -1,11 +1,7 @@
-name: Windows beta candidate
+name: Windows beta candidate (paused, manual only)
 
 on:
-  push:
-    branches: [main, 'agent/windows-beta']
-    paths: ['src/**', 'src-tauri/**', 'tests/**', 'scripts/**', 'docs/**', 'site/**', 'package*.json', 'tsconfig.json', 'vite.config.ts', 'index.html', '.cargo/**', '.github/workflows/windows.yml', 'LICENSE']
-  pull_request:
-    paths: ['src/**', 'src-tauri/**', 'tests/**', 'scripts/**', 'docs/**', 'site/**', 'package*.json', 'tsconfig.json', 'vite.config.ts', 'index.html', '.cargo/**', '.github/workflows/windows.yml', 'LICENSE']
+  # Retained for explicit portability work; current product development is Mac-only.
   workflow_dispatch:
 
 permissions:

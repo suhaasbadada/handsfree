@@ -5,7 +5,7 @@ body:
     id: problem
     attributes:
       label: What problem would this solve?
-      description: Describe your workflow without private text or recordings. Windows and Linux are planned, with no promised dates.
+      description: Describe your workflow without private text or recordings. Current focus is Mac-only (Apple Silicon, macOS 14+); Windows is paused and Linux is unsupported, with no port commitments.
     validations:
       required: true
   - type: textarea

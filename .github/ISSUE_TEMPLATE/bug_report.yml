@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a problem with the Mac or experimental Windows beta
+description: Report a problem with the Apple Silicon Mac beta (macOS 14+)
 body:
   - type: markdown
     attributes:
@@ -9,7 +9,7 @@ body:
     id: version
     attributes:
       label: HandsFree version and source
-      placeholder: App version, Mac/Windows release tag, or source commit
+      placeholder: App version, Mac release tag, or source commit
     validations:
       required: true
   - type: dropdown
@@ -18,8 +18,7 @@ body:
       label: Platform
       options:
         - macOS (Apple Silicon)
-        - Windows (x64 experimental beta)
-        - Other / source build
+        - Historical release / unsupported platform (not currently supported)
     validations:
       required: true
   - type: input

@@ -5,10 +5,12 @@ import { createHash } from 'node:crypto';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('Windows candidate workflow is isolated, x64, read-only and never publishes', () => {
+test('paused Windows candidate workflow is manual-only, x64, read-only and never publishes', () => {
   const workflow = read('.github/workflows/windows.yml');
-  assert.match(workflow, /branches: \[main, 'agent\/windows-beta'\]/);
-  assert.match(workflow, /pull_request:/);
+  const triggers = workflow.split(/^on:\s*$/m)[1]?.split(/^permissions:/m)[0];
+  assert.ok(triggers, 'Workflow has an explicit trigger block');
+  assert.deepEqual(triggers.split('\n').map(line => line.replace(/#.*/, '').trim()).filter(Boolean), ['workflow_dispatch:']);
+  assert.doesNotMatch(workflow, /^\s*(?:push|pull_request|pull_request_target|schedule|workflow_call|workflow_run):/m);
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /runs-on: windows-2022/);
   assert.match(workflow, /permissions:\n  contents: read/);
@@ -22,6 +24,10 @@ test('Windows candidate workflow is isolated, x64, read-only and never publishes
   assert.match(workflow, /Get-FileHash \$model -Algorithm SHA256/);
   assert.match(workflow, /real_model_pipeline_smoke -- --ignored --nocapture/);
   assert.ok(workflow.indexOf('real_model_pipeline_smoke') < workflow.indexOf('actions/upload-artifact@v7'));
+  const mac = read('.github/workflows/ci.yml');
+  assert.match(mac, /push:/);
+  assert.match(mac, /pull_request:/);
+  assert.match(mac, /runs-on: macos-/);
 });
 
 test('Windows packaging prepares notices before native compilation and inspects the NSIS payload', () => {
