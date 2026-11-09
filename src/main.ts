@@ -60,7 +60,7 @@ document.querySelector('#app')!.innerHTML = `
 const el = (id: string) => document.getElementById(id)!;
 const button = (id: string) => el(id) as HTMLButtonElement;
 document.body.insertAdjacentHTML('beforeend', `<dialog id="updates-dialog" aria-labelledby="updates-title">
- <h2 id="updates-title">App updates</h2><p>Installed release: <strong id="installed-release">Connecting…</strong></p>
+ <h2 id="updates-title" tabindex="-1" autofocus>App updates</h2><p>Installed release: <strong id="installed-release">Connecting…</strong></p>
  <p id="updates-message" role="status" aria-live="polite"></p><p id="updates-version" hidden></p>
  <p id="updates-notes" class="update-notes" hidden></p><progress id="updates-progress" max="100" hidden aria-label="Update download progress"></progress>
  <p>Checks contact the HandsFree release server only when you ask. Updates are signature-verified. Your model, settings and usage totals are kept.</p>

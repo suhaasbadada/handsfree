@@ -304,6 +304,19 @@ try {
   await evaluate(`window.updateFixture={installed_version:'0.1.1-beta.7',phase:'idle',notes:'',downloaded_bytes:0,message:'Choose Check for updates.'};const priorUpdates=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(['update_status','check_for_updates','install_update'].includes(command)){window.calls.push({command,args});if(command==='check_for_updates')window.updateFixture={...window.updateFixture,phase:'available',available_version:'0.1.1-beta.8',notes:'<img src=x onerror="window.updateInjected=true">',message:'Update available.'};if(command==='install_update')window.updateFixture={...window.updateFixture,phase:'error',message:'Signature verification failed. Check again.'};return structuredClone(window.updateFixture);}return priorUpdates(command,args);};document.getElementById('updates-open').click()`);
   await until(`document.getElementById('installed-release').textContent==='0.1.1-beta.7'`);
   assert.equal(await evaluate(`window.calls.some(c=>c.command==='check_for_updates'||c.command==='install_update')`),false,'Opening never checks online or installs');
+  assert.equal(await evaluate(`document.activeElement.id==='updates-title' && getComputedStyle(document.activeElement).outlineStyle==='none'`),true,'Opening focuses the readable heading without highlighting Close');
+  await send('Input.dispatchKeyEvent', {type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+  await send('Input.dispatchKeyEvent', {type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+  assert.equal(await evaluate(`document.activeElement.id==='updates-close' && document.activeElement.matches(':focus-visible') && getComputedStyle(document.activeElement).outlineStyle==='solid'`),true,'Tab still gives Close a visible keyboard focus ring');
+  // Programmatic click above does not focus the opener as keyboard activation does.
+  // Reopen from an explicitly focused trigger to test native focus restoration.
+  await evaluate(`document.getElementById('updates-dialog').close();document.getElementById('updates-open').focus();document.getElementById('updates-open').click()`);
+  await send('Input.dispatchKeyEvent', {type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+  await send('Input.dispatchKeyEvent', {type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+  await until(`!document.getElementById('updates-dialog').open`);
+  assert.equal(await evaluate(`document.activeElement.id`),'updates-open','Escape restores focus to the opener');
+  await evaluate(`document.getElementById('updates-open').click()`);
+  assert.equal(await evaluate(`document.activeElement.id`),'updates-title','Reopening does not remember the previously focused Close button');
   await evaluate(`document.getElementById('updates-check').click()`);
   await until(`!document.getElementById('updates-install').hidden`);
   assert.equal(await evaluate(`document.getElementById('installed-release').textContent`),'0.1.1-beta.7','Available release must not be shown as already installed');

@@ -14,7 +14,7 @@ function fixture() {
   return { provenance, hashes, checksums: Object.entries(hashes).map(([name, hash]) => `${hash}  ${name}\n`).join(''), commit, tree, status: '' };
 }
 test('clean candidate has exact source commit/tree and six verified payload checksums', () => {
-  assert.deepEqual(payloadNames, ['HandsFree-0.1.1-beta.7-macos-arm64.dmg', 'PROVENANCE.txt', 'HandsFree-0.1.1-beta.7-macos-arm64.app.tar.gz', 'HandsFree-0.1.1-beta.7-macos-arm64.app.tar.gz.sig', 'UPDATER-PROVENANCE.txt', 'macos-arm64.json']);
+  assert.deepEqual(payloadNames, ['HandsFree-0.1.1-beta.8-macos-arm64.dmg', 'PROVENANCE.txt', 'HandsFree-0.1.1-beta.8-macos-arm64.app.tar.gz', 'HandsFree-0.1.1-beta.8-macos-arm64.app.tar.gz.sig', 'UPDATER-PROVENANCE.txt', 'macos-arm64.json']);
   assert.equal(validateMetadata(fixture()), commit);
 });
 for (const name of payloadNames) test(`manifest rejects altered ${name} bytes`, () => {
@@ -23,12 +23,12 @@ for (const name of payloadNames) test(`manifest rejects altered ${name} bytes`, 
   assert.throws(() => validateMetadata(f), /SHA-256 mismatch/);
 });
 test('updater feed and provenance bind exact target, source, signature and executable', () => {
-  assert.equal(archiveName, 'HandsFree-0.1.1-beta.7-macos-arm64.app.tar.gz');
+  assert.equal(archiveName, 'HandsFree-0.1.1-beta.8-macos-arm64.app.tar.gz');
   const signature = 'uploaded-signature';
   const executableHash = digest('sealed executable');
-  const provenance = `Distribution: 0.1.1-beta.7\nSource commit: ${commit}\nApp executable SHA-256: ${executableHash}\n`;
+  const provenance = `Distribution: 0.1.1-beta.8\nSource commit: ${commit}\nApp executable SHA-256: ${executableHash}\n`;
   const verify = feed => validateUpdaterMetadata(feed, signature, provenance, commit, executableHash);
-  const fresh = () => updaterFeed('0.1.1-beta.7', signature);
+  const fresh = () => updaterFeed('0.1.1-beta.8', signature);
   assert.doesNotThrow(() => verify(fresh()));
   for (const mutate of [
     f => { f.version = '0.1.1-beta.6'; },
@@ -58,15 +58,15 @@ for (const [label, mutate, message] of [
 
 const sizes = Object.fromEntries(names.map((name, index) => [name, 123 + index]));
 test('draft audit requires the matching website manifest to remain unavailable', () => {
-  assert.equal(tag, 'v0.1.1-beta.7');
-  assert.equal(candidate, 'HandsFree-0.1.1-beta.7-macos-arm64.dmg');
+  assert.equal(tag, 'v0.1.1-beta.8');
+  assert.equal(candidate, 'HandsFree-0.1.1-beta.8-macos-arm64.dmg');
   assert.equal(release.publicAvailable, false);
   assert.throws(() => validateAvailability(publishedRelease), /manifest disabled/);
-  assert.doesNotThrow(() => validateAvailability(publishedRelease, true), 'Public mode accepts activated matching beta 7 coordinates');
-  for (const version of ['beta.5', 'beta.6']) {
+  assert.throws(() => validateAvailability(publishedRelease, true), /manifest disabled/, 'Public beta 7 cannot substitute for candidate beta 8');
+  for (const version of ['beta.5', 'beta.6', 'beta.7']) {
     const historical = { ...publishedRelease, version: `0.1.1-${version}`, dmgUrl: publishedRelease.dmgUrl.replaceAll('beta.7', version) };
     for (const publicMode of [false, true]) {
-      assert.throws(() => validateAvailability(historical, publicMode), /manifest disabled/, 'Historical versions cannot substitute for the beta 7 artifact');
+      assert.throws(() => validateAvailability(historical, publicMode), /manifest disabled/, 'Historical versions cannot substitute for the beta 8 artifact');
     }
   }
   assert.doesNotThrow(() => validateAvailability({ ...release, publicAvailable: false }));

@@ -160,5 +160,8 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .practice-sample { color: #8d4946; }
 .update-notes { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow-y: auto; }
 #updates-dialog .dialog-actions { flex-wrap: wrap; }
+/* Start on the dialog heading, not an apparently selected Close action.
+   Interactive controls retain their keyboard focus-visible ring. */
+#updates-title:focus { outline: none; }
 #updates-dialog strong, #updates-version { overflow-wrap: anywhere; }
 #updates-open { min-height: 24px; height: auto; padding: 0 6px; background: transparent; color: var(--muted); }

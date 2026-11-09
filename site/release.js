@@ -9,13 +9,13 @@ export const release = Object.freeze({
 });
 
 // Preparation/audit coordinates only; the website continues to use release above.
-// Retained exact beta 7 audit coordinates; not a second availability switch.
+// Beta 8 preparation only; beta 7 remains available until publication is verified.
 export const candidateRelease = Object.freeze({
   schemaVersion: 1,
-  version: '0.1.1-beta.7',
+  version: '0.1.1-beta.8',
   publicAvailable: false,
-  status: 'Mac beta 7 immutable artifact audit coordinates; public availability is controlled above.',
-  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.7/HandsFree-0.1.1-beta.7-macos-arm64.dmg',
+  status: 'Mac beta 8 preparation only; public availability is controlled above.',
+  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.8/HandsFree-0.1.1-beta.8-macos-arm64.dmg',
 });
 
 // Historical coordinates only. Windows development and public promotion are paused.

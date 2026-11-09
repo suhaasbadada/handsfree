@@ -6,8 +6,12 @@ Current public Mac distribution: **v0.1.1-beta.7**, embedded version **0.1.1**.
 CI, publication and anonymous public-byte verification passed for the exact clean
 artifact source; see [beta 7 evidence](releases/v0.1.1-beta.7.md). The active
 `release` export and static downloads select verified beta 7. The separate disabled
-`candidateRelease` export retains **beta 7 audit coordinates**, not a
-second availability switch. Website deployment and the cross-repository Homebrew
+`candidateRelease` export prepares **beta 8**, including the Updates dialog focus
+fix. Its distribution metadata, packager and auditor target beta 8; the active
+beta 7 feed remains unchanged until public artifact verification. Preserve beta 7
+outputs under `release/history/` before packaging; never replace historical assets
+or manually replace installed beta 7 to simulate an in-app upgrade.
+Website deployment and the cross-repository Homebrew
 gate below remain distinct checks; do not claim either from artifact verification.
 Windows beta 3 and historical Mac assets remain untouched. See
 [practice](practice.md) for the explicit-button flow, not a shortcut/insertion test,
