@@ -104,7 +104,7 @@ test('historical Windows coordinates are retained but public availability is pau
   assert.equal(publishedWindowsUrl(windowsRelease), null);
   assert.equal(publishedWindowsUrl(windowsDisabled), null);
   assert.equal(release.publicAvailable, true, 'Mac beta 7 is available');
-  assert.equal(release.dmgUrl, 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.9/HandsFree-0.1.1-beta.9-macos-arm64.dmg');
+  assert.equal(release.dmgUrl, 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.10/HandsFree-0.1.1-beta.10-macos-arm64.dmg');
   for (const arch of ['unknown', 'intel', 'arm64']) {
     const state = downloadState({ os: 'windows', arch }, enabled, windowsDisabled);
     assert.equal(state.url, enabled.dmgUrl);
