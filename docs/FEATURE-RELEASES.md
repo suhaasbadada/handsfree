@@ -10,10 +10,11 @@ not counted as new implementations.
 | 1 — Get started (beta 11) | Inline setup checklist; explicit permission/model actions; private input meter; configured shortcut tutorial | Verified complete publication/parity gates; exact-source CI, local/draft/public audits, activation CI, Pages, tap CI and live byte readback passed; hardware/OTA acceptance remains separate |
 | 2 — Recording controls (beta 12) | Saved microphone UID/System default; session timer; retain/refine mode, duration and sound controls; stable practice layout and focus transfer | COMPLETE: publication/parity verified, including activation CI, Pages, tap CI and live feed/page bytes; hardware/OTA acceptance separate |
 | 3 — Fit your workflow (beta 13) | Launch at login; app exclusions; temporary pause; menu-bar quick controls | COMPLETE: publication/parity verified; source/public audit, repaired activation CI, Pages, tap CI and live site/feed byte readback passed; hardware/ServiceManagement/AppKit ordering/OTA acceptance unverified |
-| 4 — Clear and accessible (beta 14) | Keyboard/VoiceOver; system appearance/reduced motion; status and actionable recovery; latest-offer updater bugfix | Unpublished candidate preparation; final validation, exact-source CI, signing and local/draft/public audits pending; no installed OTA/VoiceOver/hardware/login-OS acceptance claimed |
+| 4 — Clear and accessible (beta 14) | Keyboard/VoiceOver; system appearance/reduced motion; status and actionable recovery; latest-offer updater bugfix | PUBLISHED; exact-source CI, signing and local/draft/public audits passed; activation CI, Pages/live bytes and Homebrew deployment parity pending; installed OTA/VoiceOver/hardware/login-OS acceptance unverified |
 
 ## Group 1 verified completion evidence
 
+- [Published beta 11](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.11).
 - App artifact source: `994bcb82b2cb92a08badbd4754695378f89afa88`;
   [source CI 42761543948](https://github.com/suhaasbadada/handsfree/actions/runs/42761543948) passed.
 - Activation: `8ca7ea9bab03e240fddbf1e9017169e5c70c8bff`;
@@ -47,9 +48,9 @@ not counted as new implementations.
 - [Published beta 13](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.13),
   artifact source `aed1c5c213639958b3b418e54c2330b9ebc80e76`;
   [source CI 42775050746](https://github.com/suhaasbadada/handsfree/actions/runs/42775050746) passed.
-- Exact-source anonymous-public seven-asset audit passed. Repository active
-  release/site/README/install links and the exact signed feed select beta 13;
-  disabled candidate coordinates now prepare beta 14 without changing active beta 13.
+- Exact-source anonymous-public seven-asset audit passed. At group 3 activation,
+  release/site/README/install links and the exact signed feed selected beta 13;
+  disabled candidate coordinates prepared beta 14 without changing beta 13 artifacts.
 - DMG SHA-256: `48eee3b3684875b11c586ea4af9fec22fdefe150485db1f53f21e4e6f85a184e`.
   Updater archive SHA-256: `17308d0483e7d9820d9d585b4038c128ccc9637ecd70707c02dcba457de02271`.
   Exact feed SHA-256: `055169ccc4670c7f8b5c19f018920e9bae4cbc365e0472a0b47d3a14ccb0e675`.
@@ -72,7 +73,26 @@ not counted as new implementations.
   from actual OS login, AppKit/window ordering, hardware and OTA acceptance,
   all still unverified. No VoiceOver acceptance is claimed.
 
-## Group 4 implementation evidence — candidate preparation, unpublished
+## Group 4 publication evidence — PUBLISHED, deployment parity pending
+
+- [Published beta 14](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.14),
+  exact clean artifact source `d7ea18e36141a9302f973637c926e190c286ecc8`;
+  [source CI 42785358444](https://github.com/suhaasbadada/handsfree/actions/runs/42785358444) passed.
+- Existing-identity signing and local/draft/anonymous-public seven-asset audits
+  passed. Active repository metadata and the exact copied signed feed select
+  beta 14; the audit-coordinate candidate export remains disabled.
+- DMG SHA-256: `d56e7db32ac886efdd9e97e534bf761e9e384c6973b64fbf053705dea2737f88`.
+  Updater archive SHA-256: `4b3e60ab151de30ed26a8e53f528dbd85a3793361d1393ed47a306968fa1d053`.
+  Exact feed SHA-256: `904d3231b67f4640281a40fb1f1919a94b173c36468b833cdbc232aff62d0139`.
+  Beta 13 outputs remain at `release/history/beta13-before-beta14-5v8sbkaw/`.
+  Built candidate-era docs remain immutable at that artifact source.
+- Activation CI, Pages deployment/live website/feed byte readback, matching
+  Homebrew cask publication/remote readback and tap CI remain pending. This is
+  not a claim that all four releases have completed distribution parity.
+- The user-reported stale update/expiry problem is repaired in beta 14;
+  the prior beta 12 layout fix remains intact. The primary verified the installed
+  beta 12 complete bundle, signing requirement and model/settings/usage hashes
+  unchanged; actual installed OTA/restart remains unverified.
 
 Production-DOM CDP coverage exercises real key dispatch and browser AX names for
 the brand menu and status regions, bounded error scrolling/stable positions,
@@ -85,11 +105,11 @@ background, adds reduced-motion/runtime-contrast coverage, and refreshes the
 latest updater offer on explicit Download intent before exact-version/revision
 confirmation. Expired/changed offers require review; Check again needs no restart.
 Command-line AppKit tests exercise NSButton target/actions, not AXPress or
-VoiceOver acceptance. Final validation, exact-source CI, signing and
-local/draft/anonymous-public audits remain pending for group 4 / beta 14.
+VoiceOver acceptance. Source validation, exact-source CI, signing and
+local/draft/anonymous-public audits passed for group 4 / beta 14.
 No checks establish real macOS VoiceOver, hardware dictation, ServiceManagement
 or installed OTA replacement/restart acceptance. No custom preferences, AI
-feature or extra stored user data is added. See [candidate notes](releases/v0.1.1-beta.14.md).
+feature or extra stored user data is added. See [published notes](releases/v0.1.1-beta.14.md).
 
 ## Mandatory parity gate for every release
 
