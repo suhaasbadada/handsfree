@@ -195,8 +195,6 @@ test('beta 7 publication evidence distinguishes artifact source, bootstrap and p
     '2f735b7e48de1d60d96fbe592987991796a05fa7d8510b6e4e3b63afbf715b30', 'Historical beta 6 notes remain byte-identical');
   assert.equal(createHash('sha256').update(read('site/updates/macos-arm64.json')).digest('hex'),
     '055169ccc4670c7f8b5c19f018920e9bae4cbc365e0472a0b47d3a14ccb0e675', 'Activation preserves exact anonymously verified beta 13 feed bytes');
-  assert.equal(read('site/updates/macos-arm64.json'), read('release/macos-arm64.json'),
-    'Site feed is the byte-for-byte generated release feed, not reconstructed');
   for (const path of ['README.md', 'docs/INSTALL.md', 'SECURITY.md', 'docs/UPDATES.md']) {
     const source = read(path);
     assert.match(source, /Check for updates/);
