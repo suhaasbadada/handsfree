@@ -7,7 +7,7 @@ not counted as new implementations.
 
 | Release | Scope | State |
 | --- | --- | --- |
-| 1 — Get started (beta 11) | Inline setup checklist; explicit permission/model actions; private input meter; configured shortcut tutorial | Local tests/build/Rust checks/browser integration passed; publication pending |
+| 1 — Get started (beta 11) | Inline setup checklist; explicit permission/model actions; private input meter; configured shortcut tutorial | Published; exact-source CI and local/draft/public audits passed; site/feed deployment and Homebrew parity pending |
 | 2 — Recording controls | Microphone selection; recording timer; retain/refine mode, duration and sound controls | Pending |
 | 3 — Fit your workflow | Launch at login; app exclusions; temporary pause; menu-bar quick controls | Pending |
 | 4 — Clear and accessible | Keyboard/VoiceOver; system appearance/reduced motion; status and actionable recovery | Pending |

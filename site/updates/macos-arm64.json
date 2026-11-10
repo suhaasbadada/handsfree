@@ -1,10 +1,10 @@
 {
-  "version": "0.1.1-beta.10",
+  "version": "0.1.1-beta.11",
   "notes": "",
   "platforms": {
     "darwin-aarch64": {
-      "url": "https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.10/HandsFree-0.1.1-beta.10-macos-arm64.app.tar.gz",
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUZElJbWEvYXFOcVBnRGRyNXJCcjlySWluUmpMMTArb093ZDduWWxJcnFjUkpWdGRrSURzNFZ3Si9wTXY2SXlPSG5EaGRhampmRFJoZnI3cTRyenh5UjhpTVNDWU11cEFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0MjgxNTM2CWZpbGU6SGFuZHNGcmVlLTAuMS4xLWJldGEuMTAtbWFjb3MtYXJtNjQuYXBwLnRhci5negl2ZXJzaW9uOjAuMS4xLWJldGEuMTAKbWNsY2xTek9EY29MS1FCVms0VFR5cmF0eVZPQUgzUkg1eGJFRnRob1pvUlpIdGV5VXY4WUlRQW9VQnIxaUN4WGE2SERXbnIyZ3RqQ0k4YU1zbzZpRFE9PQo="
+      "url": "https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.11/HandsFree-0.1.1-beta.11-macos-arm64.app.tar.gz",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUZElJbWEvYXFOcUNuaktxWjRRV0t1eEVGekFlZkNmR0cwWmtKUlBxa29HOU8yUlg2QVI3TVlJTnV2Si9pRlY1M2doWERLcGdWeHR6WVkrUDNiT0RvZlI4c2VZM1FWeGdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0Mjg4MTE3CWZpbGU6SGFuZHNGcmVlLTAuMS4xLWJldGEuMTEtbWFjb3MtYXJtNjQuYXBwLnRhci5negl2ZXJzaW9uOjAuMS4xLWJldGEuMTEKd0g1dXZOWkpURElFNHQ5blowWGh2S294Rk5rdjJjeGErUkgrUExtM3lFb0MvSmpUQ1NJenQ5aHNyOTMzeXlLQnVIdXdSczB2NnAreVREcVRFSUtyRHc9PQo="
     }
   }
 }

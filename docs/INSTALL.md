@@ -36,13 +36,13 @@ brew update
 brew upgrade --cask suhaasbadada/handsfree/handsfree
 ```
 
-Reopen the Applications copy afterward. The current Mac distribution is `0.1.1-beta.10` (the embedded app version remains `0.1.1`); Homebrew selects upgrades using the cask's distribution version. Beta updates are reviewed manually, not promised on a schedule. Its documented online-audit prerelease policy finding is intentional, not a claim that the beta meets Homebrew’s stable-release policy.
+Reopen the Applications copy afterward. The current Mac distribution is `0.1.1-beta.11` (the embedded app version remains `0.1.1`); Homebrew selects upgrades using the cask's distribution version. Beta updates are reviewed manually, not promised on a schedule. Its documented online-audit prerelease policy finding is intentional, not a claim that the beta meets Homebrew’s stable-release policy.
 
 Normal updates preserve your existing model, settings, and usage totals; they do not restart onboarding or reset permissions. Do not use `--zap`, delete HandsFree's data folders, or reset totals to update. Existing permissions may still need reauthorization if macOS requests it. No installed-app upgrade or clean-machine onboarding test is implied by the release's artifact checks.
 
 ## DMG alternative
 
-Download the [Mac DMG](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.10/HandsFree-0.1.1-beta.10-macos-arm64.dmg). Open it and drag **HandsFree.app** onto **Applications**. Keep the disk image: its `Licenses` folder (project license, dependency notices and corresponding sources) accompanies redistributions. No ZIP extraction or developer tools are needed. Eject the image after copying. Do not launch the copy inside the disk image.
+Download the [Mac DMG](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.11/HandsFree-0.1.1-beta.11-macos-arm64.dmg). Open it and drag **HandsFree.app** onto **Applications**. Keep the disk image: its `Licenses` folder (project license, dependency notices and corresponding sources) accompanies redistributions. No ZIP extraction or developer tools are needed. Eject the image after copying. Do not launch the copy inside the disk image.
 
 For optional manual DMG updates, quit HandsFree, replace the Applications copy,
 then reopen. Beta 6 and earlier need this or Homebrew as a one-time bootstrap.
@@ -76,7 +76,7 @@ Focus a text field, tap your shortcut to speak, and tap again to transcribe. Esc
 speak, then **Finish**. The temporary editable result does not paste, change the
 clipboard or count toward usage. This is not a shortcut or external-insertion
 test. See [practice safeguards](practice.md) and the
-[release evidence and unperformed hardware checks](releases/v0.1.1-beta.10.md).
+[release evidence and unperformed hardware checks](releases/v0.1.1-beta.11.md).
 
 **Toggle remains the default.** For optional hold-to-record behavior, select
 **Settings → Recording mode → Push to talk**: hold Fn / Globe or your saved

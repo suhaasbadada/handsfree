@@ -63,7 +63,7 @@ test('draft audit requires the matching website manifest to remain unavailable',
   assert.equal(release.publicAvailable, false);
   assert.throws(() => validateAvailability(publishedRelease), /manifest disabled/);
   assert.doesNotThrow(() => validateAvailability(release, true), 'Public mode accepts matching beta 11 coordinates');
-  assert.throws(() => validateAvailability(publishedRelease, true), /manifest disabled/, 'Active beta 10 cannot substitute in a beta 11 public audit');
+  assert.doesNotThrow(() => validateAvailability(publishedRelease, true), 'Activated beta 11 has the same publicly audited coordinates');
   for (const version of ['beta.5', 'beta.6', 'beta.7', 'beta.8', 'beta.9', 'beta.10']) {
     const historical = { ...release, version: `0.1.1-${version}`, dmgUrl: release.dmgUrl.replaceAll('beta.11', version) };
     for (const publicMode of [false, true]) {

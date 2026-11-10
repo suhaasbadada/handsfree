@@ -2,25 +2,36 @@
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
 
-Current public Mac distribution: **v0.1.1-beta.10**, embedded version **0.1.1**.
-CI, publication and anonymous public-byte verification passed for the exact clean
-artifact source; see [beta 10 evidence](releases/v0.1.1-beta.10.md). The active
-`release` export and static downloads select verified beta 10. The separate disabled
-`candidateRelease` export prepares **beta 11 audit coordinates**, with availability
-disabled. See [beta 11 candidate notes](releases/v0.1.1-beta.11.md) for group 1:
+Current public Mac distribution: **v0.1.1-beta.11**, embedded version **0.1.1**.
+CI, publication and local/draft/anonymous-public seven-asset audits passed for the
+exact clean artifact source `994bcb82b2cb92a08badbd4754695378f89afa88`, with
+[passing source CI](https://github.com/suhaasbadada/handsfree/actions/runs/42761543948).
+See the [published release](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.11)
+and [beta 11 evidence](releases/v0.1.1-beta.11.md). The active `release` export and
+static downloads select audited beta 11; `candidateRelease` retains the same
+audit coordinates with availability disabled. Group 1 contains
 guided setup, explicit permission/model actions, a private practice input meter,
-and shortcut receipt evidence distinct from successful dictation. Preparation
-does not activate downloads, replace the installed app or change the signed feed.
-Exact artifact source is `43c40048c2e21199fb6c9808586a33611b2e61e0`, with
-[passing CI](https://github.com/suhaasbadada/handsfree/actions/runs/42749971561).
+and shortcut receipt evidence distinct from successful dictation. Activation is
+metadata-only: it copies the exact generated signed feed, without reconstructing
+its signature, and does not rebuild or replace the installed app. Artifacts and
+their bundled preparation-era docs remain sourced from immutable `994bcb82b2cb92a08badbd4754695378f89afa88`.
+DMG SHA-256: `240799cedf24705bbd5b940baaa940a1b3c6c0de01f834f2edf9f1c1dd8b53d3`.
+Updater archive SHA-256: `88bf0041059a98b8d8686b473098551008e37bd7e646e981eee738dcae3f8da2`.
+Exact audited feed SHA-256: `d2610f7d5618c1127c8d8c48b678da9fc136a57ce546f5fae8dd1074eb092e54`.
+Beta 10 outputs are preserved under `release/history/beta10-before-beta11-bbsw66sm/`;
+its [historical evidence](releases/v0.1.1-beta.10.md) remains unchanged.
 Beta 9 outputs are preserved under `release/history/beta9-before-beta10-ig1265gl/`.
 Beta 8 outputs are preserved under `release/history/beta8-before-beta9-38tada9u/`.
 The beta 7 → beta 8 attempt failed because the old client skipped TLS provider
 initialization. Beta 9 repairs it; the owner-authorized manual bootstrap preserved
 model/settings/usage hashes and signing identity and verified native readiness.
-Do not describe this as a successful OTA restart. Historical assets stay immutable.
-Website deployment and the cross-repository Homebrew
-gate below remain distinct checks; do not claim either from artifact verification.
+Do not describe this as a successful OTA restart; retain the
+[beta 9 repair evidence](releases/v0.1.1-beta.9.md). Historical assets stay immutable.
+Website/feed deployment and live byte readback, matching Homebrew publication,
+remote cask readback and tap CI remain pending distinct gates; record activation
+and tap commit SHAs together before claiming parity. Do not advance to group 2
+until those gates pass. Hardware, separate-Mac and real OTA acceptance remain
+unverified. The owner upgrades through the app; do not manually replace it.
 Windows beta 3 and historical Mac assets remain untouched. See
 [practice](practice.md) for the private button/shortcut flow, not an external insertion test,
 and [Compatibility paste](COMPATIBILITY-PASTE.md) for unchanged opt-in safeguards.
@@ -52,7 +63,7 @@ cache lacks the final resources/signature. No independent second build is used.
 An unexpected source change preserves `release/updater/.mac-source-state.json`;
 investigate that recovery receipt rather than deleting it or hiding changes.
 
-For candidate `v0.1.1-beta.11`, seven public assets must share the exact clean-source tag:
+For published `v0.1.1-beta.11`, these seven audited public assets share the exact clean-source tag:
 
 - `HandsFree-0.1.1-beta.11-macos-arm64.dmg`
 - `PROVENANCE.txt` (exact clean source commit/tree)
@@ -141,7 +152,7 @@ The candidate auditor also cleans its exact temporary mount/directory on SIGINT 
 For updater-enabled releases, also follow [the signed updater packaging and feed
 gates](UPDATES.md#release-integration). The updater archive must be generated
 **after** stable macOS signing, with a version-bound signature. The current
-published beta 10 assets and feed availability must not be changed merely by
+published beta 11 assets and feed availability must not be changed merely by
 building a future updater release. Preserve exact-source CI/public audit gates;
 never weaken them to accept a later activation HEAD.
 
