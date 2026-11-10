@@ -44,7 +44,7 @@ posixTest('packaging rejects unsupported hosts before build', () => sandbox(({ r
   assert.ok(!readdirSync(root).includes('release'));
 }));
 
-for (const existing of ['HandsFree-0.1.1-beta.10-macos-arm64.dmg', 'SHA256SUMS', 'PROVENANCE.txt', 'HandsFree-0.1.1-beta.10-macos-arm64.app.tar.gz', 'HandsFree-0.1.1-beta.10-macos-arm64.app.tar.gz.sig', 'UPDATER-PROVENANCE.txt', 'macos-arm64.json']) {
+for (const existing of ['HandsFree-0.1.1-beta.11-macos-arm64.dmg', 'SHA256SUMS', 'PROVENANCE.txt', 'HandsFree-0.1.1-beta.11-macos-arm64.app.tar.gz', 'HandsFree-0.1.1-beta.11-macos-arm64.app.tar.gz.sig', 'UPDATER-PROVENANCE.txt', 'macos-arm64.json']) {
   posixTest(`packaging refuses to overwrite ${existing}`, () => sandbox(({ root, run }) => {
     mkdirSync(join(root, 'release'));
     writeFileSync(join(root, 'release', existing), 'preserve me');

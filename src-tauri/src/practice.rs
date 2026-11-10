@@ -45,6 +45,12 @@ impl Gate {
             && self.generation == Some(generation)
             && self.phase == "recording"
     }
+    pub fn meter_identity(&self, token: u64) -> Option<(u64, u64)> {
+        if self.active != Some(token) || self.phase != "recording" {
+            return None;
+        }
+        Some((self.generation?, self.epoch?))
+    }
     pub fn bind(&mut self, token: u64, generation: u64) -> bool {
         if self.active != Some(token) {
             return false;
@@ -83,6 +89,23 @@ impl Gate {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn meter_requires_current_recording_token_generation_and_epoch() {
+        let mut g = Gate::new();
+        assert_eq!(g.meter_identity(1), None);
+        g.reserve(1);
+        g.bind(1, 7);
+        assert_eq!(g.meter_identity(1), None);
+        g.epoch = Some(3);
+        assert_eq!(g.meter_identity(1), Some((7, 3)));
+        assert_eq!(g.meter_identity(2), None);
+        g.phase = "processing".into();
+        assert_eq!(g.meter_identity(1), None);
+        g.complete(1, 7, true, Ok("private".into()));
+        assert_eq!(g.meter_identity(1), None);
+        g.revoke(1);
+        assert_eq!(g.meter_identity(1), None);
+    }
     #[test]
     fn revocation_precedes_late_start_and_never_cancels_another_lease() {
         let mut g = Gate::new();

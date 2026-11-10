@@ -88,6 +88,10 @@ pub unsafe fn hf_try_shortcut(code: i32, modifiers: u32) -> bool {
 pub unsafe fn hf_capture_shortcut(active: bool) {
     ui::capture(active);
 }
+// Private practice is Mac-only; no unowned Windows audio observation.
+pub unsafe fn hf_input_level(_: u64, _: u64, _: extern "C" fn(u64) -> bool) -> f32 {
+    -1.0
+}
 pub unsafe fn hf_record(
     generation: u64,
     epoch: u64,

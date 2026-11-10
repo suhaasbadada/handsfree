@@ -89,11 +89,14 @@ final class CapturePipeline {
 }
 
 final class AudioCapture {
+    let generation: UInt64
+    let epoch: UInt64
     private let engine = AVAudioEngine()
     private let pipeline: CapturePipeline
     private var started = false // main thread only
     private var routeObserver: NSObjectProtocol?
     init(generation: UInt64, epoch: UInt64, sink: @escaping AudioSink) throws {
+        self.generation = generation; self.epoch = epoch
         pipeline = try CapturePipeline(input: engine.inputNode.outputFormat(forBus: 0)) { data, count in
             sink(generation, epoch, data, count)
         }
@@ -116,6 +119,7 @@ final class AudioCapture {
         return wasStarted && healthy
     }
     func level() -> Float { pipeline.level() }
+    var isRecording: Bool { started }
 }
 
 // Shared production/test barrier: producer closed, engine stopped, tap removed,

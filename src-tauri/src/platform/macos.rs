@@ -1,4 +1,5 @@
 unsafe extern "C" {
+    pub fn hf_input_level(generation: u64, epoch: u64, allowed: extern "C" fn(u64) -> bool) -> f32;
     pub fn hf_compatibility(enabled: bool) -> bool;
     fn hf_focus_diagnostic(buffer: *mut u8, capacity: i32) -> i32;
     pub fn hf_mode(mode: i32) -> bool;

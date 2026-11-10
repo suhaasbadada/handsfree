@@ -4,6 +4,33 @@ import { readFileSync } from 'node:fs';
 import { Practice } from '../src/practice.ts';
 
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b; }); return { promise, resolve, reject }; };
+test('input meter is recording-only, bounded and retired on finish, mismatch, clear and stale polls', async () => {
+  const {practice:p,responses} = harness();
+  assert.equal(p.view.inputLevel,null);
+  await p.start();
+  for (const level of [0,0.45,1,null,undefined,NaN,Infinity,-1,1.1,'0.5']) {
+    responses.practice_status={generation:4,phase:'recording',text:'',input_level:level}; await p.poll();
+    assert.equal(p.view.inputLevel,typeof level==='number' && Number.isFinite(level) && level>=0 && level<=1 ? level : null);
+  }
+  responses.practice_status={generation:4,phase:'recording',text:'',input_level:0.7}; await p.poll();
+  responses.practice_status={generation:3,phase:'recording',text:'',input_level:1}; await p.poll();
+  assert.equal(p.view.inputLevel,null);
+  responses.practice_status={generation:4,phase:'recording',text:'',input_level:0.7}; await p.poll();
+  await p.finish(); assert.equal(p.view.inputLevel,null);
+  await p.poll(); assert.equal(p.view.inputLevel,null,'late recording observations cannot revive a finishing meter');
+  await p.clear(); await p.start();
+  const delayed=deferred(); responses.practice_status=delayed.promise;
+  const polling=p.poll(); await p.clear(); await p.start();
+  delayed.resolve({generation:4,phase:'recording',text:'',input_level:1}); await polling;
+  assert.equal(p.view.inputLevel,null);
+});
+test('unknown practice snapshots revoke capture rather than retain a meter or imply success', async () => {
+  const {practice:p,responses,calls} = harness(); await p.start();
+  responses.practice_status={generation:4,phase:'future',text:'must not appear',input_level:0.8};
+  await p.poll();
+  assert.equal(p.view.phase,'error'); assert.equal(p.view.inputLevel,null); assert.equal(p.view.text,'');
+  assert.ok(calls.some(c=>c.command==='practice_cancel'));
+});
 test('eligibility lost during start retires local ownership as well as native capture', async () => {
   const {practice:p,calls,responses,blur}=harness(), ack=deferred();
   responses.practice_start=ack.promise;

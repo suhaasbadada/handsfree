@@ -39,6 +39,7 @@ for rate in [16000.0, 44100.0, 48000.0] {
         let rms = sqrt(body.map { $0*$0 }.reduce(0,+) / Float(body.count))
         let expectedRMS = (left + right) / 2 / sqrt(Float(2))
         precondition(abs(rms - expectedRMS) < 0.001, "\(rate) interleaved=\(interleaved) L=\(left) R=\(right): RMS \(rms), expected \(expectedRMS)")
+        precondition(pipeline.level().isFinite && pipeline.level() < 0, "input level must reflect synthetic PCM")
         let before = received.count
         let late = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 2048)!
         late.frameLength = 2048; pipeline.enqueue(late); pipeline.drain()

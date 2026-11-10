@@ -194,3 +194,10 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
   .practice .card-heading { flex-wrap: wrap; gap: 8px; }
   .practice-bottom .subtle { text-align: left; }
 }
+/* Inline, revisitable setup: no welcome modal or additional navigation. */
+.setup-checklist { padding-left: 22px; margin: 20px 0; }
+.setup-checklist li { padding: 10px 0; }
+.setup-checklist li > span { display: block; margin-bottom: 8px; }
+.practice-meter { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; margin: 16px 0; }
+.practice-meter meter { width: 100%; }
+.practice-meter .subtle { grid-column: 1 / -1; }

@@ -700,6 +700,17 @@ private func validateDelivery() -> PasteResult {
         } catch { clearTarget(); return false }
     }
 }
+// Observation only: reuse the one explicitly started capture. Never create an engine.
+@_cdecl("hf_input_level") public func inputLevel(_ generation: UInt64, _ epoch: UInt64, _ allowed: @convention(c) (UInt64) -> Bool) -> Float {
+    main {
+        guard allowed(epoch), NSApp.isActive, NSApp.keyWindow?.isVisible == true,
+              permissions() & 7 == 7, let r = recorder, r.isRecording,
+              r.generation == generation, r.epoch == epoch else { return -1 }
+        let db = r.level()
+        guard allowed(epoch), db.isFinite else { return -1 }
+        return min(1, max(0, (db + 60) / 60))
+    }
+}
 @_cdecl("hf_stop") public func stop() {
     // Stopping capture is not cancellation: inference still needs the original
     // target. Discard explicitly only on cancel, failure, empty result, or paste.

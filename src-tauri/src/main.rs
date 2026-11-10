@@ -573,24 +573,40 @@ struct PracticeStatus {
     generation: Option<u64>,
     phase: String,
     text: String,
+    input_level: Option<f32>,
 }
 #[tauri::command]
 async fn practice_status(token: u64) -> PracticeStatus {
     if !practice_window_ready() {
         close_practice();
     }
+    // Snapshot, dispatch without Rust locks, then recheck ownership. A main-thread
+    // callback may revoke practice while the native observation is in flight.
+    let identity = PRACTICE.lock().unwrap().meter_identity(token);
+    let level = identity.and_then(|(generation, epoch)| {
+        let value = unsafe { hf_input_level(generation, epoch, delivery_allowed) };
+        (value.is_finite() && (0.0..=1.0).contains(&value)).then_some(value)
+    });
     let gate = PRACTICE.lock().unwrap();
     if gate.active != Some(token) {
         return PracticeStatus {
             generation: None,
             phase: "cancelled".into(),
             text: String::new(),
+            input_level: None,
         };
     }
     PracticeStatus {
         generation: gate.generation,
         phase: gate.phase.clone(),
         text: gate.text.clone(),
+        input_level: if identity.is_some_and(|(_, epoch)| CANCELLATION.allows(epoch))
+            && gate.meter_identity(token) == identity
+        {
+            level
+        } else {
+            None
+        },
     }
 }
 #[tauri::command]

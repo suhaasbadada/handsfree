@@ -79,6 +79,13 @@ prove discovery completeness or runtime correctness on an untested OS.
   Existing external dictation retains its ordinary completion route. Own-app
   delivery refusal code 15 exits before clipboard fallback and usage publication.
 
+- Inline Get started observes explicit native readiness only and reuses explicit
+  permission/download actions. Practice's input meter observes its existing
+  recorder by token/generation/epoch; no Rust lock crosses synchronous native
+  dispatch. Native focus, permission and cancellation checks and a post-dispatch
+  lease check fail closed. Shortcut receipt is separate from button-start and
+  transcription success; privacy teardown retires it with the meter and text.
+
 - `src/state.ts`: separate dictation/practice/update phase spaces; readonly phase
   policies fail closed for unknown/disconnected states. There is deliberately no
   global `downloading` state: a model download and an app update are different owners.

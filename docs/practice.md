@@ -21,3 +21,39 @@ If you edit during transcription, your edits are kept instead of being replaced.
 To test real insertion, leave practice, select a supported non-secure text field in
 another application, and use your usual shortcut. Normal own-app and focus-safety
 guards still apply. Practice is not a permission bypass.
+
+## Get started and microphone check
+
+**Get started** in the HandsFree menu, Settings, or practice's setup-help button
+opens an inline, revisitable checklist in Overview, not a welcome modal. Ready
+returning users do not automatically see it. Each check requires explicit native
+Mac readiness: microphone, both Accessibility and Input Monitoring, live shortcut
+hook, and verified English model. Unknown states are not ready. The buttons reuse
+the existing explicit permission and model actions. Opening or polling the guide
+does not request consent, download a model, or record. If permissions are granted
+but the hook is disconnected, the guide advises quitting and reopening the app.
+
+The shortcut tutorial uses the configured binding and recording mode. **Start
+test** does not mark the shortcut tested. Only a current-context native press or
+toggle event reports **Shortcut received**; that proves key receipt, not capture,
+speech recognition, or paste. Clear, navigation, focus loss, hiding and menus
+retire that evidence. Changing the configured binding/mode also resets it.
+
+The input meter samples the same explicitly started private practice recorder's
+`AudioCapture.level()` (dB mapped from -60…0 to 0…1). It creates no second recorder
+and saves no audio. Practice still needs the model and permissions first. A missing
+reading says waiting, not success or silence. Native main-thread checks require
+the matching generation/epoch, active visible window, current permission and
+cancellation proof; Rust checks the practice token before and after dispatch,
+without holding a Rust lock across it. UI responses are token/generation scoped,
+finite and bounded; finish, cancellation, stale results and lost eligibility
+remove the meter. Input level is not a speech or transcription quality score.
+
+Coverage: `tests/onboarding.test.mjs` exercises unknown/partial readiness and
+configured instructions; `tests/practice.test.mjs` exercises owned meter data,
+invalid/missing/stale responses and teardown; Rust `practice` tests exercise
+recording-only meter identity. `tests/ui-practice-events.mjs` runs the production
+frontend listeners via CDP with a synthetic native bridge, checking revisitable
+guidance, no implicit effects, button versus shortcut evidence, meter updates,
+and privacy teardown. No live microphone, installed-app update, or hardware
+acceptance is implied by these tests.

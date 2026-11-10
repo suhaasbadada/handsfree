@@ -9,13 +9,13 @@ export const release = Object.freeze({
 });
 
 // Preparation/audit coordinates only; the website continues to use release above.
-// Exact beta 10 artifact audit coordinates; not a second availability switch.
+// Beta 11 candidate audit coordinates; not a second availability switch.
 export const candidateRelease = Object.freeze({
   schemaVersion: 1,
-  version: '0.1.1-beta.10',
+  version: '0.1.1-beta.11',
   publicAvailable: false,
-  status: 'Mac beta 10 immutable artifact audit coordinates; public availability is controlled above.',
-  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.10/HandsFree-0.1.1-beta.10-macos-arm64.dmg',
+  status: 'Mac beta 11 candidate: guided setup and private microphone check; not yet publicly verified.',
+  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.11/HandsFree-0.1.1-beta.11-macos-arm64.dmg',
 });
 
 // Historical coordinates only. Windows development and public promotion are paused.

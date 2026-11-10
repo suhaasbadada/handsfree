@@ -6,7 +6,11 @@ Current public Mac distribution: **v0.1.1-beta.10**, embedded version **0.1.1**.
 CI, publication and anonymous public-byte verification passed for the exact clean
 artifact source; see [beta 10 evidence](releases/v0.1.1-beta.10.md). The active
 `release` export and static downloads select verified beta 10. The separate disabled
-`candidateRelease` export retains **beta 10 audit coordinates**.
+`candidateRelease` export prepares **beta 11 audit coordinates**, with availability
+disabled. See [beta 11 candidate notes](releases/v0.1.1-beta.11.md) for group 1:
+guided setup, explicit permission/model actions, a private practice input meter,
+and shortcut receipt evidence distinct from successful dictation. Preparation
+does not activate downloads, replace the installed app or change the signed feed.
 Exact artifact source is `43c40048c2e21199fb6c9808586a33611b2e61e0`, with
 [passing CI](https://github.com/suhaasbadada/handsfree/actions/runs/42749971561).
 Beta 9 outputs are preserved under `release/history/beta9-before-beta10-ig1265gl/`.
@@ -48,13 +52,13 @@ cache lacks the final resources/signature. No independent second build is used.
 An unexpected source change preserves `release/updater/.mac-source-state.json`;
 investigate that recovery receipt rather than deleting it or hiding changes.
 
-Seven public assets must share the exact clean-source tag:
+For candidate `v0.1.1-beta.11`, seven public assets must share the exact clean-source tag:
 
-- `HandsFree-0.1.1-beta.10-macos-arm64.dmg`
+- `HandsFree-0.1.1-beta.11-macos-arm64.dmg`
 - `PROVENANCE.txt` (exact clean source commit/tree)
 - `SHA256SUMS` (exactly six payload entries, excluding itself)
-- `HandsFree-0.1.1-beta.10-macos-arm64.app.tar.gz`
-- `HandsFree-0.1.1-beta.10-macos-arm64.app.tar.gz.sig`
+- `HandsFree-0.1.1-beta.11-macos-arm64.app.tar.gz`
+- `HandsFree-0.1.1-beta.11-macos-arm64.app.tar.gz.sig`
 - `UPDATER-PROVENANCE.txt` (same source and final executable hash)
 - `macos-arm64.json` (exact version/target/canonical URL/uploaded signature)
 
@@ -75,6 +79,13 @@ settings, usage and permissions during authorized bootstrap installation.
 Actual readiness/dictation and OTA replacement/restart acceptance remain separate
 gates, not consequences of a successful artifact audit. Beta 6 requires a first
 DMG/Homebrew upgrade; it cannot exercise the updater itself.
+
+Beta 11 is the first of four separately gated, sequential feature releases.
+Complete its exact-source validation, signed publication, anonymous public audit,
+feed/site activation and matching Homebrew cask publication/readback before
+advancing to the next feature release. App-repository/Homebrew distribution
+parity is mandatory each time, not deferred until the final group. Live hardware
+and actual OTA replacement/restart acceptance remain unverified until performed.
 
 Run on the existing Apple Silicon signing machine, with installed npm/Cargo dependencies, Rust documentation (runtime notices), and the existing local signing identity:
 
@@ -130,7 +141,7 @@ The candidate auditor also cleans its exact temporary mount/directory on SIGINT 
 For updater-enabled releases, also follow [the signed updater packaging and feed
 gates](UPDATES.md#release-integration). The updater archive must be generated
 **after** stable macOS signing, with a version-bound signature. The current
-published beta 8 assets and feed availability must not be changed merely by
+published beta 10 assets and feed availability must not be changed merely by
 building a future updater release. Preserve exact-source CI/public audit gates;
 never weaken them to accept a later activation HEAD.
 

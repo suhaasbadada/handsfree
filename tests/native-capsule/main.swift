@@ -1,5 +1,8 @@
 import AppKit
 
+// A revoked observation never opens an engine, checks consent or starts capture.
+precondition(inputLevel(42, 9, { _ in false }) == -1)
+
 // Production physical-edge recognizer only: no event tap, mic, or playback.
 for cancel in [false, true] {
     var hold = HoldGesture()

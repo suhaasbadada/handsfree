@@ -2,8 +2,8 @@
 // transcript or uses storage, clipboard, telemetry, or native dictation toggles.
 import type { PracticePhase } from './state.ts';
 type Invoke = <T>(command: string, args: Record<string, unknown>) => Promise<T>;
-type Result = { generation: number | null; phase: 'starting' | 'recording' | 'processing' | 'complete' | 'empty' | 'error' | 'cancelled'; text: string };
-export type PracticeView = { phase: PracticePhase; text: string; message: string };
+type Result = { generation: number | null; phase: 'starting' | 'recording' | 'processing' | 'complete' | 'empty' | 'error' | 'cancelled'; text: string; input_level?: number | null };
+export type PracticeView = { phase: PracticePhase; text: string; message: string; inputLevel: number | null };
 let nextToken = Date.now() * 1000;
 export class Practice {
   private token?: number;
@@ -16,12 +16,12 @@ export class Practice {
   private invoke: Invoke;
   private render: (view: PracticeView) => void;
   private allowed: () => boolean;
-  view: PracticeView = { phase: 'idle', text: '', message: '' };
+  view: PracticeView = { phase: 'idle', text: '', message: '', inputLevel: null };
   constructor(invoke: Invoke, render: (view: PracticeView) => void, allowed: () => boolean) {
     this.invoke = invoke; this.render = render; this.allowed = allowed;
   }
   private show(phase: PracticePhase, message: string) {
-    this.view = { ...this.view, phase, message }; this.render(this.view);
+    this.view = { ...this.view, phase, message, inputLevel: phase === 'recording' ? this.view.inputLevel : null }; this.render(this.view);
   }
   edit(text: string) { this.edited = true; this.view.text = text; }
   async start() {
@@ -82,14 +82,18 @@ export class Practice {
       const result = await this.invoke<Result>('practice_status', { token });
       if (this.token !== token || this.generation !== generation) return;
       if (!this.allowed()) { await this.clear(); return; }
+      if (!['starting','recording','processing','complete','empty','error','cancelled'].includes(result.phase)) { await this.clearWithError('Practice status is unknown. Please try again.'); return; }
       if (result.phase === 'cancelled') { await this.clear(); return; }
-      if (result.generation !== generation) return;
+      if (result.generation !== generation) { this.view.inputLevel = null; this.render(this.view); return; }
+      this.view.inputLevel = result.phase === 'recording' && this.view.phase === 'recording' && typeof result.input_level === 'number' && Number.isFinite(result.input_level) && result.input_level >= 0 && result.input_level <= 1 ? result.input_level : null;
       if (result.phase === 'complete') {
         if (!this.edited) this.view.text = result.text;
         this.show('complete', this.edited ? 'Practice complete. Your edits were kept; clear to try again.' : 'Practice complete. Nothing was pasted or saved. Clear to try again.');
       } else if (result.phase === 'empty' || result.phase === 'error') {
         this.show(result.phase, result.phase === 'empty' ? 'No speech detected. Clear and try again.' : 'Practice could not transcribe. Check your microphone, then clear and try again.');
       } else if (result.phase === 'processing') this.show('processing', 'Transcribing on this Mac…');
+      else if (result.phase === 'recording' && this.view.phase === 'recording') this.show('recording', 'Speak now, then choose Finish.');
+      else this.render(this.view);
     } catch {
       if (this.token === token) await this.clearWithError('Practice connection lost. Please try again.');
     } finally { this.polling = false; }
