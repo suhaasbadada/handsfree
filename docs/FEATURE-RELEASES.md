@@ -9,7 +9,7 @@ not counted as new implementations.
 | --- | --- | --- |
 | 1 — Get started (beta 11) | Inline setup checklist; explicit permission/model actions; private input meter; configured shortcut tutorial | Verified complete publication/parity gates; exact-source CI, local/draft/public audits, activation CI, Pages, tap CI and live byte readback passed; hardware/OTA acceptance remains separate |
 | 2 — Recording controls (beta 12) | Saved microphone UID/System default; session timer; retain/refine mode, duration and sound controls; stable practice layout and focus transfer | COMPLETE: publication/parity verified, including activation CI, Pages, tap CI and live feed/page bytes; hardware/OTA acceptance separate |
-| 3 — Fit your workflow (beta 13 candidate) | Launch at login; app exclusions; temporary pause; menu-bar quick controls | Source implementation and local UI tests reported complete; disabled candidate metadata prepared; primary review/acceptance/source CI/signing/publication/parity pending; hardware/ServiceManagement/AppKit ordering/OTA acceptance unverified |
+| 3 — Fit your workflow (beta 13) | Launch at login; app exclusions; temporary pause; menu-bar quick controls | Published: source CI and anonymous-public seven-asset audit passed; repository metadata activated; activation CI/deployment/Homebrew parity pending; hardware/ServiceManagement/AppKit ordering/OTA acceptance unverified |
 | 4 — Clear and accessible | Keyboard/VoiceOver; system appearance/reduced motion; status and actionable recovery | Pending |
 
 ## Group 1 verified completion evidence
@@ -42,13 +42,25 @@ not counted as new implementations.
   Hardware/OTA acceptance remains separate and unverified.
 - [Beta 12 notes](releases/v0.1.1-beta.12.md) record hashes and preservation boundaries.
 
-## Group 3 candidate preparation — beta 13
+## Group 3 publication evidence — beta 13, deployment/parity pending
 
-The [unpublished candidate notes](releases/v0.1.1-beta.13.md) distinguish
-synthetic coverage from actual OS login, AppKit/window ordering, hardware and
-OTA acceptance. Active beta 12 release/site/feed/README/install coordinates
-remain unchanged until beta 13's exact-source publication and public audit.
-No beta 13 source SHA, CI, packaging, publication, activation or tap receipts yet.
+- [Published beta 13](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.13),
+  artifact source `aed1c5c213639958b3b418e54c2330b9ebc80e76`;
+  [source CI 42775050746](https://github.com/suhaasbadada/handsfree/actions/runs/42775050746) passed.
+- Exact-source anonymous-public seven-asset audit passed. Repository active
+  release/site/README/install links and the exact signed feed select beta 13;
+  beta 13 candidate audit coordinates remain disabled and unchanged.
+- DMG SHA-256: `48eee3b3684875b11c586ea4af9fec22fdefe150485db1f53f21e4e6f85a184e`.
+  Updater archive SHA-256: `17308d0483e7d9820d9d585b4038c128ccc9637ecd70707c02dcba457de02271`.
+  Exact feed SHA-256: `055169ccc4670c7f8b5c19f018920e9bae4cbc365e0472a0b47d3a14ccb0e675`.
+  Prior outputs: `release/history/beta12-before-beta13-dsrbi6sn/`.
+- Activation commit/CI, Pages deployment/live website and feed byte readback,
+  matching Homebrew cask publication/readback and tap CI are pending; no group 4
+  advancement before those gates pass. The reported stale updater expiry bug is
+  deferred to group 4 / beta 14, not changed by this metadata activation.
+- [Published notes](releases/v0.1.1-beta.13.md) distinguish synthetic coverage
+  from actual OS login, AppKit/window ordering, hardware and OTA acceptance,
+  all still unverified. No VoiceOver acceptance is claimed.
 
 ## Mandatory parity gate for every release
 
