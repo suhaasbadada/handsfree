@@ -2,14 +2,31 @@
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
 
+## Beta 15 candidate preparation
+
+Candidate distribution **v0.1.1-beta.15** retains embedded version **0.1.1**.
+Packaging, artifact auditing and disabled `candidateRelease` coordinates target
+beta 15. Current public downloads, active `release`, site/feed, README and install
+guidance remain audited beta 14 until the exact-source anonymous-public
+seven-asset audit passes. See [candidate scope and limitations](releases/v0.1.1-beta.15.md).
+Beta 15 adds persisted Light/Dark/System appearance and prominent local update
+status; it does not renumber or reopen the four completed beta 11–14 groups.
+Signing, exact-source CI, artifact audits, publication, feed/site activation and
+matching Homebrew parity remain separate gates; none is established by metadata
+preparation. Preserve historical outputs before packaging; never overwrite them.
+The owner upgrades manually through the app, not by installed-app replacement.
+Preserve signing identity, updater keys, permissions and model/settings/usage data.
+
+## Current public distribution (beta 14)
+
 Current public Mac distribution: **v0.1.1-beta.14**, embedded version **0.1.1**.
 Source CI, publication and the anonymous-public seven-asset audit passed for the
 exact clean artifact source `d7ea18e36141a9302f973637c926e190c286ecc8`, with
 [passing source CI](https://github.com/suhaasbadada/handsfree/actions/runs/42785358444).
 See the [published release](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.14)
 and [beta 14 evidence](releases/v0.1.1-beta.14.md). The active `release` export and
-static downloads select audited beta 14; disabled `candidateRelease` retains
-beta 14 audit coordinates only. Group 4 contains keyboard/recovery, system
+static downloads select audited beta 14; disabled `candidateRelease` prepares
+beta 15 audit coordinates only. Group 4 contains keyboard/recovery, system
 appearance and the latest-offer updater repair without new AI. Activation is
 metadata-only: it copies the exact generated signed feed, without reconstructing
 its signature, and does not rebuild or replace the installed app. Artifacts and
