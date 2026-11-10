@@ -6,7 +6,8 @@ Current public Mac distribution: **v0.1.1-beta.9**, embedded version **0.1.1**.
 CI, publication and anonymous public-byte verification passed for the exact clean
 artifact source; see [beta 9 evidence](releases/v0.1.1-beta.9.md). The active
 `release` export and static downloads select verified beta 9. The separate disabled
-`candidateRelease` export retains **beta 9 audit coordinates**. The exact artifact
+`candidateRelease` export prepares **beta 10 audit coordinates** without activating
+downloads. Beta 9's exact artifact
 source is `a828c0e4603e771695b99ce554edcc2630951f77`, with
 [passing CI](https://github.com/suhaasbadada/handsfree/actions/runs/42707503693).
 Beta 8 outputs are preserved under `release/history/beta8-before-beta9-38tada9u/`.
