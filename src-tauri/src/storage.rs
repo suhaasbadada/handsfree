@@ -75,6 +75,8 @@ impl Stats {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(default)]
 pub struct Store {
+    #[serde(deserialize_with = "read_excluded_apps")]
+    pub excluded_bundle_ids: Vec<String>,
     #[serde(deserialize_with = "read_compatibility_paste")]
     pub compatibility_paste: bool,
     #[serde(deserialize_with = "read_recording_mode")]
@@ -90,6 +92,33 @@ pub struct Store {
     #[serde(deserialize_with = "read_microphone_uid")]
     pub microphone_uid: Option<String>,
     pub stats: Stats,
+}
+pub fn normalized_exclusions(ids: Vec<String>) -> Result<Vec<String>, String> {
+    if ids.len() > 256
+        || ids.iter().any(|id| {
+            id.len() > 255
+                || !id.contains('.')
+                || id.split('.').any(str::is_empty)
+                || !id
+                    .bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || b".-_".contains(&c))
+        })
+    {
+        return Err(
+            "Choose at most 256 valid application bundle identifiers (255 bytes each).".into(),
+        );
+    }
+    let mut ids = ids;
+    ids.sort();
+    ids.dedup();
+    Ok(ids)
+}
+fn read_excluded_apps<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
+    let value = serde_json::Value::deserialize(d)?;
+    Ok(serde_json::from_value(value)
+        .ok()
+        .and_then(|ids| normalized_exclusions(ids).ok())
+        .unwrap_or_default())
 }
 pub fn validate_microphone_uid(uid: &str) -> Result<(), String> {
     if uid.trim().is_empty() || uid.len() > 1024 || uid.chars().any(char::is_control) {
@@ -160,6 +189,7 @@ fn read_shortcut<'de, D: serde::Deserializer<'de>>(
 impl Default for Store {
     fn default() -> Self {
         Self {
+            excluded_bundle_ids: Vec::new(),
             compatibility_paste: false,
             recording_mode: RecordingMode::default(),
             shortcut: crate::shortcut::Shortcut::default(),
@@ -236,6 +266,44 @@ pub fn validate_recording_limit(seconds: u32) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn exclusions_are_bounded_deduplicated_and_field_isolated() {
+        use super::*;
+        let good = vec![
+            "com.example.Editor".to_string(),
+            "org.example.Offline".to_string(),
+            "com.example.Editor".to_string(),
+        ];
+        assert_eq!(
+            normalized_exclusions(good).unwrap(),
+            ["com.example.Editor", "org.example.Offline"]
+        );
+        for malformed in [
+            serde_json::json!(false),
+            serde_json::json!(null),
+            serde_json::json!([1]),
+            serde_json::json!(["bad id"]),
+            serde_json::json!(["com..bad"]),
+        ] {
+            let store: Store = serde_json::from_value(serde_json::json!({"excluded_bundle_ids":malformed,"sounds":true,"stats":{"words":47},"microphone_uid":"uid", "recording_limit":300})).unwrap();
+            assert!(store.excluded_bundle_ids.is_empty());
+            assert!(store.sounds);
+            assert_eq!(store.stats.words, 47);
+            assert_eq!(store.microphone_uid.as_deref(), Some("uid"));
+            assert_eq!(store.recording_limit, 300);
+        }
+        assert!(normalized_exclusions(vec!["a.b".into(); 257]).is_err());
+        assert!(normalized_exclusions(vec![format!("com.{}", "a".repeat(256))]).is_err());
+        let store: Store = serde_json::from_value(
+            serde_json::json!({"excluded_bundle_ids":["com.example.NotRunning"]}),
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::from_value::<Store>(serde_json::to_value(&store).unwrap()).unwrap(),
+            store
+        );
+        assert_eq!(store.excluded_bundle_ids, ["com.example.NotRunning"]);
+    }
     #[test]
     fn compatibility_is_explicit_opt_in_and_preserves_existing_preferences() {
         let original = serde_json::json!({"recording_mode":"push_to_talk", "shortcut":{"code":"Space","modifiers":5}, "sound_style":"warm", "sounds":true,"sound_volume":73,"recording_limit":300,"stats":{"words":123,"transcriptions":7}});

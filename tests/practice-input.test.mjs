@@ -7,17 +7,23 @@ function fixture() {
   const calls=[], responses={};let allowed=true,generation=0;
   const p=new Practice(async(command,args)=>{calls.push({command,args});return responses[command]!==undefined?await responses[command]:command==='practice_start'?++generation:undefined;},()=>{},()=>allowed);
   const inputs=new PracticeInputs(p,()=>allowed);
-  const send=(action,token=1,source=1)=>inputs.receive({context:10,action,source,token});
+  const send=(action,token=1,source=1)=>inputs.receive({context:10,action,source,token,receipt:123});
   return {p,inputs,calls,responses,send,blur:()=>{allowed=false;inputs.reset();return p.clear();}};
 }
 test('dashboard tap starts/finishes practice and never dispatches normal dictation or clipboard commands',async()=>{
   const {p,calls,send,responses}=fixture();
   await send('toggle');assert.equal(p.view.phase,'recording');
+  assert.equal(calls[0].args.shortcutReceipt,123);
   await send('toggle');assert.equal(p.view.phase,'processing');
   responses.practice_status={generation:1,phase:'complete',text:'A little more thinking.'};await p.poll();
   assert.equal(p.view.text,'A little more thinking.');
   await send('toggle');assert.equal(p.view.phase,'recording');
   assert.ok(calls.every(c=>c.command.startsWith('practice_')));
+});
+test('shortcut starts without a valid receipt fail closed; button start omits receipt',async()=>{
+ const {p,inputs,calls}=fixture();
+ for(const receipt of [undefined,0,-1,NaN,1.5]) await inputs.receive({context:10,action:'press',source:1,token:1,receipt});
+ assert.equal(calls.length,0);await inputs.start();assert.equal(p.view.phase,'recording');assert.deepEqual(Object.keys(calls[0].args),['token']);
 });
 test('early hold release waits for the actual start acknowledgement then finishes once',async()=>{
   const {p,send,responses,calls}=fixture(), ack=deferred();responses.practice_start=ack.promise;

@@ -3,6 +3,110 @@ import AVFoundation
 import ApplicationServices
 import QuartzCore
 import Carbon
+import ServiceManagement
+
+// Main-thread-owned future-admission policy. Updating it never resets a physical
+// gesture, revokes an epoch, or touches an accepted recorder/cue.
+struct WorkflowPolicy {
+    var paused = false
+    var excluded = Set<String>()
+    func external(bundle: String?, own: Bool) -> Bool {
+        guard !paused, !own, let bundle, !bundle.isEmpty else { return false }
+        return !excluded.contains(bundle)
+    }
+    func shortcut(bundle: String?, own: Bool, recording: Bool) -> Bool {
+        recording || (!paused && (own || external(bundle: bundle, own: own)))
+    }
+    func admits(practice: Bool, shortcut: Bool, received: ShortcutTarget?, live: ShortcutTarget, ownPID: pid_t) -> Bool {
+        if practice {
+            guard live.pid == ownPID else { return false }
+            return !shortcut || (!paused && received == live)
+        }
+        return received == live && live.pid != 0 && external(bundle: live.bundle, own: live.pid == ownPID)
+    }
+}
+private var workflow = WorkflowPolicy()
+private var fnReceipt = HoldGesture()
+struct ShortcutTarget: Equatable { let pid: pid_t; let bundle: String? }
+private var shortcutTargets: [UInt64: ShortcutTarget] = [:]
+private var shortcutTicket: UInt64 = 0
+private var fnTicket: UInt64 = 0
+private func freezeShortcutTarget() {
+    shortcutTicket &+= 1
+    let app = NSWorkspace.shared.frontmostApplication
+    shortcutTargets[shortcutTicket] = ShortcutTarget(pid: app?.processIdentifier ?? 0, bundle: app?.bundleIdentifier)
+    // Bounded receipts; eviction fails closed at admission, never substitutes a
+    // newer foreground. Tokens are monotonic and never reused on reconfigure.
+    if shortcutTargets.count > 512, let oldest = shortcutTargets.keys.min() { shortcutTargets.removeValue(forKey: oldest) }
+}
+private var currentShortcutTicket: UInt64 = 0
+@_cdecl("hf_shortcut_ticket") public func receiptTicket() -> UInt64 { main { currentShortcutTicket } }
+private func shortcutAllowed() -> Bool {
+    let app = NSWorkspace.shared.frontmostApplication
+    return workflow.shortcut(bundle: app?.bundleIdentifier,
+        own: app?.processIdentifier == ProcessInfo.processInfo.processIdentifier,
+        recording: recorder != nil)
+}
+struct LoginSnapshot: Encodable {
+    let status: String
+    let error: String?
+}
+// Injectable effects keep policy tests independent of actual login registration.
+func loginChange(_ enabled: Bool, status: () -> String,
+                 register: () throws -> Void, unregister: () throws -> Void) -> LoginSnapshot {
+    do {
+        let current = status()
+        if enabled && current != "enabled" && current != "approval_required" { try register() }
+        if !enabled && current != "not_registered" && current != "not_found" { try unregister() }
+        return LoginSnapshot(status: status(), error: nil)
+    } catch { return LoginSnapshot(status: status(), error: error.localizedDescription) }
+}
+private func loginStatus() -> String {
+    switch SMAppService.mainApp.status {
+    case .enabled: return "enabled"
+    case .requiresApproval: return "approval_required"
+    case .notRegistered: return "not_registered"
+    case .notFound: return "not_found"
+    @unknown default: return "unknown"
+    }
+}
+private func jsonOutput<T: Encodable>(_ value: T, _ buffer: UnsafeMutablePointer<UInt8>?, _ capacity: Int32) -> Int32 {
+    guard let buffer, capacity > 0, let data = try? JSONEncoder().encode(value), data.count <= Int(capacity) else { return -1 }
+    data.copyBytes(to: buffer, count: data.count)
+    return Int32(data.count)
+}
+@_cdecl("hf_workflow_status") public func workflowStatus(_ buffer: UnsafeMutablePointer<UInt8>?, _ capacity: Int32) -> Int32 {
+    main {
+        struct Snapshot: Encodable { let paused: Bool; let excluded_bundle_ids: [String]; let login: LoginSnapshot }
+        return jsonOutput(Snapshot(paused: workflow.paused, excluded_bundle_ids: workflow.excluded.sorted(), login: LoginSnapshot(status: loginStatus(), error: nil)), buffer, capacity)
+    }
+}
+@_cdecl("hf_paused") public func configurePaused(_ paused: Bool) { main { workflow.paused = paused } }
+@_cdecl("hf_is_paused") public func isPaused() -> Bool { main { workflow.paused } }
+@_cdecl("hf_excluded") public func configureExcluded(_ json: UnsafePointer<CChar>) {
+    let ids = (try? JSONDecoder().decode([String].self, from: Data(String(cString: json).utf8))) ?? []
+    main { workflow.excluded = Set(ids) }
+}
+@_cdecl("hf_running_apps") public func runningApps(_ buffer: UnsafeMutablePointer<UInt8>?, _ capacity: Int32) -> Int32 {
+    main {
+        struct App: Encodable { let bundle_id: String; let name: String }
+        var seen = Set<String>()
+        let apps = NSWorkspace.shared.runningApplications.compactMap { app -> App? in
+            guard app.activationPolicy == .regular, app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+                  let id = app.bundleIdentifier, !id.isEmpty, seen.insert(id).inserted else { return nil }
+            return App(bundle_id: id, name: app.localizedName ?? id)
+        }.sorted { $0.bundle_id < $1.bundle_id }
+        return jsonOutput(apps, buffer, capacity)
+    }
+}
+@_cdecl("hf_login") public func configureLogin(_ enabled: Bool, _ buffer: UnsafeMutablePointer<UInt8>?, _ capacity: Int32) -> Int32 {
+    main {
+        jsonOutput(loginChange(enabled, status: loginStatus,
+            register: { try SMAppService.mainApp.register() },
+            unregister: { try SMAppService.mainApp.unregister() }), buffer, capacity)
+    }
+}
+@_cdecl("hf_login_settings") public func openLoginSettings() { main { SMAppService.openSystemSettingsLoginItems() } }
 
 // All AppKit / recorder / AX state is confined to the main thread.
 private func main<T>(_ body: () -> T) -> T {
@@ -114,10 +218,15 @@ private var startGate: (@convention(c) (UInt64) -> Bool)?
 private var gestureCallback: (@convention(c) (Int32, Int32, UInt64) -> Void)?
 private var activationObserver: NSObjectProtocol?
 private func emitHold(_ edge: Int32?) {
-    if edge == 1 { holdFocusWatch.press(holdGesture.token) }
+    if edge == 1 {
+        freezeShortcutTarget(); currentShortcutTicket = shortcutTicket
+        holdFocusWatch.press(holdGesture.token)
+    }
     if let edge { gestureCallback?(edge, 1, holdGesture.token) }
 }
 private func resetHold() {
+    fnReceipt = HoldGesture()
+    fnReceipt.held = CGEventSource.keyState(.combinedSessionState, key: 63)
     interruptHoldFocus()
     emitHold(holdGesture.interrupt())
     emitHold(holdGesture.finish())
@@ -127,7 +236,34 @@ private func resetHold() {
 @_cdecl("hf_mode") public func recordingMode(_ mode: Int32) -> Bool {
     main { resetHold(); pushToTalk = mode == 1; callback?(6); return true }
 }
-private func holdEvent(_ type: CGEventType, _ event: CGEvent) {
+// Snapshots come only from NSApp.windows, never the system window list. Tauri's
+// tray-icon owns an NSStatusItem whose button.window is the status-bar frame;
+// its mouseDown opens an NSMenu before any menu action is dispatched.
+struct HoldControlWindow {
+    let frame: NSRect
+    let level: NSWindow.Level
+    let visible: Bool
+}
+enum HoldControls {
+    static func contains(_ type: CGEventType, quartzPoint: CGPoint, screenTop: CGFloat,
+                         capsule: NSRect?, windows: [HoldControlWindow]) -> Bool {
+        guard type == .leftMouseDown || type == .rightMouseDown || type == .otherMouseDown else { return false }
+        // CGEvent uses the primary screen's top-left; AppKit uses its bottom-left.
+        // Do not sample the later cursor position while routing a queued event.
+        let point = NSPoint(x: quartzPoint.x, y: screenTop - quartzPoint.y)
+        if type == .leftMouseDown, capsule?.contains(point) == true { return true }
+        return windows.contains {
+            $0.visible && ($0.level == .statusBar || $0.level == .popUpMenu) && $0.frame.contains(point)
+        }
+    }
+}
+// The production physical-event router is injectable without a tap, windows,
+// microphone or permissions. Control hit-testing affects mouse-down only; it
+// does not retire HoldFocusWatch or bypass AX/activation/security surveillance.
+func routeHoldEvent(_ type: CGEventType, _ event: CGEvent, gesture: inout HoldGesture,
+                    shortcutCode: Int64, shortcutModifiers: UInt32,
+                    otherHeld: () -> Bool, allowed: () -> Bool,
+                    ownControl: () -> Bool) -> Int32? {
     let code = event.getIntegerValueField(.keyboardEventKeycode)
     var mods: UInt32 = 0
     for (flag, bit): (CGEventFlags, UInt32) in [(.maskControl, 1), (.maskAlternate, 2), (.maskShift, 4), (.maskCommand, 8)] {
@@ -137,20 +273,33 @@ private func holdEvent(_ type: CGEventType, _ event: CGEvent) {
     let primaryEvent = code == shortcutCode && (fn ? type == .flagsChanged : type == .keyDown || type == .keyUp)
     if primaryEvent {
         let down = fn ? event.flags.contains(.maskSecondaryFn) : type == .keyDown
-        let otherHeld = (0..<128).contains { key in
-            key != Int(shortcutCode) && ![54,55,56,57,58,59,60,61,62,63].contains(key) && CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(key))
-        }
-        let valid = mods == (fn ? 0 : shortcutModifiers) && !otherHeld && (fn || !event.flags.contains(.maskSecondaryFn)) && event.getIntegerValueField(.keyboardEventAutorepeat) == 0
-        emitHold(holdGesture.key(down: down, valid: valid))
+        let valid = mods == (fn ? 0 : shortcutModifiers) && !otherHeld() && (fn || !event.flags.contains(.maskSecondaryFn)) && event.getIntegerValueField(.keyboardEventAutorepeat) == 0
+        return gesture.key(down: down, valid: valid && allowed())
     } else if type == .flagsChanged && !fn && (mods & shortcutModifiers) != shortcutModifiers {
         // Release of the first required modifier finishes, but primary stays latched.
-        emitHold(holdGesture.finish())
+        return gesture.finish()
     } else if type == .keyDown || type == .flagsChanged || type == .leftMouseDown || type == .rightMouseDown || type == .otherMouseDown || type == .scrollWheel {
-        // Native Finish/Cancel remain usable without first cancelling Finish.
-        if !(type == .leftMouseDown && panel?.isVisible == true && panel?.frame.contains(NSEvent.mouseLocation) == true) {
-            emitHold(holdGesture.interrupt())
-        }
+        let mouseDown = type == .leftMouseDown || type == .rightMouseDown || type == .otherMouseDown
+        if !(mouseDown && ownControl()) { return gesture.interrupt() }
     }
+    return nil
+}
+private func holdEvent(_ type: CGEventType, _ event: CGEvent) {
+    let edge = routeHoldEvent(type, event, gesture: &holdGesture,
+        shortcutCode: shortcutCode, shortcutModifiers: shortcutModifiers,
+        otherHeld: {
+            (0..<128).contains { key in
+                key != Int(shortcutCode) && ![54,55,56,57,58,59,60,61,62,63].contains(key) && CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(key))
+            }
+        }, allowed: shortcutAllowed, ownControl: {
+            guard let screenTop = NSScreen.screens.first?.frame.maxY else { return false }
+            return HoldControls.contains(type, quartzPoint: event.location,
+                screenTop: screenTop,
+                capsule: panel?.isVisible == true ? panel?.frame : nil,
+                windows: NSApp.windows.map { HoldControlWindow(frame: $0.frame, level: $0.level, visible: $0.isVisible) })
+        })
+    emitHold(edge)
+    let code = event.getIntegerValueField(.keyboardEventKeycode)
     if type == .keyDown && code == 53 { callback?(4) }
 }
 enum ShortcutPolicy {
@@ -435,8 +584,15 @@ class PillView: NSView {
             } else if type == .flagsChanged && shortcutCode == 63 {
                 let code = event.getIntegerValueField(.keyboardEventKeycode)
                 let others: CGEventFlags = [.maskShift, .maskControl, .maskAlternate, .maskCommand]
-                if !event.flags.intersection(others).isEmpty { callback?(3) }
-                else if code == 63 { callback?(event.flags.contains(.maskSecondaryFn) ? 1 : 2) }
+                if code == 63 {
+                    let down = event.flags.contains(.maskSecondaryFn)
+                    if let edge = fnReceipt.key(down: down, valid: event.flags.intersection(others).isEmpty && shortcutAllowed()) {
+                        if edge == 1 { freezeShortcutTarget(); fnTicket = shortcutTicket }
+                        currentShortcutTicket = fnTicket
+                        callback?(edge)
+                    }
+                    if !event.flags.intersection(others).isEmpty { callback?(3) }
+                }
                 else { callback?(3) } // Caps Lock and other modifier-only chords.
             } else if type == .keyDown {
                 callback?(3)
@@ -449,7 +605,11 @@ class PillView: NSView {
                     }
                     // Caps Lock does not change physical bindings. Fn does.
                     if !event.flags.contains(.maskSecondaryFn) && ShortcutPolicy.matches(code: code, modifiers: mods, expectedCode: shortcutCode, expectedModifiers: shortcutModifiers, repeatEvent: event.getIntegerValueField(.keyboardEventAutorepeat) != 0, alreadyDown: shortcutDown) {
-                        shortcutDown = true; callback?(7)
+                        shortcutDown = true
+                        if shortcutAllowed() {
+                            freezeShortcutTarget(); currentShortcutTicket = shortcutTicket
+                            callback?(7)
+                        }
                     }
                 }
             }
@@ -655,12 +815,24 @@ private func validateDelivery() -> PasteResult {
     return .sent
 }
 
-@_cdecl("hf_record") public func record(_ generation: UInt64, _ epoch: UInt64, _ microphoneUID: UnsafePointer<CChar>?, _ limit: UInt32, _ elapsed: @escaping @convention(c) (UInt64, UInt64) -> Double, _ allowed: @escaping @convention(c) (UInt64) -> Bool, _ sink: @escaping @convention(c) (UInt64, UInt64, UnsafePointer<Float>?, Int32) -> Void) -> Bool {
+@_cdecl("hf_record") public func record(_ generation: UInt64, _ epoch: UInt64, _ practice: Bool, _ receipt: UInt64, _ microphoneUID: UnsafePointer<CChar>?, _ limit: UInt32, _ elapsed: @escaping @convention(c) (UInt64, UInt64) -> Double, _ allowed: @escaping @convention(c) (UInt64) -> Bool, _ sink: @escaping @convention(c) (UInt64, UInt64, UnsafePointer<Float>?, Int32) -> Void) -> Bool {
     let uid = microphoneUID.map { String(cString: $0) }
     return main {
         guard allowed(epoch) else { return false }
         guard permissions() & 3 == 3, recorder == nil else { return false }
         guard deliverySession.map({ generation > $0.generation }) ?? true else { return false }
+        let foreground = NSWorkspace.shared.frontmostApplication
+        let initial = ShortcutTarget(pid: foreground?.processIdentifier ?? 0, bundle: foreground?.bundleIdentifier)
+        let acceptedTarget = shortcutTargets.removeValue(forKey: receipt)
+        func admissionAllowed() -> Bool {
+            let live = NSWorkspace.shared.frontmostApplication
+            let identity = ShortcutTarget(pid: live?.processIdentifier ?? 0, bundle: live?.bundleIdentifier)
+            // Explicit Start test has no receipt. A shortcut has immutable receipt
+            // identity; neither queued work nor reentrant AX can substitute focus.
+            return initial == identity && workflow.admits(practice: practice, shortcut: receipt != 0,
+                received: acceptedTarget, live: identity, ownPID: ProcessInfo.processInfo.processIdentifier)
+        }
+        guard admissionAllowed() else { return false }
         clearTarget()
         deliverySession = DeliverySession(generation: generation, epoch: epoch, compatibility: compatibilityEnabled)
         focusDiagnostics = [:]
@@ -681,6 +853,9 @@ private func validateDelivery() -> PasteResult {
         if compatibilityEnabled && IsSecureEventInputEnabled() { targetFailure = .originalSecureField }
         observeTargetFocus()
         do {
+            // AX resolution can reenter the main runloop. Freeze admission only
+            // after its final identity/policy recheck, before engine construction.
+            guard admissionAllowed() else { clearTarget(); return false }
             let r = try AudioCapture(generation: generation, epoch: epoch, microphoneUID: uid, sink: sink)
             guard allowed(epoch) else { clearTarget(); return false }
             let previewWasPlaying = cue?.isPlaying == true || endCue?.isPlaying == true

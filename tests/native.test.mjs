@@ -30,8 +30,11 @@ test('compact capsule, native shortcuts and Clean cue signals with idle-only pre
     // Optimize the DFT signal checks; -O retains Swift preconditions.
     execFileSync('swiftc', ['-O', '-sdk', sdk, '-Xcc', `-I${sdk}/usr/include`, '-swift-version', '5',
       join(root, 'src-tauri/native/Bridge.swift'), join(root, 'src-tauri/native/PastePolicy.swift'), join(root, 'src-tauri/native/AudioCapture.swift'),
-      join(root, 'tests/native-capsule/main.swift'), '-o', binary]);
-    assert.match(execFileSync(binary, { encoding: 'utf8', timeout: 10000 }), /Native capsule geometry, state layout, nonactivation, shortcut matching and Clean cues passed without capture/);
+      join(root, 'tests/native-capsule/main.swift'), '-framework', 'ServiceManagement', '-o', binary]);
+    const output = execFileSync(binary, { encoding: 'utf8', timeout: 10000 });
+    assert.match(output, /Native capsule geometry, state layout, nonactivation, shortcut matching and Clean cues passed without capture/);
+    assert.match(output, /Workflow receipt\/admission\/finish and fake login registration policy passed without capture or registration/);
+    assert.match(output, /Production hold event routing: own tray\/menu and cue-wait retained; external clicks, repeats, release and focus watch passed without UI/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -63,7 +66,7 @@ test('native paste/copy guard cancellation; fallback survives restore timers and
     const binary = join(directory, 'delivery-tests');
     execFileSync('swiftc', ['-sdk', sdk, '-Xcc', `-I${sdk}/usr/include`, '-swift-version', '5',
       join(root, 'src-tauri/native/Bridge.swift'), join(root, 'src-tauri/native/PastePolicy.swift'), join(root, 'src-tauri/native/AudioCapture.swift'),
-      join(root, 'tests/native-delivery/main.swift'), '-o', binary]);
+      join(root, 'tests/native-delivery/main.swift'), '-framework', 'ServiceManagement', '-o', binary]);
     const output = execFileSync(binary, { encoding: 'utf8', timeout: 10000 });
     assert.match(output, /Native queued-main cancellation boundary passed/);
     assert.match(output, /Native cached focus diagnostic bounded C ABI passed without AX/);

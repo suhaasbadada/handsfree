@@ -1,5 +1,70 @@
 import AppKit
 
+// Actual admission policy + physical receipt latch; synthetic identities only.
+var workflowPolicy = WorkflowPolicy()
+for id: String? in [nil, ""] {
+    precondition(!workflowPolicy.external(bundle: id, own: false))
+}
+precondition(!workflowPolicy.external(bundle: "dev.handsfree", own: true))
+precondition(workflowPolicy.external(bundle: "com.example.Editor", own: false))
+workflowPolicy.excluded = ["com.example.Editor"]
+precondition(!workflowPolicy.external(bundle: "com.example.Editor", own: false))
+precondition(workflowPolicy.shortcut(bundle: "dev.handsfree", own: true, recording: false))
+workflowPolicy.paused = true
+precondition(!workflowPolicy.shortcut(bundle: "dev.handsfree", own: true, recording: false))
+precondition(workflowPolicy.shortcut(bundle: nil, own: false, recording: true)) // Finish survives.
+var rejectedReceipt = HoldGesture()
+precondition(rejectedReceipt.key(down: true, valid: false) == nil)
+workflowPolicy.paused = false
+workflowPolicy.excluded = []
+precondition(rejectedReceipt.key(down: true, valid: true) == nil) // resume/refocus cannot rearm
+precondition(rejectedReceipt.key(down: false, valid: true) == nil)
+precondition(rejectedReceipt.key(down: true, valid: true) == 1)
+workflowPolicy.paused = true
+workflowPolicy.excluded = ["com.example.Editor"]
+precondition(rejectedReceipt.key(down: false, valid: false) == 2) // accepted release survives
+// Admission is a value decision, never a live policy closure in cue-wait work.
+workflowPolicy.paused = false
+workflowPolicy.excluded = []
+let admitted = workflowPolicy.external(bundle: "com.example.Editor", own: false)
+workflowPolicy.paused = true
+precondition(admitted && !workflowPolicy.external(bundle: "com.example.Editor", own: false))
+let ownIdentity = ShortcutTarget(pid: 10, bundle: "dev.handsfree")
+let editorIdentity = ShortcutTarget(pid: 20, bundle: "com.example.Editor")
+let otherEditor = ShortcutTarget(pid: 30, bundle: "com.example.Other")
+let unknownIdentity = ShortcutTarget(pid: 0, bundle: nil)
+// Explicit practice remains allowed; a delayed shortcut practice does not.
+precondition(workflowPolicy.admits(practice: true, shortcut: false, received: nil, live: ownIdentity, ownPID: 10))
+precondition(!workflowPolicy.admits(practice: true, shortcut: true, received: ownIdentity, live: ownIdentity, ownPID: 10))
+workflowPolicy.paused = false
+precondition(workflowPolicy.admits(practice: true, shortcut: true, received: ownIdentity, live: ownIdentity, ownPID: 10))
+precondition(!workflowPolicy.admits(practice: true, shortcut: false, received: nil, live: editorIdentity, ownPID: 10))
+precondition(workflowPolicy.admits(practice: false, shortcut: true, received: editorIdentity, live: editorIdentity, ownPID: 10))
+for target in [ownIdentity, unknownIdentity, otherEditor] {
+    precondition(!workflowPolicy.admits(practice: false, shortcut: true, received: editorIdentity, live: target, ownPID: 10))
+}
+precondition(!workflowPolicy.admits(practice: false, shortcut: true, received: nil, live: editorIdentity, ownPID: 10)) // evicted/stale receipt
+workflowPolicy.excluded = ["com.example.Editor"]
+precondition(!workflowPolicy.admits(practice: false, shortcut: true, received: editorIdentity, live: editorIdentity, ownPID: 10))
+
+var fakeLogin = "not_registered"
+var registrations = 0
+var removals = 0
+func fakeRegister() { registrations += 1; fakeLogin = "approval_required" }
+func fakeUnregister() { removals += 1; fakeLogin = "not_registered" }
+precondition(loginChange(true, status: { fakeLogin }, register: fakeRegister, unregister: fakeUnregister).status == "approval_required")
+precondition(loginChange(true, status: { fakeLogin }, register: fakeRegister, unregister: fakeUnregister).error == nil)
+precondition(registrations == 1)
+fakeLogin = "enabled"
+precondition(loginChange(true, status: { fakeLogin }, register: fakeRegister, unregister: fakeUnregister).status == "enabled")
+precondition(registrations == 1)
+precondition(loginChange(false, status: { fakeLogin }, register: fakeRegister, unregister: fakeUnregister).status == "not_registered")
+precondition(removals == 1)
+struct FakeLoginError: Error {}
+let failedLogin = loginChange(true, status: { "not_found" }, register: { throw FakeLoginError() }, unregister: fakeUnregister)
+precondition(failedLogin.status == "not_found" && failedLogin.error != nil)
+print("Workflow receipt/admission/finish and fake login registration policy passed without capture or registration")
+
 // A revoked observation never opens an engine, checks consent or starts capture.
 precondition(inputLevel(42, 9, { _ in false }) == -1)
 precondition(PillView.timerText(elapsed: 0, limit: 120) == "0:00 / 2:00")
@@ -8,6 +73,89 @@ precondition(PillView.timerText(elapsed: 999, limit: 120) == "2:00 / 2:00")
 precondition(PillView.timerText(elapsed: .infinity, limit: 120) == "0:00 / 2:00")
 
 // Production physical-edge recognizer only: no event tap, mic, or playback.
+// The actual event router receives synthetic CGEvents and own-process window
+// snapshots. External menus are absent from NSApp.windows, not broadly exempted
+// by their screen position or level. Include a secondary display left/above main.
+let trayFrame = NSRect(x: 900, y: 876, width: 24, height: 24)
+let menuFrame = NSRect(x: 780, y: 650, width: 160, height: 226)
+let secondaryTray = NSRect(x: -500, y: 1176, width: 24, height: 24)
+let controlWindows = [
+    HoldControlWindow(frame: trayFrame, level: .statusBar, visible: true),
+    HoldControlWindow(frame: menuFrame, level: .popUpMenu, visible: true),
+    HoldControlWindow(frame: secondaryTray, level: .statusBar, visible: true),
+    HoldControlWindow(frame: NSRect(x: 100, y: 650, width: 160, height: 226), level: .popUpMenu, visible: false),
+    HoldControlWindow(frame: NSRect(x: 300, y: 650, width: 160, height: 226), level: .normal, visible: true)
+]
+func routed(_ type: CGEventType, _ point: NSPoint = .zero, gesture: inout HoldGesture,
+            allowed: Bool = true, repeatEvent: Bool = false) -> Int32? {
+    let event = CGEvent(source: nil)!
+    event.type = type
+    event.flags = [] // No dependence on the operator's current physical modifiers.
+    event.location = CGPoint(x: point.x, y: 900 - point.y)
+    event.setIntegerValueField(.keyboardEventKeycode, value: 9)
+    event.setIntegerValueField(.keyboardEventAutorepeat, value: repeatEvent ? 1 : 0)
+    return routeHoldEvent(type, event, gesture: &gesture, shortcutCode: 9, shortcutModifiers: 0,
+        otherHeld: { false }, allowed: { allowed }, ownControl: {
+            HoldControls.contains(type, quartzPoint: event.location, screenTop: 900,
+                capsule: NSRect(x: 500, y: 20, width: 150, height: 44), windows: controlWindows)
+        })
+}
+for cueWaiting in [false, true] {
+    for button: CGEventType in [.leftMouseDown, .rightMouseDown, .otherMouseDown] {
+        var accepted = HoldGesture()
+        var watched = HoldFocusWatch()
+        var epochCurrent = true
+        precondition(routed(.keyDown, gesture: &accepted) == 1)
+        let token = accepted.token
+        watched.press(token)
+        // Menu opens on down, then Pause mutates future admission; neither can
+        // interrupt accepted recording or its delayed cue-capture handoff.
+        precondition(routed(button, NSPoint(x: 912, y: 888), gesture: &accepted) == nil)
+        precondition(routed(.leftMouseUp, NSPoint(x: 912, y: 888), gesture: &accepted) == nil)
+        var futurePolicy = WorkflowPolicy()
+        precondition(routed(button, NSPoint(x: 850, y: 750), gesture: &accepted) == nil)
+        futurePolicy.paused = true
+        precondition(!futurePolicy.shortcut(bundle: "com.example.Editor", own: false, recording: false))
+        precondition(routed(button, NSPoint(x: -488, y: 1188), gesture: &accepted) == nil)
+        // Repeats cannot rearm, including after Pause; release still finishes.
+        precondition(routed(.keyDown, gesture: &accepted, allowed: false, repeatEvent: true) == nil)
+        if cueWaiting { precondition(CuePolicy.canCapture(current: true, allowed: epochCurrent)) }
+        precondition(routed(.keyUp, gesture: &accepted, allowed: false) == 2)
+        precondition(accepted.token == token && watched.tokens == [token])
+        // Focus surveillance outlives release and remains capable of revoking.
+        for _ in watched.tokens { epochCurrent = false }
+        precondition(!CuePolicy.canCapture(current: true, allowed: epochCurrent))
+        watched.complete(token)
+        precondition(watched.tokens.isEmpty)
+    }
+}
+// Ordinary external clicks (including another tray/menu), hidden menus and
+// dashboard windows must still emit edge 3, once, before physical release.
+for point in [NSPoint(x: 700, y: 888), NSPoint(x: 600, y: 750),
+              NSPoint(x: 180, y: 750), NSPoint(x: 380, y: 750)] {
+    for button: CGEventType in [.leftMouseDown, .rightMouseDown, .otherMouseDown] {
+        var held = HoldGesture()
+        precondition(routed(.keyDown, gesture: &held) == 1)
+        precondition(routed(button, point, gesture: &held) == 3)
+        precondition(routed(button, point, gesture: &held) == nil)
+        precondition(routed(.keyDown, gesture: &held, repeatEvent: true) == nil)
+        precondition(routed(.keyUp, gesture: &held) == 2)
+        precondition(routed(.keyDown, gesture: &held) == 1)
+    }
+}
+for type: CGEventType in [.scrollWheel, .flagsChanged] {
+    var held = HoldGesture()
+    precondition(routed(.keyDown, gesture: &held) == 1)
+    precondition(routed(type, NSPoint(x: 912, y: 888), gesture: &held) == 3)
+}
+var capsuleHold = HoldGesture()
+precondition(routed(.keyDown, gesture: &capsuleHold) == 1)
+precondition(routed(.leftMouseDown, NSPoint(x: 550, y: 40), gesture: &capsuleHold) == nil)
+precondition(capsuleHold.finish() == 2) // Explicit native Finish, still latched.
+precondition(routed(.keyDown, gesture: &capsuleHold, repeatEvent: true) == nil)
+precondition(routed(.keyUp, gesture: &capsuleHold) == nil)
+print("Production hold event routing: own tray/menu and cue-wait retained; external clicks, repeats, release and focus watch passed without UI")
+
 for cancel in [false, true] {
     var hold = HoldGesture()
     precondition(hold.key(down: true, valid: true) == 1)

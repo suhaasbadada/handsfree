@@ -219,3 +219,9 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
   #microphone-choice-row { flex-wrap: wrap; }
   .microphone-controls { max-width: 100%; width: 100%; }
 }
+.workflow-app-controls { display:flex; gap:8px; flex-wrap:wrap; }
+.workflow-app-controls select { min-width:0; max-width:100%; flex:1 1 180px; }
+#excluded-apps { list-style:none; padding:0; margin:12px 0 0; }
+#excluded-apps li { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 0; }
+#excluded-apps span { overflow-wrap:anywhere; min-width:0; }
+#excluded-apps button { flex-shrink:0; }

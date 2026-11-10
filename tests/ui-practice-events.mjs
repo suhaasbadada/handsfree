@@ -8,13 +8,19 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
     window.fixture=${JSON.stringify(fixture)};
     window.calls=[];window.callbacks=new Map();window.listeners=new Map();window.callbackId=0;
     window.practiceGeneration=0;window.practiceResult={phase:'recording',text:''};
+    window.workflow={paused:false,excluded_bundle_ids:['com.absent.app'],login:{status:'not_registered',error:null}};
     window.emitNative=(event,payload)=>{for(const listener of window.listeners.get(event)||[])window.callbacks.get(listener.handler)?.({event,id:listener.id,payload});};
     window.__TAURI_INTERNALS__={
       transformCallback(callback){const id=++window.callbackId;window.callbacks.set(id,callback);return id;},
       async invoke(command,args){
         window.calls.push({command,args});
         if(command==='plugin:event|listen'){const id=++window.callbackId;const list=window.listeners.get(args.event)||[];list.push({...args,id});window.listeners.set(args.event,list);return id;}
-        if(command==='status')return structuredClone(window.fixture);
+         if(command==='status')return structuredClone(window.fixture);
+         if(command==='workflow_status')return structuredClone(window.workflow);
+         if(command==='set_paused'){if(window.delayPause)await new Promise(r=>window.pauseAck=r);window.workflow.paused=args.paused;return structuredClone(window.workflow);}
+         if(command==='set_launch_at_login'){if(window.rejectLogin)throw 'Login registration failed';window.workflow.login={status:args.enabled?(window.loginResult||'approval_required'):'not_registered',error:null};return structuredClone(window.workflow.login);}
+         if(command==='running_apps')return [{bundle_id:'com.running.app',name:'<b>Running app</b>'}];
+         if(command==='set_excluded_apps'){if(window.rejectExclusions)throw 'Exclusion save failed';window.workflow.excluded_bundle_ids=args.bundleIds;return structuredClone(window.workflow);}
         if(command==='list_microphones')return {devices:[{uid:'built-in',name:'Built-in microphone'},{uid:'usb-input',name:'USB input'}],default_uid:'built-in'};
         if(command==='set_microphone'){if(window.rejectMicrophone)throw 'Could not save microphone';window.fixture.microphone_uid=args.uid;return;}
         if(command==='request_microphone')window.fixture.permission_requests=(window.fixture.permission_requests||0)|1;
@@ -45,8 +51,9 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   assert.equal(await evaluate(`window.fixture.permission_requests===3 && !document.getElementById('overview').hidden && !document.getElementById('get-started').hidden`),true,'Real native permission-request bits do not redirect inline setup to Settings');
   await evaluate(`document.getElementById('started-close').click();document.querySelector('.brand').click();document.getElementById('brand-started').click()`);
   assert.equal(await evaluate(`!document.getElementById('get-started').hidden && document.activeElement.id==='get-started-title'`),true,'Menu revisits guidance without a new navigation surface');
-  await evaluate(`document.getElementById('practice-start').click()`);
-  await until(`!document.getElementById('practice-finish').hidden`);
+   await evaluate(`document.getElementById('practice-start').click()`);
+   await until(`!document.getElementById('practice-finish').hidden`);
+   assert.equal(await evaluate(`'shortcutReceipt' in window.calls.filter(c=>c.command==='practice_start').at(-1).args`),false,'Button start omits receipt in actual IPC');
   assert.equal(await evaluate(`document.getElementById('shortcut-evidence').textContent.startsWith('Shortcut not tested')`),true,'Button start is not shortcut evidence');
   await evaluate(`window.practiceResult={phase:'recording',text:'',input_level:0.65}`);
   await until(`document.getElementById('input-level').value===0.65`);
@@ -56,8 +63,12 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   await until(`document.getElementById('shortcut-tutorial').textContent.startsWith('Hold Option + Space')`);
   await evaluate(`window.fixture.recording_mode='toggle';window.fixture.shortcut_label='Fn'`);
   await until(`document.getElementById('shortcut-tutorial').textContent.startsWith('Press Fn')`);
-  await evaluate(`window.sendPractice=(action,token=1,context=window.context)=>window.emitNative('practice-input',{action,token,source:1,context});window.sendPractice('toggle')`);
-  await until(`!document.getElementById('practice-finish').hidden`);
+   const beforeInvalidReceipt = await evaluate(`window.calls.filter(c=>c.command==='practice_start').length`);
+   await evaluate(`window.emitNative('practice-input',{action:'toggle',token:1,source:1,context:window.context})`);
+   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='practice_start').length`),beforeInvalidReceipt,'Missing shortcut receipt cannot become explicit practice');
+   await evaluate(`window.sendPractice=(action,token=1,context=window.context)=>window.emitNative('practice-input',{action,token,source:1,context,receipt:123});window.sendPractice('toggle')`);
+   await until(`!document.getElementById('practice-finish').hidden`);
+   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='practice_start').at(-1).args.shortcutReceipt`),123,'Native receipt reaches actual IPC');
   assert.equal(await evaluate(`document.getElementById('shortcut-evidence').textContent.startsWith('Shortcut received')`),true,'Actual native listener reports key receipt separately from capture');
   await evaluate(`window.sendPractice('toggle');window.practiceResult={phase:'complete',text:'A little more thinking.'}`);
   await until(`document.getElementById('practice-text').value==='A little more thinking.'`);
@@ -152,7 +163,7 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
     await evaluate(`window.cancelAck();window.delayCancel=false`);
     await until(`!document.getElementById('practice-start').disabled`);
     await stable('cancelled');
-    await evaluate(`document.getElementById('practice-clear').focus({preventScroll:true});window.emitNative('practice-input',{action:'toggle',token:0,source:0,context:window.context})`);
+    await evaluate(`document.getElementById('practice-clear').focus({preventScroll:true});window.emitNative('practice-input',{action:'toggle',token:0,source:0,context:window.context,receipt:123})`);
     await until(`!document.getElementById('practice-finish').hidden`);
     assert.equal(await evaluate(`document.activeElement.id`),'practice-text','Shortcut start retires focused Clear without losing keyboard focus');
     await stable('shortcut start while Clear focused');
@@ -169,4 +180,43 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   await evaluate(`{window.rejectMicrophone=false;const s=document.getElementById('microphone-choice');s.value='';s.dispatchEvent(new Event('change'));}`);
   await until(`window.fixture.microphone_uid===null && !document.getElementById('microphone-choice').disabled`);
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='set_microphone').at(-1).args.uid`),null,'System default is persisted as null, never a device ID/name');
+  await until(`!document.getElementById('workflow-pause').disabled`);
+  assert.equal(await evaluate(`document.getElementById('excluded-apps').textContent.includes('com.absent.app')`),true,'Saved absent app remains visible');
+  const appReads = await evaluate(`window.calls.filter(c=>c.command==='running_apps').length`);
+  const statusReads = await evaluate(`window.calls.filter(c=>c.command==='workflow_status').length`);
+  await until(`window.calls.filter(c=>c.command==='workflow_status').length>${statusReads}`);
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='running_apps').length`),appReads,'Status polling does not enumerate apps');
+  await evaluate(`window.delayPause=true;document.getElementById('workflow-pause').click();document.getElementById('workflow-pause').click()`);
+  await until(`typeof window.pauseAck==='function'`);
+  assert.equal(await evaluate(`document.getElementById('workflow-pause').disabled && document.getElementById('brand-pause').disabled`),true,'Both pause controls share pending owner');
+  await evaluate(`window.pauseAck();window.delayPause=false`);
+  await until(`document.getElementById('workflow-pause').textContent==='Resume shortcuts'`);
+  await evaluate(`document.querySelector('.brand').click();document.getElementById('brand-pause').click()`);
+  await until(`document.getElementById('workflow-pause').textContent==='Pause shortcuts'`);
+  await evaluate(`window.workflow.paused=true`);
+  await until(`document.getElementById('brand-pause').textContent==='Resume shortcuts'`);
+  await evaluate(`document.getElementById('launch-at-login').click()`);
+  await until(`!document.getElementById('login-settings').hidden`);
+  assert.equal(await evaluate(`document.getElementById('launch-at-login').checked`),false,'Approval is not enabled');
+  await evaluate(`document.getElementById('login-cancel').click()`);
+  await until(`document.getElementById('login-cancel').hidden && !document.getElementById('launch-at-login').disabled`);
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='set_launch_at_login').at(-1).args.enabled`),false,'Pending registration can be explicitly withdrawn without claiming it was enabled');
+  await evaluate(`window.loginResult='enabled';document.getElementById('launch-at-login').click()`);
+  await until(`document.getElementById('launch-at-login').checked && !document.getElementById('launch-at-login').disabled`);
+  await evaluate(`window.rejectLogin=true;document.getElementById('launch-at-login').click()`);
+  await until(`document.getElementById('workflow-error').textContent.includes('Login registration failed')`);
+  assert.equal(await evaluate(`document.getElementById('launch-at-login').checked`),true,'Failed login request restores observed state');
+  await evaluate(`{const s=document.getElementById('excluded-app-choice');s.value='com.running.app';s.dispatchEvent(new Event('change'));window.rejectExclusions=true;document.getElementById('excluded-app-add').click();}`);
+  await until(`document.getElementById('workflow-error').textContent.includes('Exclusion save failed')`);
+  assert.equal(await evaluate(`window.workflow.excluded_bundle_ids.join(',')`),'com.absent.app','Failed save preserves exclusions');
+  assert.equal(await evaluate(`document.getElementById('excluded-app-choice').value`),'com.running.app','Failed save preserves picker selection for retry');
+  await evaluate(`window.rejectExclusions=false;document.getElementById('excluded-app-add').click()`);
+  await until(`document.getElementById('excluded-apps').children.length===2`);
+  assert.equal(await evaluate(`!document.getElementById('excluded-apps').querySelector('b') && document.getElementById('excluded-apps').textContent.includes('<b>Running app</b>')`),true,'Names rendered as text only');
+  await evaluate(`document.querySelector('[aria-label="Remove com.absent.app"]').click()`);
+  await until(`!window.workflow.excluded_bundle_ids.includes('com.absent.app')`);
+  await evaluate(`document.getElementById('nav-overview').click();document.getElementById('practice-start').click()`);
+  await until(`!document.getElementById('practice-finish').hidden`);
+  assert.equal(await evaluate(`'shortcutReceipt' in window.calls.filter(c=>c.command==='practice_start').at(-1).args`),false,'Explicit Start test works while paused and omits receipt');
+  await evaluate(`document.getElementById('practice-cancel').click()`);
 }

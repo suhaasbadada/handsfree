@@ -8,8 +8,8 @@ not counted as new implementations.
 | Release | Scope | State |
 | --- | --- | --- |
 | 1 — Get started (beta 11) | Inline setup checklist; explicit permission/model actions; private input meter; configured shortcut tutorial | Verified complete publication/parity gates; exact-source CI, local/draft/public audits, activation CI, Pages, tap CI and live byte readback passed; hardware/OTA acceptance remains separate |
-| 2 — Recording controls (beta 12) | Saved microphone UID/System default; session timer; retain/refine mode, duration and sound controls; stable practice layout and focus transfer | Published; exact-source CI and local/draft/anonymous-public seven-asset audits passed; repository activation prepared, activation CI/Pages/live bytes and Homebrew publication/readback/tap CI pending; hardware/OTA acceptance unverified |
-| 3 — Fit your workflow | Launch at login; app exclusions; temporary pause; menu-bar quick controls | Pending |
+| 2 — Recording controls (beta 12) | Saved microphone UID/System default; session timer; retain/refine mode, duration and sound controls; stable practice layout and focus transfer | COMPLETE: publication/parity verified, including activation CI, Pages, tap CI and live feed/page bytes; hardware/OTA acceptance separate |
+| 3 — Fit your workflow (beta 13 candidate) | Launch at login; app exclusions; temporary pause; menu-bar quick controls | Source implementation and local UI tests reported complete; disabled candidate metadata prepared; primary review/acceptance/source CI/signing/publication/parity pending; hardware/ServiceManagement/AppKit ordering/OTA acceptance unverified |
 | 4 — Clear and accessible | Keyboard/VoiceOver; system appearance/reduced motion; status and actionable recovery | Pending |
 
 ## Group 1 verified completion evidence
@@ -24,7 +24,7 @@ not counted as new implementations.
 - Live website/feed byte readback and remote cask coordinates were verified.
   These publication/parity checks are not microphone hardware or OTA acceptance.
 
-## Group 2 publication evidence — parity pending
+## Group 2 publication evidence — COMPLETE
 
 - [Published beta 12](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.12),
   artifact source `40e56571584dd6f17df020571f523a6e45b110b1`;
@@ -32,10 +32,23 @@ not counted as new implementations.
 - Local/draft/anonymous-public seven-asset audits passed. Repository website,
   README/install links and the exact generated signed feed now select beta 12;
   the candidate export remains disabled.
-- Activation SHA/CI, Pages run, live website/feed byte readback, matching tap
-  SHA/CI and remote cask readback remain pending; record them here when verified.
-  Do not advance to group 3 yet. Hardware/OTA acceptance is separate and unverified.
+- Activation `fff4b4204aa8d144111cf5d9b491b6fc1728d6d0`,
+  [activation CI 42767293534](https://github.com/suhaasbadada/handsfree/actions/runs/42767293534)
+  and [Pages 42767293520](https://github.com/suhaasbadada/handsfree/actions/runs/42767293520) passed.
+- Tap `a933768c5c0586093b9becb9f1d4cbdfc125d968`,
+  [tap CI 42767247856](https://github.com/suhaasbadada/homebrew-handsfree/actions/runs/42767247856)
+  passed. Live website/feed byte readback and matching remote cask coordinates
+  were verified (primary's verified handoff).
+  Hardware/OTA acceptance remains separate and unverified.
 - [Beta 12 notes](releases/v0.1.1-beta.12.md) record hashes and preservation boundaries.
+
+## Group 3 candidate preparation — beta 13
+
+The [unpublished candidate notes](releases/v0.1.1-beta.13.md) distinguish
+synthetic coverage from actual OS login, AppKit/window ordering, hardware and
+OTA acceptance. Active beta 12 release/site/feed/README/install coordinates
+remain unchanged until beta 13's exact-source publication and public audit.
+No beta 13 source SHA, CI, packaging, publication, activation or tap receipts yet.
 
 ## Mandatory parity gate for every release
 

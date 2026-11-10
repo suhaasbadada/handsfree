@@ -55,6 +55,33 @@ static SESSION_GENERATION: AtomicU64 = AtomicU64::new(0);
 static SHORTCUT_CAPTURE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 static PRACTICE: Mutex<practice::Gate> = Mutex::new(practice::Gate::new());
 #[cfg(target_os = "macos")]
+struct WorkflowTray {
+    pause: MenuItem<tauri::Wry>,
+    finish: MenuItem<tauri::Wry>,
+    generation: Mutex<Option<u64>>,
+}
+#[cfg(target_os = "macos")]
+static WORKFLOW_TRAY: OnceLock<WorkflowTray> = OnceLock::new();
+#[cfg(target_os = "macos")]
+fn refresh_workflow_tray() {
+    let Some(tray) = WORKFLOW_TRAY.get() else {
+        return;
+    };
+    let generation = {
+        let s = state();
+        let inner = s.inner.lock().unwrap();
+        (inner.status.phase == "recording").then_some(inner.generation)
+    };
+    *tray.generation.lock().unwrap() = generation;
+    // Never hold Inner or the tray identity lock across main-thread dispatch.
+    let _ = tray.finish.set_enabled(generation.is_some());
+    let _ = tray.pause.set_text(if unsafe { hf_is_paused() } {
+        "Resume shortcuts"
+    } else {
+        "Pause shortcuts"
+    });
+}
+#[cfg(target_os = "macos")]
 static DASHBOARD: OnceLock<Mutex<dashboard::Router>> = OnceLock::new();
 #[cfg(target_os = "macos")]
 fn dashboard_router() -> &'static Mutex<dashboard::Router> {
@@ -125,7 +152,8 @@ extern "C" fn native_gesture(edge: i32, source: i32, token: u64) {
             .unwrap()
             .physical(edge, source, token, own_window);
         if let Some(input) = routed {
-            if let Some(input) = input {
+            if let Some(mut input) = input {
+                input.receipt = unsafe { hf_shortcut_ticket() };
                 if let Some(app) = APP.get() {
                     let _ = app.emit("practice-input", input);
                 }
@@ -153,13 +181,22 @@ extern "C" fn native_gesture(edge: i32, source: i32, token: u64) {
         }
         return;
     }
+    #[cfg(target_os = "macos")]
+    let receipt = unsafe { hf_shortcut_ticket() };
     route_gesture(
         edge,
         hold::Key(source, token),
         holds(),
         &CANCELLATION,
         &SESSION_GENERATION,
-        enqueue_at,
+        |control, epoch| {
+            #[cfg(target_os = "macos")]
+            let control = match control {
+                Control::Press(key) => Control::ShortcutPress(key, receipt),
+                other => other,
+            };
+            enqueue_at(control, epoch);
+        },
     );
 }
 fn route_gesture(
@@ -209,6 +246,12 @@ extern "C" fn delivery_allowed(epoch: u64) -> bool {
     CANCELLATION.allows(epoch)
 }
 enum Control {
+    #[cfg(target_os = "macos")]
+    ShortcutPress(hold::Key, u64),
+    #[cfg(target_os = "macos")]
+    ShortcutToggle(u64),
+    #[cfg(target_os = "macos")]
+    TogglePause,
     Press(hold::Key),
     Release(hold::Key),
     Configure(Box<dyn FnOnce() + Send>),
@@ -314,7 +357,8 @@ extern "C" fn native_event(event: i32) {
             let external_session = !practice && INGRESS.lock().unwrap().current().is_some();
             if !external_session {
                 let input = dashboard_router().lock().unwrap().toggle();
-                if let (Some(app), Some(input)) = (APP.get(), input) {
+                if let (Some(app), Some(mut input)) = (APP.get(), input) {
+                    input.receipt = unsafe { hf_shortcut_ticket() };
                     let _ = app.emit("practice-input", input);
                 }
                 return;
@@ -329,6 +373,12 @@ extern "C" fn native_event(event: i32) {
             return;
         }
         if !practice || matches!(control, Control::Cancel) {
+            #[cfg(target_os = "macos")]
+            let control = if matches!(control, Control::Toggle) {
+                Control::ShortcutToggle(unsafe { hf_shortcut_ticket() })
+            } else {
+                control
+            };
             enqueue_at(control, epoch);
         }
     });
@@ -508,7 +558,7 @@ fn practice_window_ready() -> bool {
         })
 }
 #[tauri::command]
-async fn practice_start(token: u64) -> Result<u64, String> {
+async fn practice_start(token: u64, shortcut_receipt: Option<u64>) -> Result<u64, String> {
     #[cfg(target_os = "macos")]
     updater::ensure_not_busy()?;
     if !PRACTICE.lock().unwrap().reserve(token) {
@@ -540,7 +590,13 @@ async fn practice_start(token: u64) -> Result<u64, String> {
             }
             gate.epoch = Some(epoch);
         }
-        recording_command_with_route(None, epoch, None, Some(token));
+        recording_command_with_receipt(
+            None,
+            epoch,
+            None,
+            Some(token),
+            shortcut_receipt.unwrap_or(0),
+        );
         let inner = s.inner.lock().unwrap();
         if inner.practice != Some(token) || !CANCELLATION.allows(epoch) {
             return Err("Practice was cancelled before recording started.".into());
@@ -629,6 +685,72 @@ async fn list_microphones() -> Result<serde_json::Value, String> {
         .map_err(|e| e.to_string())?;
     #[cfg(not(target_os = "macos"))]
     Err("Microphone selection is available only on macOS.".into())
+}
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn workflow_status() -> Result<WorkflowStatus, String> {
+    tauri::async_runtime::spawn_blocking(platform::workflow_snapshot)
+        .await
+        .map_err(|e| e.to_string())?
+}
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn set_paused(paused: bool) -> Result<WorkflowStatus, String> {
+    configure(move || {
+        unsafe { hf_paused(paused) };
+        refresh_workflow_tray();
+        platform::workflow_snapshot()
+    })
+    .await
+}
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn set_excluded_apps(bundle_ids: Vec<String>) -> Result<WorkflowStatus, String> {
+    let ids = storage::normalized_exclusions(bundle_ids)?;
+    configure(move || {
+        let s = state();
+        // Merge under the Store owner: sound/usage writes cannot be overwritten
+        // by a snapshot taken before this FIFO action. No native dispatch here.
+        let mut inner = s.inner.lock().unwrap();
+        let mut updated = inner.store.clone();
+        updated.excluded_bundle_ids = ids;
+        let path = s.directory.join("usage.json");
+        let result = storage::save(&path, &updated);
+        if let Err(error) = &result {
+            // rename may have succeeded before directory fsync failed. Reconcile
+            // the actual readable field, not a fictional rollback of old disk.
+            let disk = storage::load(&path).map_err(|read| format!("Settings save failed: {error}; reconciliation failed: {read}"))?;
+            updated.excluded_bundle_ids = disk.excluded_bundle_ids;
+            inner.status.persistence_error = format!("Exclusion settings durability error: {error}");
+        } else {
+            inner.status.persistence_error.clear();
+        }
+        inner.store.excluded_bundle_ids = updated.excluded_bundle_ids.clone();
+        let json = cstring(&serde_json::to_string(&updated.excluded_bundle_ids).map_err(|e| e.to_string())?)?;
+        drop(inner);
+        unsafe { hf_excluded(json.as_ptr()) };
+        result.map_err(|e| format!("Exclusion settings could not be durably saved; live policy reconciled with readable disk: {e}"))?;
+        platform::workflow_snapshot()
+    }).await
+}
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn running_apps() -> Result<Vec<RunningApp>, String> {
+    tauri::async_runtime::spawn_blocking(platform::running_app_metadata)
+        .await
+        .map_err(|e| e.to_string())?
+}
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn set_launch_at_login(enabled: bool) -> Result<LoginStatus, String> {
+    configure(move || platform::change_login(enabled)).await
+}
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn open_login_settings() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(|| unsafe { hf_login_settings() })
+        .await
+        .map_err(|e| e.to_string())
 }
 #[tauri::command]
 async fn set_microphone(uid: Option<String>) -> Result<(), String> {
@@ -1205,6 +1327,17 @@ fn recording_command_with_route(
     press: Option<hold::Key>,
     practice: Option<u64>,
 ) {
+    recording_command_with_receipt(finish, epoch, press, practice, 0);
+}
+fn recording_command_with_receipt(
+    finish: Option<Option<u64>>,
+    epoch: u64,
+    press: Option<hold::Key>,
+    practice: Option<u64>,
+    receipt: u64,
+) {
+    #[cfg(not(target_os = "macos"))]
+    let _ = receipt;
     if !CANCELLATION.allows(epoch) {
         return;
     }
@@ -1330,6 +1463,8 @@ fn recording_command_with_route(
         hf_record(
             generation,
             epoch,
+            practice.is_some(),
+            receipt,
             microphone_uid
                 .as_ref()
                 .map_or(std::ptr::null(), |uid| uid.as_ptr()),
@@ -1787,6 +1922,18 @@ fn main() {
             handle_permission_args(app, &args);
         }))
         .invoke_handler(tauri::generate_handler![
+            #[cfg(target_os = "macos")]
+            workflow_status,
+            #[cfg(target_os = "macos")]
+            set_paused,
+            #[cfg(target_os = "macos")]
+            set_excluded_apps,
+            #[cfg(target_os = "macos")]
+            running_apps,
+            #[cfg(target_os = "macos")]
+            set_launch_at_login,
+            #[cfg(target_os = "macos")]
+            open_login_settings,
             practice_context,
             #[cfg(target_os = "macos")]
             updater::update_status,
@@ -1840,6 +1987,8 @@ fn main() {
                 ),
             };
             unsafe {
+                #[cfg(target_os = "macos")]
+                hf_excluded(cstring(&serde_json::to_string(&store.excluded_bundle_ids)?)?.as_ptr());
                 hf_sounds(store.sounds);
                 #[cfg(target_os = "macos")]
                 hf_compatibility(store.compatibility_paste);
@@ -1902,6 +2051,24 @@ fn main() {
             std::thread::spawn(move || {
                 for (control, epoch) in receiver {
                     match control {
+                        #[cfg(target_os = "macos")]
+                        Control::ShortcutToggle(receipt) => {
+                            recording_command_with_receipt(None, epoch, None, None, receipt)
+                        }
+                        #[cfg(target_os = "macos")]
+                        Control::ShortcutPress(key, receipt) => {
+                            recording_command_with_receipt(None, epoch, Some(key), None, receipt);
+                            let mut coordinator = holds().lock().unwrap();
+                            if !coordinator.accepted(key) {
+                                coordinator.reject(key);
+                                drop(coordinator);
+                                unsafe {
+                                    hf_gesture_complete(key.1);
+                                }
+                            }
+                        }
+                        #[cfg(target_os = "macos")]
+                        Control::TogglePause => unsafe { hf_paused(!hf_is_paused()) },
                         Control::Configure(action) => action(),
                         Control::Press(key) => {
                             recording_command(None, epoch, Some(key));
@@ -1935,6 +2102,8 @@ fn main() {
                             }
                         }
                     }
+                    #[cfg(target_os = "macos")]
+                    refresh_workflow_tray();
                 }
             });
             let open = MenuItem::with_id(app, "open", "Open HandsFree", true, None::<&str>)?;
@@ -1950,11 +2119,26 @@ fn main() {
             let separator = PredefinedMenuItem::separator(app)?;
             let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
             let cancel = MenuItem::with_id(app, "cancel", "Cancel dictation", true, None::<&str>)?;
+            let pause = MenuItem::with_id(
+                app,
+                "pause",
+                "Pause shortcuts",
+                cfg!(target_os = "macos"),
+                None::<&str>,
+            )?;
+            let finish = MenuItem::with_id(app, "finish", "Finish dictation", false, None::<&str>)?;
+            #[cfg(target_os = "macos")]
+            let _ = WORKFLOW_TRAY.set(WorkflowTray {
+                pause: pause.clone(),
+                finish: finish.clone(),
+                generation: Mutex::new(None),
+            });
             let quit = MenuItem::with_id(app, "quit", "Quit HandsFree", true, None::<&str>)?;
             let menu = Menu::with_items(
                 app,
                 &[
-                    &open, &practice, &settings, &updates, &separator, &cancel, &quit,
+                    &open, &practice, &settings, &updates, &separator, &pause, &finish, &cancel,
+                    &quit,
                 ],
             )?;
             TrayIconBuilder::new()
@@ -1970,6 +2154,17 @@ fn main() {
                     "practice" => show_dashboard_section(app, "practice"),
                     "settings" => show_dashboard_section(app, "settings"),
                     "updates" => show_dashboard_section(app, "updates"),
+                    #[cfg(target_os = "macos")]
+                    "pause" => enqueue(Control::TogglePause),
+                    #[cfg(target_os = "macos")]
+                    "finish" => {
+                        let generation = WORKFLOW_TRAY
+                            .get()
+                            .and_then(|tray| *tray.generation.lock().unwrap());
+                        if let Some(generation) = generation {
+                            enqueue(Control::Finish(Some(generation)));
+                        }
+                    }
                     "cancel" => {
                         enqueue(Control::Cancel);
                     }

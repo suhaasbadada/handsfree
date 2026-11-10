@@ -1,5 +1,5 @@
 import type { Practice } from './practice.ts';
-export type PracticeInput = {context: number; action: 'toggle' | 'press' | 'release' | 'cancel'; source: number; token: number};
+export type PracticeInput = {context: number; action: 'toggle' | 'press' | 'release' | 'cancel'; source: number; token: number; receipt: number};
 // Input identity and UI context are not recording tokens. Early key releases
 // survive a delayed start acknowledgement; stale focus contexts never restart.
 export class PracticeInputs {
@@ -11,13 +11,13 @@ export class PracticeInputs {
   constructor(practice: Practice, allowed: () => boolean) { this.practice = practice; this.allowed = allowed; }
   reset() { ++this.revision; this.preparing = false; this.held = undefined; }
   async start() { if(this.preparing || ['starting','recording','processing','cancelling'].includes(this.practice.view.phase)) return; return this.begin(); }
-  private async begin(gesture?: {key: string; released: boolean}) {
+  private async begin(gesture?: {key: string; released: boolean}, receipt?: number) {
     const revision = ++this.revision;
     this.preparing = true;
     try {
       if (['complete','empty','error'].includes(this.practice.view.phase)) await this.practice.clear();
       if (revision !== this.revision || !this.allowed()) return;
-      await this.practice.start();
+      await this.practice.start(receipt);
       if (revision === this.revision && gesture?.released && this.held === gesture) await this.practice.finish();
     } finally {
       if (revision === this.revision) {
@@ -41,15 +41,17 @@ export class PracticeInputs {
     }
     if (!this.allowed()) return;
     const phase = this.practice.view.phase;
+    // Missing native authority must never become an explicit button start.
+    if (!['recording','starting'].includes(phase) && (!Number.isSafeInteger(input.receipt) || input.receipt <= 0)) return;
     if (input.action === 'toggle') {
       if (phase === 'recording' || phase === 'starting') { await this.practice.finish(); return; }
       if (this.preparing) { this.reset(); await this.practice.clear(); return; }
       if (phase === 'processing' || phase === 'cancelling') return;
-      await this.begin();
+      await this.begin(undefined, input.receipt);
     } else if (input.action === 'press') {
       if (this.held || this.preparing || ['starting','recording','processing','cancelling'].includes(phase)) return;
       const gesture = {key, released:false}; this.held = gesture;
-      await this.begin(gesture);
+      await this.begin(gesture, input.receipt);
     }
   }
 }

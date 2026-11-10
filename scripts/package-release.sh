@@ -7,7 +7,7 @@ cd "$ROOT"
 fail() { printf '%s\n' "$*" >&2; exit 1; }
 [[ $# == 0 ]] || fail 'Usage: bash scripts/package-release.sh (no arguments)'
 [[ $(uname -s) == Darwin && $(uname -m) == arm64 ]] || fail 'Apple Silicon macOS required.'
-NAME=HandsFree-0.1.1-beta.12-macos-arm64
+NAME=HandsFree-0.1.1-beta.13-macos-arm64
 OUT="$ROOT/release"
 mkdir -p "$OUT"
 [[ ! -L "$OUT" && $(cd "$OUT" && pwd -P) == "$OUT" ]] || fail 'Refusing symlinked output directory.'
@@ -61,7 +61,7 @@ cp LICENSE "$PAYLOAD/Licenses/LICENSE"
 cp README.md CONTRIBUTING.md SECURITY.md "$PAYLOAD/Licenses/Documentation/"
 cp docs/DEVELOPMENT.md docs/RELEASING.md docs/WEBSITE.md docs/INSTALL.md docs/release-readiness.md "$PAYLOAD/Licenses/Documentation/"
 cp docs/PUSH-TO-TALK.md docs/practice.md docs/COMPATIBILITY-PASTE.md "$PAYLOAD/Licenses/Documentation/"
-cp docs/releases/v0.1.1-beta.12.md "$PAYLOAD/Licenses/Documentation/releases/"
+cp docs/releases/v0.1.1-beta.13.md "$PAYLOAD/Licenses/Documentation/releases/"
 python3 scripts/release-notices.py "$PAYLOAD/Licenses"
 printf '%s\n' 'Experimental Mac beta — self-signed, not Developer ID signed or notarized.' 'No Apple approval or legal certification. Separate-Mac QA remains unverified.' 'Upstream notices, license texts and historical SDK caveat are preserved.' 'See THIRD_PARTY_NOTICES/README.txt and Documentation/release-readiness.md.' > "$PAYLOAD/Licenses/PUBLICATION-NOTES.txt"
 # No Finder/AppleScript automation or new dependencies. The named volume and
@@ -100,7 +100,7 @@ MOUNTED=true
 verify_app "$MOUNT/HandsFree.app"
 node scripts/check-macos-assets.mjs "$MOUNT/HandsFree.app"
 [[ -L "$MOUNT/Applications" && $(readlink "$MOUNT/Applications") == /Applications ]]
-for required in 'Install HandsFree.txt' Licenses/LICENSE Licenses/Documentation/README.md Licenses/Documentation/RELEASING.md Licenses/Documentation/practice.md Licenses/Documentation/COMPATIBILITY-PASTE.md Licenses/Documentation/releases/v0.1.1-beta.12.md Licenses/THIRD_PARTY_NOTICES/inventory.json Licenses/THIRD_PARTY_SOURCES.tar.gz Licenses/PUBLICATION-NOTES.txt; do
+for required in 'Install HandsFree.txt' Licenses/LICENSE Licenses/Documentation/README.md Licenses/Documentation/RELEASING.md Licenses/Documentation/practice.md Licenses/Documentation/COMPATIBILITY-PASTE.md Licenses/Documentation/releases/v0.1.1-beta.13.md Licenses/THIRD_PARTY_NOTICES/inventory.json Licenses/THIRD_PARTY_SOURCES.tar.gz Licenses/PUBLICATION-NOTES.txt; do
   [[ -s "$MOUNT/$required" ]] || fail "Missing disk-image payload: $required"
 done
 /usr/bin/hdiutil detach "$MOUNT"
@@ -122,7 +122,7 @@ MOUNTED=false
 python3 - "$OUT/updater" "$STAGE" <<'PY'
 import pathlib, shutil, sys
 source, destination = map(pathlib.Path, sys.argv[1:])
-for name in ('HandsFree-0.1.1-beta.12-macos-arm64.app.tar.gz', 'HandsFree-0.1.1-beta.12-macos-arm64.app.tar.gz.sig', 'macos-arm64.json', 'PROVENANCE.txt'):
+for name in ('HandsFree-0.1.1-beta.13-macos-arm64.app.tar.gz', 'HandsFree-0.1.1-beta.13-macos-arm64.app.tar.gz.sig', 'macos-arm64.json', 'PROVENANCE.txt'):
     target = 'UPDATER-PROVENANCE.txt' if name == 'PROVENANCE.txt' else name
     with (source / name).open('rb') as src, (destination / target).open('xb') as dst:
         shutil.copyfileobj(src, dst)

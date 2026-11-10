@@ -24,14 +24,15 @@ export class Practice {
     this.view = { ...this.view, phase, message, inputLevel: phase === 'recording' ? this.view.inputLevel : null, elapsedSeconds: phase === 'recording' ? this.view.elapsedSeconds : null, limitSeconds: phase === 'recording' ? this.view.limitSeconds : null }; this.render(this.view);
   }
   edit(text: string) { this.edited = true; this.view.text = text; }
-  async start() {
+  async start(shortcutReceipt?: number) {
+    if (shortcutReceipt !== undefined && (!Number.isSafeInteger(shortcutReceipt) || shortcutReceipt <= 0)) return;
     if (this.token !== undefined || this.cancelling !== undefined || !this.allowed()) return;
     this.revision++;
     const token = ++nextToken;
     this.token = token; this.generation = undefined; this.edited = false; this.finishRequested = false;
     this.show('starting', 'Starting practice…');
     try {
-      const generation = await this.invoke<number>('practice_start', { token });
+      const generation = await this.invoke<number>('practice_start', { token, ...(shortcutReceipt === undefined ? {} : {shortcutReceipt}) });
       if (this.token !== token) { await this.invoke('practice_cancel', { token }); return; }
       if (!this.allowed()) { await this.clear(); return; }
       this.generation = generation;

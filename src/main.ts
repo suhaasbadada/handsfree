@@ -8,6 +8,7 @@ import { phaseLabel, canCancel, formatTime, readiness, readinessDetail } from '.
 import { Practice } from './practice';
 import { setupChecklist, shortcutTutorial } from './onboarding.ts';
 import { PracticeInputs, type PracticeInput } from './practice-input.ts';
+import { Workflow } from './workflow.ts';
 import { Updates, updateBusy } from './updates';
 import { phasePolicy, updateInstalling, type DictationPhase } from './state.ts';
 
@@ -29,7 +30,7 @@ const icon = (name: string) => `<svg viewBox="0 0 24 24" aria-hidden="true" focu
 document.querySelector('#app')!.innerHTML = `
 <div class="shell">
  <aside><a class="brand" href="#overview" aria-label="HandsFree menu" aria-haspopup="menu" aria-expanded="false" aria-controls="brand-menu"><img src="${logo}" alt="" width="36" height="36"><span>HandsFree</span>${icon('chevron')}</a>
-   <div id="brand-menu" class="brand-menu" role="menu" aria-label="HandsFree" hidden><button id="brand-overview" role="menuitem">Overview</button><button id="brand-started" role="menuitem" hidden>Get started</button><button id="brand-settings" role="menuitem">Settings</button><button id="brand-updates" role="menuitem">App updates…</button></div>
+   <div id="brand-menu" class="brand-menu" role="menu" aria-label="HandsFree" hidden><button id="brand-overview" role="menuitem">Overview</button><button id="brand-started" role="menuitem" hidden>Get started</button><button id="brand-settings" role="menuitem">Settings</button><button id="brand-pause" role="menuitem" disabled hidden>Pause shortcuts</button><button id="brand-updates" role="menuitem">App updates…</button></div>
   <div class="header-right"><nav aria-label="Main navigation"><button id="nav-overview" class="nav active" aria-label="Overview" title="Overview" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-6v-6h-4v6H4Z"/></svg></button><button id="nav-settings" class="nav" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg></button></nav><section class="status" aria-label="App status"><span id="dot" aria-hidden="true"></span><strong id="phase" aria-live="polite">Connecting…</strong><button id="cancel" hidden aria-label="Cancel dictation" title="Cancel dictation">×</button></section></div></aside>
  <main>
  <section id="overview" aria-labelledby="overview-title">
@@ -60,6 +61,13 @@ document.querySelector('#app')!.innerHTML = `
  </section>
  <section id="settings" hidden aria-labelledby="settings-title">
    <div class="settings-intro"><h1 id="settings-title">Settings</h1><button id="settings-started" class="text-action" hidden>Get started</button></div>
+   <section id="workflow" class="card" aria-labelledby="workflow-title" hidden><h2 id="workflow-title">Workflow</h2>
+    <div class="setting-row"><div><h3>Shortcut admission</h3><p id="workflow-pause-state">Checking…</p><p>Pause prevents new shortcut starts. Start test remains available.</p></div><button id="workflow-pause" disabled>Pause shortcuts</button></div>
+    <div class="setting-row"><div><h3>Launch at login</h3><p id="login-state" role="status">Checking…</p><button id="login-settings" class="text-action" hidden>Open Login Items</button><button id="login-cancel" class="text-action" hidden>Cancel pending registration</button></div><label class="switch"><input id="launch-at-login" type="checkbox" role="switch" aria-label="Launch at login" aria-describedby="login-state" disabled><span aria-hidden="true"></span></label></div>
+    <div class="setting-row"><div><h3><label for="excluded-app-choice">Excluded apps</label></h3><p>Prevent external dictation starts in these apps. Existing recordings are unaffected.</p></div></div>
+    <div class="workflow-app-controls"><select id="excluded-app-choice" aria-label="Running app to exclude" disabled><option value="">Choose a running app</option></select><button id="excluded-app-add" disabled>Add</button><button id="excluded-app-refresh" class="text-action" disabled>Refresh</button></div>
+    <ul id="excluded-apps" aria-label="Excluded apps"></ul><p id="workflow-error" class="feedback" role="status" hidden></p>
+   </section>
    <section class="card preferences" aria-labelledby="preferences-title"><h2 id="preferences-title">Preferences</h2>
     <div id="microphone-choice-row" class="setting-row" hidden><div><h3><label for="microphone-choice">Microphone</label></h3><p id="microphone-choice-help">Applies to the next recording. Unavailable selections never fall back silently.</p></div><div class="microphone-controls"><select id="microphone-choice" aria-describedby="microphone-choice-help" disabled><option value="">System default</option></select><button id="microphone-refresh" class="text-action" disabled>Refresh</button></div></div>
     <div class="setting-row"><div><h3><label for="recording-mode">Recording mode</label></h3><p id="recording-mode-help" hidden>Hold the shortcut; release to finish. Other keys or focus changes cancel.</p></div><select id="recording-mode" aria-describedby="recording-mode-help"><option value="toggle">Toggle</option><option value="push_to_talk">Push to talk</option></select></div>
@@ -140,6 +148,7 @@ function navigate(tab: 'overview' | 'settings') {
     else el(`nav-${name}`).removeAttribute('aria-current');
   }
   renderPractice();
+  if (tab === 'settings' && current?.platform === 'macos') { void workflow.refresh(); void workflow.runningApps(); }
 }
 function feedback(message: string) {
   el('feedback').hidden = !message; el('feedback').textContent = message;
@@ -157,6 +166,7 @@ function closeBrandMenu(restore = false) {
   renderPractice();
 }
 function openBrandMenu() {
+  void workflow.refresh();
   el('brand-menu').hidden = false; brand.setAttribute('aria-expanded','true'); renderPractice();
 }
 brand.addEventListener('click', e => { e.preventDefault(); if(el('brand-menu').hidden) openBrandMenu(); else closeBrandMenu(); });
@@ -265,7 +275,7 @@ window.addEventListener('focus', () => { windowActive=true; renderPractice(); })
 void listen('practice-cleared', () => { practiceContext=0; clearPractice(); }).catch(() => { /* Browser-only preview has no native events. */ });
 void listen<PracticeInput>('practice-input', ({payload}) => {
   if(payload.context!==practiceContext || !practiceVisible() || capturing || captureStopping || installingUpdate()) return;
-  if (payload.action === 'toggle' || payload.action === 'press') { shortcutReceived = true; renderPractice(); }
+  if ((payload.action === 'toggle' || payload.action === 'press') && Number.isSafeInteger(payload.receipt) && payload.receipt > 0) { shortcutReceived = true; renderPractice(); }
   void practiceInputs.receive(payload);
 }).catch(()=>{});
 void listen<string>('dashboard-navigate', ({payload}) => {
@@ -280,7 +290,59 @@ let confirmedUpdate: string | undefined;
 const canInstallUpdate = () => current?.platform === 'macos'
   && phasePolicy(current.phase).installUpdate
   && practice.view.phase === 'idle' && !capturing && !captureStopping && !shortcutPending && !downloadPending && !modePending;
-const updates = new Updates(invoke, () => { renderUpdates(); renderPractice(); renderShortcut(); }, canInstallUpdate);
+const updates = new Updates(invoke, () => { renderUpdates(); renderPractice(); renderShortcut(); renderWorkflow(); }, canInstallUpdate);
+const workflowAllowed = () => current?.platform === 'macos' && !installingUpdate();
+const workflow = new Workflow(invoke, renderWorkflow, workflowAllowed);
+let workflowAppKey = '';
+function renderWorkflow() {
+  const status = workflow.status, allowed = workflowAllowed();
+  el('workflow').hidden = current?.platform !== 'macos';
+  el('brand-pause').hidden = current?.platform !== 'macos';
+  for(const id of ['workflow-pause','brand-pause']) {
+    button(id).disabled = !allowed || !status || workflow.pending.pause;
+    button(id).textContent = status?.paused ? 'Resume shortcuts' : 'Pause shortcuts';
+  }
+  el('workflow-pause-state').textContent = status ? status.paused ? 'Paused until resumed or app restarts' : 'Shortcuts active' : 'Checking…';
+  const login = el('launch-at-login') as HTMLInputElement;
+  login.checked = status?.login.status === 'enabled';
+  login.disabled = !allowed || !status || workflow.pending.login || status.login.status === 'approval_required';
+  const labels = {enabled:'Enabled in macOS', approval_required:'Approval required in macOS Login Items', not_registered:'Not registered', not_found:'Login item not found', unknown:'macOS status unknown'};
+  el('login-state').textContent = status ? `${labels[status.login.status]}${status.login.error ? ` · ${status.login.error}` : ''}` : 'Checking…';
+  el('login-settings').hidden = status?.login.status !== 'approval_required';
+  button('login-settings').disabled = !allowed || workflow.pending.settings || workflow.pending.login;
+  el('login-cancel').hidden = status?.login.status !== 'approval_required';
+  button('login-cancel').disabled = !allowed || workflow.pending.login;
+  const choice = el('excluded-app-choice') as HTMLSelectElement;
+  const key = JSON.stringify([workflow.apps,status?.excluded_bundle_ids]);
+  if(key !== workflowAppKey) {
+    workflowAppKey = key; const selected = choice.value;
+    choice.replaceChildren(new Option('Choose a running app',''));
+    for(const app of workflow.apps) if(!status?.excluded_bundle_ids.includes(app.bundle_id)) choice.add(new Option(`${app.name} · ${app.bundle_id}`,app.bundle_id));
+    choice.value = Array.from(choice.options).some(option=>option.value===selected) ? selected : '';
+    el('excluded-apps').replaceChildren();
+    for(const id of status?.excluded_bundle_ids ?? []) {
+      const item = document.createElement('li'), name = document.createElement('span'), remove = document.createElement('button');
+      const app = workflow.apps.find(app=>app.bundle_id===id);
+      name.textContent = app ? `${app.name} · ${id}` : id;
+      remove.textContent = 'Remove'; remove.setAttribute('aria-label',`Remove ${id}`);
+      remove.onclick = () => { void workflow.exclusions(workflow.status!.excluded_bundle_ids.filter(saved=>saved!==id)); };
+      item.append(name,remove); el('excluded-apps').append(item);
+    }
+  }
+  choice.disabled = !allowed || !status || workflow.pending.exclusions || workflow.pending.apps;
+  button('excluded-app-add').disabled = choice.disabled || !choice.value;
+  button('excluded-app-refresh').disabled = !allowed || workflow.pending.apps || workflow.pending.exclusions;
+  for(const remove of Array.from(el('excluded-apps').querySelectorAll('button'))) remove.disabled = !allowed || workflow.pending.exclusions;
+  el('workflow-error').textContent = workflow.error; el('workflow-error').hidden = !workflow.error;
+}
+el('excluded-app-choice').onchange = renderWorkflow;
+el('excluded-app-refresh').onclick = () => { void workflow.runningApps(); };
+el('excluded-app-add').onclick = () => { const id = (el('excluded-app-choice') as HTMLSelectElement).value; if(id && workflow.status && workflow.apps.some(app=>app.bundle_id===id)) void workflow.exclusions([...new Set([...workflow.status.excluded_bundle_ids,id])]); };
+el('launch-at-login').onchange = () => { void workflow.login((el('launch-at-login') as HTMLInputElement).checked); };
+el('login-settings').onclick = () => { void workflow.openLoginSettings(); };
+el('login-cancel').onclick = () => { void workflow.login(false); };
+el('workflow-pause').onclick = () => { if(workflow.status) void workflow.pause(!workflow.status.paused); };
+el('brand-pause').onclick = () => { closeBrandMenu(true); if(workflow.status) void workflow.pause(!workflow.status.paused); };
 function renderUpdates() {
   const view = updates.view;
   el('installed-release').textContent = view.installed_version || 'Connecting…';
@@ -551,6 +613,7 @@ async function refreshStatus() {
      const windows = current.platform === 'windows';
       el('updates-open').hidden = current.platform !== 'macos';
       el('brand-updates').hidden = current.platform !== 'macos';
+      renderWorkflow(); void workflow.refresh();
      if (updatesDialog.open) { renderUpdates(); void updates.refresh(); void updates.progress(); }
      button('setup').disabled = false;
     button('reset').disabled = false;
@@ -625,7 +688,7 @@ async function refreshStatus() {
     el('setup').textContent = 'Open settings';
     el('storage-error').hidden = !current.persistence_error;
     el('storage-error').textContent = current.persistence_error;
-  } catch (e) { current = undefined; clearPractice(); renderPractice(); feedback(`Couldn’t connect to HandsFree: ${String(e)}`); }
+  } catch (e) { current = undefined; clearPractice(); renderPractice(); renderWorkflow(); feedback(`Couldn’t connect to HandsFree: ${String(e)}`); }
 }
 void refresh();
 void getVersion().then(version => { el('app-version').textContent = version; }).catch(() => { /* Packaged version fallback for browser previews. */ });

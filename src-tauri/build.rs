@@ -112,6 +112,7 @@ fn build_macos() {
         "ApplicationServices",
         "CoreGraphics",
         "QuartzCore",
+        "ServiceManagement",
     ] {
         println!("cargo:rustc-link-lib=framework={framework}");
     }

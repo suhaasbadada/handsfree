@@ -64,10 +64,36 @@ prove discovery completeness or runtime correctness on an untested OS.
 | Disabled/wrong action | `action-policy`, `preferences-ui`, `permissions-readiness` | Shared policy fixture in Node and Rust |
 | Update error or stale dialog | `update-operation`, `update-lifecycle`, `updates-ui`, `dialogs` | Updater Rust/Node tests, fresh-process TLS regression, isolated signed install |
 | Tray/Dock/reopen behavior | `dashboard-lifecycle` | Native lifecycle tests; installed readiness |
+| Pause/exclusions/login/tray Finish | `workflow-admission`, `login-registration` | Synthetic native policy/fake login adapter; Store tests; [workflow IPC](WORKFLOW.md) |
 | Paused Windows code | IDs prefixed `windows-` | Preserve code; Mac tests do not establish Windows runtime acceptance |
 | Marketing demo/download or release rollout | IDs prefixed `website-` or `release-` | Website/packaging tests; deployment and runtime gates separately |
 
 ## Executable contracts
+
+- Workflow policy is native-main-thread-owned future admission, not a cancellation
+  lease. Receipt checks latch rejected physical input; monotonic bounded tickets
+  retain PID/bundle identity through the FIFO and reject changed/unknown/own-app
+  external targets before engine construction. Explicit practice remains available
+  while paused; shortcut practice carries its native receipt. Successful native
+  admission freezes workflow eligibility through cue wait. Store merges/exclusion
+  publication use Configure without gesture resets or cancellation, and reconcile
+  readable disk after potentially post-rename save failure. Login status/effects
+  belong solely to main-thread ServiceManagement, never a competing saved boolean.
+  Physical hold mouse-down interruption exempts only the capsule's left-click
+  controls and visible own-process status-item/menu window frames (event coordinates
+  converted to AppKit space), including during accepted cue wait. External clicks
+  still cancel; activation/AX/security focus surveillance is not relaxed. Injected
+  production-router tests cover this distinction; actual AppKit menu-window
+  publication/event ordering and hardware tray acceptance remain separate gates.
+
+- `src/workflow.ts` owns independent pause/login/exclusion/app-list pending flags
+  and coalesced status reads. Any write invalidates older snapshots; write replies
+  merge only their owned field, preserving concurrent independent edits. Settings
+  and brand-menu pause observe actual native state (including tray changes).
+  Login approval is not enabled; failed requests restore observed selections.
+  Running apps are metadata-only, loaded on Settings open or explicit Refresh,
+  never by status polling. Saved absent bundle IDs remain removable. Installer
+  eligibility is UI-only; native setters still recheck. No new dictation phase.
 
 - Dashboard routing uses a revision-bound view context, not a recording lease.
   Focus loss, navigation, open menus/dialogs and shortcut capture revoke input

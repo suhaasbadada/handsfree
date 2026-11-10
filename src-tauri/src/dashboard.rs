@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 #[derive(Clone, Copy, serde::Serialize, Debug, PartialEq)]
 pub struct Input {
+    pub receipt: u64,
     pub context: u64,
     pub action: &'static str,
     pub source: i32,
@@ -26,6 +27,7 @@ impl Router {
     }
     pub fn toggle(&self) -> Option<Input> {
         self.context.map(|context| Input {
+            receipt: 0,
             context,
             action: "toggle",
             source: 0,
@@ -49,6 +51,7 @@ impl Router {
             _ => return None,
         };
         Some(context.map(|context| Input {
+            receipt: 0,
             context,
             source,
             token,
