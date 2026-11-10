@@ -2,38 +2,44 @@
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
 
-## Beta 15 candidate preparation
+## Beta 15 publication and metadata activation
 
-Candidate distribution **v0.1.1-beta.15** retains embedded version **0.1.1**.
-Packaging, artifact auditing and disabled `candidateRelease` coordinates target
-beta 15. Current public downloads, active `release`, site/feed, README and install
-guidance remain audited beta 14 until the exact-source anonymous-public
-seven-asset audit passes. See [candidate scope and limitations](releases/v0.1.1-beta.15.md).
+Published distribution **v0.1.1-beta.15** retains embedded version **0.1.1**.
 Beta 15 adds persisted Light/Dark/System appearance and prominent local update
 status; it does not renumber or reopen the four completed beta 11–14 groups.
-Signing, exact-source CI, artifact audits, publication, feed/site activation and
-matching Homebrew parity remain separate gates; none is established by metadata
-preparation. Preserve historical outputs before packaging; never overwrite them.
+Beta 14's latest-offer refresh before confirmation and once-only updater consent
+remain unchanged: no unsolicited feed polling, automatic download or installation.
+See [published scope and limitations](releases/v0.1.1-beta.15.md).
+
+Activation CI, Pages deployment and live website/feed byte readback, matching
+Homebrew cask publication/readback and tap CI must be verified independently for
+their exact revisions. Record final external receipts separately; artifact source
+CI and the public audit do not establish these gates. Metadata activation does
+not establish installed OTA, native OS, microphone or VoiceOver acceptance.
 The owner upgrades manually through the app, not by installed-app replacement.
 Preserve signing identity, updater keys, permissions and model/settings/usage data.
 
-## Current public distribution (beta 14)
+## Current public distribution (beta 15)
 
-Current public Mac distribution: **v0.1.1-beta.14**, embedded version **0.1.1**.
+Current public Mac distribution: **v0.1.1-beta.15**, embedded version **0.1.1**.
 Source CI, publication and the anonymous-public seven-asset audit passed for the
-exact clean artifact source `d7ea18e36141a9302f973637c926e190c286ecc8`, with
-[passing source CI](https://github.com/suhaasbadada/handsfree/actions/runs/42785358444).
-See the [published release](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.14)
-and [beta 14 evidence](releases/v0.1.1-beta.14.md). The active `release` export and
-static downloads select audited beta 14; disabled `candidateRelease` prepares
-beta 15 audit coordinates only. Group 4 contains keyboard/recovery, system
-appearance and the latest-offer updater repair without new AI. Activation is
+exact clean artifact source `3641d4cd5ac7a1081bc3f1f0bbf9d0d6acb6d7e4`, with
+[passing source CI](https://github.com/suhaasbadada/handsfree/actions/runs/42921056595).
+See the [published release](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.15)
+and [beta 15 evidence](releases/v0.1.1-beta.15.md). The active `release` export and
+static downloads select audited beta 15; disabled `candidateRelease` remains
+unchanged audit coordinates, not an availability switch. Activation is
 metadata-only: it copies the exact generated signed feed, without reconstructing
 its signature, and does not rebuild or replace the installed app. Artifacts and
-their bundled preparation-era docs remain sourced from immutable `d7ea18e36141a9302f973637c926e190c286ecc8`.
-DMG SHA-256: `d56e7db32ac886efdd9e97e534bf761e9e384c6973b64fbf053705dea2737f88`.
-Updater archive SHA-256: `4b3e60ab151de30ed26a8e53f528dbd85a3793361d1393ed47a306968fa1d053`.
-Exact audited feed SHA-256: `904d3231b67f4640281a40fb1f1919a94b173c36468b833cdbc232aff62d0139`.
+their bundled preparation-era docs remain sourced from immutable `3641d4cd5ac7a1081bc3f1f0bbf9d0d6acb6d7e4`.
+DMG SHA-256: `208f178256c9ede3327e290bfe84d4e5b9577da53801b6ca834aa88acc4cf86f`.
+Updater archive SHA-256: `ecd1578546cf9df2b5bfafaf894bbb8209b645c1fa0074ce157c4a87a4ede398`.
+Exact audited feed SHA-256: `580764c93b4aed5b68dae7ebd9df2f7362675939295321fa0d3aac8a4ae03e39`.
+Keep the tracked current-feed hash pinned to these audited beta 15 bytes; tests
+must not depend on ignored `release/` artifacts. The actual seven-asset audit
+compares generated feed bytes separately. All four completed ledger groups remain
+immutable. Beta 14 outputs are preserved under `release/history/beta14-before-beta15-_wpbr0gq/`;
+its [historical evidence](releases/v0.1.1-beta.14.md) remains unchanged.
 Beta 13 outputs are preserved under `release/history/beta13-before-beta14-5v8sbkaw/`;
 its [historical evidence](releases/v0.1.1-beta.13.md) remains unchanged.
 Beta 12 outputs are preserved under `release/history/beta12-before-beta13-dsrbi6sn/`;
@@ -63,6 +69,14 @@ and [Compatibility paste](COMPATIBILITY-PASTE.md) for unchanged opt-in safeguard
 
 ## Beta 14 publication and metadata activation (group 4)
 
+Immutable beta 14 artifact source: `d7ea18e36141a9302f973637c926e190c286ecc8`,
+source CI `42785358444`. Historical DMG SHA-256:
+`d56e7db32ac886efdd9e97e534bf761e9e384c6973b64fbf053705dea2737f88`.
+Historical updater archive SHA-256:
+`4b3e60ab151de30ed26a8e53f528dbd85a3793361d1393ed47a306968fa1d053`.
+Historical feed SHA-256:
+`904d3231b67f4640281a40fb1f1919a94b173c36468b833cdbc232aff62d0139`.
+
 All four release publication/parity gates are complete. Beta 14 activation
 `91bb319e0435b8de96c500ec261dd259a9ac5fa7` passed CI `42787161996` and
 Pages `42787161534`; live feed/manifest/page bytes match the audited release.
@@ -72,9 +86,9 @@ OTA, VoiceOver, microphone hardware or ServiceManagement acceptance.
 
 Distribution **v0.1.1-beta.14** retains embedded version **0.1.1**. The exact-source
 anonymous-public seven-asset audit passed before this metadata activation.
-Active website/feed/README/install coordinates select beta 14; the candidate
+At that activation, website/feed/README/install coordinates selected beta 14; the candidate
 export remains disabled and package/audit/build coordinates are unchanged.
-Keep the tracked current-feed hash pinned to audited beta 14; tests must not
+At that activation the tracked current-feed hash was pinned to audited beta 14; tests must not
 depend on ignored `release/` artifacts. The actual artifact audit compared
 generated feed bytes; normal tests use the tracked feed hash as equality oracle.
 
@@ -130,7 +144,7 @@ Published distribution **v0.1.1-beta.12** retains internal app version **0.1.1**
 Exact-source CI and local/draft/anonymous-public seven-asset audits passed before
 this metadata-only activation. Copy `release/macos-arm64.json` byte-for-byte to
 `site/updates/macos-arm64.json`; do not reconstruct the signature. The disabled
-`candidateRelease` remains disabled audit coordinates (now audited beta 14).
+`candidateRelease` remained disabled audit coordinates at that activation.
 App behavior and immutable beta 12 artifacts do not change during activation;
 the current packaging/distribution coordinates target the next candidate.
 See [published scope and limitations](releases/v0.1.1-beta.12.md).
@@ -167,13 +181,13 @@ cache lacks the final resources/signature. No independent second build is used.
 An unexpected source change preserves `release/updater/.mac-source-state.json`;
 investigate that recovery receipt rather than deleting it or hiding changes.
 
-Published `v0.1.1-beta.14` contains these seven assets from the same clean source; the exact-source anonymous-public audit passed:
+Published `v0.1.1-beta.15` contains these seven assets from the same clean source; the exact-source anonymous-public audit passed:
 
-- `HandsFree-0.1.1-beta.14-macos-arm64.dmg`
+- `HandsFree-0.1.1-beta.15-macos-arm64.dmg`
 - `PROVENANCE.txt` (exact clean source commit/tree)
 - `SHA256SUMS` (exactly six payload entries, excluding itself)
-- `HandsFree-0.1.1-beta.14-macos-arm64.app.tar.gz`
-- `HandsFree-0.1.1-beta.14-macos-arm64.app.tar.gz.sig`
+- `HandsFree-0.1.1-beta.15-macos-arm64.app.tar.gz`
+- `HandsFree-0.1.1-beta.15-macos-arm64.app.tar.gz.sig`
 - `UPDATER-PROVENANCE.txt` (same source and final executable hash)
 - `macos-arm64.json` (exact version/target/canonical URL/uploaded signature)
 
