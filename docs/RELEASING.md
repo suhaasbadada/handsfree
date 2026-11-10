@@ -46,6 +46,13 @@ and [Compatibility paste](COMPATIBILITY-PASTE.md) for unchanged opt-in safeguard
 
 ## Beta 14 publication and metadata activation (group 4)
 
+All four release publication/parity gates are complete. Beta 14 activation
+`91bb319e0435b8de96c500ec261dd259a9ac5fa7` passed CI `42787161996` and
+Pages `42787161534`; live feed/manifest/page bytes match the audited release.
+Tap `521db2d98ccbc61eb419d192b4ff8b468b74373a` passed CI `42787103742`
+and remote version/checksum readback. These are distribution gates, not installed
+OTA, VoiceOver, microphone hardware or ServiceManagement acceptance.
+
 Distribution **v0.1.1-beta.14** retains embedded version **0.1.1**. The exact-source
 anonymous-public seven-asset audit passed before this metadata activation.
 Active website/feed/README/install coordinates select beta 14; the candidate

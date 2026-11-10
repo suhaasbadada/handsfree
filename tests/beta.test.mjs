@@ -98,7 +98,7 @@ test('beta 13 publication notes separate audited artifacts from pending deployme
   assert.ok(read('src-tauri/src/updater.rs').includes('assert_eq!(installed_version(), "0.1.1-beta.14")'));
 });
 
-test('beta 14 publication records audited source and hashes, with deployment and real acceptance pending', () => {
+test('beta 14 publication records audited source and hashes, with real OS acceptance separate', () => {
   const notes = read('docs/releases/v0.1.1-beta.14.md');
   for (const evidence of ['Published experimental Mac beta',
     'Internal app version: **0.1.1**', 'beta 11–14', '**before confirmation**',
@@ -113,14 +113,14 @@ test('beta 14 publication records audited source and hashes, with deployment and
     '4b3e60ab151de30ed26a8e53f528dbd85a3793361d1393ed47a306968fa1d053',
     '904d3231b67f4640281a40fb1f1919a94b173c36468b833cdbc232aff62d0139',
     'beta13-before-beta14-5v8sbkaw', 'candidate-era documentation remains immutable',
-    'user-reported stale updater', 'prior beta 12 layout fix', 'independent pending gates',
+    'user-reported stale updater', 'prior beta 12 layout fix', 'independent distribution gates passed',
     'OTA replacement/restart', 'VoiceOver', '**unverified**', 'updater keys',
     'model/settings/usage data', 'No new AI features']) assert.ok(notes.includes(evidence), evidence);
   assert.doesNotMatch(notes, /Unpublished experimental|audits are pending|No beta 14 artifact source SHA/);
   const guide = read('docs/RELEASING.md');
   assert.match(guide, /## Beta 14 publication and metadata activation \(group 4\)/);
   const ledger = read('docs/FEATURE-RELEASES.md');
-  assert.match(ledger, /Group 4 publication evidence — PUBLISHED, deployment parity pending/);
+  assert.match(ledger, /Group 4 publication evidence — COMPLETE/);
   for (const source of [guide, ledger]) {
     for (const evidence of ['d7ea18e36141a9302f973637c926e190c286ecc8', '42785358444',
       'd56e7db32ac886efdd9e97e534bf761e9e384c6973b64fbf053705dea2737f88',
