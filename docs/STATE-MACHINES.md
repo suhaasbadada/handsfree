@@ -58,7 +58,7 @@ prove discovery completeness or runtime correctness on an untested OS.
 | --- | --- | --- |
 | Unexpected start/finish/cancel | `dictation`, `cancellation`, `hold-routing`, `fn-tap` | Rust routing/epoch/hold tests |
 | Audio truncation or capture after cancel | `native-audio`, `cue-capture-handoff`, `stream-slot`, `audio-queue`, `segmentation-inference` | Native cue tests and streaming Rust tests |
-| Lost/stale practice text | `practice-lease`, `practice-ui` | `tests/practice.test.mjs`, Rust gate tests |
+| Lost/stale practice text or dashboard shortcut | `dashboard-context`, `practice-input`, `practice-lease`, `practice-ui` | `tests/practice-input.test.mjs`, `tests/practice.test.mjs`, Rust router/gate tests, browser event integration |
 | Wrong field, double paste, clipboard loss | `delivery`, `focus-resolution`, `clipboard` | Permission-free native/focus harnesses; real editor acceptance is separate |
 | Shortcut settings race | `shortcut-key-recognizer`, `shortcut-capture`, `preference-transaction`, `native-hook` | `tests/shortcut.test.mjs`, browser smoke |
 | Disabled/wrong action | `action-policy`, `preferences-ui`, `permissions-readiness` | Shared policy fixture in Node and Rust |
@@ -68,6 +68,16 @@ prove discovery completeness or runtime correctness on an untested OS.
 | Marketing demo/download or release rollout | IDs prefixed `website-` or `release-` | Website/packaging tests; deployment and runtime gates separately |
 
 ## Executable contracts
+
+- Dashboard routing uses a revision-bound view context, not a recording lease.
+  Focus loss, navigation, open menus/dialogs and shortcut capture revoke input
+  eligibility. Native visibility/focus and recording guards remain authoritative.
+  A physical hold keeps its receipt context through release/cancel; an ineligible
+  dashboard press is absorbed, never converted into external dictation.
+  `PracticeInputs` owns physical identity and early release, while `Practice`
+  separately owns token/generation and finish-before-start acknowledgement.
+  Existing external dictation retains its ordinary completion route. Own-app
+  delivery refusal code 15 exits before clipboard fallback and usage publication.
 
 - `src/state.ts`: separate dictation/practice/update phase spaces; readonly phase
   policies fail closed for unknown/disconnected states. There is deliberately no

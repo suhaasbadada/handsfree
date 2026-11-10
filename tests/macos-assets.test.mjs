@@ -7,13 +7,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const assets = [
-  { name: 'current.js', bytes: Buffer.from('<h1>Your activity</h1>Recording mode <option value="toggle">Toggle</option><option value="push_to_talk">Push to talk</option> set_recording_mode Compatibility paste compatibility-paste set_compatibility_paste compatibility_paste the exact field cannot be verified Try your voice Start practice Temporary practice field Nothing is pasted or copied. practice_start practice_finish practice_cancel practice_status') },
+  { name: 'current.js', bytes: Buffer.from('<h1>Your activity</h1>Recording mode <option value="toggle">Toggle</option><option value="push_to_talk">Push to talk</option> set_recording_mode Compatibility paste compatibility-paste set_compatibility_paste compatibility_paste the exact field cannot be verified A space to try it Start test Practice dictation No clipboard. No usage counted. practice-input practice_context practice_start practice_finish practice_cancel practice_status') },
   { name: 'current.css', bytes: Buffer.from('.metrics { display: grid; }') },
 ];
 const cached = assets.map(asset => brotliCompressSync(asset.bytes));
 const backendMarker = 'Keep the HandsFree window visible and focused to practice.';
 const executable = Buffer.concat([Buffer.from(`Mach-O fixture _hf_gesture_complete ${backendMarker}`), ...cached]);
-for (const marker of ['Try your voice', 'Start practice', 'Temporary practice field', 'Nothing is pasted or copied.', 'practice_start', 'practice_finish', 'practice_cancel', 'practice_status']) {
+for (const marker of ['A space to try it', 'Start test', 'Practice dictation', 'No clipboard. No usage counted.', 'practice-input', 'practice_context', 'practice_start', 'practice_finish', 'practice_cancel', 'practice_status']) {
   test(`compiled practice audit rejects missing ${marker} even when stale bytes are embedded`, () => {
     const stale = [{ ...assets[0], bytes: Buffer.from(assets[0].bytes.toString().replaceAll(marker, 'old')) }, assets[1]];
     const cache = stale.map(asset => brotliCompressSync(asset.bytes));
@@ -21,7 +21,7 @@ for (const marker of ['Try your voice', 'Start practice', 'Temporary practice fi
   });
 }
 test('pre-practice Compatibility paste frontend cannot pass merely because it is embedded', () => {
-  const stale = [{ ...assets[0], bytes: Buffer.from(assets[0].bytes.toString().split(' Try your voice')[0]) }, assets[1]];
+  const stale = [{ ...assets[0], bytes: Buffer.from(assets[0].bytes.toString().split(' A space to try it')[0]) }, assets[1]];
   const cache = stale.map(asset => brotliCompressSync(asset.bytes));
   assert.throws(() => verifyEmbeddedFrontend(Buffer.concat(cache), stale, cache), /Missing compiled practice UI/);
 });

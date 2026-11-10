@@ -187,7 +187,7 @@ pub fn insertion_text(text: &str) -> String {
 /// Native PasteResult codes. Diagnostics intentionally exclude AX values,
 /// field labels, app names, clipboard data, and transcript text.
 pub fn should_copy_fallback(text: &str, paste_code: i32) -> bool {
-    !text.is_empty() && matches!(paste_code, 1..=15)
+    !text.is_empty() && matches!(paste_code, 1..=14)
 }
 
 pub fn copied_message(paste_code: i32) -> String {
@@ -348,10 +348,10 @@ mod tests {
             copied_message(3),
             "Copied. Automatic paste skipped: Not pasted [start:no-original-focus]."
         );
-        for code in 1..=15 {
+        for code in 1..=14 {
             assert!(should_copy_fallback("final text", code));
         }
-        for code in [0, 16, -1, 17] {
+        for code in [0, 15, 16, -1, 17] {
             assert!(!should_copy_fallback("final text", code));
         }
         for code in 0..=16 {

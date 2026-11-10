@@ -18,7 +18,7 @@ export function verifyEmbeddedFrontend(executable, assets, cached) {
   for (const marker of ['Compatibility paste', 'compatibility-paste', 'set_compatibility_paste', 'compatibility_paste', 'the exact field cannot be verified']) {
     requireThat(javascript.includes(marker), `Missing compiled Compatibility paste UI: ${marker}`);
   }
-  for (const marker of ['Try your voice', 'Start practice', 'Temporary practice field', 'Nothing is pasted or copied.', 'practice_start', 'practice_finish', 'practice_cancel', 'practice_status']) {
+  for (const marker of ['A space to try it', 'Start test', 'Practice dictation', 'No clipboard. No usage counted.', 'practice-input', 'practice_context', 'practice_start', 'practice_finish', 'practice_cancel', 'practice_status']) {
     requireThat(javascript.includes(marker), `Missing compiled practice UI: ${marker}`);
   }
   for (const asset of assets) {

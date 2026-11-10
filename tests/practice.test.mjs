@@ -4,6 +4,14 @@ import { readFileSync } from 'node:fs';
 import { Practice } from '../src/practice.ts';
 
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b; }); return { promise, resolve, reject }; };
+test('eligibility lost during start retires local ownership as well as native capture', async () => {
+  const {practice:p,calls,responses,blur}=harness(), ack=deferred();
+  responses.practice_start=ack.promise;
+  const starting=p.start();blur();ack.resolve(6);await starting;
+  assert.equal(p.view.phase,'idle');
+  assert.equal(p.view.text,'');
+  assert.ok(calls.some(c=>c.command==='practice_cancel'));
+});
 function harness() {
   const calls = [], responses = {}, views = [];
   let focused = true;

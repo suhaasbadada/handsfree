@@ -9,6 +9,7 @@ export class Practice {
   private token?: number;
   private generation?: number;
   private edited = false;
+  private finishRequested = false;
   private polling = false;
   private cancelling?: number;
   private revision = 0;
@@ -27,15 +28,15 @@ export class Practice {
     if (this.token !== undefined || this.cancelling !== undefined || !this.allowed()) return;
     this.revision++;
     const token = ++nextToken;
-    this.token = token; this.generation = undefined; this.edited = false;
+    this.token = token; this.generation = undefined; this.edited = false; this.finishRequested = false;
     this.show('starting', 'Starting practice…');
     try {
       const generation = await this.invoke<number>('practice_start', { token });
-      if (this.token !== token || !this.allowed()) {
-        await this.invoke('practice_cancel', { token }); return;
-      }
+      if (this.token !== token) { await this.invoke('practice_cancel', { token }); return; }
+      if (!this.allowed()) { await this.clear(); return; }
       this.generation = generation;
       this.show('recording', 'Speak now, then choose Finish.');
+      if (this.finishRequested) await this.finish();
     } catch (error) {
       if (this.token !== token) return;
       this.token = undefined;
@@ -43,6 +44,7 @@ export class Practice {
     }
   }
   async finish() {
+    if (this.token !== undefined && this.view.phase === 'starting') { this.finishRequested = true; return; }
     const token = this.token, generation = this.generation;
     if (token === undefined || generation === undefined || this.view.phase !== 'recording') return;
     this.show('processing', 'Transcribing on this Mac…');
@@ -55,7 +57,7 @@ export class Practice {
   async clear() {
     const revision = ++this.revision;
     const token = this.token ?? this.cancelling;
-    this.token = undefined; this.generation = undefined; this.edited = false;
+    this.token = undefined; this.generation = undefined; this.edited = false; this.finishRequested = false;
     this.cancelling = token;
     this.view.text = ''; this.show(token === undefined ? 'idle' : 'cancelling', token === undefined ? '' : 'Cancelling practice…');
     if (token !== undefined) {

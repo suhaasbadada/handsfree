@@ -6,6 +6,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { checkPracticeEvents } from './ui-practice-events.mjs';
 
 const binary = process.env.BROWSER_BINARY;
 const port = process.env.UI_PORT ?? '5187';
@@ -264,7 +265,8 @@ try {
   await until(`document.getElementById('phase').textContent==='Copied' && document.getElementById('dot').className==='copied'`);
   assert.equal(await evaluate(`document.getElementById('cancel').hidden && !document.getElementById('preview-sound').disabled && !document.getElementById('change-shortcut').disabled && !document.body.textContent.includes(window.fixture.transcript)`), true, 'Copied fallback is ready without exposing payload');
   assert.equal(await evaluate(`getComputedStyle(document.getElementById('dot')).backgroundColor`), 'rgb(112, 107, 104)', 'Normal fallback is graphite; muted red is reserved for recording/active controls');
-  assert.match(await evaluate(`document.getElementById('message').textContent`), /start:no-original-focus/);
+  assert.match(await evaluate(`document.getElementById('message').textContent`), /Text copied/);
+  assert.match(await evaluate(`document.getElementById('message').title`), /start:no-original-focus/, 'Technical reason remains available without dominating the UI');
   await evaluate(`document.getElementById('nav-settings').click();document.getElementById('feedback').hidden=true;window.fixture.message='Select a text field and press Fn.'`);
   await until(`document.getElementById('message').textContent==='Select a text field and press Fn.'`);
   assert.equal(await evaluate(`document.querySelector('footer').getBoundingClientRect().bottom<=innerHeight`), true, `Ready settings fit the normal window: ${JSON.stringify(await evaluate(`Array.from(document.querySelectorAll('aside,header,.settings-intro,#settings .card,.local-data,.status,footer')).map(e=>({name:e.className||e.tagName,height:e.getBoundingClientRect().height,bottom:e.getBoundingClientRect().bottom}))`))}`);
@@ -273,9 +275,10 @@ try {
   await delay(900);
   assert.equal(await evaluate(`document.body.textContent.includes(window.fixture.transcript)`), false);
   // Practice uses its own IPC result, never the ordinary transcript fixture.
+  await evaluate(`window.dispatchEvent(new Event('focus'))`);
   await evaluate(`window.fixture.platform='macos';window.practiceGeneration=0;window.practiceResult={phase:'recording',text:''};const beforePractice=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='practice_start'){window.calls.push({command,args});if(window.practiceReject)throw 'Practice busy';if(window.practiceDelay)await new Promise(r=>window.practiceAck=r);return ++window.practiceGeneration;}if(command==='practice_finish'){window.calls.push({command,args});window.practiceResult.phase='processing';return;}if(command==='practice_status'){return {...window.practiceResult,generation:window.practiceGeneration};}if(command==='practice_cancel'){window.calls.push({command,args});return;}return beforePractice(command,args);};document.getElementById('nav-overview').click()`);
   await until(`!document.getElementById('practice').hidden && !document.getElementById('practice-start').disabled`);
-  assert.ok((await send('Accessibility.getFullAXTree')).nodes.some(n=>n.role?.value==='textbox' && n.name?.value==='Temporary practice field'));
+  assert.ok((await send('Accessibility.getFullAXTree')).nodes.some(n=>n.role?.value==='textbox' && n.name?.value==='Practice dictation'));
   await evaluate(`document.getElementById('practice-start').click();document.getElementById('practice-start').click()`);
   await until(`!document.getElementById('practice-finish').disabled`);
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='practice_start').length`),1);
@@ -361,7 +364,7 @@ try {
         assert.equal(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth`), true, `No horizontal overflow at ${width}px, ${theme}, ${tab}`);
         assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('button, select, input')).filter(e=>e.getClientRects().length && (e.getBoundingClientRect().right>innerWidth || e.getBoundingClientRect().left<0)).map(e=>e.id)`), [], 'All controls fit');
         if (tab==='settings') assert.equal(await evaluate(`(() => {const label=document.querySelector('.shortcut-row h3').getBoundingClientRect(),value=document.querySelector('.shortcut-value').getBoundingClientRect();return value.top>=label.bottom || value.left>=label.right;})()`), true, 'Shortcut value never overlaps its label');
-        assert.equal(await evaluate(`['words','saved','count'].every(id=>{const s=getComputedStyle(document.getElementById(id));return s.color==='rgb(166, 74, 69)' && s.opacity==='1'})`), true, 'Readable muted brand red numbers, not faded opacity');
+        assert.equal(await evaluate(`['words','saved','count'].every(id=>{const s=getComputedStyle(document.getElementById(id));return s.color==='rgb(48, 46, 45)' && s.opacity==='1'})`), true, 'Readable neutral activity numbers, not faded opacity');
         assert.equal(await evaluate(`(() => {const status=document.querySelector('.status').getBoundingClientRect(),nav=document.querySelector('nav').getBoundingClientRect();return status.top>=nav.bottom && Math.abs(status.right-nav.right)<1 && !document.querySelector('main .status');})()`), true, 'Compact status aligns to navigation upper right');
       }
       await evaluate(`document.getElementById('change-shortcut').click()`);
@@ -511,7 +514,8 @@ try {
      }
    }
    assert.equal(await evaluate(`window.calls.slice(${windowsCallsStart}).some(c=>['request_permissions','start_recording','download_model','preview_sound'].includes(c.command))`), false, 'Windows setup never requests AX, starts recording, downloads or plays sound automatically');
-   console.log('UI smoke passed: Mac and Windows capability combinations, native-platform shortcuts/defaults/errors/timeouts, private payload, preferences, downloads, responsive layout at 320–1280px. No microphone capture.');
+   await checkPracticeEvents({send,evaluate,until,port});
+   console.log('UI smoke passed: native practice event wiring, context races, Mac and Windows capabilities, shortcuts, privacy, preferences, downloads and responsive layout. No microphone capture.');
 } finally {
   socket?.close();
   browser.kill('SIGTERM');

@@ -2,6 +2,8 @@
 mod cancellation;
 #[cfg(any(windows, test))]
 mod control_tap;
+#[cfg(target_os = "macos")]
+mod dashboard;
 mod hold;
 mod logic;
 mod platform;
@@ -28,8 +30,8 @@ use std::{
     time::{Duration, Instant},
 };
 use tauri::{
-    menu::{Menu, MenuItem},
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    menu::{Menu, MenuItem, PredefinedMenuItem},
+    tray::TrayIconBuilder,
     Emitter, Manager,
 };
 use tokio::io::AsyncWriteExt;
@@ -52,6 +54,19 @@ static HOLDS: OnceLock<Mutex<hold::Coordinator>> = OnceLock::new();
 static SESSION_GENERATION: AtomicU64 = AtomicU64::new(0);
 static SHORTCUT_CAPTURE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 static PRACTICE: Mutex<practice::Gate> = Mutex::new(practice::Gate::new());
+#[cfg(target_os = "macos")]
+static DASHBOARD: OnceLock<Mutex<dashboard::Router>> = OnceLock::new();
+#[cfg(target_os = "macos")]
+fn dashboard_router() -> &'static Mutex<dashboard::Router> {
+    DASHBOARD.get_or_init(|| Mutex::new(dashboard::Router::default()))
+}
+#[tauri::command]
+fn practice_context(revision: u64, active: bool) {
+    #[cfg(target_os = "macos")]
+    dashboard_router().lock().unwrap().context(revision, active);
+    #[cfg(not(target_os = "macos"))]
+    let _ = (revision, active);
+}
 async fn configure<T: Send + 'static>(
     action: impl FnOnce() -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {
@@ -102,6 +117,25 @@ extern "C" fn capture_start_allowed(generation: u64) -> bool {
     holds().lock().unwrap().can_start(generation)
 }
 extern "C" fn native_gesture(edge: i32, source: i32, token: u64) {
+    #[cfg(target_os = "macos")]
+    {
+        let own_window = practice_window_ready();
+        let routed = dashboard_router()
+            .lock()
+            .unwrap()
+            .physical(edge, source, token, own_window);
+        if let Some(input) = routed {
+            if let Some(input) = input {
+                if let Some(app) = APP.get() {
+                    let _ = app.emit("practice-input", input);
+                }
+            }
+            if edge == 2 {
+                unsafe { hf_gesture_complete(token) };
+            }
+            return;
+        }
+    }
     #[cfg(target_os = "macos")]
     if updater::busy() {
         if edge == 1 {
@@ -273,6 +307,18 @@ extern "C" fn native_event(event: i32) {
         (gate.active.is_some(), gate.generation)
     };
     route_native_event(event, &GESTURE, &CANCELLATION, |control, epoch| {
+        #[cfg(target_os = "macos")]
+        if matches!(control, Control::Toggle) && practice_window_ready() {
+            // Do not hijack a real dictation already started in another app.
+            let external_session = !practice && INGRESS.lock().unwrap().current().is_some();
+            if !external_session {
+                let input = dashboard_router().lock().unwrap().toggle();
+                if let (Some(app), Some(input)) = (APP.get(), input) {
+                    let _ = app.emit("practice-input", input);
+                }
+                return;
+            }
+        }
         // The capsule's Finish button must finish only the practice generation
         // visible at receipt, never toggle or restart a later recording.
         if practice && matches!(control, Control::Finish(None)) {
@@ -1329,6 +1375,23 @@ fn complete_transcription(session: Arc<streaming::Session>, result: Result<Strin
                     -1
                 }
             };
+            // A focus change between shortcut receipt and capture can still
+            // land on our own window. Never turn that test into clipboard/usage.
+            if result == 15 {
+                let mut inner = s.inner.lock().unwrap();
+                if inner.generation != generation {
+                    return;
+                }
+                inner.status.phase = "idle".into();
+                inner.status.message =
+                    "Use the microphone in the practice panel to test dictation here.".into();
+                drop(inner);
+                unsafe {
+                    hf_discard_target();
+                    hf_overlay(0);
+                }
+                return;
+            }
             // Submitted Paste is not acknowledged by macOS: never copy again
             // after submission. Refusals keep the same insertion-safe text.
             let copy_result = if logic::should_copy_fallback(&text, result) {
@@ -1595,6 +1658,9 @@ async fn download() -> Result<(), String> {
     result
 }
 fn show_settings(app: &tauri::AppHandle) {
+    show_dashboard_section(app, "overview");
+}
+fn show_dashboard_section(app: &tauri::AppHandle, section: &'static str) {
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
         if let Some(window) = handle.get_webview_window("main") {
@@ -1602,6 +1668,7 @@ fn show_settings(app: &tauri::AppHandle) {
             let _ = window.show();
             let _ = window.unminimize();
             let _ = window.set_focus();
+            let _ = window.emit("dashboard-navigate", section);
         }
     });
 }
@@ -1629,6 +1696,7 @@ fn main() {
             handle_permission_args(app, &args);
         }))
         .invoke_handler(tauri::generate_handler![
+            practice_context,
             #[cfg(target_os = "macos")]
             updater::update_status,
             #[cfg(target_os = "macos")]
@@ -1775,16 +1843,26 @@ fn main() {
                     }
                 }
             });
-            let settings = MenuItem::with_id(
+            let open = MenuItem::with_id(app, "open", "Open HandsFree", true, None::<&str>)?;
+            let practice =
+                MenuItem::with_id(app, "practice", "Practice dictation…", true, None::<&str>)?;
+            let updates = MenuItem::with_id(
                 app,
-                "settings",
-                "Settings / Last transcript…",
-                true,
+                "updates",
+                "App updates…",
+                cfg!(target_os = "macos"),
                 None::<&str>,
             )?;
+            let separator = PredefinedMenuItem::separator(app)?;
+            let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
             let cancel = MenuItem::with_id(app, "cancel", "Cancel dictation", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit HandsFree", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&settings, &cancel, &quit])?;
+            let menu = Menu::with_items(
+                app,
+                &[
+                    &open, &practice, &settings, &updates, &separator, &cancel, &quit,
+                ],
+            )?;
             TrayIconBuilder::new()
                 .icon(tauri::image::Image::from_bytes(include_bytes!(
                     "../icons/tray.png"
@@ -1792,24 +1870,17 @@ fn main() {
                 .icon_as_template(true)
                 .tooltip("HandsFree · Dictation")
                 .menu(&menu)
-                .show_menu_on_left_click(false)
+                .show_menu_on_left_click(true)
                 .on_menu_event(|app, event| match event.id.as_ref() {
-                    "settings" => show_settings(app),
+                    "open" => show_settings(app),
+                    "practice" => show_dashboard_section(app, "practice"),
+                    "settings" => show_dashboard_section(app, "settings"),
+                    "updates" => show_dashboard_section(app, "updates"),
                     "cancel" => {
                         enqueue(Control::Cancel);
                     }
                     "quit" => app.exit(0),
                     _ => {}
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        show_settings(tray.app_handle());
-                    }
                 })
                 .build(app)?;
             unsafe {
@@ -1832,6 +1903,8 @@ fn main() {
                         | tauri::WindowEvent::Destroyed
                 )
             {
+                #[cfg(target_os = "macos")]
+                dashboard_router().lock().unwrap().deactivate();
                 close_practice();
                 let _ = window.emit("practice-cleared", ());
             }
