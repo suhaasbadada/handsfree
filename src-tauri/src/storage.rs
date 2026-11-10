@@ -87,7 +87,22 @@ pub struct Store {
     pub sound_volume: f32,
     #[serde(deserialize_with = "read_recording_limit")]
     pub recording_limit: u32,
+    #[serde(deserialize_with = "read_microphone_uid")]
+    pub microphone_uid: Option<String>,
     pub stats: Stats,
+}
+pub fn validate_microphone_uid(uid: &str) -> Result<(), String> {
+    if uid.trim().is_empty() || uid.len() > 1024 || uid.chars().any(char::is_control) {
+        return Err("Invalid microphone identifier.".into());
+    }
+    Ok(())
+}
+fn read_microphone_uid<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+    let value = serde_json::Value::deserialize(d)?;
+    Ok(value
+        .as_str()
+        .filter(|uid| validate_microphone_uid(uid).is_ok())
+        .map(str::to_owned))
 }
 fn read_compatibility_paste<'de, D: serde::Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
     Ok(serde_json::Value::deserialize(d)?.as_bool() == Some(true))
@@ -152,6 +167,7 @@ impl Default for Store {
             sounds: false,
             sound_volume: 50.0,
             recording_limit: 120,
+            microphone_uid: None,
             stats: Stats::default(),
         }
     }
@@ -273,6 +289,37 @@ mod tests {
         }
     }
     use super::*;
+    #[test]
+    fn microphone_uid_is_stable_optional_and_malformed_fields_are_isolated() {
+        for value in [
+            serde_json::json!(null),
+            serde_json::json!(42),
+            serde_json::json!({}),
+            serde_json::json!(""),
+            serde_json::json!("bad\u{0}uid"),
+        ] {
+            let store: Store = serde_json::from_value(serde_json::json!({"microphone_uid":value,"recording_limit":300,"sounds":true,"stats":{"words":17}})).unwrap();
+            assert_eq!(store.microphone_uid, None);
+            assert_eq!(store.recording_limit, 300);
+            assert!(store.sounds);
+            assert_eq!(store.stats.words, 17);
+        }
+        let store: Store =
+            serde_json::from_value(serde_json::json!({"microphone_uid":"disconnected-but-valid"}))
+                .unwrap();
+        assert_eq!(
+            store.microphone_uid.as_deref(),
+            Some("disconnected-but-valid")
+        );
+        assert_eq!(
+            serde_json::from_value::<Store>(serde_json::to_value(&store).unwrap()).unwrap(),
+            store
+        );
+        assert_eq!(
+            serde_json::from_str::<Store>("{}").unwrap().microphone_uid,
+            None
+        );
+    }
     #[test]
     fn shortcuts_are_preserved_and_missing_preferences_use_platform_default() {
         for (code, modifiers) in [("Space", 5), ("KeyJ", 2)] {

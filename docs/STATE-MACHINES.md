@@ -86,6 +86,24 @@ prove discovery completeness or runtime correctness on an untested OS.
   lease check fail closed. Shortcut receipt is separate from button-start and
   transcription success; privacy teardown retires it with the meter and text.
 
+- Recording controls persist an optional CoreAudio **UID**, never a device ID or
+  name. Null follows system default at the next recording; an unavailable saved
+  UID remains selected and fails closed. Listing is metadata-only. The configure
+  FIFO saves a merged Store before publishing; no native setting/global default
+  is changed. A frozen UID goes to the existing recorder, which binds its engine
+  before format/converter creation, revalidates after the cue and engine startup,
+  and fails the existing pipeline on route changes. Hardware acceptance is separate.
+  Both capsule and practice timers observe the existing Session's accepted sample
+  count and frozen limit, not wall time (cue delay counts zero). Generation/epoch
+  and practice-token checks bound observations; no second recorder is created.
+
+- Practice owns stable bounded status/copy/action slots, including the native
+  status header and overview diagnostic area. Contextual controls reuse grid
+  positions; retiring focused controls transfers focus without scrolling. Real
+  long errors scroll within their status slot instead of moving the card/activity.
+  Fresh-document CDP assertions cover pending/recording/meter/timer/processing/
+  complete/error/retry/cancel at 320/400/740/980px, including native status changes.
+
 - `src/state.ts`: separate dictation/practice/update phase spaces; readonly phase
   policies fail closed for unknown/disconnected states. There is deliberately no
   global `downloading` state: a model download and an app update are different owners.

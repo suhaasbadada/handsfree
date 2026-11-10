@@ -248,6 +248,7 @@ struct Status {
     sound_volume: f32,
     sound_style: String,
     recording_limit: u32,
+    microphone_uid: Option<String>,
     recording_mode: storage::RecordingMode,
     compatibility_paste: bool,
     shortcut: shortcut::Shortcut,
@@ -574,6 +575,8 @@ struct PracticeStatus {
     phase: String,
     text: String,
     input_level: Option<f32>,
+    elapsed_seconds: Option<f64>,
+    limit_seconds: Option<u32>,
 }
 #[tauri::command]
 async fn practice_status(token: u64) -> PracticeStatus {
@@ -594,12 +597,21 @@ async fn practice_status(token: u64) -> PracticeStatus {
             phase: "cancelled".into(),
             text: String::new(),
             input_level: None,
+            elapsed_seconds: None,
+            limit_seconds: None,
         };
     }
+    let progress = identity
+        .filter(|(_, epoch)| CANCELLATION.allows(*epoch))
+        .filter(|_| gate.meter_identity(token) == identity)
+        .and_then(|(generation, epoch)| INGRESS.lock().unwrap().get(generation, epoch))
+        .map(|session| (session.seconds(), session.limit_seconds()));
     PracticeStatus {
         generation: gate.generation,
         phase: gate.phase.clone(),
         text: gate.text.clone(),
+        elapsed_seconds: progress.map(|p| p.0),
+        limit_seconds: progress.map(|p| p.1),
         input_level: if identity.is_some_and(|(_, epoch)| CANCELLATION.allows(epoch))
             && gate.meter_identity(token) == identity
         {
@@ -608,6 +620,38 @@ async fn practice_status(token: u64) -> PracticeStatus {
             None
         },
     }
+}
+#[tauri::command]
+async fn list_microphones() -> Result<serde_json::Value, String> {
+    #[cfg(target_os = "macos")]
+    return tauri::async_runtime::spawn_blocking(platform::microphones)
+        .await
+        .map_err(|e| e.to_string())?;
+    #[cfg(not(target_os = "macos"))]
+    Err("Microphone selection is available only on macOS.".into())
+}
+#[tauri::command]
+async fn set_microphone(uid: Option<String>) -> Result<(), String> {
+    if let Some(uid) = &uid {
+        storage::validate_microphone_uid(uid)?;
+    }
+    configure(move || {
+        let s = state();
+        let mut inner = s.inner.lock().unwrap();
+        if !shortcut_edit_allowed(&inner.status.phase) || SHORTCUT_CAPTURE.load(Ordering::Acquire) {
+            return Err(
+                "Finish dictation and shortcut recording before changing microphone.".into(),
+            );
+        }
+        let mut updated = inner.store.clone();
+        updated.microphone_uid = uid.clone();
+        storage::save(&s.directory.join("usage.json"), &updated)?;
+        inner.store = updated;
+        inner.status.microphone_uid = uid;
+        inner.status.persistence_error.clear();
+        Ok(())
+    })
+    .await
 }
 #[tauri::command]
 async fn set_sounds(enabled: bool) -> Result<(), String> {
@@ -1274,7 +1318,28 @@ fn recording_command_with_route(
             limit / 60
         )
     };
+    #[cfg(target_os = "macos")]
+    let microphone_uid = inner
+        .store
+        .microphone_uid
+        .as_ref()
+        .map(|uid| std::ffi::CString::new(uid.as_str()).expect("validated microphone UID"));
     drop(inner);
+    #[cfg(target_os = "macos")]
+    let started = unsafe {
+        hf_record(
+            generation,
+            epoch,
+            microphone_uid
+                .as_ref()
+                .map_or(std::ptr::null(), |uid| uid.as_ptr()),
+            limit,
+            recording_elapsed,
+            delivery_allowed,
+            capture_audio,
+        )
+    };
+    #[cfg(not(target_os = "macos"))]
     let started = unsafe { hf_record(generation, epoch, delivery_allowed, capture_audio) };
     if started && CANCELLATION.allows(epoch) {
         unsafe {
@@ -1285,7 +1350,7 @@ fn recording_command_with_route(
             if !capture_start_allowed(generation) && CANCELLATION.allows(epoch) {
                 None
             } else {
-                Some("Microphone could not start. Check permissions and your input device.".into())
+                Some("Microphone could not start. Check permissions and reconnect the selected input, or choose another microphone in Settings.".into())
             },
         );
     }
@@ -1296,6 +1361,16 @@ fn transcribe(session: Arc<streaming::Session>) {
     let result = infer(&session, &model_path(&s));
     let epoch = session.epoch;
     enqueue_at(Control::Complete(session, result), epoch);
+}
+#[cfg(target_os = "macos")]
+extern "C" fn recording_elapsed(generation: u64, epoch: u64) -> f64 {
+    if !CANCELLATION.allows(epoch) {
+        return 0.0;
+    }
+    let session = INGRESS.lock().unwrap().get(generation, epoch);
+    session
+        .filter(|s| !s.cancelled.load(Ordering::Acquire))
+        .map_or(0.0, |s| s.seconds())
 }
 fn complete_transcription(session: Arc<streaming::Session>, result: Result<String, String>) {
     let s = state();
@@ -1733,6 +1808,8 @@ fn main() {
             copy_transcript,
             set_sounds,
             set_recording_limit,
+            list_microphones,
+            set_microphone,
             set_sound_volume,
             set_sound_style,
             set_shortcut,
@@ -1800,6 +1877,7 @@ fn main() {
                         sound_volume: store.sound_volume,
                         sound_style: store.sound_style.clone(),
                         recording_limit: store.recording_limit,
+                        microphone_uid: store.microphone_uid.clone(),
                         recording_mode: store.recording_mode,
                         compatibility_paste: store.compatibility_paste,
                         shortcut: store.shortcut.clone(),

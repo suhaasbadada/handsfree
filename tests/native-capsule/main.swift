@@ -2,6 +2,10 @@ import AppKit
 
 // A revoked observation never opens an engine, checks consent or starts capture.
 precondition(inputLevel(42, 9, { _ in false }) == -1)
+precondition(PillView.timerText(elapsed: 0, limit: 120) == "0:00 / 2:00")
+precondition(PillView.timerText(elapsed: 61.99, limit: 300) == "1:01 / 5:00")
+precondition(PillView.timerText(elapsed: 999, limit: 120) == "2:00 / 2:00")
+precondition(PillView.timerText(elapsed: .infinity, limit: 120) == "0:00 / 2:00")
 
 // Production physical-edge recognizer only: no event tap, mic, or playback.
 for cancel in [false, true] {

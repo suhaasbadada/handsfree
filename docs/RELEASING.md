@@ -8,8 +8,8 @@ exact clean artifact source `994bcb82b2cb92a08badbd4754695378f89afa88`, with
 [passing source CI](https://github.com/suhaasbadada/handsfree/actions/runs/42761543948).
 See the [published release](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.11)
 and [beta 11 evidence](releases/v0.1.1-beta.11.md). The active `release` export and
-static downloads select audited beta 11; `candidateRelease` retains the same
-audit coordinates with availability disabled. Group 1 contains
+static downloads select audited beta 11; disabled `candidateRelease` now selects
+beta 12 preparation/audit coordinates only. Group 1 contains
 guided setup, explicit permission/model actions, a private practice input meter,
 and shortcut receipt evidence distinct from successful dictation. Activation is
 metadata-only: it copies the exact generated signed feed, without reconstructing
@@ -28,13 +28,30 @@ model/settings/usage hashes and signing identity and verified native readiness.
 Do not describe this as a successful OTA restart; retain the
 [beta 9 repair evidence](releases/v0.1.1-beta.9.md). Historical assets stay immutable.
 Website/feed deployment and live byte readback, matching Homebrew publication,
-remote cask readback and tap CI remain pending distinct gates; record activation
-and tap commit SHAs together before claiming parity. Do not advance to group 2
-until those gates pass. Hardware, separate-Mac and real OTA acceptance remain
+remote cask readback and tap CI passed for group 1. See the exact activation/tap
+SHAs and run IDs in [the four-release ledger](FEATURE-RELEASES.md#group-1-verified-completion-evidence).
+Group 2 preparation may proceed. Hardware, separate-Mac and real OTA acceptance remain
 unverified. The owner upgrades through the app; do not manually replace it.
 Windows beta 3 and historical Mac assets remain untouched. See
 [practice](practice.md) for the private button/shortcut flow, not an external insertion test,
 and [Compatibility paste](COMPATIBILITY-PASTE.md) for unchanged opt-in safeguards.
+
+## Beta 12 candidate preparation (group 2)
+
+Candidate distribution **v0.1.1-beta.12** retains internal app version **0.1.1**.
+`src-tauri/distribution.json`, packaging/audit coordinates and only the disabled
+`candidateRelease` export identify beta 12. Public website/download links,
+README/install links and the exact audited signed feed remain beta 11 unchanged.
+See [candidate scope and limitations](releases/v0.1.1-beta.12.md).
+
+Group 2 is locally validated except the latest small Clear focus regression
+rerun, which is pending. No clean artifact source SHA, candidate CI, signed
+artifacts, checksums or local/draft/anonymous-public artifact audits are claimed
+for beta 12. Do not activate it before exact-source CI and all artifact audits
+pass. Preserve the existing signing identity, permissions and model/settings/usage
+data; no installation, launch or OTA acceptance is implied by metadata tests.
+All four releases require independent app/Homebrew distribution parity, not just
+the last release; preserve the [mandatory cross-repository gate](#mandatory-cross-repository-homebrew-gate).
 
 ## Beta 7 artifact source and publication
 

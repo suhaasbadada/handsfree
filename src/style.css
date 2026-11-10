@@ -118,10 +118,13 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); margin-top: 10
 .local-data > p { margin: 12px 0 0; }
 .danger { color: var(--danger); }
 .danger:hover:not(:disabled) { background: var(--active); }
-.status { display: flex; align-items: center; justify-content: flex-end; gap: 7px; min-height: 20px; color: var(--muted); }
+.status { display: flex; align-items: center; justify-content: flex-end; gap: 7px; min-height: 36px; color: var(--muted); }
 .status strong { display: block; overflow-wrap: anywhere; }
 .status button { width: 36px; height: 36px; min-width: 36px; padding: 0; font-size: 22px; }
 .status-detail { color: var(--muted); line-height: 1.65; overflow-wrap: anywhere; margin: 0 0 12px; }
+#cancel[hidden] { display: block !important; visibility: hidden; pointer-events: none; }
+main:has(#overview:not([hidden]) #practice:not([hidden])) > #message { block-size: 3.3em; overflow-y: auto; }
+main:has(#overview:not([hidden]) #practice:not([hidden])) > #message[hidden] { display: block !important; visibility: hidden; }
 #dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--muted); }
 #dot.recording { background: var(--accent); animation: pulse 1.6s infinite; }
 #dot.processing, #dot.downloading { animation: pulse 1.6s infinite; }
@@ -179,7 +182,16 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .practice label { font-weight: 600; }
 .practice textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 128px; padding: 16px; border: 1px solid var(--line, #dcd5cf); border-radius: 11px; background: #faf9f6; color: inherit; font: inherit; line-height: 1.65; }
 .practice textarea:focus { outline: 2px solid #a95450; outline-offset: 2px; }
-.practice-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.practice-actions { display: grid; grid-template-columns: 125px 36px 36px; grid-template-rows: 40px; gap: 8px; align-items: center; }
+#practice-start, #practice-finish { grid-area: 1 / 1; width: 125px; }
+#practice-cancel, #practice-clear { grid-area: 1 / 2; }
+#practice-setup { grid-area: 1 / 3; }
+#practice-message { block-size: 4.8em; line-height: 1.6; overflow-y: auto; overflow-wrap: anywhere; }
+.stable-copy { display: grid; min-width: 0; }
+.stable-copy > * { grid-area: 1 / 1; }
+.copy-reserve { visibility: hidden; pointer-events: none; }
+.microphone-controls { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 55%; }
+.microphone-controls select { min-width: 0; max-width: 100%; }
 .practice-sample { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .update-notes { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow-y: auto; }
 #updates-dialog .dialog-actions, #update-confirm-dialog .dialog-actions { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -198,6 +210,12 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .setup-checklist { padding-left: 22px; margin: 20px 0; }
 .setup-checklist li { padding: 10px 0; }
 .setup-checklist li > span { display: block; margin-bottom: 8px; }
-.practice-meter { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; margin: 16px 0; }
+.practice-meter { display: grid; grid-template-columns: auto minmax(30px,1fr); gap: 8px 12px; align-items: center; margin: 16px 0; }
 .practice-meter meter { width: 100%; }
 .practice-meter .subtle { grid-column: 1 / -1; }
+#practice-timer { grid-column: 1 / -1; font-variant-numeric: tabular-nums; min-height: 1.6em; }
+@media (max-width: 560px) {
+  .practice-bottom { display: grid; grid-template-columns: minmax(0,1fr); }
+  #microphone-choice-row { flex-wrap: wrap; }
+  .microphone-controls { max-width: 100%; width: 100%; }
+}

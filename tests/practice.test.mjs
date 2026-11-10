@@ -88,6 +88,19 @@ test('user editing during transcription is preserved; mismatched result is ignor
   responses.practice_status = {generation:4,phase:'complete',text:'spoken'};
   await p.poll(); assert.equal(p.view.text, 'typed while processing');
 });
+test('sample-derived timer accepts only current bounded recording progress and clears on teardown', async () => {
+  const {practice:p,responses} = harness(); await p.start();
+  responses.practice_status = {generation:4,phase:'recording',text:'',elapsed_seconds:61.99,limit_seconds:120};
+  await p.poll(); assert.equal(p.view.elapsedSeconds,61.99); assert.equal(p.view.limitSeconds,120);
+  for (const invalid of [NaN,Infinity,-1,121]) {
+    responses.practice_status.elapsed_seconds=invalid; await p.poll(); assert.equal(p.view.elapsedSeconds,null);
+  }
+  responses.practice_status.elapsed_seconds=20; responses.practice_status.generation=3;
+  await p.poll(); assert.equal(p.view.limitSeconds,null);
+  responses.practice_status.generation=4; await p.poll();
+  await p.finish(); assert.equal(p.view.elapsedSeconds,null); assert.equal(p.view.limitSeconds,null);
+  await p.clear(); assert.equal(p.view.elapsedSeconds,null);
+});
 test('rejected starts, finish errors, empty speech, native cancellation and poll failures stay local', async () => {
   const h = harness(), p = h.practice;
   h.responses.practice_start = new Error('busy'); await p.start();

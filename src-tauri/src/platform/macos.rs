@@ -20,9 +20,13 @@ unsafe extern "C" {
     pub fn hf_record(
         generation: u64,
         epoch: u64,
+        microphone_uid: *const std::ffi::c_char,
+        limit: u32,
+        elapsed: extern "C" fn(u64, u64) -> f64,
         allowed: extern "C" fn(u64) -> bool,
         sink: extern "C" fn(u64, u64, *const f32, i32),
     ) -> bool;
+    fn hf_microphones(buffer: *mut u8, capacity: i32) -> i32;
     pub fn hf_sounds(enabled: bool);
     pub fn hf_sound_volume(volume: f32);
     pub fn hf_preview_sound() -> bool;
@@ -47,6 +51,16 @@ unsafe extern "C" {
         allowed: extern "C" fn(u64) -> bool,
     ) -> i32;
     pub fn hf_cleanup();
+}
+
+pub fn microphones() -> Result<serde_json::Value, String> {
+    let mut buffer = vec![0u8; 65536];
+    let length = unsafe { hf_microphones(buffer.as_mut_ptr(), buffer.len() as i32) };
+    if length <= 0 || length as usize > buffer.len() {
+        return Err("Could not list microphones. Try again.".into());
+    }
+    serde_json::from_slice(&buffer[..length as usize])
+        .map_err(|_| "Invalid microphone list.".into())
 }
 
 // Main-thread cached metadata only; no live AX requests on status polling.

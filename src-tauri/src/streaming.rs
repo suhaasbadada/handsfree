@@ -115,6 +115,9 @@ impl Session {
     pub fn seconds(&self) -> f64 {
         self.queue.lock().unwrap().total as f64 / RATE as f64
     }
+    pub fn limit_seconds(&self) -> u32 {
+        (self.limit / RATE) as u32
+    }
     pub fn check(&self) -> Result<(), String> {
         if self.cancelled.load(Ordering::Acquire) {
             return Err("Cancelled.".into());
@@ -465,5 +468,23 @@ mod tests {
         let s = Session::new(2, 2, 120);
         s.finish(Some("capture failed".into()));
         assert!(run(&s, || Ok(()), |_, _| panic!()).is_err());
+    }
+    #[test]
+    fn timer_observes_only_accepted_samples_and_the_sessions_frozen_limit() {
+        let mut preference = 120;
+        let first = Session::new(1, 7, preference);
+        assert_eq!(first.seconds(), 0.0); // Pending cue/start does not tick.
+        first.push(&vec![0.; RATE + RATE / 2]);
+        preference = 300;
+        assert_eq!(first.seconds(), 1.5);
+        assert_eq!(first.limit_seconds(), 120);
+        let next = Session::new(2, 7, preference);
+        assert_eq!(next.limit_seconds(), 300);
+        assert_eq!(next.seconds(), 0.0);
+        first.push(&vec![0.; 121 * RATE]);
+        assert_eq!(first.seconds(), f64::from(first.limit_seconds()));
+        first.cancel();
+        first.push(&vec![0.; RATE]);
+        assert_eq!(first.seconds(), 120.0);
     }
 }

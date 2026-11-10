@@ -102,3 +102,37 @@ for reason in ["Fn", "tick", "custom", "limit", "cancel", "error", "quit", "pend
     precondition(events.count == before, "Late tap escaped finish barrier")
 }
 print("Finish once after drain; cancel/error/quit/pending-start/mute suppressed without playback")
+
+do {
+    let available = [MicrophoneDevice(uid: "one", name: "Same name"), MicrophoneDevice(uid: "two", name: "Same name")]
+    let saved = try Microphones.selectedUID(saved: "two", available: available, defaultUID: { preconditionFailure("Saved UID never resolves default") })
+    let system = try Microphones.selectedUID(saved: nil, available: available, defaultUID: { "one" })
+    precondition(saved == "two" && system == "one")
+    do {
+        _ = try Microphones.selectedUID(saved: "disconnected", available: available, defaultUID: { preconditionFailure("Unavailable UID must not fall back") })
+        preconditionFailure("Disconnected UID accepted")
+    } catch {}
+    var events: [String] = []
+    let prepared = try MicrophoneBinding.prepare(resolve: { events.append("resolve UID"); return 42 }, bind: { id in
+        precondition(id == 42); events.append("bind")
+    }, format: { events.append("format"); return "selected format" })
+    precondition(prepared.0 == 42 && prepared.1 == "selected format")
+    precondition(events == ["resolve UID", "bind", "format"])
+    for failure in ["missing", "bind"] {
+        events = []
+        do {
+            _ = try MicrophoneBinding.prepare(resolve: {
+                events.append("resolve")
+                if failure == "missing" { throw NSError(domain: "missing UID", code: 1) }
+                return 42
+            }, bind: { _ in events.append("bind"); throw NSError(domain: "bind failed", code: 1) }, format: { events.append("format"); return "default forbidden" })
+            preconditionFailure("Selection failure must not fall back")
+        } catch { precondition(!events.contains("format")) }
+    }
+    try MicrophoneBinding.revalidate(expected: 42, resolve: { 42 })
+    do {
+        try MicrophoneBinding.revalidate(expected: 42, resolve: { 43 })
+        preconditionFailure("Changed route during cue must fail")
+    } catch {}
+    print("Microphone UID bind-before-format, missing/bind failure and delayed route revalidation passed without hardware")
+} catch { preconditionFailure("Synthetic microphone binding failed: \(error)") }

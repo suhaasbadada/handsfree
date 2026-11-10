@@ -16,6 +16,7 @@ test('memory capture converter drains hardware-rate stereo and bounds producer b
       join(root, 'src-tauri/native/AudioCapture.swift'), join(root, 'tests/native-capture/main.swift'), '-o', binary]);
     const output = execFileSync(binary, { encoding: 'utf8', timeout: 10000 });
     assert.match(output, /bounded overload passed without microphone/);
+    assert.match(output, /Microphone UID bind-before-format, missing\/bind failure and delayed route revalidation passed without hardware/);
     assert.match(output, /Finish once after drain; cancel\/error\/quit\/pending-start\/mute suppressed without playback/);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });

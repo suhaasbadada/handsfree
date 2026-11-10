@@ -11,7 +11,7 @@ import { PracticeInputs, type PracticeInput } from './practice-input.ts';
 import { Updates, updateBusy } from './updates';
 import { phasePolicy, updateInstalling, type DictationPhase } from './state.ts';
 
-type Status = { platform?: 'windows' | 'macos'; compatibility_paste?: boolean; phase: DictationPhase; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: 'clean' | 'warm'; recording_limit: number; recording_mode?: 'toggle' | 'push_to_talk'; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
+type Status = { microphone_uid?: string | null; platform?: 'windows' | 'macos'; compatibility_paste?: boolean; phase: DictationPhase; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: 'clean' | 'warm'; recording_limit: number; recording_mode?: 'toggle' | 'push_to_talk'; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
 const logo = new URL('../src-tauri/icons/icon.png', import.meta.url).href;
 const glyphs: Record<string,string> = {
  mic:'<rect x="8" y="3" width="8" height="12" rx="4"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/>',
@@ -49,8 +49,8 @@ document.querySelector('#app')!.innerHTML = `
     <section id="practice" class="card practice" aria-labelledby="practice-title" hidden>
     <div class="card-heading"><div><h2 id="practice-title">A space to try it</h2><p class="practice-instruction">Use the microphone or your shortcut. Your words appear right here.</p></div><span class="test-badge">${icon('shield')}Private test</span></div>
      <p class="practice-sample">“A little less typing. A little more thinking.”</p>
-     <p id="shortcut-tutorial"></p><p id="shortcut-evidence" class="subtle" role="status">Shortcut not tested here yet. Start test checks the microphone, not the shortcut.</p>
-     <div class="practice-meter"><label for="input-level">Microphone input</label><meter id="input-level" min="0" max="1" value="0" aria-describedby="input-level-help"></meter><span id="input-level-help" class="subtle">Start a private test to check input. No audio file is saved.</span></div>
+     <p id="shortcut-tutorial"></p><div class="stable-copy subtle"><span aria-hidden="true" class="copy-reserve">Shortcut received in this practice view. This confirms the key event, not microphone or transcription success.</span><p id="shortcut-evidence" role="status">Shortcut not tested here yet. Start test checks the microphone, not the shortcut.</p></div>
+     <div class="practice-meter"><label for="input-level">Microphone input</label><meter id="input-level" min="0" max="1" value="0" aria-describedby="input-level-help"></meter><span id="practice-timer" aria-label="Recording time">— / —</span><div class="stable-copy subtle"><span aria-hidden="true" class="copy-reserve">Start a private test to check input. No audio file is saved.</span><span id="input-level-help">Start a private test to check input. No audio file is saved.</span></div></div>
     <label for="practice-text" class="sr-only">Practice dictation</label>
     <textarea id="practice-text" rows="4" autocomplete="off" spellcheck="false" aria-describedby="practice-privacy" placeholder="Speak freely. This space is just for you."></textarea>
     <div class="practice-bottom"><div class="practice-actions"><button id="practice-start" class="primary" disabled>${icon('mic')}<span>Start test</span></button><button id="practice-finish" class="primary" disabled hidden>${icon('check')}<span>Finish</span></button><button id="practice-cancel" class="icon-action" aria-label="Cancel practice" title="Cancel practice" disabled hidden>${icon('close')}</button><button id="practice-clear" class="icon-action" aria-label="Clear practice" title="Clear practice">${icon('clear')}</button><button id="practice-setup" class="icon-action" aria-label="Practice setup help" title="Practice setup help">${icon('settings')}</button></div><p id="practice-privacy" class="subtle">No clipboard. No usage counted.<br>Clears when you leave this view.</p></div>
@@ -61,6 +61,7 @@ document.querySelector('#app')!.innerHTML = `
  <section id="settings" hidden aria-labelledby="settings-title">
    <div class="settings-intro"><h1 id="settings-title">Settings</h1><button id="settings-started" class="text-action" hidden>Get started</button></div>
    <section class="card preferences" aria-labelledby="preferences-title"><h2 id="preferences-title">Preferences</h2>
+    <div id="microphone-choice-row" class="setting-row" hidden><div><h3><label for="microphone-choice">Microphone</label></h3><p id="microphone-choice-help">Applies to the next recording. Unavailable selections never fall back silently.</p></div><div class="microphone-controls"><select id="microphone-choice" aria-describedby="microphone-choice-help" disabled><option value="">System default</option></select><button id="microphone-refresh" class="text-action" disabled>Refresh</button></div></div>
     <div class="setting-row"><div><h3><label for="recording-mode">Recording mode</label></h3><p id="recording-mode-help" hidden>Hold the shortcut; release to finish. Other keys or focus changes cancel.</p></div><select id="recording-mode" aria-describedby="recording-mode-help"><option value="toggle">Toggle</option><option value="push_to_talk">Push to talk</option></select></div>
     <div id="compatibility-row" class="setting-row" hidden><div><h3>Compatibility paste</h3><p id="compatibility-help">For apps that hide their text field. Pastes once into the same active app/window; the exact field cannot be verified.</p></div><label class="switch"><input id="compatibility-paste" type="checkbox" role="switch" aria-label="Compatibility paste" aria-describedby="compatibility-help"><span aria-hidden="true"></span></label></div>
      <div class="setting-row shortcut-row"><div><h3>Shortcut</h3></div><div class="shortcut-value"><button id="change-shortcut" aria-label="Record shortcut" title="Record shortcut" aria-pressed="false" aria-describedby="shortcut-feedback"><span id="saved-shortcut">…</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/></svg></button><button id="stop-shortcut" hidden>Cancel</button><button id="shortcut-fn" class="text-action" hidden>Use default</button></div><p id="shortcut-feedback" role="status" hidden></p></div>
@@ -108,6 +109,12 @@ let stylePending = false;
 let volumePending = false;
 let limitPending = false;
 let modePending = false;
+let microphonePending = false;
+let microphonesLoading = false;
+let microphonesLoaded = false;
+let microphoneDevices: {uid: string; name: string}[] = [];
+let defaultMicrophone: string | null = null;
+let microphoneOptions = '';
 let volumeEditing = false;
 let previewPending = false;
 let shortcutPending = false;
@@ -217,10 +224,18 @@ const practice = new Practice(invoke, view => {
 const practiceInputs = new PracticeInputs(practice, practiceVisible);
 function clearPractice() { shortcutReceived = false; practiceInputs.reset(); void practice.clear(); }
 function renderPractice() {
+  const focusedAction = document.activeElement;
+  if (focusedAction instanceof HTMLButtonElement && focusedAction.closest('.practice-actions')) {
+    // Retire a contextual control without browser focus/scroll recovery.
+    const phase = practice.view.phase;
+    if ((['practice-start','practice-clear'].includes(focusedAction.id) && ['starting','recording','processing','cancelling'].includes(phase)) || (focusedAction.id === 'practice-finish' && phase !== 'recording') || (focusedAction.id === 'practice-cancel' && !['starting','recording','processing'].includes(phase))) practiceField.focus({preventScroll:true});
+  }
   el('practice').hidden = current?.platform !== 'macos';
   el('shortcut-tutorial').textContent = current ? shortcutTutorial(displayShortcut(current), current.recording_mode) : 'Waiting for your configured shortcut…';
   el('shortcut-evidence').textContent = shortcutReceived ? 'Shortcut received in this practice view. This confirms the key event, not microphone or transcription success.' : 'Shortcut not tested here yet. Start test checks the microphone, not the shortcut.';
   const level = practiceVisible() ? practice.view.inputLevel : null;
+  const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2,'0')}`;
+  el('practice-timer').textContent = practiceVisible() && practice.view.elapsedSeconds !== null && practice.view.limitSeconds !== null ? `${clock(practice.view.elapsedSeconds)} / ${clock(practice.view.limitSeconds)}` : '— / —';
   (el('input-level') as HTMLMeterElement).value = level ?? 0;
   el('input-level').setAttribute('aria-valuetext', level === null ? 'No current input reading' : `${Math.round(level * 100)} percent input level`);
   el('input-level-help').textContent = level !== null ? 'Live input level, not a speech or transcription score.' : practice.view.phase === 'recording' ? 'Waiting for an input reading…' : 'Start a private test to check input. No audio file is saved.';
@@ -440,6 +455,41 @@ soundStyle.onchange = async () => {
   stylePending = false; soundStyle.disabled = !isIdle() || previewPending;
 };
 const recordingLimit = el('recording-limit') as HTMLSelectElement;
+const microphoneChoice = el('microphone-choice') as HTMLSelectElement;
+function renderMicrophones() {
+  el('microphone-choice-row').hidden = current?.platform !== 'macos';
+  if (!microphonePending) {
+    const selected = current?.microphone_uid ?? '';
+    const defaultName = microphoneDevices.find(d=>d.uid===defaultMicrophone)?.name;
+    const signature = JSON.stringify([selected, defaultMicrophone, microphoneDevices]);
+    if (signature !== microphoneOptions) {
+    const options = [new Option(defaultName ? `System default · ${defaultName}` : 'System default', ''), ...microphoneDevices.map(d=>new Option(d.name,d.uid))];
+    if (selected && !microphoneDevices.some(d=>d.uid===selected)) options.push(new Option('Saved microphone · Unavailable', selected));
+    microphoneChoice.replaceChildren(...options);
+    microphoneOptions = signature;
+    }
+    microphoneChoice.value = selected;
+  }
+  microphoneChoice.disabled = microphonePending || microphonesLoading || !isIdle() || capturing || captureStopping || current?.platform !== 'macos';
+  button('microphone-refresh').disabled = microphonesLoading || microphonePending || current?.platform !== 'macos';
+}
+async function refreshMicrophones() {
+  if (microphonesLoading || current?.platform !== 'macos') return;
+  microphonesLoading = true; renderMicrophones();
+  try {
+    const result = await invoke<{devices:{uid:string;name:string}[];default_uid:string|null}>('list_microphones');
+    microphoneDevices = result.devices; defaultMicrophone = result.default_uid;
+  } catch (error) { feedback(String(error)); }
+  finally { microphonesLoading = false; renderMicrophones(); }
+}
+button('microphone-refresh').onclick = () => void refreshMicrophones();
+microphoneChoice.onchange = async () => {
+  if (microphonePending || microphoneChoice.disabled) return;
+  const uid = microphoneChoice.value || null;
+  microphonePending = true; renderMicrophones();
+  await action('set_microphone', {uid});
+  microphonePending = false; renderMicrophones();
+};
 recordingLimit.onchange = async () => {
   if (limitPending) return;
   limitPending = true; recordingLimit.disabled = true;
@@ -487,6 +537,8 @@ function refresh(): Promise<void> {
 async function refreshStatus() {
   try {
       current = await invoke<Status>('status');
+      renderMicrophones();
+      if (current.platform === 'macos' && !microphonesLoaded) { microphonesLoaded = true; void refreshMicrophones(); }
       const configuration = JSON.stringify([current.shortcut, current.recording_mode]);
       if (configuration !== tutorialConfiguration) { tutorialConfiguration = configuration; shortcutReceived = false; }
       el('brand-started').hidden = current.platform !== 'macos';

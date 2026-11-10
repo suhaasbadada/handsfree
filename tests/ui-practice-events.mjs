@@ -15,12 +15,15 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
         window.calls.push({command,args});
         if(command==='plugin:event|listen'){const id=++window.callbackId;const list=window.listeners.get(args.event)||[];list.push({...args,id});window.listeners.set(args.event,list);return id;}
         if(command==='status')return structuredClone(window.fixture);
+        if(command==='list_microphones')return {devices:[{uid:'built-in',name:'Built-in microphone'},{uid:'usb-input',name:'USB input'}],default_uid:'built-in'};
+        if(command==='set_microphone'){if(window.rejectMicrophone)throw 'Could not save microphone';window.fixture.microphone_uid=args.uid;return;}
         if(command==='request_microphone')window.fixture.permission_requests=(window.fixture.permission_requests||0)|1;
         if(command==='request_permissions')window.fixture.permission_requests=(window.fixture.permission_requests||0)|2;
         if(command==='practice_context'){window.context=args.active?args.revision:0;return;}
-        if(command==='practice_start'){if(window.delayStart)await new Promise(r=>window.startAck=r);return ++window.practiceGeneration;}
-        if(command==='practice_status')return {...window.practiceResult,generation:window.practiceGeneration};
-        if(command==='practice_finish'){window.practiceResult.phase='processing';return;}
+        if(command==='practice_start'){if(window.delayStart)await new Promise(r=>window.startAck=r);if(window.rejectStart)throw window.rejectStart;if(window.layoutLiveStatus){window.fixture.phase='recording';window.fixture.message='Press Fn to finish, Escape to cancel. Maximum 2 minutes.';}return ++window.practiceGeneration;}
+        if(command==='practice_status'){if(window.layoutLiveStatus && ['complete','empty','error'].includes(window.practiceResult.phase)){window.fixture.phase='idle';window.fixture.message='Practice finished. No text was pasted or saved.';}return {...window.practiceResult,generation:window.practiceGeneration};}
+        if(command==='practice_finish'){window.practiceResult.phase='processing';if(window.layoutLiveStatus){window.fixture.phase='processing';window.fixture.message='Transcribing locally…';}return;}
+        if(command==='practice_cancel'){if(window.delayCancel)await new Promise(r=>window.cancelAck=r);if(window.layoutLiveStatus){window.fixture.phase='idle';window.fixture.message='Cancelled.';}return;}
         if(command==='update_status')return {installed_version:'0.1.1-beta.9',phase:'idle',notes:'',downloaded_bytes:0,message:'Choose Check for updates.'};
       }
     };
@@ -99,4 +102,71 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   await until(`document.getElementById('updates-dialog').open && window.context===0`);
   await evaluate(`document.getElementById('updates-close').click()`);
   await until(`window.context>0`);
+
+  // Fresh production documents at each width: no direct controller calls or
+  // screenshots masquerading as layout evidence. Compare document positions AND
+  // scroll offsets so scroll anchoring cannot hide reflow.
+  for (const width of [320,400,740,980]) {
+    await send('Emulation.setDeviceMetricsOverride', {width,height:820,deviceScaleFactor:1,mobile:false});
+    await send('Page.navigate', {url:`http://127.0.0.1:${port}`});
+    await until(`window.context>0 && !document.getElementById('practice-start').disabled`);
+    await evaluate(`window.layoutLiveStatus=true;document.getElementById('practice-start').focus({preventScroll:true});window.scrollTo(0,Math.max(0,document.getElementById('practice').getBoundingClientRect().top+scrollY-80));window.layoutSnapshot=()=>({scroll:scrollY,rects:['practice','practice-text','practice-message'].map(id=>document.getElementById(id)).concat([document.querySelector('.practice-actions'),document.querySelector('.activity'),document.querySelector('footer')]).map(e=>{const r=e.getBoundingClientRect();return [r.x,r.y+scrollY,r.width,r.height]})});`);
+    const pristine = await evaluate(`window.layoutSnapshot()`);
+    const stable = async state => {
+      const actual = await evaluate(`window.layoutSnapshot()`);
+      assert.deepEqual(actual,pristine,`${width}px ${state}: practice, textarea, actions, activity, footer and scroll must stay pristine`);
+      assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth && [...document.querySelectorAll('#practice button,#practice textarea,#practice meter')].filter(e=>e.getClientRects().length).every(e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth;})`),true,`${width}px ${state}: contained controls`);
+    };
+    await evaluate(`window.delayStart=true;document.getElementById('practice-start').click()`);
+    await until(`typeof window.startAck==='function'`);
+    await stable('pending start');
+    assert.equal(await evaluate(`document.activeElement.id`),'practice-text','Retiring Start keeps focus without scrolling');
+    await evaluate(`window.startAck();window.delayStart=false`);
+    await until(`!document.getElementById('practice-finish').hidden`);
+    await until(`document.getElementById('phase').textContent==='Listening'`);
+    await stable('recording before samples');
+    await evaluate(`window.practiceResult={phase:'recording',text:'',input_level:0.81,elapsed_seconds:61.9,limit_seconds:120};window.emitNative('practice-input',{action:'press',token:99,source:1,context:window.context})`);
+    await until(`document.getElementById('input-level').value===0.81 && document.getElementById('practice-timer').textContent==='1:01 / 2:00'`);
+    await stable('meter, timer and shortcut receipt');
+    await evaluate(`window.fixture.recording_limit=300`);
+    await until(`document.getElementById('recording-limit').value==='300'`);
+    assert.equal(await evaluate(`document.getElementById('practice-timer').textContent`),'1:01 / 2:00','Current timer keeps frozen native limit');
+    await evaluate(`document.getElementById('practice-finish').focus({preventScroll:true});document.getElementById('practice-finish').click()`);
+    await until(`document.getElementById('practice-message').textContent.includes('Transcribing')`);
+    await until(`document.getElementById('phase').textContent==='Processing'`);
+    await stable('processing');
+    await evaluate(`window.practiceResult={phase:'complete',text:'Completed privately.'}`);
+    await until(`document.getElementById('practice-text').value==='Completed privately.'`);
+    await until(`document.getElementById('phase').textContent==='Ready'`);
+    await stable('complete / record again');
+    await evaluate(`window.rejectStart='Selected microphone unavailable. '.repeat(40);document.getElementById('practice-start').click()`);
+    await until(`document.getElementById('practice-message').textContent.startsWith('Selected microphone unavailable')`);
+    await stable('long start error with bounded overflow');
+    assert.equal(await evaluate(`document.getElementById('practice-message').scrollHeight>document.getElementById('practice-message').clientHeight`),true,'Genuine long errors remain accessible by bounded scrolling');
+    await evaluate(`window.rejectStart='';window.practiceResult={phase:'recording',text:''};document.getElementById('practice-start').click()`);
+    await until(`!document.getElementById('practice-finish').hidden`);
+    await stable('retry');
+    await evaluate(`window.delayCancel=true;document.getElementById('practice-cancel').click()`);
+    await until(`typeof window.cancelAck==='function'`);
+    await stable('pending cancellation');
+    await evaluate(`window.cancelAck();window.delayCancel=false`);
+    await until(`!document.getElementById('practice-start').disabled`);
+    await stable('cancelled');
+    await evaluate(`document.getElementById('practice-clear').focus({preventScroll:true});window.emitNative('practice-input',{action:'toggle',token:0,source:0,context:window.context})`);
+    await until(`!document.getElementById('practice-finish').hidden`);
+    assert.equal(await evaluate(`document.activeElement.id`),'practice-text','Shortcut start retires focused Clear without losing keyboard focus');
+    await stable('shortcut start while Clear focused');
+    await evaluate(`document.getElementById('practice-cancel').click()`);
+    await until(`!document.getElementById('practice-start').disabled`);
+  }
+
+  await evaluate(`document.getElementById('nav-settings').click();window.fixture.microphone_uid='disconnected-uid'`);
+  await until(`document.getElementById('microphone-choice').value==='disconnected-uid'`);
+  assert.equal(await evaluate(`document.getElementById('microphone-choice').selectedOptions[0].textContent`),'Saved microphone · Unavailable','Disconnected saved UID remains visible, never replaced by default');
+  await evaluate(`{window.rejectMicrophone=true;const s=document.getElementById('microphone-choice');s.value='usb-input';s.dispatchEvent(new Event('change'));}`);
+  await until(`!document.getElementById('microphone-choice').disabled && document.getElementById('feedback').textContent.includes('Could not save microphone')`);
+  assert.equal(await evaluate(`document.getElementById('microphone-choice').value`),'disconnected-uid','Failed save rolls selection back');
+  await evaluate(`{window.rejectMicrophone=false;const s=document.getElementById('microphone-choice');s.value='';s.dispatchEvent(new Event('change'));}`);
+  await until(`window.fixture.microphone_uid===null && !document.getElementById('microphone-choice').disabled`);
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='set_microphone').at(-1).args.uid`),null,'System default is persisted as null, never a device ID/name');
 }

@@ -1,5 +1,23 @@
 # Practice in Overview
 
+## Recording controls (next release)
+
+Select a microphone in Settings, or choose **System default**. A saved microphone
+that is disconnected remains selected and is shown as unavailable; reconnect it
+or explicitly choose another input. A recording never silently falls back from a
+chosen device to a different microphone. Device listing does not request permission
+or open a recorder. Changes apply to the next recording.
+
+The capsule and practice timer count accepted audio samples, not time spent playing
+the start cue. The displayed maximum is frozen for that session; changing the
+recording-limit preference affects only the next recording. The private meter and
+timer are cleared when their practice owner is finished, revoked or loses focus.
+
+Practice reserves status, help and action space so start, processing, completion,
+errors and cancellation do not move the textarea, activity or footer. Long errors
+remain readable in a bounded scroll area. Contextual buttons transfer keyboard
+focus to the textarea before hiding, without scrolling the page.
+
 Available in [Mac beta 6](releases/v0.1.1-beta.6.md) (embedded app version `0.1.1`).
 Live microphone practice acceptance and separate-Mac QA have not been performed;
 automated checks and local installation do not establish hardware acceptance.

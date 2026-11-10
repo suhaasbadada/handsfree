@@ -30,6 +30,21 @@ private var tap: CFMachPort?
 private var source: CFRunLoopSource?
 private var hookReason: Int32 = 0 // 0 unattempted, 1 connected, 2 permission, 3 port, 4 source, 5 disabled
 private var recorder: AudioCapture?
+private var recordingElapsed: (() -> Double)?
+private var recordingLimit: UInt32 = 120
+
+@_cdecl("hf_microphones") public func microphones(_ buffer: UnsafeMutablePointer<UInt8>?, _ capacity: Int32) -> Int32 {
+    main {
+        guard let buffer, capacity > 0 else { return -1 }
+        do {
+            struct Snapshot: Encodable { let devices: [MicrophoneDevice]; let default_uid: String? }
+            let data = try JSONEncoder().encode(Snapshot(devices: Microphones.devices(), default_uid: Microphones.defaultUID()))
+            guard data.count <= Int(capacity) else { return -1 }
+            data.copyBytes(to: buffer, count: data.count)
+            return Int32(data.count)
+        } catch { return -1 }
+    }
+}
 private var meter: Timer?
 private var panel: NSPanel?
 private var pill: PillView?
@@ -267,6 +282,12 @@ class PillView: NSView {
     var phase = 0
     var level: CGFloat = 0
     var tick: CGFloat = 0
+    var elapsed: Double = 0
+    var limit: UInt32 = 120
+    static func timerText(elapsed: Double, limit: UInt32) -> String {
+        let seconds = elapsed.isFinite ? Int(min(Double(limit), max(0, elapsed))) : 0
+        return String(format: "%d:%02d / %d:%02d", seconds / 60, seconds % 60, limit / 60, limit % 60)
+    }
     private var shrinkFrom = CapsuleGeometry.rect(phase: 1)
     private var shrinkStarted: CFTimeInterval?
     var capsuleRect: NSRect {
@@ -313,9 +334,11 @@ class PillView: NSView {
             for i in 0..<9 {
                 let shape = CGFloat([0.35, 0.6, 0.85, 0.65, 1, 0.7, 0.9, 0.5, 0.3][i])
                 // Amplitude comes only from the recorder, never a fake sine wave.
-                let h = 3 + level * 23 * shape
-                NSBezierPath(roundedRect: NSRect(x: 49.5 + CGFloat(i) * 6, y: (bounds.height-h)/2, width: 3, height: h), xRadius: 1.5, yRadius: 1.5).fill()
+                let h = 3 + level * 16 * shape
+                NSBezierPath(roundedRect: NSRect(x: 49.5 + CGFloat(i) * 6, y: 28-h/2, width: 3, height: h), xRadius: 1.5, yRadius: 1.5).fill()
             }
+            let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .center
+            (Self.timerText(elapsed: elapsed, limit: limit) as NSString).draw(in: NSRect(x: 40, y: 6, width: 70, height: 12), withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium), .foregroundColor: NSColor(white: 0.25, alpha: 1), .paragraphStyle: paragraph])
         } else if phase == 2 {
             for i in 0..<3 {
                 let breath = reduceMotion ? 0.65 : 0.45 + 0.4 * (0.5 + 0.5 * sin(tick / 30 * 2 * .pi / 1.4 - CGFloat(i) * 0.8))
@@ -632,7 +655,8 @@ private func validateDelivery() -> PasteResult {
     return .sent
 }
 
-@_cdecl("hf_record") public func record(_ generation: UInt64, _ epoch: UInt64, _ allowed: @convention(c) (UInt64) -> Bool, _ sink: @escaping @convention(c) (UInt64, UInt64, UnsafePointer<Float>?, Int32) -> Void) -> Bool {
+@_cdecl("hf_record") public func record(_ generation: UInt64, _ epoch: UInt64, _ microphoneUID: UnsafePointer<CChar>?, _ limit: UInt32, _ elapsed: @escaping @convention(c) (UInt64, UInt64) -> Double, _ allowed: @escaping @convention(c) (UInt64) -> Bool, _ sink: @escaping @convention(c) (UInt64, UInt64, UnsafePointer<Float>?, Int32) -> Void) -> Bool {
+    let uid = microphoneUID.map { String(cString: $0) }
     return main {
         guard allowed(epoch) else { return false }
         guard permissions() & 3 == 3, recorder == nil else { return false }
@@ -657,11 +681,16 @@ private func validateDelivery() -> PasteResult {
         if compatibilityEnabled && IsSecureEventInputEnabled() { targetFailure = .originalSecureField }
         observeTargetFocus()
         do {
-            let r = try AudioCapture(generation: generation, epoch: epoch, sink: sink)
+            let r = try AudioCapture(generation: generation, epoch: epoch, microphoneUID: uid, sink: sink)
             guard allowed(epoch) else { clearTarget(); return false }
             let previewWasPlaying = cue?.isPlaying == true || endCue?.isPlaying == true
             cue?.stop(); endCue?.stop()
             recorder = r
+            recordingLimit = limit
+            recordingElapsed = { [weak r] in
+                guard let r, recorder === r, allowed(epoch) else { return 0 }
+                return elapsed(generation, epoch)
+            }
             audioBusy = true
             recordingCueProfile = cueProfile
             if soundsEnabled {
@@ -738,6 +767,7 @@ private func validateDelivery() -> PasteResult {
         overlayGeneration += 1
         let generation = overlayGeneration
         meter?.invalidate(); meter = nil
+        if phase != 1 { recordingElapsed = nil }
         if phase == 0 { panel?.orderOut(nil); return }
         if panel == nil {
             let p = OverlayPanel(contentRect: NSRect(origin: .zero, size: CapsuleGeometry.size), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -756,7 +786,7 @@ private func validateDelivery() -> PasteResult {
         // The backing window stays fixed to avoid clipping during the shrink;
         // its transparent area never intercepts clicks while processing.
         panel?.ignoresMouseEvents = phase == 2
-        pill?.setPhase(Int(phase)); pill?.level = 0; pill?.needsDisplay = true
+        pill?.setPhase(Int(phase)); pill?.level = 0; pill?.elapsed = 0; pill?.limit = recordingLimit; pill?.needsDisplay = true
         panel?.orderFrontRegardless()
         if phase == 1 || phase == 2 {
             meter = Timer.scheduledTimer(withTimeInterval: 1.0/30.0, repeats: true) { timer in
@@ -764,6 +794,8 @@ private func validateDelivery() -> PasteResult {
                 if phase == 1 {
                     let db = recorder?.level() ?? -60
                     pill?.level = CGFloat(max(0, min(1, (db + 55) / 45)))
+                    pill?.elapsed = recordingElapsed?() ?? 0
+                    if let pill { pill.setAccessibilityValue(PillView.timerText(elapsed: pill.elapsed, limit: pill.limit)) }
                 } else if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
                     pill?.needsDisplay = true; timer.invalidate(); meter = nil; return
                 }
