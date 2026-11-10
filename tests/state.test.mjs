@@ -32,7 +32,7 @@ test('each domain keeps its own phase space; downloading is not a global phase',
 });
 test('progress snapshots cannot regress installation or report terminal success', () => {
   for (const current of updatePhases) for (const reported of [...updatePhases, undefined, 'new_phase']) {
-    const expected = current === 'downloading' && ['downloading','installing'].includes(reported) || current === 'installing' && reported === 'installing';
+    const expected = ['checking','downloading'].includes(current) && ['downloading','installing'].includes(reported) || current === 'installing' && reported === 'installing';
     assert.equal(acceptsUpdateProgress(current, reported), expected, `${current} -> ${reported}`);
   }
 });

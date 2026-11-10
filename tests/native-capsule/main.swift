@@ -307,6 +307,44 @@ precondition(!CuePolicy.canCapture(current: true, allowed: false))
 precondition(!CuePolicy.canCapture(current: false, allowed: true))
 precondition(CuePolicy.canCapture(current: true, allowed: true))
 let recordingRect = CapsuleGeometry.rect(phase: 1)
+// Production labels, visibility and NSButton target/actions, with only the
+// callback replaced. AX press/traversal requires a real application session and
+// is not established by this command-line harness.
+overlay(1)
+let axPill = app.windows.first { $0 is NSPanel }!.contentView as! PillView
+var axActions: [Int32] = []
+let productionAction = axPill.onAction
+axPill.onAction = { axActions.append($0) }
+axPill.setPhase(1)
+precondition(axPill.accessibilityRole() == .group)
+precondition(axPill.accessibilityLabel() == "HandsFree listening")
+precondition(axPill.accessibilityHelp()?.contains("shortcut again") == true)
+let axButtons = axPill.subviews.compactMap { $0 as? NSButton }
+precondition(axButtons.count == 2)
+for (button, name) in zip(axButtons, ["Cancel dictation", "Finish dictation"]) {
+    precondition(button.accessibilityLabel() == name && !button.isHidden)
+    button.performClick(nil)
+    precondition(axActions.last == (name == "Cancel dictation" ? 4 : 5))
+}
+precondition(axActions == [4, 5])
+for phase in [2, 3, 4, 5, 0] {
+    axPill.setPhase(1)
+    axPill.setAccessibilityValue("0:12 / 2:00")
+    axPill.setPhase(phase)
+    precondition(axPill.accessibilityValue() == nil, "Recording timer must not leak into another phase")
+    precondition(axPill.subviews.allSatisfy { $0.isHidden })
+}
+axPill.onAction = productionAction
+overlay(0)
+func luminance(_ color: NSColor) -> CGFloat {
+    let c = color.usingColorSpace(.sRGB)!
+    func linear(_ v: CGFloat) -> CGFloat { v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4) }
+    return 0.2126 * linear(c.redComponent) + 0.7152 * linear(c.greenComponent) + 0.0722 * linear(c.blueComponent)
+}
+func contrast(_ a: NSColor, _ b: NSColor) -> CGFloat {
+    let x = luminance(a), y = luminance(b)
+    return (max(x, y) + 0.05) / (min(x, y) + 0.05)
+}
 let processingRect = CapsuleGeometry.rect(phase: 2)
 precondition(processingRect.size == NSSize(width: 54, height: 28))
 for step in 0...22 {
@@ -368,9 +406,15 @@ for phase: Int32 in [1, 2, 3, 4, 5, 1] {
                 if color.redComponent > color.blueComponent + 0.15 { redPixels += 1 }
             }
         }
-        precondition(lightPixels > 500, "Capsule stays light under either system appearance")
+        let dark = appearance == .darkAqua
+        let palette = CapsulePalette(appearance: view.effectiveAppearance)
+        precondition(contrast(palette.text, palette.surface) >= 4.5)
+        precondition(contrast(palette.primaryText, palette.primary) >= 4.5)
+        precondition(contrast(palette.text, palette.button) >= 4.5)
+        precondition(contrast(palette.accent, palette.surface) >= 3)
+        precondition(dark ? darkPixels > 500 : lightPixels > 500, "Rendered capsule must follow effective appearance")
         if phase == 1 { precondition(redPixels > 20, "Recording waveform uses muted red, not blue or lime") }
-        if phase == 3 || phase == 4 || phase == 5 { precondition(darkPixels > 10, "Status/error feedback must have readable dark text, not white-on-white") }
+        if phase == 3 || phase == 4 || phase == 5 { precondition(dark ? lightPixels > 10 : darkPixels > 10, "Rendered status text must contrast with the actual capsule paint") }
     }
     if phase == 1, let path = ProcessInfo.processInfo.environment["HF_CAPSULE_PREVIEW"] {
         try! bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: path))

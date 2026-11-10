@@ -32,5 +32,5 @@ export const updatePhaseBusy = (phase: unknown) => phase === 'checking' || updat
 // Within one revision, delayed download snapshots must not undo installation.
 // Final errors/success come from the owning invoke, not progress polling.
 export function acceptsUpdateProgress(current: UpdatePhase, reported: unknown): boolean {
-  return current === 'downloading' ? updateInstalling(reported) : current === 'installing' && reported === 'installing';
+  return current === 'checking' || current === 'downloading' ? updateInstalling(reported) : current === 'installing' && reported === 'installing';
 }

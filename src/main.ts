@@ -29,7 +29,7 @@ const glyphs: Record<string,string> = {
 const icon = (name: string) => `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${glyphs[name]}</svg>`;
 document.querySelector('#app')!.innerHTML = `
 <div class="shell">
- <aside><a class="brand" href="#overview" aria-label="HandsFree menu" aria-haspopup="menu" aria-expanded="false" aria-controls="brand-menu"><img src="${logo}" alt="" width="36" height="36"><span>HandsFree</span>${icon('chevron')}</a>
+ <aside><button class="brand" aria-label="HandsFree menu" aria-haspopup="menu" aria-expanded="false" aria-controls="brand-menu"><img src="${logo}" alt="" width="36" height="36"><span>HandsFree</span>${icon('chevron')}</button>
    <div id="brand-menu" class="brand-menu" role="menu" aria-label="HandsFree" hidden><button id="brand-overview" role="menuitem">Overview</button><button id="brand-started" role="menuitem" hidden>Get started</button><button id="brand-settings" role="menuitem">Settings</button><button id="brand-pause" role="menuitem" disabled hidden>Pause shortcuts</button><button id="brand-updates" role="menuitem">App updates…</button></div>
   <div class="header-right"><nav aria-label="Main navigation"><button id="nav-overview" class="nav active" aria-label="Overview" title="Overview" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-6v-6h-4v6H4Z"/></svg></button><button id="nav-settings" class="nav" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg></button></nav><section class="status" aria-label="App status"><span id="dot" aria-hidden="true"></span><strong id="phase" aria-live="polite">Connecting…</strong><button id="cancel" hidden aria-label="Cancel dictation" title="Cancel dictation">×</button></section></div></aside>
  <main>
@@ -55,7 +55,7 @@ document.querySelector('#app')!.innerHTML = `
     <label for="practice-text" class="sr-only">Practice dictation</label>
     <textarea id="practice-text" rows="4" autocomplete="off" spellcheck="false" aria-describedby="practice-privacy" placeholder="Speak freely. This space is just for you."></textarea>
     <div class="practice-bottom"><div class="practice-actions"><button id="practice-start" class="primary" disabled>${icon('mic')}<span>Start test</span></button><button id="practice-finish" class="primary" disabled hidden>${icon('check')}<span>Finish</span></button><button id="practice-cancel" class="icon-action" aria-label="Cancel practice" title="Cancel practice" disabled hidden>${icon('close')}</button><button id="practice-clear" class="icon-action" aria-label="Clear practice" title="Clear practice">${icon('clear')}</button><button id="practice-setup" class="icon-action" aria-label="Practice setup help" title="Practice setup help">${icon('settings')}</button></div><p id="practice-privacy" class="subtle">No clipboard. No usage counted.<br>Clears when you leave this view.</p></div>
-    <p id="practice-message" role="status" aria-live="polite"></p>
+    <div class="practice-status-slot"><p id="practice-message" role="status" aria-label="Practice status" aria-live="polite"></p><button id="practice-recovery" class="text-action" hidden>Microphone settings</button></div>
    </section>
    <section class="activity" aria-labelledby="activity-title"><h2 id="activity-title">Your activity</h2><div class="metrics" aria-label="Real dictation only; practice tests excluded"><article><span>${icon('words')}Words</span><strong id="words">0</strong></article><article><span tabindex="0" title="Estimate per dictation: typing at 40 words/minute, minus recording time, never below zero. Not a productivity measurement.">${icon('clock')}Time saved<small>Estimated</small></span><strong id="saved">0 sec</strong></article><article><span>${icon('wave')}Dictations</span><strong id="count">0</strong></article></div></section>
  </section>
@@ -87,7 +87,7 @@ document.querySelector('#app')!.innerHTML = `
   </section>
     <section class="local-data" aria-labelledby="data-title"><div class="setting-row"><div><h2 id="data-title">Usage totals</h2></div><button id="reset" class="danger" aria-haspopup="dialog">Reset totals</button></div><p id="privacy-detail" class="subtle">Audio and transcription stay on this device.</p></section>
  </section>
- <p id="message" class="status-detail" aria-live="polite" hidden></p>
+ <div class="general-status-slot"><p id="message" class="status-detail" role="status" aria-label="Dictation status" aria-live="polite" hidden></p><button id="message-recovery" class="text-action" hidden>Open settings</button></div>
  <p id="feedback" class="feedback" role="status" hidden></p><p id="storage-error" class="feedback" role="status" hidden></p>
   </main>
   <footer><span class="footer-privacy">${icon('shield')}On-device · English</span><div class="footer-meta"><span class="footer-brand"><span class="sr-only">HandsFree</span><span id="app-version">0.1.1</span><span class="beta-badge">BETA</span></span><button id="updates-open" class="text-action" hidden>${icon('update')}Updates</button></div></footer>
@@ -99,7 +99,8 @@ document.body.insertAdjacentHTML('beforeend', `<dialog id="updates-dialog" aria-
  <h2 id="updates-title" tabindex="-1" autofocus>App updates</h2><p>Installed release: <strong id="installed-release">Connecting…</strong></p>
  <p id="updates-message" role="status" aria-live="polite"></p><p id="updates-version" hidden></p>
  <p id="updates-notes" class="update-notes" hidden></p><progress id="updates-progress" max="100" hidden aria-label="Update download progress"></progress>
- <p>Checks contact the HandsFree release server only when you ask. Updates are signature-verified. Your model, settings and usage totals are kept.</p>
+ <p>Check for updates and Download &amp; restart refresh release metadata online. Download opens confirmation for the latest offer before downloading the signature-verified update. Your model, settings and usage totals are kept.</p>
+ <button id="updates-check-again" class="text-action" hidden>Check again</button>
  <div class="dialog-actions"><button id="updates-close">Close</button><button id="updates-check">Check for updates</button><button id="updates-install" class="primary" hidden>Download &amp; restart…</button></div>
  </dialog>
  <dialog id="update-confirm-dialog" aria-labelledby="update-confirm-title"><h2 id="update-confirm-title" tabindex="-1" autofocus>Update HandsFree?</h2>
@@ -138,7 +139,33 @@ const isIdle = () => !installingUpdate() && phasePolicy(current?.phase).previewS
 let seenPermissionRequests = 0;
 let guidePermissionRequests = 0;
 let gettingStartedInitialized = false;
+let focusIntent = 0;
+document.addEventListener('pointerdown', () => ++focusIntent, true);
+document.addEventListener('keydown', () => ++focusIntent, true);
+document.addEventListener('focusin', e => { if (e.target !== document.body) ++focusIntent; }, true);
+// A disabled/replaced initiating control may leave focus on body. Restore only
+// for this action, in this view, with no intervening focus or user intent.
+async function workflowFocus(source: HTMLElement, effect: () => Promise<void>, target: () => HTMLElement | undefined) {
+  const owned = document.activeElement === source && !el('settings').hidden;
+  const intent = focusIntent;
+  await effect();
+  if (!owned || intent !== focusIntent || el('settings').hidden || !document.hasFocus()) return;
+  if (document.activeElement !== source && document.activeElement !== document.body) return;
+  const next = target();
+  if (next && next.getClientRects().length && !next.matches(':disabled')) next.focus({preventScroll:true});
+}
+function statusText(id: string, text: string) {
+  const node = el(id);
+  if (node.textContent !== text) node.textContent = text;
+  if (text) node.tabIndex = 0; else node.removeAttribute('tabindex');
+}
+function focusHeading(tab: 'overview' | 'settings') {
+  const heading = el(`${tab}-title`); heading.tabIndex = -1; heading.focus({preventScroll:true});
+}
 function navigate(tab: 'overview' | 'settings') {
+  ++focusIntent;
+  updates.cancelPreparation();
+  if (updateConfirmDialog.open) updateConfirmDialog.close();
   if (tab !== 'overview') clearPractice();
   if (capturing && tab !== 'settings') void stopCapture();
   for (const name of ['overview', 'settings']) {
@@ -151,7 +178,9 @@ function navigate(tab: 'overview' | 'settings') {
   if (tab === 'settings' && current?.platform === 'macos') { void workflow.refresh(); void workflow.runningApps(); }
 }
 function feedback(message: string) {
-  el('feedback').hidden = !message; el('feedback').textContent = message;
+  el('feedback').hidden = !message; statusText('feedback', message);
+  el('feedback').setAttribute('aria-label','Action feedback');
+  button('message-recovery').hidden = !message && current?.phase !== 'error' && current?.phase !== 'not_pasted';
 }
 async function action(command: string, args?: Record<string, unknown>): Promise<boolean> {
   try { await invoke(command, args); feedback(''); await refresh(); return true; }
@@ -159,7 +188,7 @@ async function action(command: string, args?: Record<string, unknown>): Promise<
 }
 el('nav-overview').onclick = () => navigate('overview');
 el('nav-settings').onclick = () => navigate('settings');
-const brand = document.querySelector('.brand') as HTMLAnchorElement;
+const brand = document.querySelector('.brand') as HTMLButtonElement;
 function closeBrandMenu(restore = false) {
   el('brand-menu').hidden = true; brand.setAttribute('aria-expanded','false');
   if (restore) brand.focus();
@@ -168,19 +197,31 @@ function closeBrandMenu(restore = false) {
 function openBrandMenu() {
   void workflow.refresh();
   el('brand-menu').hidden = false; brand.setAttribute('aria-expanded','true'); renderPractice();
+  menuItems()[0]?.focus();
 }
+const menuItems = () => Array.from(el('brand-menu').querySelectorAll<HTMLButtonElement>('button:not([hidden]):not(:disabled)')).filter(item => item.getClientRects().length);
 brand.addEventListener('click', e => { e.preventDefault(); if(el('brand-menu').hidden) openBrandMenu(); else closeBrandMenu(); });
 brand.onkeydown = e => { if(e.key==='ArrowDown'){e.preventDefault();openBrandMenu();button('brand-overview').focus();} };
 el('brand-menu').onkeydown = e => {
   if(e.key==='Escape'){e.preventDefault();closeBrandMenu(true);return;}
-  if(e.key==='ArrowDown'||e.key==='ArrowUp') {
-    e.preventDefault(); const items=Array.from(el('brand-menu').querySelectorAll<HTMLButtonElement>('button:not([hidden])'));
-    const index=items.indexOf(document.activeElement as HTMLButtonElement); items[(index+(e.key==='ArrowDown'?1:-1)+items.length)%items.length]?.focus();
+  if(e.key==='Tab') {
+    // Menu items are a composite, not a separate tab sequence. Continue from
+    // the trigger to the outside control (or back from it for Shift+Tab).
+    closeBrandMenu(true); return;
+  }
+  if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)) {
+    e.preventDefault(); const items=menuItems();
+    const index=items.indexOf(document.activeElement as HTMLButtonElement);
+    items[e.key==='Home'?0:e.key==='End'?items.length-1:(index+(e.key==='ArrowDown'?1:-1)+items.length)%items.length]?.focus();
   }
 };
+el('brand-menu').addEventListener('focusout', e => {
+  if (!(e.relatedTarget instanceof Node) || (!el('brand-menu').contains(e.relatedTarget) && e.relatedTarget !== brand)) closeBrandMenu();
+});
+brand.addEventListener('focusout', e => { if (!(e.relatedTarget instanceof Node) || !el('brand-menu').contains(e.relatedTarget)) closeBrandMenu(); });
 document.addEventListener('pointerdown', e => { if(!brand.contains(e.target as Node)&&!el('brand-menu').contains(e.target as Node)) closeBrandMenu(); });
-el('brand-overview').onclick=()=>{closeBrandMenu();navigate('overview');};
-el('brand-settings').onclick=()=>{closeBrandMenu();navigate('settings');};
+el('brand-overview').onclick=()=>{closeBrandMenu();navigate('overview');focusHeading('overview');};
+el('brand-settings').onclick=()=>{closeBrandMenu();navigate('settings');focusHeading('settings');};
 function openGettingStarted() {
   if (current?.platform !== 'macos') return;
   closeBrandMenu(); navigate('overview'); el('get-started').hidden = false; renderGettingStarted();
@@ -228,7 +269,7 @@ function syncPracticeContext() {
 const practice = new Practice(invoke, view => {
   // Assign a value, never HTML; no normal dictation payload is read here.
   if (practiceField.value !== view.text) practiceField.value = view.text;
-  el('practice-message').textContent = view.message;
+  statusText('practice-message', view.message);
   renderPractice();
 }, practiceVisible);
 const practiceInputs = new PracticeInputs(practice, practiceVisible);
@@ -259,6 +300,8 @@ function renderPractice() {
   button('practice-cancel').hidden = !active;
   button('practice-clear').hidden = active || practice.view.phase==='cancelling';
   button('practice-setup').hidden = false;
+  if (practice.view.phase !== 'error' && document.activeElement === el('practice-recovery')) practiceField.focus({preventScroll:true});
+  button('practice-recovery').hidden = practice.view.phase !== 'error';
   renderGettingStarted();
   syncPracticeContext();
 }
@@ -268,6 +311,8 @@ el('practice-finish').onclick = () => void practice.finish();
 el('practice-cancel').onclick = clearPractice;
 el('practice-clear').onclick = clearPractice;
 el('practice-setup').onclick = openGettingStarted;
+el('practice-recovery').onclick = () => { navigate('settings'); el('microphone-choice').focus(); };
+el('message-recovery').onclick = () => { navigate('settings'); focusHeading('settings'); };
 window.addEventListener('blur', () => { windowActive=false; syncPracticeContext(); clearPractice(); });
 window.addEventListener('pagehide', () => { windowActive=false; syncPracticeContext(); clearPractice(); });
 window.addEventListener('focus', () => { windowActive=true; renderPractice(); });
@@ -319,15 +364,25 @@ function renderWorkflow() {
     choice.replaceChildren(new Option('Choose a running app',''));
     for(const app of workflow.apps) if(!status?.excluded_bundle_ids.includes(app.bundle_id)) choice.add(new Option(`${app.name} · ${app.bundle_id}`,app.bundle_id));
     choice.value = Array.from(choice.options).some(option=>option.value===selected) ? selected : '';
-    el('excluded-apps').replaceChildren();
+    const existing = new Map(Array.from(el('excluded-apps').children, item => [(item as HTMLElement).dataset.bundleId!, item]));
     for(const id of status?.excluded_bundle_ids ?? []) {
-      const item = document.createElement('li'), name = document.createElement('span'), remove = document.createElement('button');
+      const item = existing.get(id) ?? document.createElement('li'); existing.delete(id);
+      (item as HTMLElement).dataset.bundleId = id;
+      const name = item.querySelector('span') ?? document.createElement('span'), remove = item.querySelector('button') ?? document.createElement('button');
       const app = workflow.apps.find(app=>app.bundle_id===id);
       name.textContent = app ? `${app.name} · ${id}` : id;
       remove.textContent = 'Remove'; remove.setAttribute('aria-label',`Remove ${id}`);
-      remove.onclick = () => { void workflow.exclusions(workflow.status!.excluded_bundle_ids.filter(saved=>saved!==id)); };
-      item.append(name,remove); el('excluded-apps').append(item);
+      remove.onclick = () => {
+        const index = Array.from(el('excluded-apps').children).indexOf(item);
+        void workflowFocus(remove, () => workflow.exclusions(workflow.status!.excluded_bundle_ids.filter(saved=>saved!==id)), () => {
+          const remaining = Array.from(el('excluded-apps').querySelectorAll('button'));
+          return item.isConnected ? remove : remaining[index] ?? remaining[index-1] ?? choice;
+        });
+      };
+      if (!name.parentNode) item.append(name,remove);
+      if (!item.parentNode) el('excluded-apps').append(item);
     }
+    for (const item of existing.values()) item.remove();
   }
   choice.disabled = !allowed || !status || workflow.pending.exclusions || workflow.pending.apps;
   button('excluded-app-add').disabled = choice.disabled || !choice.value;
@@ -338,13 +393,18 @@ function renderWorkflow() {
 el('excluded-app-choice').onchange = renderWorkflow;
 el('excluded-app-refresh').onclick = () => { void workflow.runningApps(); };
 el('excluded-app-add').onclick = () => { const id = (el('excluded-app-choice') as HTMLSelectElement).value; if(id && workflow.status && workflow.apps.some(app=>app.bundle_id===id)) void workflow.exclusions([...new Set([...workflow.status.excluded_bundle_ids,id])]); };
-el('launch-at-login').onchange = () => { void workflow.login((el('launch-at-login') as HTMLInputElement).checked); };
-el('login-settings').onclick = () => { void workflow.openLoginSettings(); };
-el('login-cancel').onclick = () => { void workflow.login(false); };
+const loginFocusTarget = () => button('login-settings').hidden ? el('launch-at-login') : el('login-settings');
+el('launch-at-login').onchange = () => { void workflowFocus(el('launch-at-login'), () => workflow.login((el('launch-at-login') as HTMLInputElement).checked), loginFocusTarget); };
+el('login-settings').onclick = () => { void workflowFocus(el('login-settings'), () => workflow.openLoginSettings(), loginFocusTarget); };
+el('login-cancel').onclick = () => { void workflowFocus(el('login-cancel'), () => workflow.login(false), () => button('login-cancel').hidden ? loginFocusTarget() : el('login-cancel')); };
 el('workflow-pause').onclick = () => { if(workflow.status) void workflow.pause(!workflow.status.paused); };
 el('brand-pause').onclick = () => { closeBrandMenu(true); if(workflow.status) void workflow.pause(!workflow.status.paused); };
 function renderUpdates() {
   const view = updates.view;
+  if (confirmedUpdate && (view.phase !== 'available' || confirmedUpdate !== view.available_version)) {
+    confirmedUpdate = undefined;
+    if (updateConfirmDialog.open) updateConfirmDialog.close();
+  }
   el('installed-release').textContent = view.installed_version || 'Connecting…';
   el('updates-message').textContent = view.message;
   el('updates-version').hidden = !view.available_version;
@@ -353,6 +413,8 @@ function renderUpdates() {
   el('updates-notes').textContent = view.notes;
   button('updates-check').disabled = updateBusy(view) || updateConfirmDialog.open;
   el('updates-check').hidden = view.phase === 'available' || ['downloading', 'installing'].includes(view.phase);
+  el('updates-check-again').hidden = view.phase !== 'available';
+  button('updates-check-again').disabled = updateBusy(view) || updateConfirmDialog.open;
   el('updates-install').hidden = view.phase !== 'available';
   button('updates-install').disabled = !canInstallUpdate();
   button('update-confirm').disabled = !canInstallUpdate() || view.phase !== 'available' || confirmedUpdate !== view.available_version;
@@ -362,20 +424,29 @@ function renderUpdates() {
   else progress.removeAttribute('value');
 }
 el('updates-open').onclick = () => { if (current?.platform !== 'macos') return; updatesDialog.showModal(); renderPractice(); renderUpdates(); void updates.refresh(); };
-updatesDialog.onclose = () => renderPractice();
-el('updates-close').onclick = () => updatesDialog.close();
+updatesDialog.addEventListener('beforetoggle', event => { if ((event as ToggleEvent).newState === 'closed') updates.cancelPreparation(); });
+updatesDialog.onclose = () => {
+  if (updatesDialog.open) return; // A queued close event cannot affect a reopened dialog.
+  updates.cancelPreparation(); if (updateConfirmDialog.open) updateConfirmDialog.close(); renderPractice();
+};
+updatesDialog.oncancel = () => updates.cancelPreparation();
+el('updates-close').onclick = () => { updates.cancelPreparation(); updatesDialog.close(); };
 el('updates-check').onclick = () => { if (!updateConfirmDialog.open && current?.platform === 'macos') void updates.check(); };
-el('updates-install').onclick = () => {
-  if (!canInstallUpdate() || updates.view.phase !== 'available') return;
-  confirmedUpdate = updates.view.available_version;
+el('updates-check-again').onclick = el('updates-check').onclick;
+el('updates-install').onclick = async () => {
+  if (!updatesDialog.open || updateConfirmDialog.open) return;
+  const version = await updates.prepareConfirmation();
+  if (!version || !updatesDialog.open || !canInstallUpdate() || updates.view.phase !== 'available' || updates.view.available_version !== version) return;
+  confirmedUpdate = version;
   el('update-confirm-detail').textContent = `Install ${confirmedUpdate}?`;
   updateConfirmDialog.showModal(); renderPractice(); renderUpdates();
 };
-el('update-keep').onclick = () => updateConfirmDialog.close();
-updateConfirmDialog.onclose = () => { confirmedUpdate = undefined; renderPractice(); renderUpdates(); };
+el('update-keep').onclick = () => { updates.cancelPreparation(); updateConfirmDialog.close(); };
+updateConfirmDialog.oncancel = () => { confirmedUpdate = undefined; updates.cancelPreparation(); };
+updateConfirmDialog.onclose = () => { if (updateConfirmDialog.open) return; confirmedUpdate = undefined; renderPractice(); renderUpdates(); };
 el('update-confirm').onclick = () => {
   const version = confirmedUpdate;
-  if (!version || !canInstallUpdate() || version !== updates.view.available_version) return;
+  if (!updateConfirmDialog.open || !updatesDialog.open || !version || !canInstallUpdate() || version !== updates.view.available_version) return;
   updateConfirmDialog.close(); confirmedUpdate = undefined;
   void updates.install(version);
 };
@@ -532,7 +603,7 @@ function renderMicrophones() {
     }
     microphoneChoice.value = selected;
   }
-  microphoneChoice.disabled = microphonePending || microphonesLoading || !isIdle() || capturing || captureStopping || current?.platform !== 'macos';
+  microphoneChoice.disabled = microphonePending || microphonesLoading || !canEditShortcut() || capturing || captureStopping || current?.platform !== 'macos';
   button('microphone-refresh').disabled = microphonesLoading || microphonePending || current?.platform !== 'macos';
 }
 async function refreshMicrophones() {
@@ -632,9 +703,10 @@ async function refreshStatus() {
     // Keep diagnostics outside the compact header; never render dictation payloads.
     const idleHint = `Select a text field and press ${current.shortcut_label}.`;
     const message = current.message.startsWith('Copied.') ? 'Text copied. Switch to your app and paste when you’re ready.' : current.message.startsWith('Paste shortcut sent') ? 'Paste sent to your app. Check the original field.' : current.message;
-    el('message').textContent = current.phase === 'idle' && current.message === idleHint ? '' : message;
+    statusText('message', current.phase === 'idle' && current.message === idleHint ? '' : message);
     el('message').title = current.message;
     el('message').hidden = !el('message').textContent;
+    button('message-recovery').hidden = current.phase !== 'error' && current.phase !== 'not_pasted' && el('feedback').hidden;
     el('dot').className = current.phase;
     button('mic').disabled = current.microphone;
      el('mic').textContent = windows ? 'Open settings' : current.microphone ? 'Allowed' : 'Allow';

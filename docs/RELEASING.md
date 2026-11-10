@@ -8,8 +8,8 @@ exact clean artifact source `aed1c5c213639958b3b418e54c2330b9ebc80e76`, with
 [passing source CI](https://github.com/suhaasbadada/handsfree/actions/runs/42775050746).
 See the [published release](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.13)
 and [beta 13 evidence](releases/v0.1.1-beta.13.md). The active `release` export and
-static downloads select audited beta 13; disabled `candidateRelease` retains
-beta 13 audit coordinates only. Group 3 contains launch-at-login controls, app
+static downloads select audited beta 13; disabled `candidateRelease` prepares
+beta 14 audit coordinates only. Group 3 contains launch-at-login controls, app
 exclusions, temporary pause and menu quick controls without new AI. Activation is
 metadata-only: it copies the exact generated signed feed, without reconstructing
 its signature, and does not rebuild or replace the installed app. Artifacts and
@@ -42,12 +42,38 @@ Windows beta 3 and historical Mac assets remain untouched. See
 [practice](practice.md) for the private button/shortcut flow, not an external insertion test,
 and [Compatibility paste](COMPATIBILITY-PASTE.md) for unchanged opt-in safeguards.
 
+## Beta 14 candidate preparation (group 4)
+
+Distribution **v0.1.1-beta.14** retains embedded version **0.1.1**. Only the
+disabled candidate export and package/audit/build coordinates advance. Active
+beta 13 website/feed/README/install bytes remain unchanged until beta 14 passes
+the exact-source anonymous-public audit. Keep the tracked current-feed hash
+pinned to audited beta 13; tests must not depend on ignored `release/` artifacts.
+
+This fourth lean release covers keyboard menu/status scrolling and actionable
+recovery, guarded workflow focus, system appearance without a native forced Light
+theme/background, reduced motion/runtime contrast, and the latest-offer updater
+bugfix. Explicit Download refreshes the feed before exact-version/revision
+confirmation; changed or expired offers require review/reconfirmation, stale
+offers/errors clear, and Check again remains available without an app restart.
+Opening/status reads never authorize unsolicited feed polling. The beta 12 layout
+stays stable. See [candidate scope and limitations](releases/v0.1.1-beta.14.md).
+
+Final validation, exact-source CI, existing-identity signing and local/draft/public
+audits are pending. Command-line AppKit NSButton target/action tests are not
+AXPress/VoiceOver acceptance. No installed OTA/restart, hardware or actual OS
+login acceptance is claimed. Preserve the existing self-signed identity, updater
+keys, permissions and model/settings/usage data; do not manually install the app.
+After public audit, activate only the exact generated signed feed and audited
+download coordinates, then independently verify activation CI, Pages/live bytes,
+Homebrew cask parity/readback and tap CI. No new AI features or product bloat.
+
 ## Beta 13 publication and metadata activation (group 3)
 
 Distribution **v0.1.1-beta.13** retains embedded version **0.1.1**. The active
 release/site/feed/README/install metadata selects the anonymously audited public
-assets; the disabled beta 13 candidate export and package/build coordinates do
-not change. The four sequential releases are owner-authorized, but publication
+assets; the disabled candidate export and package/build coordinates now prepare
+beta 14. The four sequential releases are owner-authorized, but publication
 is not installed-app acceptance. See [published scope and honest remaining gates](releases/v0.1.1-beta.13.md).
 
 Group 3 covers OS-authoritative launch at login (including approval and explicit
@@ -61,10 +87,12 @@ Beta 12 outputs were preserved before packaging; no historical assets are
 overwritten. Exact-source CI and the anonymous-public seven-asset audit passed
 before this metadata-only activation. Copy the exact generated signed feed bytes,
 not a reconstructed signature. Activation CI, Pages/live byte readback and matching
-Homebrew cask publication/readback and tap CI remain separate mandatory gates
-before group 4. No manual installed app replacement, data reset, new identity,
+Homebrew cask publication/readback and tap CI passed, including independently
+verified live site/feed bytes; see the [completed group 3 ledger](FEATURE-RELEASES.md#group-3-publication-evidence--complete).
+No manual installed app replacement, data reset, new identity,
 models or AI scope is authorized by these metadata edits. The reported stale
-updater expiry bug is deferred to group 4 / beta 14; updater behavior is unchanged.
+updater expiry bug is addressed only by group 4 / beta 14 source, not by changing
+the immutable beta 13 artifacts.
 
 ## Beta 12 publication and metadata activation (group 2, completed)
 
@@ -72,7 +100,7 @@ Published distribution **v0.1.1-beta.12** retains internal app version **0.1.1**
 Exact-source CI and local/draft/anonymous-public seven-asset audits passed before
 this metadata-only activation. Copy `release/macos-arm64.json` byte-for-byte to
 `site/updates/macos-arm64.json`; do not reconstruct the signature. The disabled
-`candidateRelease` remains disabled audit coordinates (now beta 13 preparation).
+`candidateRelease` remains disabled audit coordinates (now beta 14 preparation).
 App behavior and immutable beta 12 artifacts do not change during activation;
 the current packaging/distribution coordinates target the next candidate.
 See [published scope and limitations](releases/v0.1.1-beta.12.md).

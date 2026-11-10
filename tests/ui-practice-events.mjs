@@ -18,9 +18,9 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
          if(command==='status')return structuredClone(window.fixture);
          if(command==='workflow_status')return structuredClone(window.workflow);
          if(command==='set_paused'){if(window.delayPause)await new Promise(r=>window.pauseAck=r);window.workflow.paused=args.paused;return structuredClone(window.workflow);}
-         if(command==='set_launch_at_login'){if(window.rejectLogin)throw 'Login registration failed';window.workflow.login={status:args.enabled?(window.loginResult||'approval_required'):'not_registered',error:null};return structuredClone(window.workflow.login);}
+         if(command==='set_launch_at_login'){if(window.delayLogin)await new Promise(r=>window.loginAck=r);if(window.rejectLogin)throw 'Login registration failed';window.workflow.login={status:args.enabled?(window.loginResult||'approval_required'):'not_registered',error:null};return structuredClone(window.workflow.login);}
          if(command==='running_apps')return [{bundle_id:'com.running.app',name:'<b>Running app</b>'}];
-         if(command==='set_excluded_apps'){if(window.rejectExclusions)throw 'Exclusion save failed';window.workflow.excluded_bundle_ids=args.bundleIds;return structuredClone(window.workflow);}
+         if(command==='set_excluded_apps'){if(window.delayExclusions)await new Promise(r=>window.exclusionsAck=r);if(window.rejectExclusions)throw 'Exclusion save failed';window.workflow.excluded_bundle_ids=args.bundleIds;return structuredClone(window.workflow);}
         if(command==='list_microphones')return {devices:[{uid:'built-in',name:'Built-in microphone'},{uid:'usb-input',name:'USB input'}],default_uid:'built-in'};
         if(command==='set_microphone'){if(window.rejectMicrophone)throw 'Could not save microphone';window.fixture.microphone_uid=args.uid;return;}
         if(command==='request_microphone')window.fixture.permission_requests=(window.fixture.permission_requests||0)|1;

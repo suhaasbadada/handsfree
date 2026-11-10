@@ -94,6 +94,11 @@ prove discovery completeness or runtime correctness on an untested OS.
   Running apps are metadata-only, loaded on Settings open or explicit Refresh,
   never by status polling. Saved absent bundle IDs remain removable. Installer
   eligibility is UI-only; native setters still recheck. No new dictation phase.
+  Frontend action focus is a separate per-action intent guard: completion can
+  restore only the initiating control (or its visible recovery target) in the
+  same Settings visit, without intervening input/focus/navigation. Exclusion
+  rows retain identity through metadata updates; successful removal selects
+  next/previous Remove, then the picker. Failure retains the initiating Remove.
 
 - Dashboard routing uses a revision-bound view context, not a recording lease.
   Focus loss, navigation, open menus/dialogs and shortcut capture revoke input
@@ -129,6 +134,12 @@ prove discovery completeness or runtime correctness on an untested OS.
   long errors scroll within their status slot instead of moving the card/activity.
   Fresh-document CDP assertions cover pending/recording/meter/timer/processing/
   complete/error/retry/cancel at 320/400/740/980px, including native status changes.
+  Populated practice/general status regions are named keyboard tab stops with
+  bounded scrolling and stable text nodes; empty reserved slots are not tab stops.
+  Recovery uses existing microphone/settings/setup destinations, never inferred
+  URLs or uncertain paste retries. Brand menu keyboard exit/focusout restores
+  only currently eligible practice context, not held input. Group 4 is partial:
+  production-DOM CDP key/AX evidence is not macOS VoiceOver acceptance.
 
 - `src/state.ts`: separate dictation/practice/update phase spaces; readonly phase
   policies fail closed for unknown/disconnected states. There is deliberately no
@@ -138,7 +149,12 @@ prove discovery completeness or runtime correctness on an untested OS.
   It freezes existing eligibility, including the stricter update refusal for
   `not_pasted`; it does not relax guards for uncommitted work.
 - `tests/updates.test.mjs`: revision/stale-response, unknown/incomplete snapshot,
-  explicit confirmation, duplicate invoke and monotonic progress behavior.
+  explicit fresh preconfirmation checks, revocable preparation, exact-version
+  consent, duplicate invoke and monotonic progress behavior. Opening/status
+  polling remain local. Native status invalidates idle offers at exactly ten
+  minutes; errors clear offer/version/notes, never the installed version. Expired
+  confirmation refreshes within the owning RAII operation before the idle lease
+  or any archive bytes; changed versions return a fresh offer requiring review.
 - `tests/state-catalog.test.mjs`: unique IDs, resolvable owners/anchors/test paths
   and valid dependency references. Catalog cycles reflect coordination, not a
   scheduling order; do not topologically reorder runtime code from this graph.

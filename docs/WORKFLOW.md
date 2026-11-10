@@ -1,5 +1,17 @@
 # macOS workflow controls
 
+## Keyboard completion focus (group 4, partial)
+
+Login switches and pending-registration cancellation restore a currently visible
+switch or approval recovery control after success/failure only while that action
+still owns focus. Exclusion rows retain DOM identity across metadata updates;
+removing a row focuses the next Remove, previous Remove, or picker, while a failed
+remove returns to the same control. Navigation (including away and back), other
+input or another focused control revokes completion focus restoration. This UI
+guard does not alter the independent workflow controller revisions or native
+authorization. CDP synthetic login/exclusion replies are not real macOS
+ServiceManagement, Login Items, VoiceOver or hardware acceptance.
+
 The native main-thread `WorkflowPolicy` owns **future admission**, separately from
 recording lifetime, cancellation epochs, physical holds, and Store persistence.
 Pause is ephemeral and starts false in each process. Only exclusions persist.

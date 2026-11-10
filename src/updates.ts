@@ -15,6 +15,8 @@ export class Updates {
   private revision = 0;
   private pending = false;
   private polling = false;
+  private preparation = 0;
+  private prepared?: { version: string; revision: number };
   private invoke: Invoke;
   private render: (view: UpdateView) => void;
   private canInstall: () => boolean;
@@ -22,11 +24,13 @@ export class Updates {
     this.invoke = invoke; this.render = render; this.canInstall = canInstall;
   }
   private accept(view: UpdateView) {
-    if (!view || typeof view.installed_version !== 'string' || !isUpdatePhase(view.phase) || (view.phase === 'available' && (typeof view.available_version !== 'string' || !view.available_version))) throw new Error('Update status is unavailable. Reopen this window to retry.');
+    if (!view || typeof view.installed_version !== 'string' || !isUpdatePhase(view.phase) || (view.phase === 'available' && (typeof view.available_version !== 'string' || !view.available_version))) throw new Error('Update status is unavailable. Choose Check for updates to retry.');
+    if (view.phase !== 'available' || view.available_version !== this.prepared?.version) this.prepared = undefined;
     this.view = view; this.render(view);
   }
   private error(error: unknown) {
-    this.view = { ...this.view, phase: 'error', message: String(error) }; this.render(this.view);
+    this.prepared = undefined;
+    this.view = { ...this.view, phase: 'error', available_version: undefined, notes: '', downloaded_bytes: 0, total_bytes: undefined, message: String(error) }; this.render(this.view);
   }
   async refresh() {
     if (this.pending || this.polling) return;
@@ -40,23 +44,38 @@ export class Updates {
   }
   async check() {
     if (this.pending || updateBusy(this.view)) return;
+    this.prepared = undefined;
     this.pending = true; ++this.revision;
     this.view = { ...this.view, phase: 'checking', available_version: undefined, notes: '', message: 'Checking for updates…' }; this.render(this.view);
     try { this.accept(await this.invoke<UpdateView>('check_for_updates')); }
     catch (error) { this.error(error); }
     finally { this.pending = false; }
   }
+  // Explicit Download intent authorizes a feed refresh, not archive bytes.
+  // Closing/navigation revokes the callback, even if the same dialog reopens.
+  cancelPreparation() { ++this.preparation; this.prepared = undefined; }
+  async prepareConfirmation(): Promise<string | undefined> {
+    if (this.pending || this.view.phase !== 'available' || !this.canInstall()) return;
+    const preparation = ++this.preparation;
+    const revision = this.revision + 1;
+    await this.check();
+    if (preparation !== this.preparation || revision !== this.revision || this.view.phase !== 'available' || !this.canInstall()) return;
+    const version = this.view.available_version!;
+    this.prepared = { version, revision };
+    return version;
+  }
   async install(version: string) {
-    if (this.pending || this.view.phase !== 'available' || this.view.available_version !== version || !this.canInstall()) return;
+    if (this.pending || this.view.phase !== 'available' || this.view.available_version !== version || this.prepared?.version !== version || this.prepared.revision !== this.revision || !this.canInstall()) return;
+    this.prepared = undefined;
     this.pending = true; ++this.revision;
-    this.view = { ...this.view, phase: 'downloading', downloaded_bytes: 0, message: 'Starting the signed update…' }; this.render(this.view);
+    this.view = { ...this.view, phase: 'checking', downloaded_bytes: 0, message: 'Validating the confirmed release before downloading…' }; this.render(this.view);
     try { this.accept(await this.invoke<UpdateView>('install_update', { version })); }
     catch (error) { this.error(error); }
     finally { this.pending = false; }
   }
-  // Only local status IPC is polled while a download is running, never the feed.
+  // Only local status IPC is polled during an owned operation, never the feed.
   async progress() {
-    if (!this.pending || !['downloading', 'installing'].includes(this.view.phase) || this.polling) return;
+    if (!this.pending || !['checking', 'downloading', 'installing'].includes(this.view.phase) || this.polling) return;
     const revision = this.revision;
     this.polling = true;
     try {

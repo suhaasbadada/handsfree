@@ -6,7 +6,7 @@
   "build": { "beforeDevCommand": "npm run dev", "devUrl": "http://127.0.0.1:5173", "beforeBuildCommand": "npm run build", "frontendDist": "../dist" },
   "app": {
     "macOSPrivateApi": true,
-    "windows": [{ "label": "main", "title": "HandsFree", "width": 980, "height": 820, "minWidth": 560, "minHeight": 650, "visible": true, "theme": "Light", "backgroundColor": "#f7f6f3" }],
+    "windows": [{ "label": "main", "title": "HandsFree", "width": 980, "height": 820, "minWidth": 560, "minHeight": 650, "visible": true }],
     "security": {
       "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost",
       "devCsp": "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost ws://127.0.0.1:5173; img-src 'self' asset: http://asset.localhost"

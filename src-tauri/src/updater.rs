@@ -56,7 +56,7 @@ impl Default for View {
             notes: String::new(),
             downloaded_bytes: 0,
             total_bytes: None,
-            message: "Updates are checked only when you choose Check for updates.".into(),
+            message: "Choose Check for updates to contact the release server.".into(),
         }
     }
 }
@@ -67,13 +67,34 @@ struct State {
     pending: Option<(Update, Instant)>,
 }
 impl State {
+    fn clear_offer(&mut self) {
+        self.pending = None;
+        self.view.available_version = None;
+        self.view.notes.clear();
+        self.view.downloaded_bytes = 0;
+        self.view.total_bytes = None;
+    }
+    fn expire(&mut self, now: Instant) {
+        if !self.running
+            && self.view.phase == "available"
+            && !self
+                .pending
+                .as_ref()
+                .is_some_and(|(_, at)| metadata_fresh(*at, now))
+        {
+            self.clear_offer();
+            self.view.phase = "idle";
+            self.view.message =
+                "The previous offer expired. Choose Check for updates to refresh it.".into();
+        }
+    }
     fn begin(&mut self, check: bool) -> bool {
         if self.running {
             return false;
         }
         self.running = true;
         if check {
-            self.pending = None;
+            self.clear_offer();
             self.view = View {
                 phase: "checking",
                 message: "Checking the HandsFree release feed…".into(),
@@ -84,7 +105,7 @@ impl State {
     }
     fn finish(&mut self, result: Result<(), String>) {
         if let Err(error) = result {
-            self.pending = None;
+            self.clear_offer();
             self.view.phase = "error";
             self.view.message = format!("{error} Choose Check for updates to retry.");
         }
@@ -195,7 +216,9 @@ impl Drop for Operation {
 
 #[tauri::command]
 pub fn update_status() -> View {
-    state().lock().unwrap().view.clone()
+    let mut state = state().lock().unwrap();
+    state.expire(Instant::now());
+    state.view.clone()
 }
 
 #[derive(Deserialize)]
@@ -374,7 +397,11 @@ async fn check() -> Result<(), String> {
     state.pending = update;
     state.view.phase = if newer { "available" } else { "up_to_date" };
     state.view.available_version = newer.then_some(feed.version);
-    state.view.notes = plain_notes(&feed.notes);
+    state.view.notes = if newer {
+        plain_notes(&feed.notes)
+    } else {
+        String::new()
+    };
     state.view.message = if newer {
         "Update available. Download and restart only when you are ready; finish dictation first."
     } else {
@@ -417,28 +444,81 @@ pub async fn check_for_updates() -> View {
     }
 }
 
+enum InstallOutcome<T> {
+    Completed,
+    Review(Option<(T, Instant)>),
+}
+// The same owned operation spans refresh and the exact-version decision. Neither
+// the FIFO idle lease nor any archive/installed bytes are touched before consent
+// matches. Generic effects let tests use a fake clock/transport, never an app.
+async fn install_confirmed<T, F, Fut, V, D, Done>(
+    cached: Option<(T, Instant)>,
+    expected: &str,
+    now: Instant,
+    fresh: F,
+    version: V,
+    download_install: D,
+) -> Result<InstallOutcome<T>, String>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = Result<Option<(T, Instant)>, String>>,
+    V: Fn(&T) -> &str,
+    D: FnOnce(T) -> Done,
+    Done: std::future::Future<Output = Result<(), String>>,
+{
+    let offer = match cached {
+        Some((update, at)) if metadata_fresh(at, now) => Some((update, at)),
+        _ => fresh().await?,
+    };
+    match offer {
+        Some((update, _)) if version(&update) == expected => {
+            download_install(update).await?;
+            Ok(InstallOutcome::Completed)
+        }
+        other => Ok(InstallOutcome::Review(other)),
+    }
+}
+
 async fn install(expected_version: String) -> Result<(), String> {
     preflight()?;
-    let update = {
+    let cached = state().lock().unwrap().pending.take();
+    let outcome = install_confirmed(
+        cached,
+        &expected_version,
+        Instant::now(),
+        || async {
+            {
+                let mut state = state().lock().unwrap();
+                state.clear_offer();
+                state.view.phase = "checking";
+                state.view.message =
+                    "Refreshing expired release metadata before downloading…".into();
+            }
+            check().await?;
+            Ok(state().lock().unwrap().pending.take())
+        },
+        |update| &update.version,
+        download_install,
+    )
+    .await?;
+    if let InstallOutcome::Review(offer) = outcome {
         let mut state = state().lock().unwrap();
-        let (update, checked_at) = state
-            .pending
-            .take()
-            .ok_or("Choose Check for updates before downloading an update.")?;
-        if update.version != expected_version {
-            return Err("The available release changed after confirmation. Check again and confirm the new version.".into());
+        state.pending = offer;
+        if state.pending.is_some() {
+            state.view.phase = "available";
+            state.view.message = "The available release changed. Review the fresh offer and choose Download & restart again to confirm it.".into();
         }
-        if !metadata_fresh(checked_at, Instant::now()) {
-            return Err("The update check has expired. Check again before installing.".into());
-        }
-        if !validate_feed(&update.raw_json, &installed_version())?.1 {
-            return Err(
-                "The release is not newer than this distribution. Check again before installing."
-                    .into(),
-            );
-        }
-        update
-    };
+    }
+    Ok(())
+}
+
+async fn download_install(update: Update) -> Result<(), String> {
+    if !validate_feed(&update.raw_json, &installed_version())?.1 {
+        return Err(
+            "The release is not newer than this distribution. Check again before installing."
+                .into(),
+        );
+    }
     // A FIFO barrier, not a racy UI/phase snapshot. No data is cancelled or lost.
     let _lease = crate::acquire_update_idle().await?;
     {
@@ -573,7 +653,7 @@ mod tests {
     }
     #[test]
     fn distribution_and_prerelease_ordering() {
-        assert_eq!(installed_version(), "0.1.1-beta.13");
+        assert_eq!(installed_version(), "0.1.1-beta.14");
         assert!(
             validate_feed(&feed("0.1.1-beta.8"), "0.1.1-beta.7")
                 .unwrap()
@@ -709,11 +789,164 @@ mod tests {
         assert!(ensure_not_busy().is_ok());
     }
     #[test]
-    fn stale_metadata_requires_a_new_explicit_check() {
+    fn metadata_expires_at_exactly_ten_minutes() {
         let now = Instant::now();
         assert!(metadata_fresh(now, now));
         assert!(!metadata_fresh(now, now + MAX_AGE));
         assert!(!metadata_fresh(now, now + MAX_AGE + Duration::from_secs(1)));
+    }
+    fn restored_fixture() -> Update {
+        let mut context = tauri::test::mock_context(tauri::test::noop_assets());
+        context.config_mut().plugins.0.insert(
+            "updater".into(),
+            serde_json::json!({"pubkey":"unused-no-download"}),
+        );
+        let app = tauri::test::mock_builder()
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .build(context)
+            .unwrap();
+        signed_updater_builder(app.handle())
+            .endpoints(vec![FEED.parse().unwrap()])
+            .unwrap()
+            .build()
+            .unwrap()
+            .restore_update(feed("1.0.0"))
+            .unwrap()
+            .unwrap()
+    }
+    #[test]
+    fn local_status_expiry_and_failures_clear_offer_but_preserve_installed_version() {
+        let at = Instant::now();
+        let mut state = State {
+            pending: Some((restored_fixture(), at)),
+            ..State::default()
+        };
+        state.view.phase = "available";
+        state.view.available_version = Some("1.0.0".into());
+        state.view.notes = "Old notes".into();
+        let installed = state.view.installed_version.clone();
+        state.expire(at + MAX_AGE - Duration::from_nanos(1));
+        assert_eq!(state.view.phase, "available");
+        state.running = true;
+        state.expire(at + MAX_AGE);
+        assert!(
+            state.pending.is_some(),
+            "Status must not interfere with the owning operation"
+        );
+        state.running = false;
+        state.expire(at + MAX_AGE);
+        assert_eq!(state.view.phase, "idle");
+        assert!(state.pending.is_none());
+        assert!(state.view.available_version.is_none());
+        assert!(state.view.notes.is_empty());
+        assert_eq!(state.view.installed_version, installed);
+        state.view.available_version = Some("stale".into());
+        state.view.notes = "stale notes".into();
+        state.running = true;
+        state.finish(Err("offline".into()));
+        assert!(state.view.available_version.is_none());
+        assert!(state.view.notes.is_empty());
+        assert_eq!(state.view.installed_version, installed);
+        assert!(
+            state.begin(true),
+            "No restart needed after a failed operation"
+        );
+    }
+    #[test]
+    fn expired_confirmation_refreshes_before_any_download_or_idle_lease() {
+        use std::cell::Cell;
+        let at = Instant::now();
+        // All effects below are injected: no network, app install, lease, or wait.
+        for seconds in [600, 1800] {
+            for latest in [Some("11"), Some("12"), None] {
+                let checks = Cell::new(0);
+                let downloads = Cell::new(0);
+                let now = at + Duration::from_secs(seconds);
+                let result = tauri::async_runtime::block_on(install_confirmed(
+                    Some(("11".to_string(), at)),
+                    "11",
+                    now,
+                    || async {
+                        checks.set(checks.get() + 1);
+                        assert_eq!(downloads.get(), 0);
+                        Ok(latest.map(|version| (version.to_string(), now)))
+                    },
+                    |version| version.as_str(),
+                    |version| {
+                        let checks = &checks;
+                        let downloads = &downloads;
+                        async move {
+                            assert_eq!(checks.get(), 1);
+                            assert_eq!(
+                                version, "11",
+                                "Never substitute an unconfirmed newer version"
+                            );
+                            downloads.set(downloads.get() + 1);
+                            Ok(())
+                        }
+                    },
+                ))
+                .unwrap();
+                assert_eq!(checks.get(), 1);
+                assert_eq!(downloads.get(), usize::from(latest == Some("11")));
+                match (latest, result) {
+                    (Some("11"), InstallOutcome::Completed)
+                    | (None, InstallOutcome::Review(None)) => {}
+                    (Some("12"), InstallOutcome::Review(Some((offer, checked_at)))) => {
+                        assert_eq!(offer, "12");
+                        assert_eq!(checked_at, now);
+                    }
+                    _ => panic!("Unexpected confirmation decision"),
+                }
+            }
+        }
+        let result = tauri::async_runtime::block_on(install_confirmed(
+            Some(("11".to_string(), at)),
+            "11",
+            at + MAX_AGE,
+            || async { Err("offline".to_string()) },
+            |version| version.as_str(),
+            |_| async { panic!("Offline must not acquire a lease/download/install") },
+        ));
+        assert!(matches!(result, Err(error) if error == "offline"));
+        let result = tauri::async_runtime::block_on(install_confirmed(
+            None::<(String, Instant)>,
+            "11",
+            at,
+            || async { Ok(Some(("12".to_string(), at))) },
+            |version| version.as_str(),
+            |_| async {
+                panic!("A locally expired/removed offer must still reconfirm a new version")
+            },
+        ))
+        .unwrap();
+        assert!(matches!(result, InstallOutcome::Review(Some((offer, _))) if offer == "12"));
+        let downloads = Cell::new(0);
+        let result = tauri::async_runtime::block_on(install_confirmed(
+            Some(("11".to_string(), at)),
+            "11",
+            at + MAX_AGE - Duration::from_nanos(1),
+            || async { panic!("Fresh exact metadata does not need a native network refresh") },
+            |version| version.as_str(),
+            |_| async {
+                downloads.set(downloads.get() + 1);
+                Ok(())
+            },
+        ))
+        .unwrap();
+        assert!(matches!(result, InstallOutcome::Completed));
+        assert_eq!(downloads.get(), 1);
+        // An offer changed during confirmation is retained for review, not used.
+        let result = tauri::async_runtime::block_on(install_confirmed(
+            Some(("12".to_string(), at)),
+            "11",
+            at,
+            || async { panic!("A fresh cache need not be checked again natively") },
+            |version| version.as_str(),
+            |_| async { panic!("A different confirmed identity must not download") },
+        ))
+        .unwrap();
+        assert!(matches!(result, InstallOutcome::Review(Some((offer, _))) if offer == "12"));
     }
     #[test]
     fn simultaneous_quit_and_install_cannot_both_win() {

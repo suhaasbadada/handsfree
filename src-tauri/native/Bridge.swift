@@ -398,6 +398,27 @@ private class OverlayPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 }
+// Resolve against the view, not a launch-time preference: an already-visible
+// nonactivating capsule follows system appearance without changing its owner.
+struct CapsulePalette {
+    let surface: NSColor
+    let text: NSColor
+    let accent: NSColor
+    let button: NSColor
+    let primary: NSColor
+    let primaryText: NSColor
+    let border: NSColor
+    init(appearance: NSAppearance) {
+        let dark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        surface = NSColor(white: dark ? 0.16 : 0.98, alpha: 1)
+        text = NSColor(white: dark ? 0.94 : 0.22, alpha: 1)
+        accent = dark ? NSColor(srgbRed: 0.90, green: 0.61, blue: 0.57, alpha: 1) : NSColor(srgbRed: 0.65, green: 0.29, blue: 0.27, alpha: 1)
+        button = NSColor(white: dark ? 0.28 : 0.90, alpha: 1)
+        primary = NSColor(white: dark ? 0.92 : 0.27, alpha: 1)
+        primaryText = NSColor(white: dark ? 0.15 : 1, alpha: 1)
+        border = NSColor(white: dark ? 0.44 : 0.60, alpha: 1)
+    }
+}
 private class CapsuleButton: NSButton {
     override var isFlipped: Bool { true }
     var hovered = false
@@ -411,9 +432,11 @@ private class CapsuleButton: NSButton {
     override func mouseEntered(with event: NSEvent) { hovered = true; needsDisplay = true }
     override func mouseExited(with event: NSEvent) { hovered = false; needsDisplay = true }
     override func draw(_ dirtyRect: NSRect) {
-        (finish ? NSColor(white: hovered ? 0.20 : 0.27, alpha: 1) : NSColor(white: hovered ? 0.84 : 0.90, alpha: 1)).setFill()
+        let palette = CapsulePalette(appearance: effectiveAppearance)
+        let fill = finish ? palette.primary : palette.button
+        (hovered ? fill.blended(withFraction: 0.12, of: finish ? palette.primaryText : palette.text) ?? fill : fill).setFill()
         NSBezierPath(ovalIn: bounds.insetBy(dx: 3, dy: 3)).fill()
-        (finish ? NSColor.white : NSColor(white: 0.26, alpha: 1)).setStroke()
+        (finish ? palette.primaryText : palette.text).setStroke()
         let path = NSBezierPath(); path.lineWidth = 1.8; path.lineCapStyle = .round; path.lineJoinStyle = .round
         if finish {
             let points = CapsuleGeometry.checkmark(in: bounds)
@@ -428,6 +451,7 @@ private class CapsuleButton: NSButton {
 }
 
 class PillView: NSView {
+    var onAction: (Int32) -> Void = { callback?($0) }
     var phase = 0
     var level: CGFloat = 0
     var tick: CGFloat = 0
@@ -458,8 +482,13 @@ class PillView: NSView {
         addSubview(cancelButton); addSubview(finishButton)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-    @objc private func cancelRecording() { callback?(4) }
-    @objc private func finishRecording() { callback?(5) }
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+        subviews.forEach { $0.needsDisplay = true }
+    }
+    @objc private func cancelRecording() { onAction(4) }
+    @objc private func finishRecording() { onAction(5) }
     func setPhase(_ value: Int) {
         let previous = phase
         shrinkFrom = capsuleRect
@@ -468,18 +497,20 @@ class PillView: NSView {
         tick = 0
         cancelButton.isHidden = value != 1
         finishButton.isHidden = value != 1
+        setAccessibilityValue(nil)
         setAccessibilityLabel(value == 1 ? "HandsFree listening" : value == 2 ? "Transcribing" : value == 4 ? "No speech" : value == 5 ? "Copied" : "HandsFree needs attention. Open settings")
-        setAccessibilityHelp(value == 1 && pushToTalk ? "Release the shortcut to finish. Escape cancels." : value == 2 ? "Press Escape or use Cancel in HandsFree to cancel dictation." : nil)
+        setAccessibilityHelp(value == 1 ? (pushToTalk ? "Release the shortcut to finish. Escape cancels." : "Press the shortcut again or use Finish dictation to finish. Escape cancels.") : value == 2 ? "Press Escape or use Cancel in HandsFree to cancel dictation." : nil)
     }
     override func draw(_ dirtyRect: NSRect) {
         let capsule = capsuleRect
-        NSColor(calibratedRed: 0.985, green: 0.981, blue: 0.969, alpha: 0.97).setFill()
+        let palette = CapsulePalette(appearance: effectiveAppearance)
+        palette.surface.setFill()
         NSBezierPath(roundedRect: capsule.insetBy(dx: 1, dy: 1), xRadius: capsule.height / 2, yRadius: capsule.height / 2).fill()
-        NSColor(white: 0.25, alpha: 0.12).setStroke()
+        palette.border.setStroke()
         NSBezierPath(roundedRect: capsule.insetBy(dx: 1, dy: 1), xRadius: capsule.height / 2, yRadius: capsule.height / 2).stroke()
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         if phase == 1 {
-            NSColor(calibratedRed: 0.65, green: 0.29, blue: 0.27, alpha: 1).setFill()
+            palette.accent.setFill()
             for i in 0..<9 {
                 let shape = CGFloat([0.35, 0.6, 0.85, 0.65, 1, 0.7, 0.9, 0.5, 0.3][i])
                 // Amplitude comes only from the recorder, never a fake sine wave.
@@ -487,11 +518,11 @@ class PillView: NSView {
                 NSBezierPath(roundedRect: NSRect(x: 49.5 + CGFloat(i) * 6, y: 28-h/2, width: 3, height: h), xRadius: 1.5, yRadius: 1.5).fill()
             }
             let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .center
-            (Self.timerText(elapsed: elapsed, limit: limit) as NSString).draw(in: NSRect(x: 40, y: 6, width: 70, height: 12), withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium), .foregroundColor: NSColor(white: 0.25, alpha: 1), .paragraphStyle: paragraph])
+            (Self.timerText(elapsed: elapsed, limit: limit) as NSString).draw(in: NSRect(x: 40, y: 6, width: 70, height: 12), withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium), .foregroundColor: palette.text, .paragraphStyle: paragraph])
         } else if phase == 2 {
             for i in 0..<3 {
-                let breath = reduceMotion ? 0.65 : 0.45 + 0.4 * (0.5 + 0.5 * sin(tick / 30 * 2 * .pi / 1.4 - CGFloat(i) * 0.8))
-                NSColor(white: 0.35, alpha: breath).setFill()
+                let breath = reduceMotion ? 1 : 0.75 + 0.25 * (0.5 + 0.5 * sin(tick / 30 * 2 * .pi / 1.4 - CGFloat(i) * 0.8))
+                palette.text.withAlphaComponent(breath).setFill()
                 NSBezierPath(ovalIn: NSRect(x: capsule.midX - 12 + CGFloat(i) * 10, y: capsule.midY - 2, width: 4, height: 4)).fill()
             }
         } else {
@@ -499,7 +530,7 @@ class PillView: NSView {
             let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .center
             let x: CGFloat = 9
             let height: CGFloat = phase == 4 || phase == 5 ? 14 : 28
-            (text as NSString).draw(in: NSRect(x: x, y: (bounds.height-height)/2, width: bounds.width-x-9, height: height), withAttributes: [.font: NSFont.systemFont(ofSize: 10.5, weight: .medium), .foregroundColor: NSColor(white: 0.22, alpha: 1), .paragraphStyle: paragraph])
+            (text as NSString).draw(in: NSRect(x: x, y: (bounds.height-height)/2, width: bounds.width-x-9, height: height), withAttributes: [.font: NSFont.systemFont(ofSize: 10.5, weight: .medium), .foregroundColor: palette.text, .paragraphStyle: paragraph])
         }
     }
 }

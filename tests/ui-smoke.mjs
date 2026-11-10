@@ -7,19 +7,23 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { checkPracticeEvents } from './ui-practice-events.mjs';
+import { checkKeyboardRecovery } from './ui-keyboard-recovery.mjs';
 
 const binary = process.env.BROWSER_BINARY;
 const port = process.env.UI_PORT ?? '5187';
 if (!binary) throw new Error('Set BROWSER_BINARY to a Chromium-compatible browser. Start npm run dev -- --port 5187 first.');
 const profile = mkdtempSync(join(tmpdir(), 'handsfree-ui-'));
-const browser = spawn(binary, ['--headless', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=9237', `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' });
+const browser = spawn(binary, ['--headless', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=9237', `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore','ignore','pipe'] });
+let browserErrors = '';
+browser.stderr.on('data', chunk => { browserErrors = (browserErrors + chunk.toString()).slice(-4000); });
 let socket;
 let id = 0;
 const pending = new Map();
 function send(method, params = {}) {
   return new Promise((resolve, reject) => {
     const request = ++id;
-    pending.set(request, { resolve, reject });
+    const timer = setTimeout(() => { pending.delete(request); reject(new Error(`CDP timeout: ${method}`)); },15000);
+    pending.set(request, { resolve: value => { clearTimeout(timer); resolve(value); }, reject: error => { clearTimeout(timer); reject(error); } });
     socket.send(JSON.stringify({ id: request, method, params }));
   });
 }
@@ -30,7 +34,7 @@ async function evaluate(expression) {
 }
 async function until(expression) {
   for (let i = 0; i < 100; i++) { if (await evaluate(expression)) return; await delay(50); }
-  throw new Error(`Timed out: ${expression}\n${JSON.stringify(await evaluate(`({focus:document.activeElement?.id,feedback:document.getElementById('feedback')?.textContent,calls:window.calls?.slice(-12)})`))}`);
+  throw new Error(`Timed out: ${expression}\n${JSON.stringify(await evaluate(`({url:location.href,body:document.body?.innerText.slice(0,600),focus:document.activeElement?.id,feedback:document.getElementById('feedback')?.textContent,calls:window.calls?.slice(-12)})`))}`);
 }
 try {
   let page;
@@ -38,7 +42,7 @@ try {
     try { page = await (await fetch(`http://127.0.0.1:9237/json/new?http://127.0.0.1:${port}`, { method: 'PUT' })).json(); break; }
     catch { await delay(50); }
   }
-  assert.ok(page?.webSocketDebuggerUrl, 'Headless browser started');
+  assert.ok(page?.webSocketDebuggerUrl, `Headless browser started: ${browserErrors}`);
   socket = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
   socket.onmessage = event => {
@@ -49,6 +53,7 @@ try {
     }
   };
   await send('Emulation.setDeviceMetricsOverride', { width: 980, height: 820, deviceScaleFactor: 1, mobile: false });
+  await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-color-scheme',value:'light'},{name:'prefers-reduced-motion',value:'no-preference'}]});
   await until(`Boolean(document.getElementById('nav-settings'))`);
   assert.equal(await evaluate(`document.querySelector('footer .beta-badge').textContent==='BETA' && document.querySelector('footer .beta-badge').getBoundingClientRect().width>0 && !document.querySelector('.brand .beta-badge') && !document.querySelector('main footer') && document.getElementById('app-version').textContent==='0.1.1'`), true, 'Version, beta and language metadata live in the actual footer');
    assert.equal(await evaluate(`['setup','change-shortcut','mic','permissions','download','reset','sounds','sound-volume'].every(id=>document.getElementById(id).disabled)`), true, 'Native controls are unavailable before the backend connects');
@@ -304,8 +309,8 @@ try {
   assert.equal(await evaluate(`localStorage.length===0 && sessionStorage.length===0 && window.calls.filter(c=>c.command==='copy_transcript').length===0`),true,'Practice does not persist or request normal clipboard actions');
   // Opening Updates reads local installed metadata, never a network check. The
   // test boundary stands in for native IPC; actual signatures are tested in Rust.
-  await evaluate(`window.updateFixture={installed_version:'0.1.1-beta.7',phase:'idle',notes:'',downloaded_bytes:0,message:'Choose Check for updates.'};const priorUpdates=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(['update_status','check_for_updates','install_update'].includes(command)){window.calls.push({command,args});if(command==='check_for_updates')window.updateFixture={...window.updateFixture,phase:'available',available_version:'0.1.1-beta.8',notes:'<img src=x onerror="window.updateInjected=true">',message:'Update available.'};if(command==='install_update')window.updateFixture={...window.updateFixture,phase:'error',message:'Signature verification failed. Check again.'};return structuredClone(window.updateFixture);}return priorUpdates(command,args);};document.getElementById('updates-open').click()`);
-  await until(`document.getElementById('installed-release').textContent==='0.1.1-beta.7'`);
+  await evaluate(`window.updateNextVersion='0.1.1-beta.11';window.updateFixture={installed_version:'0.1.1-beta.10',phase:'idle',notes:'',downloaded_bytes:0,message:'Choose Check for updates.'};const priorUpdates=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(['update_status','check_for_updates','install_update'].includes(command)){window.calls.push({command,args});if(command==='check_for_updates'){if(window.updateCheckWait)await window.updateCheckWait;window.updateFixture={...window.updateFixture,phase:'available',available_version:window.updateNextVersion,notes:'<img src=x onerror="window.updateInjected=true">',message:'Update available.'};}if(command==='install_update')window.updateFixture={...window.updateFixture,phase:'error',available_version:undefined,notes:'',message:'Signature verification failed. Check again.'};return structuredClone(window.updateFixture);}return priorUpdates(command,args);};document.getElementById('updates-open').click()`);
+  await until(`document.getElementById('installed-release').textContent==='0.1.1-beta.10'`);
   assert.equal(await evaluate(`window.calls.some(c=>c.command==='check_for_updates'||c.command==='install_update')`),false,'Opening never checks online or installs');
   assert.equal(await evaluate(`document.activeElement.id==='updates-title' && getComputedStyle(document.activeElement).outlineStyle==='none'`),true,'Opening focuses the readable heading without highlighting Close');
   await send('Input.dispatchKeyEvent', {type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
@@ -323,37 +328,85 @@ try {
   await evaluate(`document.getElementById('updates-check').click()`);
   await until(`!document.getElementById('updates-install').hidden`);
   assert.equal(await evaluate(`document.getElementById('updates-check').hidden`),true,'Available updates replace Check instead of awkwardly wrapping a third action');
+  assert.equal(await evaluate(`!document.getElementById('updates-check-again').hidden && !document.getElementById('updates-check-again').closest('.dialog-actions')`),true,'Check again remains available outside the two-button action row');
   for (const width of [320,390,400,560,980]) {
     await send('Emulation.setDeviceMetricsOverride', {width,height:820,deviceScaleFactor:1,mobile:false});
     assert.equal(await evaluate(`(()=>{const d=document.getElementById('updates-dialog');const buttons=[...d.querySelectorAll('.dialog-actions button')].filter(b=>!b.hidden);return buttons.length===2 && d.scrollWidth<=d.clientWidth && buttons.every(b=>b.getBoundingClientRect().right<=d.getBoundingClientRect().right);})()`),true,`Two contained update actions at ${width}px`);
     if(width>=390) assert.equal(await evaluate(`document.getElementById('updates-close').getBoundingClientRect().top===document.getElementById('updates-install').getBoundingClientRect().top`),true,'Normal dialog keeps both actions on one row');
   }
   await send('Emulation.setDeviceMetricsOverride', {width:980,height:820,deviceScaleFactor:1,mobile:false});
-  assert.equal(await evaluate(`document.getElementById('installed-release').textContent`),'0.1.1-beta.7','Available release must not be shown as already installed');
+  assert.equal(await evaluate(`document.getElementById('installed-release').textContent`),'0.1.1-beta.10','Available release must not be shown as already installed');
   assert.equal(await evaluate(`!window.updateInjected && !document.querySelector('#updates-notes img') && document.getElementById('updates-notes').textContent.includes('<img')`),true,'Release notes remain plain text');
-  await evaluate(`document.getElementById('updates-install').click()`);
-  assert.equal(await evaluate(`document.getElementById('update-confirm-dialog').open`),true);
+  await evaluate(`window.updateNextVersion='0.1.1-beta.12';window.updateCheckWait=new Promise(resolve=>window.finishUpdateCheck=resolve);document.getElementById('updates-install').click()`);
+  assert.equal(await evaluate(`document.getElementById('update-confirm-dialog').open`),false,'Download must await the actual fresh metadata check');
+  assert.equal(await evaluate(`document.getElementById('updates-progress').hidden && !window.calls.some(c=>c.command==='install_update')`),true,'Metadata refresh does not claim to download archive bytes');
+  await evaluate(`document.getElementById('updates-install').click();window.finishUpdateCheck();window.updateCheckWait=undefined`);
+  await until(`document.getElementById('update-confirm-dialog').open`);
+  assert.equal(await evaluate(`document.getElementById('update-confirm-detail').textContent`),'Install 0.1.1-beta.12?','The existing open app confirms the latest offer, not cached beta11');
   assert.equal(await evaluate(`document.activeElement.id==='update-confirm-title' && getComputedStyle(document.activeElement).outlineStyle==='none'`),true,'Confirmation focuses its heading, not Not now or the install action');
   await send('Input.dispatchKeyEvent', {type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
   await send('Input.dispatchKeyEvent', {type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
-  assert.equal(await evaluate(`document.getElementById('update-confirm-dialog').open && !window.calls.some(c=>c.command==='install_update')`),true,'Enter on the initial heading never confirms installation');
+  assert.equal(await evaluate(`document.getElementById('update-confirm-dialog').open && !window.calls.some(c=>c.command==='install_update')`),true,`Enter on the initial heading never confirms installation: ${JSON.stringify(await evaluate(`({open:document.getElementById('update-confirm-dialog').open,focus:document.activeElement.id,update:window.updateFixture,fixture:window.fixture,calls:window.calls.slice(-15)})`))}`);
   assert.equal(await evaluate(`window.calls.some(c=>c.command==='install_update')`),false,'A download offer is not installation consent');
   await evaluate(`document.getElementById('update-keep').click()`);
   await until(`!document.getElementById('update-confirm-dialog').open`);
+  await evaluate(`window.updateCheckWait=new Promise(resolve=>window.finishUpdateCheck=resolve);document.getElementById('updates-install').click();document.getElementById('updates-close').click()`);
+  await until(`!document.getElementById('updates-dialog').open`);
+  await evaluate(`document.getElementById('updates-open').click();window.finishUpdateCheck();window.updateCheckWait=undefined`);
+  await until(`!document.getElementById('updates-install').hidden`);
+  assert.equal(await evaluate(`document.getElementById('update-confirm-dialog').open`),false,'Closing and reopening during preparation cannot resurrect confirmation');
+  await evaluate(`document.getElementById('updates-install').click()`);
+  await until(`document.getElementById('update-confirm-dialog').open`);
+  await evaluate(`window.updateFixture={...window.updateFixture,phase:'idle',available_version:undefined,notes:'',message:'The previous offer expired. Check again.'}`);
+  await until(`!document.getElementById('update-confirm-dialog').open`);
+  assert.equal(await evaluate(`window.calls.some(c=>c.command==='install_update')`),false,'Local expiry invalidates open confirmation without installing');
+  await evaluate(`document.getElementById('updates-check').click()`);
+  await until(`!document.getElementById('updates-install').hidden`);
+  await evaluate(`document.getElementById('updates-check-again').click()`);
+  await until(`!document.getElementById('updates-install').hidden`);
   await evaluate(`window.fixture.phase='recording'`);
   await until(`document.getElementById('updates-install').disabled`);
   await evaluate(`window.fixture.phase='idle'`);
   await until(`!document.getElementById('updates-install').disabled`);
-  await evaluate(`document.getElementById('updates-install').click();document.getElementById('update-confirm').click()`);
+  await evaluate(`document.getElementById('updates-install').click()`);
+  await until(`document.getElementById('update-confirm-dialog').open`);
+  await evaluate(`document.getElementById('update-confirm').click()`);
   await until(`document.getElementById('updates-message').textContent.includes('Signature verification failed')`);
   assert.equal(await evaluate(`document.getElementById('updates-check').hidden`),false,'Failures restore the explicit Check retry action');
-  assert.deepEqual(await evaluate(`window.calls.filter(c=>c.command==='install_update').map(c=>c.args)`),[{version:'0.1.1-beta.8'}],'Only the explicitly confirmed version is sent to native installation');
+  assert.deepEqual(await evaluate(`window.calls.filter(c=>c.command==='install_update').map(c=>c.args)`),[{version:'0.1.1-beta.12'}],'Only the freshly offered and explicitly confirmed version is sent to native installation');
+  await evaluate(`document.getElementById('updates-check').click()`);
+  await until(`!document.getElementById('updates-install').hidden`);
+  assert.equal(await evaluate(`document.getElementById('installed-release').textContent`),'0.1.1-beta.10','An explicit retry recovers without restarting or changing installed identity');
   await evaluate(`document.getElementById('updates-close').click()`);
   for (const theme of ['light','dark']) {
     await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-color-scheme',value:theme}]});
-    assert.deepEqual(await evaluate(`({scheme:getComputedStyle(document.documentElement).colorScheme,bg:getComputedStyle(document.documentElement).backgroundColor,text:getComputedStyle(document.documentElement).color})`), {scheme:'light',bg:'rgb(247, 246, 243)',text:'rgb(48, 46, 45)'}, 'The app stays intentionally light even on a dark system');
+    assert.deepEqual(await evaluate(`({scheme:getComputedStyle(document.documentElement).colorScheme,bg:getComputedStyle(document.documentElement).backgroundColor,text:getComputedStyle(document.documentElement).color})`), {scheme:'light dark',bg:theme==='dark'?'rgb(32, 31, 30)':'rgb(247, 246, 243)',text:theme==='dark'?'rgb(243, 239, 234)':'rgb(48, 46, 45)'}, 'The app follows system appearance without a saved theme preference');
     await evaluate(`document.getElementById('feedback').hidden=false;document.getElementById('feedback').textContent='Could not save. Try again.'`);
-    assert.deepEqual(await evaluate(`({bg:getComputedStyle(document.getElementById('feedback')).backgroundColor,text:getComputedStyle(document.getElementById('feedback')).color})`), {bg:'rgb(250, 240, 223)',text:'rgb(48, 46, 45)'}, 'Warning feedback has dark readable text in either system mode');
+    const readability = await evaluate(`(() => {
+      const rgb = value => value.match(/[\\d.]+/g).slice(0,3).map(Number);
+      const luminance = value => rgb(value).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
+      const contrast = (a,b) => {const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05)};
+      const background = el => {for(;el;el=el.parentElement){const bg=getComputedStyle(el).backgroundColor;if(bg!=='rgba(0, 0, 0, 0)')return bg;}return getComputedStyle(document.documentElement).backgroundColor;};
+      return ['.primary','textarea','select','.test-badge','.beta-badge','#feedback','footer','.subtle','.danger'].map(selector=>{
+        const el=document.querySelector(selector),s=getComputedStyle(el);
+        return {selector,ratio:contrast(s.color,background(el))};
+      });
+    })()`);
+    for (const {selector,ratio} of readability) assert.ok(ratio>=4.5, `${theme} ${selector} text contrast ${ratio.toFixed(2)} must be >=4.5`);
+    for (const motion of ['no-preference','reduce']) {
+      await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-color-scheme',value:theme},{name:'prefers-reduced-motion',value:motion}]});
+      for (const phase of ['recording','processing','downloading']) {
+        await evaluate(`window.fixture.phase=${JSON.stringify(phase)}`);
+        await until(`document.getElementById('dot').classList.contains(${JSON.stringify(phase)})`);
+        const styles = await evaluate(`({animation:getComputedStyle(document.getElementById('dot')).animationName,duration:getComputedStyle(document.querySelector('button')).transitionDuration,switchDuration:getComputedStyle(document.querySelector('.switch span'),'::after').transitionDuration})`);
+        assert.equal(styles.animation, motion==='reduce'?'none':'pulse', `${theme} ${phase} ${motion} animation`);
+        assert.equal(styles.duration,motion==='reduce'?'0s':'0.15s', `${theme} ${phase} button transition`);
+        assert.equal(styles.switchDuration,motion==='reduce'?'0s':'0.15s', `${theme} ${phase} switch transition`);
+      }
+    }
+    await evaluate(`window.fixture.phase='idle'`);
+    await until(`document.getElementById('dot').classList.contains('idle')`);
+    await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-color-scheme',value:theme},{name:'prefers-reduced-motion',value:'no-preference'}]});
     await evaluate(`document.getElementById('feedback').hidden=true`);
     for (const width of [320, 390, 400, 560, 740, 980, 1280]) {
       await send('Emulation.setDeviceMetricsOverride', { width, height: 820, deviceScaleFactor: 1, mobile: false });
@@ -364,7 +417,7 @@ try {
         assert.equal(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth`), true, `No horizontal overflow at ${width}px, ${theme}, ${tab}`);
         assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('button, select, input')).filter(e=>e.getClientRects().length && (e.getBoundingClientRect().right>innerWidth || e.getBoundingClientRect().left<0)).map(e=>e.id)`), [], 'All controls fit');
         if (tab==='settings') assert.equal(await evaluate(`(() => {const label=document.querySelector('.shortcut-row h3').getBoundingClientRect(),value=document.querySelector('.shortcut-value').getBoundingClientRect();return value.top>=label.bottom || value.left>=label.right;})()`), true, 'Shortcut value never overlaps its label');
-        assert.equal(await evaluate(`['words','saved','count'].every(id=>{const s=getComputedStyle(document.getElementById(id));return s.color==='rgb(48, 46, 45)' && s.opacity==='1'})`), true, 'Readable neutral activity numbers, not faded opacity');
+        assert.equal(await evaluate(`['words','saved','count'].every(id=>{const s=getComputedStyle(document.getElementById(id));return s.color==='${theme==='dark'?'rgb(243, 239, 234)':'rgb(48, 46, 45)'}' && s.opacity==='1'})`), true, 'Readable appearance-specific activity numbers, not faded opacity');
         assert.equal(await evaluate(`(() => {const status=document.querySelector('.status').getBoundingClientRect(),nav=document.querySelector('nav').getBoundingClientRect();return status.top>=nav.bottom && Math.abs(status.right-nav.right)<1 && !document.querySelector('main .status');})()`), true, 'Compact status aligns to navigation upper right');
       }
       await evaluate(`document.getElementById('change-shortcut').click()`);
@@ -514,11 +567,17 @@ try {
      }
    }
    assert.equal(await evaluate(`window.calls.slice(${windowsCallsStart}).some(c=>['request_permissions','start_recording','download_model','preview_sound'].includes(c.command))`), false, 'Windows setup never requests AX, starts recording, downloads or plays sound automatically');
+   console.log('UI smoke: base/theme checks passed; checking practice events');
    await checkPracticeEvents({send,evaluate,until,port});
+   console.log('UI smoke: practice checks passed; checking keyboard/recovery');
+   await checkKeyboardRecovery({send,evaluate,until,port});
    console.log('UI smoke passed: native practice event wiring, context races, Mac and Windows capabilities, shortcuts, privacy, preferences, downloads and responsive layout. No microphone capture.');
 } finally {
   socket?.close();
+  const exited = new Promise(resolve => { if (browser.exitCode !== null || browser.signalCode !== null) resolve(); else browser.once('exit',resolve); });
+  const forceExit = setTimeout(() => browser.kill('SIGKILL'),5000);
   browser.kill('SIGTERM');
-  await new Promise(resolve => browser.once('exit', resolve));
+  await exited;
+  clearTimeout(forceExit);
   rmSync(profile, { recursive: true, force: true });
 }

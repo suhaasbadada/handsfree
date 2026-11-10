@@ -53,8 +53,14 @@ Opening the dialog, starting the app, and status polling do not check online.
 These requests disclose ordinary connection metadata to GitHub, never audio,
 transcripts, model files, settings, or usage totals.
 
-An available update offers **Download & restart…**, followed by confirmation of
-the exact distribution version. No automatic installation, downgrade, or silent
+An available update offers **Download & restart…** and a separate **Check again**
+text action. Download explicitly refreshes feed metadata **before** opening
+confirmation of the freshly returned exact distribution version. A cached offer
+therefore cannot make an already-open app install a superseded release through
+the ordinary UI flow. This is a metadata check, not an archive download. Closing
+or navigating during the refresh revokes its confirmation callback. Up-to-date,
+offline and malformed responses do not open confirmation; retry needs no restart.
+No automatic installation, downgrade, or silent
 restart is performed. A native idle barrier refuses updates during recording,
 transcription, practice, shortcut capture, model download, or an unpasted result.
 While downloading/installing, new work and quitting are blocked. The official
@@ -79,7 +85,21 @@ signature, with `requireSignedVersion: true`. Feed versions use strict semantic
 ordering of the embedded distribution (for example beta 8 > beta 7), not the
 stable internal version. The only accepted target is `darwin-aarch64`; URLs must
 be the exact canonical versioned HandsFree GitHub `.app.tar.gz` asset. Metadata
-expires after ten minutes and is revalidated against the confirmed version.
+expires at exactly ten minutes. Local status reads clear expired offers and their
+notes without contacting the feed, except while an operation owns the state.
+Failed checks/installs also clear unusable offers while retaining the installed
+version. If confirmation outlives the cache, the same native RAII operation
+refreshes metadata before acquiring the FIFO idle/install lease or downloading
+any archive bytes. The same freshly verified confirmed version can proceed;
+a different version is returned as a fresh offer for review and **requires new
+confirmation**, never silent substitution. Opening/status polling still never
+authorize a feed request. Signature, canonical URL, pinned key, version ordering,
+install/quit exclusion and crypto-provider initialization remain mandatory.
+
+Fake-clock/transport Rust tests and controller/fresh-document browser tests cover
+expiry, same/newer/offline responses, stale callbacks and the cached-beta11 to
+fresh-beta12 flow without downloading or installing a release. These are not
+installed-app OTA, restart, microphone or hardware acceptance.
 
 The updater public key is in `src-tauri/tauri.macos.conf.json`. Its private key is
 kept at `~/Library/Application Support/HandsFree Updater Signing/handsfree-updater.key`

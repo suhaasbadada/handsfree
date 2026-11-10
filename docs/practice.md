@@ -1,5 +1,9 @@
 # Practice in Overview
 
+Extended shortcut instructions and receipt evidence are shown while **Get started**
+is open. Returning ready users keep a compact practice panel with the input meter
+and timer; recording-state changes do not expand the tutorial or move the layout.
+
 ## Recording controls (Mac beta 12)
 
 Select a microphone in Settings, or choose **System default**. A saved microphone
@@ -75,3 +79,22 @@ frontend listeners via CDP with a synthetic native bridge, checking revisitable
 guidance, no implicit effects, button versus shortcut evidence, meter updates,
 and privacy teardown. No live microphone, installed-app update, or hardware
 acceptance is implied by these tests.
+
+## Keyboard and recovery (group 4, partial)
+
+The brand menu is a button: Enter, Space or Down opens it at the first enabled
+item; arrows/Home/End skip disabled items, Escape returns to the brand, and Tab
+leaves the menu rather than leaving practice disabled. Focusout closes without
+stealing focus. Menu navigation focuses the visible view heading. Returning
+eligibility never replays a stale held shortcut.
+
+Populated practice and dictation status regions are named keyboard stops. Use
+Down/Page Down to read long messages in their fixed slots; unchanged polls keep
+text nodes and scroll position. Empty slots do not enter the tab order.
+Practice errors expose **Microphone settings**, focusing the existing picker:
+reconnect an unavailable selected device or choose another. **Practice setup
+help** still opens the existing guide. General errors offer **Open settings**,
+not an inferred action or an automatic retry of uncertain paste. No automatic
+permission prompt, download, capture or clipboard access is added.
+Production-DOM CDP key/AX tests are synthetic browser evidence only; real macOS
+VoiceOver, keyboard configuration and microphone acceptance remain unverified.
