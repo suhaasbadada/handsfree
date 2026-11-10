@@ -10,9 +10,9 @@
   --button: #f0eeeb;
   --warning: #faf0df;
   --danger: #a24736;
-  --primary-bg: #302e2d;
-  --primary-fg: #ffffff;
-  --primary-hover: #45403d;
+  --primary-bg: #a64a45;
+  --primary-fg: #fffefa;
+  --primary-hover: #943f3b;
   --focus: #a95450;
   --input: #faf9f6;
   --badge-fg: #4c6251;
@@ -25,7 +25,7 @@
   font-synthesis: none;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-appearance="light"]):not([data-appearance="dark"]) {
     --bg: #201f1e;
     --surface: #292725;
     --text: #f3efea;
@@ -36,9 +36,9 @@
     --button: #3b3733;
     --warning: #463921;
     --danger: #f0a18e;
-    --primary-bg: #eee5dc;
+    --primary-bg: #e69b91;
     --primary-fg: #292522;
-    --primary-hover: #ffffff;
+    --primary-hover: #eeaaa0;
     --focus: #eeaaa0;
     --input: #242220;
     --badge-fg: #c1d8c4;
@@ -47,6 +47,30 @@
     --switch-thumb: #201f1e;
     --selection: #65413b;
   }
+}
+:root[data-appearance="light"] { color-scheme: light; }
+:root[data-appearance="dark"] {
+  color-scheme: dark;
+  --bg: #201f1e;
+  --surface: #292725;
+  --text: #f3efea;
+  --muted: #c2bab3;
+  --line: #635c56;
+  --accent: #e69b91;
+  --active: #44302e;
+  --button: #3b3733;
+  --warning: #463921;
+  --danger: #f0a18e;
+  --primary-bg: #e69b91;
+  --primary-fg: #292522;
+  --primary-hover: #eeaaa0;
+  --focus: #eeaaa0;
+  --input: #242220;
+  --badge-fg: #c1d8c4;
+  --badge-bg: #2e3b30;
+  --switch-track: #827970;
+  --switch-thumb: #201f1e;
+  --selection: #65413b;
 }
 ::selection { background: var(--selection); color: var(--text); }
 * { box-sizing: border-box; }
@@ -117,6 +141,12 @@ kbd { display: inline-block; max-width: 100%; background: var(--button); border:
 .setting-row:last-child { border-bottom: 0; padding-bottom: 0; }
 .preferences .setting-row { padding-top: 7px; padding-bottom: 7px; }
 .preferences .setting-row:last-child { padding-bottom: 0; }
+.preference-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; border-bottom: 1px solid var(--line); }
+.preferences .preference-pair .setting-row { border: 0; padding-bottom: 7px; }
+@media (max-width: 650px) {
+  .preference-pair { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .preferences .preference-pair .setting-row:first-child { border-bottom: 1px solid var(--line); }
+}
 .setting-row > div:first-child { flex: 1; min-width: 0; }
 .setting-row p { color: var(--muted); line-height: 1.6; margin: 4px 0 0; }
 .setting-row button { flex: none; }

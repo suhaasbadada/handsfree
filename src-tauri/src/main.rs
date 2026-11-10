@@ -277,6 +277,7 @@ fn enqueue_at(control: Control, epoch: u64) {
 
 #[derive(Clone, Serialize)]
 struct Status {
+    appearance: storage::Appearance,
     platform: &'static str,
     phase: String,
     message: String,
@@ -774,6 +775,43 @@ async fn set_microphone(uid: Option<String>) -> Result<(), String> {
         Ok(())
     })
     .await
+}
+#[cfg(target_os = "macos")]
+#[derive(Serialize)]
+struct AppearanceStatus {
+    appearance: storage::Appearance,
+}
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn set_appearance(appearance: storage::Appearance) -> Result<AppearanceStatus, String> {
+    configure(move || {
+        // Presentation only: no cancellation, gesture reset, capture or phase gate.
+        // AppKit dispatch must never run while Inner is locked.
+        if !unsafe { hf_appearance(appearance.native_code()) } {
+            return Err("Native appearance could not be applied.".into());
+        }
+        let s = state();
+        let mut inner = s.inner.lock().unwrap();
+        let old = inner.store.appearance;
+        let mut updated = inner.store.clone();
+        updated.appearance = appearance;
+        let path = s.directory.join("usage.json");
+        let result = storage::save(&path, &updated);
+        let actual = match &result {
+            Ok(()) => appearance,
+            Err(_) => storage::load(&path).map(|disk| disk.appearance).unwrap_or(old),
+        };
+        inner.store.appearance = actual;
+        inner.status.appearance = actual;
+        inner.status.persistence_error = result.as_ref().err()
+            .map(|e| format!("Appearance durability error: {e}")).unwrap_or_default();
+        drop(inner);
+        if actual != appearance && !unsafe { hf_appearance(actual.native_code()) } {
+            return Err("Native appearance reconciliation failed.".into());
+        }
+        result.map_err(|e| format!("Appearance could not be durably saved; live appearance reconciled with readable disk (or last known preference): {e}"))?;
+        Ok(AppearanceStatus { appearance: actual })
+    }).await
 }
 #[tauri::command]
 async fn set_sounds(enabled: bool) -> Result<(), String> {
@@ -1929,6 +1967,8 @@ fn main() {
             #[cfg(target_os = "macos")]
             set_excluded_apps,
             #[cfg(target_os = "macos")]
+            set_appearance,
+            #[cfg(target_os = "macos")]
             running_apps,
             #[cfg(target_os = "macos")]
             set_launch_at_login,
@@ -1988,6 +2028,10 @@ fn main() {
             };
             unsafe {
                 #[cfg(target_os = "macos")]
+                if !hf_appearance(store.appearance.native_code()) {
+                    return Err("Native appearance could not be initialized.".into());
+                }
+                #[cfg(target_os = "macos")]
                 hf_excluded(cstring(&serde_json::to_string(&store.excluded_bundle_ids)?)?.as_ptr());
                 hf_sounds(store.sounds);
                 #[cfg(target_os = "macos")]
@@ -2008,6 +2052,7 @@ fn main() {
                     session_epoch: CANCELLATION.current(),
                     practice: None,
                     status: Status {
+                        appearance: store.appearance,
                         platform: std::env::consts::OS,
                         phase: "idle".into(),
                         message: if ready {

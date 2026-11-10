@@ -9,10 +9,11 @@ import { Practice } from './practice';
 import { setupChecklist, shortcutTutorial } from './onboarding.ts';
 import { PracticeInputs, type PracticeInput } from './practice-input.ts';
 import { Workflow } from './workflow.ts';
+import { AppearancePreference, appearanceValue, type Appearance } from './appearance.ts';
 import { Updates, updateBusy } from './updates';
 import { phasePolicy, updateInstalling, type DictationPhase } from './state.ts';
 
-type Status = { microphone_uid?: string | null; platform?: 'windows' | 'macos'; compatibility_paste?: boolean; phase: DictationPhase; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: 'clean' | 'warm'; recording_limit: number; recording_mode?: 'toggle' | 'push_to_talk'; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
+type Status = { appearance?: Appearance; microphone_uid?: string | null; platform?: 'windows' | 'macos'; compatibility_paste?: boolean; phase: DictationPhase; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: 'clean' | 'warm'; recording_limit: number; recording_mode?: 'toggle' | 'push_to_talk'; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
 const logo = new URL('../src-tauri/icons/icon.png', import.meta.url).href;
 const glyphs: Record<string,string> = {
  mic:'<rect x="8" y="3" width="8" height="12" rx="4"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/>',
@@ -69,11 +70,11 @@ document.querySelector('#app')!.innerHTML = `
     <ul id="excluded-apps" aria-label="Excluded apps"></ul><p id="workflow-error" class="feedback" role="status" hidden></p>
    </section>
    <section class="card preferences" aria-labelledby="preferences-title"><h2 id="preferences-title">Preferences</h2>
+    <div class="preference-pair"><div class="setting-row"><div><h3><label for="appearance-choice">Appearance</label></h3></div><select id="appearance-choice" disabled><option value="light">Light</option><option value="dark">Dark</option><option value="system" selected>System</option></select></div><div class="setting-row"><div><h3><label for="recording-limit">Recording limit</label></h3></div><select id="recording-limit" title="Applies to the next recording"><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="240">4 minutes</option><option value="300">5 minutes</option></select></div></div>
     <div id="microphone-choice-row" class="setting-row" hidden><div><h3><label for="microphone-choice">Microphone</label></h3><p id="microphone-choice-help">Applies to the next recording. Unavailable selections never fall back silently.</p></div><div class="microphone-controls"><select id="microphone-choice" aria-describedby="microphone-choice-help" disabled><option value="">System default</option></select><button id="microphone-refresh" class="text-action" disabled>Refresh</button></div></div>
     <div class="setting-row"><div><h3><label for="recording-mode">Recording mode</label></h3><p id="recording-mode-help" hidden>Hold the shortcut; release to finish. Other keys or focus changes cancel.</p></div><select id="recording-mode" aria-describedby="recording-mode-help"><option value="toggle">Toggle</option><option value="push_to_talk">Push to talk</option></select></div>
     <div id="compatibility-row" class="setting-row" hidden><div><h3>Compatibility paste</h3><p id="compatibility-help">For apps that hide their text field. Pastes once into the same active app/window; the exact field cannot be verified.</p></div><label class="switch"><input id="compatibility-paste" type="checkbox" role="switch" aria-label="Compatibility paste" aria-describedby="compatibility-help"><span aria-hidden="true"></span></label></div>
      <div class="setting-row shortcut-row"><div><h3>Shortcut</h3></div><div class="shortcut-value"><button id="change-shortcut" aria-label="Record shortcut" title="Record shortcut" aria-pressed="false" aria-describedby="shortcut-feedback"><span id="saved-shortcut">…</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/></svg></button><button id="stop-shortcut" hidden>Cancel</button><button id="shortcut-fn" class="text-action" hidden>Use default</button></div><p id="shortcut-feedback" role="status" hidden></p></div>
-    <div class="setting-row"><div><h3><label for="recording-limit">Recording limit</label></h3></div><select id="recording-limit" title="Applies to the next recording"><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="240">4 minutes</option><option value="300">5 minutes</option></select></div>
     <div class="setting-row listening-row"><div><h3>Sound</h3></div><select id="sound-style" aria-label="Sound"><option value="clean">Clean</option><option value="warm">Warm</option></select><span id="sound-state" class="state">Off</span><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Recording sounds"><span aria-hidden="true"></span></label></div>
     <div class="setting-row volume-row"><h3><label for="sound-volume">Volume</label></h3><div class="sound-controls"><input id="sound-volume" type="range" min="0" max="100" step="1" value="50" aria-describedby="volume-percent"><output id="volume-percent" for="sound-volume">50%</output></div><button id="preview-sound" class="icon-action" aria-label="Preview sound" title="Preview sound" disabled>${icon('play')}</button></div>
   </section>
@@ -589,6 +590,17 @@ soundStyle.onchange = async () => {
 };
 const recordingLimit = el('recording-limit') as HTMLSelectElement;
 const microphoneChoice = el('microphone-choice') as HTMLSelectElement;
+const appearanceChoice = el('appearance-choice') as HTMLSelectElement;
+const appearance = new AppearancePreference(invoke, () => {
+  document.documentElement.dataset.appearance = appearance.value;
+  appearanceChoice.value = appearance.selection;
+  appearanceChoice.disabled = appearance.pending || !current || current.platform !== 'macos' || installingUpdate();
+});
+appearanceChoice.onchange = async () => {
+  if (appearanceChoice.disabled) return;
+  await appearance.change(appearanceValue(appearanceChoice.value));
+  feedback(appearance.error);
+};
 function renderMicrophones() {
   el('microphone-choice-row').hidden = current?.platform !== 'macos';
   if (!microphonePending) {
@@ -668,8 +680,10 @@ function refresh(): Promise<void> {
   return refreshTask;
 }
 async function refreshStatus() {
+  const appearanceRevision = appearance.revision;
   try {
       current = await invoke<Status>('status');
+      appearance.observe(current.appearance, appearanceRevision);
       renderMicrophones();
       if (current.platform === 'macos' && !microphonesLoaded) { microphonesLoaded = true; void refreshMicrophones(); }
       const configuration = JSON.stringify([current.shortcut, current.recording_mode]);

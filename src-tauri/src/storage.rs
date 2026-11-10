@@ -75,6 +75,8 @@ impl Stats {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(default)]
 pub struct Store {
+    #[serde(deserialize_with = "read_appearance")]
+    pub appearance: Appearance,
     #[serde(deserialize_with = "read_excluded_apps")]
     pub excluded_bundle_ids: Vec<String>,
     #[serde(deserialize_with = "read_compatibility_paste")]
@@ -112,6 +114,26 @@ pub fn normalized_exclusions(ids: Vec<String>) -> Result<Vec<String>, String> {
     ids.sort();
     ids.dedup();
     Ok(ids)
+}
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Appearance {
+    #[default]
+    System,
+    Light,
+    Dark,
+}
+impl Appearance {
+    pub fn native_code(self) -> i32 {
+        match self {
+            Self::System => 0,
+            Self::Light => 1,
+            Self::Dark => 2,
+        }
+    }
+}
+fn read_appearance<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Appearance, D::Error> {
+    Ok(serde_json::from_value(serde_json::Value::deserialize(d)?).unwrap_or_default())
 }
 fn read_excluded_apps<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
     let value = serde_json::Value::deserialize(d)?;
@@ -189,6 +211,7 @@ fn read_shortcut<'de, D: serde::Deserializer<'de>>(
 impl Default for Store {
     fn default() -> Self {
         Self {
+            appearance: Appearance::System,
             excluded_bundle_ids: Vec::new(),
             compatibility_paste: false,
             recording_mode: RecordingMode::default(),
@@ -266,6 +289,49 @@ pub fn validate_recording_limit(seconds: u32) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn appearance_migrates_only_its_field_and_roundtrips_every_choice() {
+        use super::*;
+        let baseline: Store = serde_json::from_value(serde_json::json!({
+            "sounds": true, "sound_volume": 27, "sound_style": "warm",
+            "microphone_uid": "saved-input", "recording_limit": 300,
+            "recording_mode": "push_to_talk", "compatibility_paste": true,
+            "excluded_bundle_ids": ["com.example.Editor"],
+            "stats": {"words": 47, "transcriptions": 3, "speech_seconds": 12, "saved_seconds": 20}
+        }))
+        .unwrap();
+        assert_eq!(baseline.appearance, Appearance::System);
+        for malformed in [
+            serde_json::Value::Null,
+            serde_json::json!(true),
+            serde_json::json!(3),
+            serde_json::json!({}),
+            serde_json::json!([]),
+            serde_json::json!("Dark"),
+            serde_json::json!("unknown"),
+        ] {
+            let mut json = serde_json::to_value(&baseline).unwrap();
+            json["appearance"] = malformed;
+            assert_eq!(serde_json::from_value::<Store>(json).unwrap(), baseline);
+        }
+        let directory =
+            std::env::temp_dir().join(format!("handsfree-appearance-{}", std::process::id()));
+        fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("usage.json");
+        for (appearance, wire, code) in [
+            (Appearance::System, "system", 0),
+            (Appearance::Light, "light", 1),
+            (Appearance::Dark, "dark", 2),
+        ] {
+            let mut updated = baseline.clone();
+            updated.appearance = appearance;
+            assert_eq!(appearance.native_code(), code);
+            assert_eq!(serde_json::to_value(&updated).unwrap()["appearance"], wire);
+            save(&path, &updated).unwrap();
+            assert_eq!(load(&path).unwrap(), updated);
+        }
+        fs::remove_dir_all(directory).unwrap();
+    }
     #[test]
     fn exclusions_are_bounded_deduplicated_and_field_isolated() {
         use super::*;

@@ -113,6 +113,18 @@ private func main<T>(_ body: () -> T) -> T {
     if Thread.isMainThread { return body() }
     return DispatchQueue.main.sync(execute: body)
 }
+// Nil truly removes the app override: future OS changes remain live in System.
+// Injectable assignment tests exercise the same guarded adapter without capture.
+func applyAppearance(_ mode: Int32, assign: (NSAppearance?) -> Void) -> Bool {
+    guard (0...2).contains(mode) else { return false }
+    let appearance = mode == 0 ? nil : NSAppearance(named: mode == 1 ? .aqua : .darkAqua)
+    guard mode == 0 || appearance != nil else { return false }
+    assign(appearance)
+    return true
+}
+@_cdecl("hf_appearance") public func setAppearance(_ mode: Int32) -> Bool {
+    main { applyAppearance(mode) { NSApplication.shared.appearance = $0 } }
+}
 // Only the dashboard lifecycle changes Dock presence. Recording never calls this.
 @_cdecl("hf_dashboard_visible") public func dashboardVisible(_ visible: Bool) -> Bool {
     main {
@@ -410,13 +422,17 @@ struct CapsulePalette {
     let border: NSColor
     init(appearance: NSAppearance) {
         let dark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        surface = NSColor(white: dark ? 0.16 : 0.98, alpha: 1)
-        text = NSColor(white: dark ? 0.94 : 0.22, alpha: 1)
-        accent = dark ? NSColor(srgbRed: 0.90, green: 0.61, blue: 0.57, alpha: 1) : NSColor(srgbRed: 0.65, green: 0.29, blue: 0.27, alpha: 1)
-        button = NSColor(white: dark ? 0.28 : 0.90, alpha: 1)
-        primary = NSColor(white: dark ? 0.92 : 0.27, alpha: 1)
-        primaryText = NSColor(white: dark ? 0.15 : 1, alpha: 1)
-        border = NSColor(white: dark ? 0.44 : 0.60, alpha: 1)
+        func rgb(_ hex: UInt32) -> NSColor {
+            NSColor(srgbRed: CGFloat((hex >> 16) & 255) / 255,
+                green: CGFloat((hex >> 8) & 255) / 255, blue: CGFloat(hex & 255) / 255, alpha: 1)
+        }
+        surface = rgb(dark ? 0x292725 : 0xfffefa)
+        text = rgb(dark ? 0xf3efea : 0x302e2d)
+        accent = rgb(dark ? 0xe69b91 : 0xa64a45)
+        button = rgb(dark ? 0x3b3733 : 0xf0eeeb)
+        primary = accent
+        primaryText = rgb(dark ? 0x292522 : 0xfffefa)
+        border = rgb(dark ? 0x827970 : 0x706b68)
     }
 }
 private class CapsuleButton: NSButton {

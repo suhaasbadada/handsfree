@@ -1,5 +1,16 @@
 import AppKit
 
+// Guarded runtime adapter: explicit choices override, System removes assignment.
+var assignedAppearance: NSAppearance? = nil
+var appearanceAssignments = 0
+for mode: Int32 in [1, 2, 0, 2, 1, 0] {
+    precondition(applyAppearance(mode) { assignedAppearance = $0; appearanceAssignments += 1 })
+    precondition(mode == 0 ? assignedAppearance == nil : assignedAppearance?.name == (mode == 1 ? .aqua : .darkAqua))
+}
+precondition(!applyAppearance(3) { _ in appearanceAssignments += 1 })
+precondition(!applyAppearance(-1) { _ in appearanceAssignments += 1 })
+precondition(appearanceAssignments == 6)
+
 // Actual admission policy + physical receipt latch; synthetic identities only.
 var workflowPolicy = WorkflowPolicy()
 for id: String? in [nil, ""] {
@@ -370,6 +381,20 @@ for phase: Int32 in [1, 2, 3, 4, 5, 1] {
     precondition(!panel.canBecomeKey && !panel.canBecomeMain && !panel.isKeyWindow)
     precondition(panel.styleMask.contains(.nonactivatingPanel))
     let view = panel.contentView!
+    panel.appearance = nil
+    view.appearance = nil
+    for mode: Int32 in [1, 2, 0, 2, 1, 0] {
+        precondition(setAppearance(mode))
+        precondition(mode == 0 ? app.appearance == nil : app.appearance?.name == (mode == 1 ? .aqua : .darkAqua))
+        if mode != 0 {
+            let dark = mode == 2
+            precondition((view.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua) == dark)
+            let live = CapsulePalette(appearance: view.effectiveAppearance)
+            precondition(contrast(live.text, live.surface) >= 4.5)
+            precondition(contrast(live.primaryText, live.primary) >= 4.5)
+            precondition(contrast(live.accent, live.surface) >= 3)
+        }
+    }
     let buttons = view.subviews.compactMap { $0 as? NSButton }
     precondition(buttons.count == 2 && buttons.allSatisfy { $0.isFlipped })
     precondition(buttons.allSatisfy { view.bounds.contains($0.frame) && $0.frame.width == 34 && $0.frame.height == 34 })

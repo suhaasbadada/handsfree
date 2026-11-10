@@ -4,6 +4,12 @@ Extended shortcut instructions and receipt evidence are shown while **Get starte
 is open. Returning ready users keep a compact practice panel with the input meter
 and timer; recording-state changes do not expand the tutorial or move the layout.
 
+Settings → Preferences → **Appearance** offers Light, Dark and System (default).
+It changes presentation only, including the floating capsule; it does not clear
+practice, change its geometry/timer or affect capture and usage. Explicit choices
+override OS appearance; System follows future OS changes. See [Appearance](APPEARANCE.md)
+for persistence, brand palette and automated-verification boundaries.
+
 ## Recording controls (Mac beta 12)
 
 Select a microphone in Settings, or choose **System default**. A saved microphone

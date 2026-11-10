@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { checkPracticeEvents } from './ui-practice-events.mjs';
 import { checkKeyboardRecovery } from './ui-keyboard-recovery.mjs';
+import { checkAppearance } from './ui-appearance.mjs';
 
 const binary = process.env.BROWSER_BINARY;
 const port = process.env.UI_PORT ?? '5187';
@@ -568,6 +569,7 @@ try {
    }
    assert.equal(await evaluate(`window.calls.slice(${windowsCallsStart}).some(c=>['request_permissions','start_recording','download_model','preview_sound'].includes(c.command))`), false, 'Windows setup never requests AX, starts recording, downloads or plays sound automatically');
    console.log('UI smoke: base/theme checks passed; checking practice events');
+   await checkAppearance({send,evaluate,until,port});
    await checkPracticeEvents({send,evaluate,until,port});
    console.log('UI smoke: practice checks passed; checking keyboard/recovery');
    await checkKeyboardRecovery({send,evaluate,until,port});

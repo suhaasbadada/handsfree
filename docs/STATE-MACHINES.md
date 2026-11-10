@@ -70,6 +70,17 @@ prove discovery completeness or runtime correctness on an untested OS.
 
 ## Executable contracts
 
+- Appearance is presentation, not readiness or capture authorization. One saved
+  `system`/`light`/`dark` preference defaults only its own absent/malformed field.
+  Configure serializes writes without cancelling dictation or resetting gestures;
+  save failures reconcile readable disk (including post-rename errors). AppKit's
+  main-thread app override is set to Aqua/DarkAqua or removed with nil for System,
+  with no Rust state lock across native dispatch. The frontend appearance owner
+  rejects stale/pending status observations and duplicate writes; only actual
+  saved/reconciled status changes the root attribute, never speculative input.
+  System's CSS media subscription and native effective appearance remain live.
+  See [Appearance](APPEARANCE.md) and the executable controller/native/DOM tests.
+
 - Workflow policy is native-main-thread-owned future admission, not a cancellation
   lease. Receipt checks latch rejected physical input; monotonic bounded tickets
   retain PID/bundle identity through the FIFO and reject changed/unknown/own-app
