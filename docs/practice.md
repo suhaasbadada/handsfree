@@ -1,6 +1,6 @@
 # Practice in Overview
 
-## Recording controls (next release)
+## Recording controls (Mac beta 12)
 
 Select a microphone in Settings, or choose **System default**. A saved microphone
 that is disconnected remains selected and is shown as unavailable; reconnect it

@@ -2,22 +2,24 @@
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
 
-Current public Mac distribution: **v0.1.1-beta.11**, embedded version **0.1.1**.
+Current public Mac distribution: **v0.1.1-beta.12**, embedded version **0.1.1**.
 CI, publication and local/draft/anonymous-public seven-asset audits passed for the
-exact clean artifact source `994bcb82b2cb92a08badbd4754695378f89afa88`, with
-[passing source CI](https://github.com/suhaasbadada/handsfree/actions/runs/42761543948).
-See the [published release](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.11)
-and [beta 11 evidence](releases/v0.1.1-beta.11.md). The active `release` export and
-static downloads select audited beta 11; disabled `candidateRelease` now selects
-beta 12 preparation/audit coordinates only. Group 1 contains
-guided setup, explicit permission/model actions, a private practice input meter,
-and shortcut receipt evidence distinct from successful dictation. Activation is
+exact clean artifact source `40e56571584dd6f17df020571f523a6e45b110b1`, with
+[passing source CI](https://github.com/suhaasbadada/handsfree/actions/runs/42765942619).
+See the [published release](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.12)
+and [beta 12 evidence](releases/v0.1.1-beta.12.md). The active `release` export and
+static downloads select audited beta 12; disabled `candidateRelease` retains
+beta 12 audit coordinates only. Group 2 contains microphone selection, a
+sample-derived session timer and stable practice layout/focus transfer, retaining
+existing recording modes, duration and sound controls without new AI. Activation is
 metadata-only: it copies the exact generated signed feed, without reconstructing
 its signature, and does not rebuild or replace the installed app. Artifacts and
-their bundled preparation-era docs remain sourced from immutable `994bcb82b2cb92a08badbd4754695378f89afa88`.
-DMG SHA-256: `240799cedf24705bbd5b940baaa940a1b3c6c0de01f834f2edf9f1c1dd8b53d3`.
-Updater archive SHA-256: `88bf0041059a98b8d8686b473098551008e37bd7e646e981eee738dcae3f8da2`.
-Exact audited feed SHA-256: `d2610f7d5618c1127c8d8c48b678da9fc136a57ce546f5fae8dd1074eb092e54`.
+their bundled preparation-era docs remain sourced from immutable `40e56571584dd6f17df020571f523a6e45b110b1`.
+DMG SHA-256: `e7e588bdfaf22d291a72cc8a820eab227ad3fa2f21f63f011115521cbe5d6b12`.
+Updater archive SHA-256: `22ea22c351ac2d28a16364b851a6fbdf21f18fa026265329f73459b5bea46500`.
+Exact audited feed SHA-256: `30d23e26e80bf201634b842c80360eae9eb6de16660475b202fd8f634353a20d`.
+Beta 11 outputs are preserved under `release/history/beta11-before-beta12-1bbihewj/`;
+its [historical evidence](releases/v0.1.1-beta.11.md) remains unchanged.
 Beta 10 outputs are preserved under `release/history/beta10-before-beta11-bbsw66sm/`;
 its [historical evidence](releases/v0.1.1-beta.10.md) remains unchanged.
 Beta 9 outputs are preserved under `release/history/beta9-before-beta10-ig1265gl/`.
@@ -30,25 +32,25 @@ Do not describe this as a successful OTA restart; retain the
 Website/feed deployment and live byte readback, matching Homebrew publication,
 remote cask readback and tap CI passed for group 1. See the exact activation/tap
 SHAs and run IDs in [the four-release ledger](FEATURE-RELEASES.md#group-1-verified-completion-evidence).
-Group 2 preparation may proceed. Hardware, separate-Mac and real OTA acceptance remain
+Group 2 activation CI, Pages/live byte readback, matching Homebrew publication,
+remote cask readback and tap CI remain pending. Do not advance to group 3 yet.
+Hardware, separate-Mac and real OTA acceptance remain
 unverified. The owner upgrades through the app; do not manually replace it.
 Windows beta 3 and historical Mac assets remain untouched. See
 [practice](practice.md) for the private button/shortcut flow, not an external insertion test,
 and [Compatibility paste](COMPATIBILITY-PASTE.md) for unchanged opt-in safeguards.
 
-## Beta 12 candidate preparation (group 2)
+## Beta 12 publication and metadata activation (group 2)
 
-Candidate distribution **v0.1.1-beta.12** retains internal app version **0.1.1**.
-`src-tauri/distribution.json`, packaging/audit coordinates and only the disabled
-`candidateRelease` export identify beta 12. Public website/download links,
-README/install links and the exact audited signed feed remain beta 11 unchanged.
-See [candidate scope and limitations](releases/v0.1.1-beta.12.md).
+Published distribution **v0.1.1-beta.12** retains internal app version **0.1.1**.
+Exact-source CI and local/draft/anonymous-public seven-asset audits passed before
+this metadata-only activation. Copy `release/macos-arm64.json` byte-for-byte to
+`site/updates/macos-arm64.json`; do not reconstruct the signature. The disabled
+`candidateRelease` remains audit coordinates. Packaging/distribution coordinates,
+app behavior and immutable artifacts do not change during activation.
+See [published scope and limitations](releases/v0.1.1-beta.12.md).
 
-Group 2 is locally validated except the latest small Clear focus regression
-rerun, which is pending. No clean artifact source SHA, candidate CI, signed
-artifacts, checksums or local/draft/anonymous-public artifact audits are claimed
-for beta 12. Do not activate it before exact-source CI and all artifact audits
-pass. Preserve the existing signing identity, permissions and model/settings/usage
+Preserve the existing signing identity, permissions and model/settings/usage
 data; no installation, launch or OTA acceptance is implied by metadata tests.
 All four releases require independent app/Homebrew distribution parity, not just
 the last release; preserve the [mandatory cross-repository gate](#mandatory-cross-repository-homebrew-gate).
@@ -80,13 +82,13 @@ cache lacks the final resources/signature. No independent second build is used.
 An unexpected source change preserves `release/updater/.mac-source-state.json`;
 investigate that recovery receipt rather than deleting it or hiding changes.
 
-For published `v0.1.1-beta.11`, these seven audited public assets share the exact clean-source tag:
+For published `v0.1.1-beta.12`, these seven audited public assets share the exact clean-source tag:
 
-- `HandsFree-0.1.1-beta.11-macos-arm64.dmg`
+- `HandsFree-0.1.1-beta.12-macos-arm64.dmg`
 - `PROVENANCE.txt` (exact clean source commit/tree)
 - `SHA256SUMS` (exactly six payload entries, excluding itself)
-- `HandsFree-0.1.1-beta.11-macos-arm64.app.tar.gz`
-- `HandsFree-0.1.1-beta.11-macos-arm64.app.tar.gz.sig`
+- `HandsFree-0.1.1-beta.12-macos-arm64.app.tar.gz`
+- `HandsFree-0.1.1-beta.12-macos-arm64.app.tar.gz.sig`
 - `UPDATER-PROVENANCE.txt` (same source and final executable hash)
 - `macos-arm64.json` (exact version/target/canonical URL/uploaded signature)
 
@@ -169,7 +171,7 @@ The candidate auditor also cleans its exact temporary mount/directory on SIGINT 
 For updater-enabled releases, also follow [the signed updater packaging and feed
 gates](UPDATES.md#release-integration). The updater archive must be generated
 **after** stable macOS signing, with a version-bound signature. The current
-published beta 11 assets and feed availability must not be changed merely by
+published beta 12 assets and feed availability must not be changed merely by
 building a future updater release. Preserve exact-source CI/public audit gates;
 never weaken them to accept a later activation HEAD.
 
