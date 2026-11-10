@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Updates } from '../src/updates.ts';
+import { Updates, updateIndicator } from '../src/updates.ts';
 
 const view = (phase = 'idle', extra = {}) => ({ installed_version: '0.1.1-beta.7', phase, notes: '', downloaded_bytes: 0, message: '', ...extra });
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
@@ -15,6 +15,16 @@ function fixture() {
   return { updates, calls, responses, busy: () => { allowed = false; } };
 }
 const available = () => view('available', { available_version: '0.1.1-beta.8', notes: '<script>not executable</script>' });
+test('persistent update summary distinguishes verified offers, success, errors and unknown checks', () => {
+  assert.deepEqual(updateIndicator(available()), {label:'Update available',detail:'0.1.1-beta.8',attention:'available'});
+  assert.equal(updateIndicator(view()).detail,'Not checked');
+  assert.equal(updateIndicator(view('up_to_date')).label,'Up to date');
+  assert.equal(updateIndicator(view('up_to_date')).detail,'At last check','Local cached success is not advertised as continuous online monitoring');
+  assert.equal(updateIndicator(view('error',{available_version:'0.1.1-beta.8'})).attention,'error','A stale version on an error is not an offer or success');
+  assert.equal(updateIndicator(view('error')).label,'Update failed');
+  for (const phase of ['checking','downloading','installing']) assert.equal(updateIndicator(view(phase)).attention,'none');
+  assert.notEqual(updateIndicator(view('available')).attention,'available','An incomplete offer cannot gain a prominent update action');
+});
 test('opening reads installed distribution locally; only explicit checking contacts the feed', async () => {
   const { updates: u, calls, responses } = fixture();
   assert.deepEqual(calls, []);

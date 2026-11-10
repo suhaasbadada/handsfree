@@ -1,5 +1,13 @@
 # Signed in-app updates (Mac beta 7 onward)
 
+The footer shows the latest locally known update state without opening a dialog:
+**Not checked**, **Up to date**, **Update available** with its version, or
+**Update failed** with a retry destination. A verified available update is a
+prominent brand-colored action. Opening it shows the existing update dialog;
+download still refreshes the offer before exact-version confirmation. Local status
+observations outside the dialog do not contact the feed. Choose **Check for updates**
+to discover a newly published release; there is no unsolicited background check.
+
 Introduced in [published Mac beta 7](releases/v0.1.1-beta.7.md), not a retroactive
 change to beta 6. Beta 6 and earlier need one initial DMG/Homebrew bootstrap
 upgrade. [Beta 8](releases/v0.1.1-beta.8.md) fixes initial Updates dialog focus and

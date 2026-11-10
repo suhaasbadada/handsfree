@@ -160,7 +160,11 @@ prove discovery completeness or runtime correctness on an untested OS.
   It freezes existing eligibility, including the stricter update refusal for
   `not_pasted`; it does not relax guards for uncommitted work.
 - `tests/updates.test.mjs`: revision/stale-response, unknown/incomplete snapshot,
-  explicit fresh preconfirmation checks, revocable preparation, exact-version
+  plus a persistent footer projection of local updater status. Only a validated
+  available offer receives the prominent update action; error/unknown/expired
+  observations never imply up to date. Local status/progress IPC is coalesced even
+  with the dialog closed, without authorizing network checks or installation.
+  Coverage also includes explicit fresh preconfirmation checks, revocable preparation, exact-version
   consent, duplicate invoke and monotonic progress behavior. Opening/status
   polling remain local. Native status invalidates idle offers at exactly ten
   minutes; errors clear offer/version/notes, never the installed version. Expired

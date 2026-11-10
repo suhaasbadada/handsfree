@@ -10,6 +10,20 @@ export type UpdateView = {
 };
 type Invoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 export const updateBusy = (view: UpdateView) => updatePhaseBusy(view.phase);
+export function updateIndicator(view: UpdateView): {label: string; detail: string; attention: 'available' | 'error' | 'none'} {
+  switch (view.phase) {
+    case 'available':
+      return view.available_version
+        ? {label: 'Update available', detail: view.available_version, attention: 'available'}
+        : {label: 'Updates', detail: 'Check for latest', attention: 'none'};
+    case 'up_to_date': return {label: 'Up to date', detail: 'At last check', attention: 'none'};
+    case 'checking': return {label: 'Checking updates…', detail: 'Please wait', attention: 'none'};
+    case 'downloading': return {label: 'Downloading update', detail: 'View progress', attention: 'none'};
+    case 'installing': return {label: 'Installing update', detail: 'Keep HandsFree open', attention: 'none'};
+    case 'error': return {label: 'Update failed', detail: 'Open to retry', attention: 'error'};
+    default: return {label: 'Updates', detail: 'Not checked', attention: 'none'};
+  }
+}
 export class Updates {
   view: UpdateView = { installed_version: '', phase: 'idle', notes: '', downloaded_bytes: 0, message: 'Choose Check for updates to contact the release server.' };
   private revision = 0;

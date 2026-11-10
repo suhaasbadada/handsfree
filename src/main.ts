@@ -10,7 +10,7 @@ import { setupChecklist, shortcutTutorial } from './onboarding.ts';
 import { PracticeInputs, type PracticeInput } from './practice-input.ts';
 import { Workflow } from './workflow.ts';
 import { AppearancePreference, appearanceValue, type Appearance } from './appearance.ts';
-import { Updates, updateBusy } from './updates';
+import { Updates, updateBusy, updateIndicator } from './updates';
 import { phasePolicy, updateInstalling, type DictationPhase } from './state.ts';
 
 type Status = { appearance?: Appearance; microphone_uid?: string | null; platform?: 'windows' | 'macos'; compatibility_paste?: boolean; phase: DictationPhase; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: 'clean' | 'warm'; recording_limit: number; recording_mode?: 'toggle' | 'push_to_talk'; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
@@ -91,7 +91,7 @@ document.querySelector('#app')!.innerHTML = `
  <div class="general-status-slot"><p id="message" class="status-detail" role="status" aria-label="Dictation status" aria-live="polite" hidden></p><button id="message-recovery" class="text-action" hidden>Open settings</button></div>
  <p id="feedback" class="feedback" role="status" hidden></p><p id="storage-error" class="feedback" role="status" hidden></p>
   </main>
-  <footer><span class="footer-privacy">${icon('shield')}On-device · English</span><div class="footer-meta"><span class="footer-brand"><span class="sr-only">HandsFree</span><span id="app-version">0.1.1</span><span class="beta-badge">BETA</span></span><button id="updates-open" class="text-action" hidden>${icon('update')}Updates</button></div></footer>
+  <footer><span class="footer-privacy">${icon('shield')}On-device · English</span><div class="footer-meta"><span class="footer-brand"><span class="sr-only">HandsFree</span><span id="app-version">0.1.1</span><span class="beta-badge">BETA</span></span><button id="updates-open" class="text-action" hidden>${icon('update')}<span class="update-summary"><strong id="updates-indicator-label">Updates</strong><span id="updates-indicator-detail">Not checked</span></span><span id="updates-announcement" class="sr-only" role="status" aria-live="polite"></span></button></div></footer>
 </div>
 <dialog id="reset-dialog" aria-labelledby="reset-title"><h2 id="reset-title">Reset usage totals?</h2><p>Totals will return to zero. Your preferences and language model won’t change.</p><div class="dialog-actions"><button id="keep-stats" autofocus>Keep totals</button><button id="confirm-reset" class="danger">Reset totals</button></div></dialog>`;
 const el = (id: string) => document.getElementById(id)!;
@@ -402,6 +402,13 @@ el('workflow-pause').onclick = () => { if(workflow.status) void workflow.pause(!
 el('brand-pause').onclick = () => { closeBrandMenu(true); if(workflow.status) void workflow.pause(!workflow.status.paused); };
 function renderUpdates() {
   const view = updates.view;
+  const indicator = updateIndicator(view);
+  for (const [id, text] of [['updates-indicator-label', indicator.label], ['updates-indicator-detail', indicator.detail], ['updates-announcement', `${indicator.label}. ${indicator.detail}`]]) {
+    if (el(id).textContent !== text) el(id).textContent = text;
+  }
+  button('updates-open').dataset.attention = indicator.attention;
+  button('updates-open').title = `${indicator.label}. ${indicator.detail}. Open app updates`;
+  button('updates-open').setAttribute('aria-label', button('updates-open').title);
   if (confirmedUpdate && (view.phase !== 'available' || confirmedUpdate !== view.available_version)) {
     confirmedUpdate = undefined;
     if (updateConfirmDialog.open) updateConfirmDialog.close();
@@ -699,7 +706,7 @@ async function refreshStatus() {
       el('updates-open').hidden = current.platform !== 'macos';
       el('brand-updates').hidden = current.platform !== 'macos';
       renderWorkflow(); void workflow.refresh();
-     if (updatesDialog.open) { renderUpdates(); void updates.refresh(); void updates.progress(); }
+     if (current.platform === 'macos') { void updates.refresh(); void updates.progress(); }
      button('setup').disabled = false;
     button('reset').disabled = false;
     if (!soundsPending) sounds.disabled = false;

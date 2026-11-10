@@ -275,6 +275,13 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 #updates-dialog strong, #updates-version { overflow-wrap: anywhere; }
 #updates-open { display: inline-flex; align-items: center; gap: 5px; min-width: 0; min-height: 24px; height: auto; padding: 0; background: transparent; color: var(--muted); }
 #updates-open svg { width: 14px; height: 14px; }
+.update-summary { display: grid; gap: 1px; text-align: left; min-width: 0; }
+.update-summary strong { font-size: 11px; font-weight: 600; }
+.update-summary > span { font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#updates-open { width: 184px; min-height: 42px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 9px; justify-content: flex-start; }
+#updates-open[data-attention="available"] { color: var(--primary-fg); background: var(--primary-bg); border-color: var(--primary-bg); }
+#updates-open[data-attention="available"]:hover { background: var(--primary-hover); }
+#updates-open[data-attention="error"] { color: var(--danger); border-color: var(--danger); }
 @media (max-width: 560px) {
   .practice .card-heading { flex-wrap: wrap; gap: 8px; }
   .practice-bottom .subtle { text-align: left; }
