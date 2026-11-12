@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 // macOS VoiceOver / WKWebView or ServiceManagement acceptance.
 export async function checkKeyboardRecovery({send,evaluate,until,port}) {
   await send('Page.navigate', {url:`http://127.0.0.1:${port}`});
+  await until(`Boolean(document.getElementById('nav-practice-page'))`);
+  await evaluate(`document.getElementById('nav-practice-page').click()`);
   await until(`window.context>0 && !document.getElementById('practice-start').disabled`);
   const key = async (key, modifiers=0) => {
     const codes = {Enter:13,' ':32,ArrowDown:40,ArrowUp:38,Home:36,End:35,Escape:27,Tab:9,PageDown:34};
@@ -37,6 +39,8 @@ export async function checkKeyboardRecovery({send,evaluate,until,port}) {
   assert.equal(await focused(),'settings-title');
   await evaluate(`document.querySelector('.brand').focus()`); await key('Enter'); await key('Enter');
   assert.equal(await focused(),'overview-title');
+  assert.equal(await evaluate(`window.context===0`),true,'Overview menu selection does not restore Practice context');
+  await evaluate(`document.getElementById('nav-practice-page').click()`);
 
   await evaluate(`window.rejectStart='Selected microphone unavailable. Reconnect it or choose another microphone. '.repeat(80);document.getElementById('practice-start').click()`);
   await until(`!document.getElementById('practice-recovery').hidden`);
@@ -56,7 +60,7 @@ export async function checkKeyboardRecovery({send,evaluate,until,port}) {
   }
   await evaluate(`document.getElementById('practice-recovery').click()`);
   assert.equal(await focused(),'microphone-choice','Explicit recovery uses existing picker');
-  await evaluate(`window.fixture.phase='idle';window.fixture.message='';window.rejectStart='';document.getElementById('nav-overview').click()`);
+  await evaluate(`window.fixture.phase='idle';window.fixture.message='';window.rejectStart='';document.getElementById('nav-practice-page').click()`);
   await until(`!document.getElementById('practice-message').textContent && document.getElementById('message').hidden`);
   assert.equal(await evaluate(`['practice-message','message'].every(id=>!document.getElementById(id).hasAttribute('tabindex'))`),true,'Empty reserved status is not a tab stop');
 

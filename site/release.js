@@ -8,14 +8,14 @@ export const release = Object.freeze({
   dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.15/HandsFree-0.1.1-beta.15-macos-arm64.dmg',
 });
 
-// Beta 15 audit coordinates; the website uses the audited active release above.
+// Beta 16 candidate coordinates; the website keeps audited beta 15 active above.
 // Disabled even after publication; not a second availability switch.
 export const candidateRelease = Object.freeze({
   schemaVersion: 1,
-  version: '0.1.1-beta.15',
+  version: '0.1.1-beta.16',
   publicAvailable: false,
-  status: 'Mac beta 15 candidate: appearance choices and prominent update status. Publication and public audit pending; not an availability switch.',
-  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.15/HandsFree-0.1.1-beta.15-macos-arm64.dmg',
+  status: 'Mac beta 16 candidate: Overview, private Practice and grouped Settings dashboard. Publication and public audit pending; not an availability switch.',
+  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.16/HandsFree-0.1.1-beta.16-macos-arm64.dmg',
 });
 
 // Historical coordinates only. Windows development and public promotion are paused.

@@ -2,7 +2,7 @@
 :root { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
 button, input, select, kbd { font-family: inherit; }
 .brand { font-size: 17px; font-weight: 600; letter-spacing: -.4px; }
-h1 { font-size: 32px; font-weight: 600; letter-spacing: -.9px; line-height: 1.25; }
+h1 { font-size: 27px; font-weight: 600; letter-spacing: -.7px; line-height: 1.25; }
 h2 { font-size: 16px; font-weight: 600; letter-spacing: -.2px; }
 h3 { font-size: 14px; font-weight: 500; }
 .hero h1 { font-size: clamp(25px, 4vw, 31px); letter-spacing: -.9px; margin-bottom: 10px; }

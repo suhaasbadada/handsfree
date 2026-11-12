@@ -35,7 +35,11 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
     };
   `});
   await send('Page.navigate', {url:`http://127.0.0.1:${port}`});
+  await until(`window.listeners.has('practice-input') && document.getElementById('phase').textContent==='Ready'`);
+  assert.equal(await evaluate(`!document.getElementById('overview').hidden && document.getElementById('practice-page').hidden && !window.context && !window.calls.some(c=>c.command==='practice_context' && c.args.active)`),true,'Initial Overview never grants a practice context');
+  await evaluate(`document.getElementById('nav-practice-page').click()`);
   await until(`window.context>0 && window.listeners.has('practice-input') && !document.getElementById('practice-start').disabled`);
+  assert.equal(await evaluate(`!document.getElementById('practice-page').hidden && document.getElementById('overview').hidden && document.getElementById('nav-practice-page').getAttribute('aria-current')==='page'`),true,'Explicit Practice entry selects its page and grants context');
   const baseline = await evaluate(`JSON.stringify(window.fixture.stats)`);
   assert.equal(await evaluate(`document.getElementById('get-started').hidden`),true,'Returning ready users do not see a wizard');
   await evaluate(`document.getElementById('practice-setup').click()`);
@@ -48,7 +52,7 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   await until(`['request_microphone','request_permissions','download_model'].every(command=>window.calls.filter(c=>c.command===command).length===1)`);
   await evaluate(`Object.assign(window.fixture,{microphone:true,input_monitoring:true,model_ready:true,hotkey:true})`);
   await until(`!document.getElementById('practice-start').disabled`);
-  assert.equal(await evaluate(`window.fixture.permission_requests===3 && !document.getElementById('overview').hidden && !document.getElementById('get-started').hidden`),true,'Real native permission-request bits do not redirect inline setup to Settings');
+   assert.equal(await evaluate(`window.fixture.permission_requests===3 && !document.getElementById('practice-page').hidden && !document.getElementById('get-started').hidden`),true,'Real native permission-request bits do not redirect inline Practice setup to Settings');
   await evaluate(`document.getElementById('started-close').click();document.querySelector('.brand').click();document.getElementById('brand-started').click()`);
   assert.equal(await evaluate(`!document.getElementById('get-started').hidden && document.activeElement.id==='get-started-title'`),true,'Menu revisits guidance without a new navigation surface');
    await evaluate(`document.getElementById('practice-start').click()`);
@@ -74,11 +78,18 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   await until(`document.getElementById('practice-text').value==='A little more thinking.'`);
   assert.equal(await evaluate(`JSON.stringify(window.fixture.stats)`),baseline,'Native practice leaves totals unchanged');
   assert.equal(await evaluate(`window.calls.every(c=>!['toggle','copy_transcript','reset_stats'].includes(c.command))`),true,'Practice uses no normal dictation, clipboard or stats reset IPC');
-  await evaluate(`window.oldContext=window.context;window.emitNative('dashboard-navigate','settings')`);
-  await until(`window.context===0 && document.getElementById('practice-text').value===''`);
+   await evaluate(`window.oldContext=window.context;document.getElementById('nav-overview').click()`);
+   await until(`window.context===0 && document.getElementById('practice-text').value===''`);
+   assert.equal(await evaluate(`!document.getElementById('overview').hidden && document.getElementById('practice-page').hidden`),true,'Overview navigation revokes and clears Practice');
+   const overviewStarts = await evaluate(`window.calls.filter(c=>c.command==='practice_start').length`);
+   await evaluate(`window.sendPractice('toggle',1,window.oldContext)`);
+   assert.equal(await evaluate(`window.context===0 && document.getElementById('practice-text').value==='' && window.calls.filter(c=>c.command==='practice_start').length===${overviewStarts}`),true,'Stale native input cannot revive Practice on Overview');
+   await evaluate(`window.emitNative('dashboard-navigate','settings')`);
+   await until(`!document.getElementById('settings').hidden && window.context===0`);
   assert.equal(await evaluate(`document.getElementById('input-level').value===0 && document.getElementById('shortcut-evidence').textContent.startsWith('Shortcut not tested')`),true,'Navigation retires meter and evidence');
   await evaluate(`window.emitNative('dashboard-navigate','practice')`);
-  await until(`window.context>window.oldContext && document.activeElement.id==='practice-text' && !document.getElementById('practice-start').disabled`);
+   await until(`window.context>window.oldContext && document.activeElement.id==='practice-text' && !document.getElementById('practice-start').disabled`);
+   assert.equal(await evaluate(`!document.getElementById('practice-page').hidden && document.getElementById('nav-practice-page').getAttribute('aria-current')==='page'`),true,'Tray Practice navigation selects the dedicated page');
   const starts = await evaluate(`window.calls.filter(c=>c.command==='practice_start').length`);
   await evaluate(`window.sendPractice('toggle',1,window.oldContext)`);
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='practice_start').length`),starts,'Old context is rejected');
@@ -91,7 +102,9 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   await until(`!document.getElementById('practice-start').disabled`);
   await evaluate(`document.querySelector('.brand').click()`);
   await until(`window.context===0 && !document.getElementById('brand-menu').hidden`);
-  await evaluate(`document.getElementById('brand-overview').click()`);
+   await evaluate(`document.getElementById('brand-overview').click()`);
+   await until(`window.context===0 && !document.getElementById('overview').hidden`);
+   await evaluate(`document.getElementById('nav-practice-page').click()`);
   await until(`window.context>0`);
   await evaluate(`window.oldContext=window.context;window.dispatchEvent(new Event('blur'))`);
   await until(`window.context===0`);
@@ -106,7 +119,7 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
     await until(`window.context===0`);
     await evaluate(`window.startAck();window.delayStart=false`);
     await until(`document.getElementById('practice-cancel').hidden`);
-    await evaluate(`document.getElementById('updates-dialog').close();document.getElementById('brand-overview').click()`);
+     await evaluate(`document.getElementById('updates-dialog').close();document.getElementById('brand-overview').click();document.getElementById('nav-practice-page').click()`);
     await until(`window.context>0 && !document.getElementById('practice-start').disabled`);
   }
   await evaluate(`window.emitNative('dashboard-navigate','updates')`);
@@ -119,7 +132,9 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   // scroll offsets so scroll anchoring cannot hide reflow.
   for (const width of [320,400,740,980]) {
     await send('Emulation.setDeviceMetricsOverride', {width,height:820,deviceScaleFactor:1,mobile:false});
-    await send('Page.navigate', {url:`http://127.0.0.1:${port}`});
+     await send('Page.navigate', {url:`http://127.0.0.1:${port}`});
+     await until(`Boolean(document.getElementById('nav-practice-page'))`);
+     await evaluate(`document.getElementById('nav-practice-page').click()`);
     await until(`window.context>0 && !document.getElementById('practice-start').disabled`);
     await evaluate(`window.layoutLiveStatus=true;document.getElementById('practice-start').focus({preventScroll:true});window.scrollTo(0,Math.max(0,document.getElementById('practice').getBoundingClientRect().top+scrollY-80));window.layoutSnapshot=()=>({scroll:scrollY,rects:['practice','practice-text','practice-message'].map(id=>document.getElementById(id)).concat([document.querySelector('.practice-actions'),document.querySelector('.activity'),document.querySelector('footer')]).map(e=>{const r=e.getBoundingClientRect();return [r.x,r.y+scrollY,r.width,r.height]})});`);
     const pristine = await evaluate(`window.layoutSnapshot()`);
@@ -215,7 +230,7 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   assert.equal(await evaluate(`!document.getElementById('excluded-apps').querySelector('b') && document.getElementById('excluded-apps').textContent.includes('<b>Running app</b>')`),true,'Names rendered as text only');
   await evaluate(`document.querySelector('[aria-label="Remove com.absent.app"]').click()`);
   await until(`!window.workflow.excluded_bundle_ids.includes('com.absent.app')`);
-  await evaluate(`document.getElementById('nav-overview').click();document.getElementById('practice-start').click()`);
+   await evaluate(`document.getElementById('nav-practice-page').click();document.getElementById('practice-start').click()`);
   await until(`!document.getElementById('practice-finish').hidden`);
   assert.equal(await evaluate(`'shortcutReceipt' in window.calls.filter(c=>c.command==='practice_start').at(-1).args`),false,'Explicit Start test works while paused and omits receipt');
   await evaluate(`document.getElementById('practice-cancel').click()`);

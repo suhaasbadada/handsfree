@@ -23,6 +23,7 @@ export async function checkAppearance({send,evaluate,until,port}) {
   try {
     await send('Page.navigate',{url:`http://127.0.0.1:${port}`});
     await until(`document.documentElement.dataset.appearance==='system' && !document.getElementById('appearance-choice').disabled`);
+    await evaluate(`document.getElementById('nav-practice-page').click()`);
     const before = await evaluate(`JSON.stringify(window.fixture)`);
     const bounds = await evaluate(`(()=>{const r=document.getElementById('practice-title').closest('section').getBoundingClientRect();return [r.x,r.y,r.width,r.height];})()`);
     const choose = async mode => {

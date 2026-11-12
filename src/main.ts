@@ -32,13 +32,19 @@ document.querySelector('#app')!.innerHTML = `
 <div class="shell">
  <aside><button class="brand" aria-label="HandsFree menu" aria-haspopup="menu" aria-expanded="false" aria-controls="brand-menu"><img src="${logo}" alt="" width="36" height="36"><span>HandsFree</span>${icon('chevron')}</button>
    <div id="brand-menu" class="brand-menu" role="menu" aria-label="HandsFree" hidden><button id="brand-overview" role="menuitem">Overview</button><button id="brand-started" role="menuitem" hidden>Get started</button><button id="brand-settings" role="menuitem">Settings</button><button id="brand-pause" role="menuitem" disabled hidden>Pause shortcuts</button><button id="brand-updates" role="menuitem">App updates…</button></div>
-  <div class="header-right"><nav aria-label="Main navigation"><button id="nav-overview" class="nav active" aria-label="Overview" title="Overview" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-6v-6h-4v6H4Z"/></svg></button><button id="nav-settings" class="nav" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg></button></nav><section class="status" aria-label="App status"><span id="dot" aria-hidden="true"></span><strong id="phase" aria-live="polite">Connecting…</strong><button id="cancel" hidden aria-label="Cancel dictation" title="Cancel dictation">×</button></section></div></aside>
+   <div class="header-right"><nav aria-label="Main navigation"><button id="nav-overview" class="nav active" aria-label="Overview" title="Overview" aria-current="page">${icon('words')}<span>Overview</span></button><button id="nav-practice-page" class="nav" aria-label="Practice" title="Practice">${icon('mic')}<span>Practice</span></button><button id="nav-settings" class="nav" aria-label="Settings" title="Settings">${icon('settings')}<span>Settings</span></button></nav><section class="status" aria-label="App status"><span id="dot" aria-hidden="true"></span><strong id="phase" aria-live="polite">Connecting…</strong><button id="cancel" hidden aria-label="Cancel dictation" title="Cancel dictation">×</button></section></div></aside>
  <main>
  <section id="overview" aria-labelledby="overview-title">
-    <div class="hero"><span class="eyebrow">A little less typing</span><h1 id="overview-title">Make room for your thoughts.</h1><p><span id="recording-action">Press</span> <kbd id="overview-shortcut">…</kbd> <span id="recording-instruction">to dictate in any app</span></p></div>
+     <div class="page-heading"><span class="eyebrow">Your workspace</span><h1 id="overview-title">Overview</h1><p>Voice typing, without the busywork.</p></div>
+     <div class="hero"><div class="hero-mark">${icon('wave')}</div><h2>Write wherever you work.</h2><p>Select a text field in another app.</p><p class="shortcut-instruction"><span id="recording-action">Press</span> <kbd id="overview-shortcut">…</kbd> <span id="recording-instruction">to dictate in any app</span></p><div class="hero-caption">${icon('shield')}Processed on this device. Never sent to a cloud.</div></div>
     <section class="card readiness"><div><h2 id="ready-title">Finish setting up</h2><p id="ready-detail">Connecting to HandsFree…</p></div><button id="setup" class="primary" disabled>Open settings</button></section>
    <section id="overview-model" class="card readiness" hidden aria-label="English model"><div><h2>English model</h2><p id="overview-model-state">One-time download · Works offline afterward</p></div><button id="overview-download" class="primary" disabled>Download English model (~148 MB)</button></section>
-    <section id="get-started" class="card" aria-labelledby="get-started-title" hidden>
+    <section class="activity" aria-labelledby="activity-title"><div class="section-heading"><h2 id="activity-title">All-time activity</h2><span class="subtle">Private tests excluded</span></div><div class="metrics" aria-label="Real dictation only; practice tests excluded"><article><span>Words</span><strong id="words">0</strong></article><article><span tabindex="0" title="Estimate per dictation: typing at 40 words/minute, minus recording time, never below zero. Not a productivity measurement.">Time saved<small>Estimated</small></span><strong id="saved">0 sec</strong></article><article><span>Dictations</span><strong id="count">0</strong></article></div></section>
+    <button id="overview-practice" class="practice-link"><span>${icon('mic')}<span><strong>Find your rhythm</strong><small>Try your microphone and shortcut in a private space.</small></span></span><span aria-hidden="true">→</span></button>
+  </section>
+  <section id="practice-page" hidden aria-labelledby="practice-page-title">
+    <div class="page-heading"><span class="eyebrow">A private workspace</span><h1 id="practice-page-title">Practice</h1><p>Get comfortable with voice typing. Nothing leaves this page.</p></div>
+     <section id="get-started" class="card" aria-labelledby="get-started-title" hidden>
      <div class="card-heading"><div><h2 id="get-started-title" tabindex="-1">Get started</h2><p>Set up once, then try your voice here. Checks never request access or start recording.</p></div><button id="started-close" class="text-action">Done</button></div>
      <ol class="setup-checklist">
       <li><span id="check-microphone">Microphone · Checking…</span><button id="started-mic">Allow microphone</button></li>
@@ -49,8 +55,8 @@ document.querySelector('#app')!.innerHTML = `
      <p>Once all four are ready, use the private test below to check your microphone and shortcut. The model is required for this test; it works offline after download.</p>
     </section>
     <section id="practice" class="card practice" aria-labelledby="practice-title" hidden>
-    <div class="card-heading"><div><h2 id="practice-title">A space to try it</h2><p class="practice-instruction">Use the microphone or your shortcut. Your words appear right here.</p></div><span class="test-badge">${icon('shield')}Private test</span></div>
-     <p class="practice-sample">“A little less typing. A little more thinking.”</p>
+     <div class="card-heading"><div><h2 id="practice-title">Try your voice</h2><p class="practice-instruction">Start a test or use your shortcut. Your words appear below.</p></div><span class="test-badge">${icon('shield')}Private</span></div>
+      <p class="practice-sample">Try saying: “A little less typing. A little more thinking.”</p>
      <p id="shortcut-tutorial"></p><div class="stable-copy subtle"><span aria-hidden="true" class="copy-reserve">Shortcut received in this practice view. This confirms the key event, not microphone or transcription success.</span><p id="shortcut-evidence" role="status">Shortcut not tested here yet. Start test checks the microphone, not the shortcut.</p></div>
      <div class="practice-meter"><label for="input-level">Microphone input</label><meter id="input-level" min="0" max="1" value="0" aria-describedby="input-level-help"></meter><span id="practice-timer" aria-label="Recording time">— / —</span><div class="stable-copy subtle"><span aria-hidden="true" class="copy-reserve">Start a private test to check input. No audio file is saved.</span><span id="input-level-help">Start a private test to check input. No audio file is saved.</span></div></div>
     <label for="practice-text" class="sr-only">Practice dictation</label>
@@ -58,24 +64,27 @@ document.querySelector('#app')!.innerHTML = `
     <div class="practice-bottom"><div class="practice-actions"><button id="practice-start" class="primary" disabled>${icon('mic')}<span>Start test</span></button><button id="practice-finish" class="primary" disabled hidden>${icon('check')}<span>Finish</span></button><button id="practice-cancel" class="icon-action" aria-label="Cancel practice" title="Cancel practice" disabled hidden>${icon('close')}</button><button id="practice-clear" class="icon-action" aria-label="Clear practice" title="Clear practice">${icon('clear')}</button><button id="practice-setup" class="icon-action" aria-label="Practice setup help" title="Practice setup help">${icon('settings')}</button></div><p id="practice-privacy" class="subtle">No clipboard. No usage counted.<br>Clears when you leave this view.</p></div>
     <div class="practice-status-slot"><p id="practice-message" role="status" aria-label="Practice status" aria-live="polite"></p><button id="practice-recovery" class="text-action" hidden>Microphone settings</button></div>
    </section>
-   <section class="activity" aria-labelledby="activity-title"><h2 id="activity-title">Your activity</h2><div class="metrics" aria-label="Real dictation only; practice tests excluded"><article><span>${icon('words')}Words</span><strong id="words">0</strong></article><article><span tabindex="0" title="Estimate per dictation: typing at 40 words/minute, minus recording time, never below zero. Not a productivity measurement.">${icon('clock')}Time saved<small>Estimated</small></span><strong id="saved">0 sec</strong></article><article><span>${icon('wave')}Dictations</span><strong id="count">0</strong></article></div></section>
+    <p id="practice-platform-help" class="subtle" hidden>Private practice is available on macOS. Use Overview for your configured dictation shortcut.</p>
  </section>
  <section id="settings" hidden aria-labelledby="settings-title">
-   <div class="settings-intro"><h1 id="settings-title">Settings</h1><button id="settings-started" class="text-action" hidden>Get started</button></div>
-   <section id="workflow" class="card" aria-labelledby="workflow-title" hidden><h2 id="workflow-title">Workflow</h2>
-    <div class="setting-row"><div><h3>Shortcut admission</h3><p id="workflow-pause-state">Checking…</p><p>Pause prevents new shortcut starts. Start test remains available.</p></div><button id="workflow-pause" disabled>Pause shortcuts</button></div>
+    <div class="settings-intro page-heading"><span class="eyebrow">Preferences</span><h1 id="settings-title">Settings</h1><p>Configure how HandsFree works on your device.</p><button id="settings-started" class="text-action" hidden>Setup guide</button></div>
+    <section id="workflow" class="card" aria-labelledby="workflow-title" hidden><h2 id="workflow-title">General</h2>
+     <div class="setting-row"><div><h3>Keyboard shortcuts</h3><p id="workflow-pause-state">Checking…</p><p>Pause shortcuts without interrupting a recording. Private tests stay available.</p></div><button id="workflow-pause" disabled>Pause shortcuts</button></div>
     <div class="setting-row"><div><h3>Launch at login</h3><p id="login-state" role="status">Checking…</p><button id="login-settings" class="text-action" hidden>Open Login Items</button><button id="login-cancel" class="text-action" hidden>Cancel pending registration</button></div><label class="switch"><input id="launch-at-login" type="checkbox" role="switch" aria-label="Launch at login" aria-describedby="login-state" disabled><span aria-hidden="true"></span></label></div>
     <div class="setting-row"><div><h3><label for="excluded-app-choice">Excluded apps</label></h3><p>Prevent external dictation starts in these apps. Existing recordings are unaffected.</p></div></div>
     <div class="workflow-app-controls"><select id="excluded-app-choice" aria-label="Running app to exclude" disabled><option value="">Choose a running app</option></select><button id="excluded-app-add" disabled>Add</button><button id="excluded-app-refresh" class="text-action" disabled>Refresh</button></div>
     <ul id="excluded-apps" aria-label="Excluded apps"></ul><p id="workflow-error" class="feedback" role="status" hidden></p>
    </section>
-   <section class="card preferences" aria-labelledby="preferences-title"><h2 id="preferences-title">Preferences</h2>
-    <div class="preference-pair"><div class="setting-row"><div><h3><label for="appearance-choice">Appearance</label></h3></div><select id="appearance-choice" disabled><option value="light">Light</option><option value="dark">Dark</option><option value="system" selected>System</option></select></div><div class="setting-row"><div><h3><label for="recording-limit">Recording limit</label></h3></div><select id="recording-limit" title="Applies to the next recording"><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="240">4 minutes</option><option value="300">5 minutes</option></select></div></div>
+   <section class="card preferences" aria-labelledby="preferences-title"><h2 id="preferences-title">Dictation</h2>
+     <div class="setting-row"><div><h3><label for="recording-limit">Recording limit</label></h3><p>Maximum length of each recording.</p></div><select id="recording-limit" title="Applies to the next recording"><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="240">4 minutes</option><option value="300">5 minutes</option></select></div>
     <div id="microphone-choice-row" class="setting-row" hidden><div><h3><label for="microphone-choice">Microphone</label></h3><p id="microphone-choice-help">Applies to the next recording. Unavailable selections never fall back silently.</p></div><div class="microphone-controls"><select id="microphone-choice" aria-describedby="microphone-choice-help" disabled><option value="">System default</option></select><button id="microphone-refresh" class="text-action" disabled>Refresh</button></div></div>
     <div class="setting-row"><div><h3><label for="recording-mode">Recording mode</label></h3><p id="recording-mode-help" hidden>Hold the shortcut; release to finish. Other keys or focus changes cancel.</p></div><select id="recording-mode" aria-describedby="recording-mode-help"><option value="toggle">Toggle</option><option value="push_to_talk">Push to talk</option></select></div>
     <div id="compatibility-row" class="setting-row" hidden><div><h3>Compatibility paste</h3><p id="compatibility-help">For apps that hide their text field. Pastes once into the same active app/window; the exact field cannot be verified.</p></div><label class="switch"><input id="compatibility-paste" type="checkbox" role="switch" aria-label="Compatibility paste" aria-describedby="compatibility-help"><span aria-hidden="true"></span></label></div>
      <div class="setting-row shortcut-row"><div><h3>Shortcut</h3></div><div class="shortcut-value"><button id="change-shortcut" aria-label="Record shortcut" title="Record shortcut" aria-pressed="false" aria-describedby="shortcut-feedback"><span id="saved-shortcut">…</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/></svg></button><button id="stop-shortcut" hidden>Cancel</button><button id="shortcut-fn" class="text-action" hidden>Use default</button></div><p id="shortcut-feedback" role="status" hidden></p></div>
-    <div class="setting-row listening-row"><div><h3>Sound</h3></div><select id="sound-style" aria-label="Sound"><option value="clean">Clean</option><option value="warm">Warm</option></select><span id="sound-state" class="state">Off</span><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Recording sounds"><span aria-hidden="true"></span></label></div>
+   </section>
+   <section class="card preferences" aria-labelledby="experience-title"><h2 id="experience-title">Appearance &amp; sound</h2>
+     <div class="setting-row"><div><h3><label for="appearance-choice">Appearance</label></h3><p>Light, dark, or follow your system.</p></div><select id="appearance-choice" disabled><option value="light">Light</option><option value="dark">Dark</option><option value="system" selected>System</option></select></div>
+     <div class="setting-row listening-row"><div><h3>Recording sounds</h3></div><select id="sound-style" aria-label="Sound"><option value="clean">Clean</option><option value="warm">Warm</option></select><span id="sound-state" class="state">Off</span><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Recording sounds"><span aria-hidden="true"></span></label></div>
     <div class="setting-row volume-row"><h3><label for="sound-volume">Volume</label></h3><div class="sound-controls"><input id="sound-volume" type="range" min="0" max="100" step="1" value="50" aria-describedby="volume-percent"><output id="volume-percent" for="sound-volume">50%</output></div><button id="preview-sound" class="icon-action" aria-label="Preview sound" title="Preview sound" disabled>${icon('play')}</button></div>
   </section>
   <section class="card setup-card" aria-labelledby="setup-title"><div class="card-heading"><h2 id="setup-title">Setup</h2><span id="setup-state" class="subtle" role="status">Checking…</span></div>
@@ -160,16 +169,17 @@ function statusText(id: string, text: string) {
   if (node.textContent !== text) node.textContent = text;
   if (text) node.tabIndex = 0; else node.removeAttribute('tabindex');
 }
-function focusHeading(tab: 'overview' | 'settings') {
+type Page = 'overview' | 'practice-page' | 'settings';
+function focusHeading(tab: Page) {
   const heading = el(`${tab}-title`); heading.tabIndex = -1; heading.focus({preventScroll:true});
 }
-function navigate(tab: 'overview' | 'settings') {
+function navigate(tab: Page) {
   ++focusIntent;
   updates.cancelPreparation();
   if (updateConfirmDialog.open) updateConfirmDialog.close();
-  if (tab !== 'overview') clearPractice();
+  if (tab !== 'practice-page') clearPractice();
   if (capturing && tab !== 'settings') void stopCapture();
-  for (const name of ['overview', 'settings']) {
+  for (const name of ['overview', 'practice-page', 'settings']) {
     el(name).hidden = name !== tab;
     el(`nav-${name}`).classList.toggle('active', name === tab);
     if (name === tab) el(`nav-${name}`).setAttribute('aria-current', 'page');
@@ -188,6 +198,8 @@ async function action(command: string, args?: Record<string, unknown>): Promise<
   catch (e) { feedback(String(e)); return false; }
 }
 el('nav-overview').onclick = () => navigate('overview');
+el('nav-practice-page').onclick = () => navigate('practice-page');
+el('overview-practice').onclick = () => { navigate('practice-page'); focusHeading('practice-page'); };
 el('nav-settings').onclick = () => navigate('settings');
 const brand = document.querySelector('.brand') as HTMLButtonElement;
 function closeBrandMenu(restore = false) {
@@ -225,7 +237,7 @@ el('brand-overview').onclick=()=>{closeBrandMenu();navigate('overview');focusHea
 el('brand-settings').onclick=()=>{closeBrandMenu();navigate('settings');focusHeading('settings');};
 function openGettingStarted() {
   if (current?.platform !== 'macos') return;
-  closeBrandMenu(); navigate('overview'); el('get-started').hidden = false; renderGettingStarted();
+  closeBrandMenu(); navigate('practice-page'); el('get-started').hidden = false; renderGettingStarted();
   el('get-started-title').focus(); el('get-started').scrollIntoView({block:'nearest'});
 }
 el('brand-started').onclick = openGettingStarted;
@@ -254,7 +266,7 @@ el('setup').onclick = () => {
 };
 const practiceField = el('practice-text') as HTMLTextAreaElement;
 let windowActive = document.hasFocus();
-const practiceVisible = () => windowActive && !el('overview').hidden && !document.hidden && document.hasFocus() && !document.querySelector('dialog[open]') && el('brand-menu').hidden;
+const practiceVisible = () => windowActive && !el('practice-page').hidden && !document.hidden && document.hasFocus() && !document.querySelector('dialog[open]') && el('brand-menu').hidden;
 let practiceContext = 0;
 let shortcutReceived = false;
 let tutorialConfiguration = '';
@@ -283,6 +295,7 @@ function renderPractice() {
     if ((['practice-start','practice-clear'].includes(focusedAction.id) && ['starting','recording','processing','cancelling'].includes(phase)) || (focusedAction.id === 'practice-finish' && phase !== 'recording') || (focusedAction.id === 'practice-cancel' && !['starting','recording','processing'].includes(phase))) practiceField.focus({preventScroll:true});
   }
   el('practice').hidden = current?.platform !== 'macos';
+  el('practice-platform-help').hidden = current?.platform !== 'windows';
   el('shortcut-tutorial').textContent = current ? shortcutTutorial(displayShortcut(current), current.recording_mode) : 'Waiting for your configured shortcut…';
   el('shortcut-evidence').textContent = shortcutReceived ? 'Shortcut received in this practice view. This confirms the key event, not microphone or transcription success.' : 'Shortcut not tested here yet. Start test checks the microphone, not the shortcut.';
   const level = practiceVisible() ? practice.view.inputLevel : null;
@@ -328,7 +341,7 @@ void listen<string>('dashboard-navigate', ({payload}) => {
   closeBrandMenu();
   if(payload==='updates') button('updates-open').click();
    else if(payload==='get-started') openGettingStarted();
-   else { navigate(payload==='settings'?'settings':'overview'); if(payload==='practice') practiceField.focus(); }
+    else { navigate(payload==='settings'?'settings':payload==='practice'?'practice-page':'overview'); if(payload==='practice') practiceField.focus(); }
 }).catch(()=>{});
 const updatesDialog = el('updates-dialog') as HTMLDialogElement;
 const updateConfirmDialog = el('update-confirm-dialog') as HTMLDialogElement;
@@ -715,7 +728,7 @@ async function refreshStatus() {
     const requests = (current as Status & { permission_requests?: number }).permission_requests ?? 0;
     if (requests !== seenPermissionRequests) {
       const added = requests & ~seenPermissionRequests;
-      const fromGuide = added !== 0 && (added & ~guidePermissionRequests) === 0 && !el('get-started').hidden && !el('overview').hidden;
+      const fromGuide = added !== 0 && (added & ~guidePermissionRequests) === 0 && !el('get-started').hidden && !el('practice-page').hidden;
       guidePermissionRequests &= ~requests;
       seenPermissionRequests = requests;
       if (!fromGuide) navigate('settings');

@@ -64,9 +64,9 @@ try {
   await until(`document.getElementById('ready-title').textContent==='Ready'`);
   assert.deepEqual(await evaluate(`['words','saved','count'].map(id=>document.getElementById(id).textContent)`), ['0','0 sec','0'], 'First-launch totals are real zeros');
   assert.equal(await evaluate(`document.querySelectorAll('details').length`), 0, 'No disclosure maze in the app or its dialogs');
-  assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('nav button'),b=>({name:b.getAttribute('aria-label'),title:b.title,text:b.textContent.trim(),icon:!!b.querySelector('svg')}))`), [{name:'Overview',title:'Overview',text:'',icon:true},{name:'Settings',title:'Settings',text:'',icon:true}], 'Icon navigation retains accessible button names and tooltips');
+  assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('nav button'),b=>({name:b.getAttribute('aria-label'),title:b.title,text:b.textContent.trim(),icon:!!b.querySelector('svg')}))`), ['Overview','Practice','Settings'].map(name=>({name,title:name,text:name,icon:true})), 'Three labeled navigation buttons retain accessible names and tooltips');
   const accessibility = await send('Accessibility.getFullAXTree');
-  for (const name of ['Overview','Settings']) assert.ok(accessibility.nodes.some(node=>node.role?.value==='button' && node.name?.value===name), `${name} is an accessible button`);
+  for (const name of ['Overview','Practice','Settings']) assert.ok(accessibility.nodes.some(node=>node.role?.value==='button' && node.name?.value===name), `${name} is an accessible button`);
   assert.equal(await evaluate(`document.getElementById('overview-model').hidden`), true, 'Existing users do not see another download CTA');
   // Clean first launch: download remains discoverable for every permissions /
   // hook combination, without a poll initiating any network operation.
@@ -276,14 +276,16 @@ try {
   assert.match(await evaluate(`document.getElementById('message').title`), /start:no-original-focus/, 'Technical reason remains available without dominating the UI');
   await evaluate(`document.getElementById('nav-settings').click();document.getElementById('feedback').hidden=true;window.fixture.message='Select a text field and press Fn.'`);
   await until(`document.getElementById('message').textContent==='Select a text field and press Fn.'`);
-  assert.equal(await evaluate(`document.querySelector('footer').getBoundingClientRect().bottom<=innerHeight`), true, `Ready settings fit the normal window: ${JSON.stringify(await evaluate(`Array.from(document.querySelectorAll('aside,header,.settings-intro,#settings .card,.local-data,.status,footer')).map(e=>({name:e.className||e.tagName,height:e.getBoundingClientRect().height,bottom:e.getBoundingClientRect().bottom}))`))}`);
+   await evaluate(`document.querySelector('footer').scrollIntoView({block:'end'})`);
+   assert.equal(await evaluate(`(()=>{const footer=document.querySelector('footer').getBoundingClientRect(),data=document.querySelector('.local-data').getBoundingClientRect();return footer.bottom<=innerHeight+1 && footer.top>=data.bottom;})()`), true, 'Expanded Settings retains a reachable, non-overlapping footer');
+   await evaluate(`window.scrollTo(0,0)`);
   await evaluate(`window.fixture.phase='idle'`);
   await evaluate(`window.fixture.transcript='A little less typing. A little more room to think.'; document.getElementById('feedback').hidden=true;`);
   await delay(900);
   assert.equal(await evaluate(`document.body.textContent.includes(window.fixture.transcript)`), false);
   // Practice uses its own IPC result, never the ordinary transcript fixture.
   await evaluate(`window.dispatchEvent(new Event('focus'))`);
-  await evaluate(`window.fixture.platform='macos';window.practiceGeneration=0;window.practiceResult={phase:'recording',text:''};const beforePractice=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='practice_start'){window.calls.push({command,args});if(window.practiceReject)throw 'Practice busy';if(window.practiceDelay)await new Promise(r=>window.practiceAck=r);return ++window.practiceGeneration;}if(command==='practice_finish'){window.calls.push({command,args});window.practiceResult.phase='processing';return;}if(command==='practice_status'){return {...window.practiceResult,generation:window.practiceGeneration};}if(command==='practice_cancel'){window.calls.push({command,args});return;}return beforePractice(command,args);};document.getElementById('nav-overview').click()`);
+  await evaluate(`window.fixture.platform='macos';window.practiceGeneration=0;window.practiceResult={phase:'recording',text:''};const beforePractice=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='practice_start'){window.calls.push({command,args});if(window.practiceReject)throw 'Practice busy';if(window.practiceDelay)await new Promise(r=>window.practiceAck=r);return ++window.practiceGeneration;}if(command==='practice_finish'){window.calls.push({command,args});window.practiceResult.phase='processing';return;}if(command==='practice_status'){return {...window.practiceResult,generation:window.practiceGeneration};}if(command==='practice_cancel'){window.calls.push({command,args});return;}return beforePractice(command,args);};document.getElementById('nav-practice-page').click()`);
   await until(`!document.getElementById('practice').hidden && !document.getElementById('practice-start').disabled`);
   assert.ok((await send('Accessibility.getFullAXTree')).nodes.some(n=>n.role?.value==='textbox' && n.name?.value==='Practice dictation'));
   await evaluate(`document.getElementById('practice-start').click();document.getElementById('practice-start').click()`);
@@ -300,7 +302,7 @@ try {
   await evaluate(`window.practiceDelay=true;document.getElementById('practice-start').click();document.getElementById('nav-settings').click();window.practiceAck()`);
   await delay(950);
   assert.equal(await evaluate(`document.getElementById('practice-text').value==='' && document.getElementById('practice-finish').disabled`),true,'Late acknowledgement after navigation stays cancelled');
-  await evaluate(`window.practiceDelay=false;window.practiceReject=true;document.getElementById('nav-overview').click();document.getElementById('practice-start').click()`);
+  await evaluate(`window.practiceDelay=false;window.practiceReject=true;document.getElementById('nav-practice-page').click();document.getElementById('practice-start').click()`);
   await until(`document.getElementById('practice-message').textContent.includes('Practice busy')`);
   await evaluate(`window.practiceReject=false;document.getElementById('practice-clear').click()`);
   await until(`!document.getElementById('practice-start').disabled`);
@@ -412,15 +414,15 @@ try {
     await evaluate(`document.getElementById('feedback').hidden=true`);
     for (const width of [320, 390, 400, 560, 740, 980, 1280]) {
       await send('Emulation.setDeviceMetricsOverride', { width, height: 820, deviceScaleFactor: 1, mobile: false });
-      for (const tab of ['overview','settings']) {
+      for (const tab of ['overview','practice-page','settings']) {
         await evaluate(`document.getElementById('nav-${tab}').click()`);
-        const nav = await evaluate(`(() => { const a=document.getElementById('nav-overview').getBoundingClientRect(), b=document.getElementById('nav-settings').getBoundingClientRect(),brand=document.querySelector('.brand').getBoundingClientRect();return {same:a.y===b.y&&a.width===b.width&&a.height===b.height,width:a.width,height:a.height,centered:Math.abs((brand.y+brand.height/2)-(a.y+a.height/2))<1,active:document.querySelector('nav [aria-current="page"]').id};})()`);
-        assert.deepEqual(nav, {same:true,width:40,height:40,centered:true,active:`nav-${tab}`}, `Header aligned at ${width}px`);
+        const nav = await evaluate(`(() => { const rs=[...document.querySelectorAll('nav button')].map(e=>e.getBoundingClientRect());return {same:rs.every(r=>Math.abs(r.width-rs[0].width)<1&&r.height===40),aligned:rs.every(r=>innerWidth<=760?r.y===rs[0].y:r.x===rs[0].x),active:document.querySelector('nav [aria-current="page"]').id};})()`);
+        assert.deepEqual(nav, {same:true,aligned:true,active:`nav-${tab}`}, `Labeled navigation aligned at ${width}px`);
         assert.equal(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth`), true, `No horizontal overflow at ${width}px, ${theme}, ${tab}`);
         assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('button, select, input')).filter(e=>e.getClientRects().length && (e.getBoundingClientRect().right>innerWidth || e.getBoundingClientRect().left<0)).map(e=>e.id)`), [], 'All controls fit');
         if (tab==='settings') assert.equal(await evaluate(`(() => {const label=document.querySelector('.shortcut-row h3').getBoundingClientRect(),value=document.querySelector('.shortcut-value').getBoundingClientRect();return value.top>=label.bottom || value.left>=label.right;})()`), true, 'Shortcut value never overlaps its label');
         assert.equal(await evaluate(`['words','saved','count'].every(id=>{const s=getComputedStyle(document.getElementById(id));return s.color==='${theme==='dark'?'rgb(243, 239, 234)':'rgb(48, 46, 45)'}' && s.opacity==='1'})`), true, 'Readable appearance-specific activity numbers, not faded opacity');
-        assert.equal(await evaluate(`(() => {const status=document.querySelector('.status').getBoundingClientRect(),nav=document.querySelector('nav').getBoundingClientRect();return status.top>=nav.bottom && Math.abs(status.right-nav.right)<1 && !document.querySelector('main .status');})()`), true, 'Compact status aligns to navigation upper right');
+        assert.equal(await evaluate(`(() => {const status=document.querySelector('.status').getBoundingClientRect(),nav=document.querySelector('nav').getBoundingClientRect();return (innerWidth<=760?status.bottom<=nav.top:status.top>=nav.bottom) && !document.querySelector('main .status');})()`), true, 'Status remains in the responsive navigation shell without overlap');
       }
       await evaluate(`document.getElementById('change-shortcut').click()`);
       await until(recording);
@@ -463,9 +465,9 @@ try {
      await send('Emulation.setDeviceMetricsOverride', {width:740,height:820,deviceScaleFactor:1,mobile:false});
      await evaluate(`window.fixture.phase='idle';window.fixture.message='';document.getElementById('feedback').hidden=true`);
      await until(`document.getElementById('phase').textContent==='Ready'`);
-     for (const width of [740,400,320]) {
+     for (const width of [980,740,400,320]) {
        await send('Emulation.setDeviceMetricsOverride', {width,height:820,deviceScaleFactor:1,mobile:false});
-       for (const tab of ['overview','settings']) {
+       for (const tab of ['overview','practice-page','settings']) {
          await evaluate(`document.getElementById('nav-${tab}').click()`);
          const shot = await send('Page.captureScreenshot', {format:'png',captureBeyondViewport:true});
          writeFileSync(join(process.env.UI_SCREENSHOT_DIR, `${tab}-${width}.png`), Buffer.from(shot.data,'base64'));
@@ -473,7 +475,7 @@ try {
      }
      await evaluate(`Object.assign(window.fixture,{model_ready:false,microphone:false,accessibility:false,input_monitoring:false,hotkey:false})`);
      await until(`document.getElementById('setup-state').textContent==='Needs attention'`);
-     for (const tab of ['overview','settings']) {
+     for (const tab of ['overview','practice-page','settings']) {
        await evaluate(`document.getElementById('nav-${tab}').click()`);
        const shot = await send('Page.captureScreenshot', {format:'png',captureBeyondViewport:true});
        writeFileSync(join(process.env.UI_SCREENSHOT_DIR, `${tab}-first-run-320.png`), Buffer.from(shot.data,'base64'));

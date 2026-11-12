@@ -2,6 +2,36 @@
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
 
+## Beta 16 candidate preparation (not activation)
+
+Candidate distribution **v0.1.1-beta.16** retains embedded version **0.1.1**.
+Distribution, packaging/audit filenames and the disabled `candidateRelease`
+select beta 16. The active Mac release, website downloads, signed public feed,
+README and install guide remain byte-identical beta 15 coordinates. Keep the
+tracked feed hash pinned to audited beta 15; metadata tests must not depend on
+ignored `release/` artifacts. Historical beta 11–15 notes and the four completed
+ledger groups remain immutable; the beta 15 evidence below is not beta 16 evidence.
+
+The candidate is a coherent dashboard redesign with labeled **Overview, Practice
+and Settings** navigation. Overview presents the configured shortcut and activity
+without granting capture. Private Practice has its own page, ephemeral clearing
+and context revocation, guarded focus/title updates and tray routing. Settings
+groups General, Dictation, Appearance & sound and Setup. The warm brand, adaptive
+Light/Dark/System appearance and prominent update footer remain; practice text,
+meter, actions and status keep stable geometry. Usage/data semantics and native
+authorization guards remain unchanged. See [candidate scope and limitations](releases/v0.1.1-beta.16.md).
+
+Preparation validation reported by the primary: source smoke, Node tests (302
+passed, 1 skipped) and frontend build passed; Joffrey's independent read-only
+review reported no findings, with 24 targeted checks passing. These are source
+checks, not runtime VoiceOver, microphone hardware or actual OTA acceptance.
+No installed-app replacement is performed or authorized by this preparation.
+Beta 16 exact clean-source CI, existing-identity signing, local/draft/public
+seven-asset audits, publication, activation CI, Pages/live byte readback and
+matching Homebrew publication/readback and tap CI remain separate pending gates.
+Preserve the existing signing identity, updater keys, permissions and
+model/settings/usage data. The owner upgrades manually through the app.
+
 ## Beta 15 publication and metadata activation
 
 Published distribution **v0.1.1-beta.15** retains embedded version **0.1.1**.

@@ -70,6 +70,14 @@ prove discovery completeness or runtime correctness on an untested OS.
 
 ## Executable contracts
 
+- The dashboard has three explicit destinations: Overview, Practice and Settings.
+  Only the visible, focused Practice page can grant a practice context. Navigation
+  away clears its ephemeral text/input owner and revokes the context; late native
+  receipts cannot revive it. Overview never grants capture or external-delivery
+  authority. Native dashboard own-app refusal remains the independent final guard.
+  The setup guide lives in Practice; tray Practice navigation selects that page.
+  Browser context, blur, pending-start and stale-receipt contracts cover this split.
+
 - Appearance is presentation, not readiness or capture authorization. One saved
   `system`/`light`/`dark` preference defaults only its own absent/malformed field.
   Configure serializes writes without cancelling dictation or resetting gestures;
