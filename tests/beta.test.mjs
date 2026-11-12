@@ -27,7 +27,7 @@ test('landing Beta is a small superscript, not a full-size wordmark or pill', ()
 });
 
 test('README, release notes, installer guide and filename disclose beta without renaming the app', () => {
-  assert.match(read('README.md'), /!\[Mac beta: v0\.1\.1-beta\.15\]\(https:\/\/img.shields.io\/badge\/Mac_beta-v0\.1\.1--beta\.15-a64a45.svg\)/);
+  assert.match(read('README.md'), /!\[Mac beta: v0\.1\.1-beta\.16\]\(https:\/\/img.shields.io\/badge\/Mac_beta-v0\.1\.1--beta\.16-a64a45.svg\)/);
   assert.match(read('docs/releases/v0.1.1-beta.2.md'), /# HandsFree v0\.1\.1-beta\.2/);
   assert.match(read('docs/releases/v0.1.1-beta.2.md'), /Prerelease · Beta testing/);
   assert.match(read('docs/INSTALL.md'), /# Install HandsFree \(Mac beta\)/);
@@ -38,7 +38,7 @@ test('README, release notes, installer guide and filename disclose beta without 
   assert.equal(config.identifier, 'com.handsfree.local');
 });
 
-test('active Mac beta 15 and disabled beta 16 candidate coordinates keep embedded version unchanged', async () => {
+test('active Mac beta 16 and disabled audit coordinates keep embedded version unchanged', async () => {
   const { release, candidateRelease } = await import('../site/release.js');
   const { candidate, tag } = await import('../scripts/check-release.mjs');
   const version = JSON.parse(read('package.json')).version;
@@ -48,12 +48,19 @@ test('active Mac beta 15 and disabled beta 16 candidate coordinates keep embedde
   assert.equal(JSON.parse(read('src-tauri/tauri.conf.json')).version, version);
   assert.ok(read('src-tauri/Cargo.toml').includes(`version = "${version}"`));
   assert.ok(read('src-tauri/Cargo.lock').includes(`name = "handsfree"\nversion = "${version}"`));
-  assert.equal(release.version, `${version}-beta.15`);
+  assert.equal(release.version, `${version}-beta.16`);
   assert.equal(release.publicAvailable, true, 'Activation follows publication and public asset verification');
   assert.equal(candidateRelease.version, `${version}-beta.16`);
   assert.equal(candidateRelease.publicAvailable, false, 'Candidate must not activate public downloads');
   assert.ok(release.dmgUrl.endsWith(`/releases/download/v${release.version}/HandsFree-${release.version}-macos-arm64.dmg`));
-  assert.notEqual(release.dmgUrl, candidateRelease.dmgUrl, 'Active release stays on audited beta 15 while beta 16 is prepared');
+  assert.equal(release.dmgUrl, candidateRelease.dmgUrl, 'Activation selects audited beta 16 without enabling the candidate switch');
+  assert.deepEqual(candidateRelease, {
+    schemaVersion: 1,
+    version: '0.1.1-beta.16',
+    publicAvailable: false,
+    status: 'Mac beta 16 candidate: Overview, private Practice and grouped Settings dashboard. Publication and public audit pending; not an availability switch.',
+    dmgUrl: release.dmgUrl,
+  }, 'Disabled preparation record remains unchanged after publication');
   assert.equal(JSON.parse(read('src-tauri/distribution.json')).version, candidateRelease.version);
   assert.equal(tag, `v${candidateRelease.version}`);
   assert.equal(candidate, `HandsFree-${candidateRelease.version}-macos-arm64.dmg`);
@@ -120,29 +127,33 @@ test('beta 15 publication documents appearance, cached update status and separat
   assert.doesNotMatch(notes, /Candidate experimental|No beta 15 clean artifact source/);
 });
 
-test('beta 16 candidate documents dashboard scope without claiming publication or runtime acceptance', () => {
+test('beta 16 publication records exact receipts without claiming activation or runtime acceptance', () => {
   const notes = read('docs/releases/v0.1.1-beta.16.md');
-  for (const scope of ['Candidate experimental Mac beta', 'Internal app version: **0.1.1**',
+  for (const scope of ['Published experimental Mac beta', 'Internal app version: **0.1.1**',
     'Overview, Practice and Settings', 'does not grant capture', 'ephemeral',
     'context revocation', 'focus', 'tray routing', 'General, Dictation, Appearance & sound and Setup',
     'Light/Dark/System', 'prominent update footer', 'stable geometry', 'Usage/data semantics',
-    'native guards remain unchanged', 'candidateRelease.publicAvailable', 'audited beta 15',
-    'No beta 16 clean artifact source', 'VoiceOver/AXPress', 'microphone hardware',
+    'native guards remain unchanged', 'candidateRelease.publicAvailable',
+    'VoiceOver/AXPress', 'microphone hardware',
     'actual OTA', '**unverified**', 'Do not manually replace the installed app',
     'existing signing identity', 'updater keys']) assert.ok(notes.includes(scope), scope);
   assert.ok(read('src-tauri/src/updater.rs').includes('assert_eq!(installed_version(), "0.1.1-beta.16")'));
   const guide = read('docs/RELEASING.md');
-  assert.match(guide, /## Beta 16 candidate preparation \(not activation\)/);
-  assert.ok(guide.indexOf('## Beta 16 candidate') < guide.indexOf('## Beta 15 publication'));
-  assert.doesNotMatch(notes, /Published experimental Mac beta|Exact-source CI passed/);
+  assert.match(guide, /## Beta 16 publication and metadata activation/);
+  assert.ok(guide.indexOf('## Beta 16 publication') < guide.indexOf('## Beta 15 publication'));
+  for (const source of [notes, guide]) {
+    for (const evidence of ['79b509bf6f8196ff9d1922498f92120cbf9e85f2', '43149304049',
+      'c3be19d550a8d7cfbed2642fc321aa0d34431684d761e55f59ebe530fae5f071',
+      '43e1ecb7d72d0afabb37cb4fd77c42dcfd29d24333c56a956b84250e27987cdf',
+      '8dfed02a2df4bac85ad5c09e2273bd0209d5d529435b994ede74dfcc29b6ac15',
+      'beta15-before-beta16-w53ip9wg', 'Activation CI', 'Pages', 'Homebrew',
+      'tap CI remain', 'pending gates']) assert.ok(source.includes(evidence), evidence);
+  }
+  assert.doesNotMatch(notes, /Candidate experimental|No beta 16 clean artifact source|remain on audited beta 15/);
 });
 
-test('candidate preparation preserves active public surfaces and completed ledger bytes', () => {
+test('beta 16 activation preserves completed historical ledger bytes', () => {
   const hashes = {
-    'README.md': '8f18471094bb62cb55818e284cc5d695d5b6f4acebab2d8716274a5555cdb2b4',
-    'docs/INSTALL.md': 'c238474940ec5427ac9ea5371a53548e17b334091ad54217272701b5baedf3de',
-    'site/index.html': '3a9258640d033d7a48756efc5547adbb8c8ea631251876e0cdc2dabf79f3afb0',
-    'site/updates/macos-arm64.json': '580764c93b4aed5b68dae7ebd9df2f7362675939295321fa0d3aac8a4ae03e39',
     'docs/FEATURE-RELEASES.md': '4e52e54e2be54bc1f0985034e37cb765c59f838f9f8512ec0eedeb83977bada8',
   };
   for (const [path, hash] of Object.entries(hashes)) {
@@ -199,7 +210,7 @@ test('beta 14 publication records audited source and hashes, with real OS accept
   }
   // Source-only oracle: never read ignored release/ output to check active feed.
   assert.equal(createHash('sha256').update(read('site/updates/macos-arm64.json')).digest('hex'),
-    '580764c93b4aed5b68dae7ebd9df2f7362675939295321fa0d3aac8a4ae03e39');
+    '8dfed02a2df4bac85ad5c09e2273bd0209d5d529435b994ede74dfcc29b6ac15');
 });
 
 test('beta 12 historical notes and completed group 2 parity ledger do not claim hardware acceptance', () => {
@@ -253,13 +264,13 @@ test('beta 16 packaging retains practice guidance; beta 6 publication evidence r
   assert.doesNotMatch(read('docs/DEVELOPMENT.md'), /Practice field \(development builds\)|unpublished beta 6 candidate/);
 });
 
-test('Mac beta 15 activation coordinates current docs and all static download links', async () => {
+test('Mac beta 16 activation coordinates current docs and all static download links', async () => {
   const { release } = await import('../site/release.js');
-  assert.equal(release.version, '0.1.1-beta.15');
+  assert.equal(release.version, '0.1.1-beta.16');
   for (const path of ['README.md', 'docs/INSTALL.md', 'site/index.html']) {
     const source = read(path);
     assert.ok(source.includes(release.dmgUrl), `${path} links the verified current Mac DMG`);
-    assert.doesNotMatch(source, /releases\/download\/v0\.1\.1-beta\.(?:[23456789]|10|11|12|13|14)\/|HandsFree-0\.1\.1-beta\.(?:[23456789]|10|11|12|13|14)-macos|Mac_beta-v0\.1\.1--beta\.(?:[23456789]|10|11|12|13|14)-/, `${path} must not advertise a stale Mac download; historical evidence links remain valid`);
+    assert.doesNotMatch(source, /releases\/download\/v0\.1\.1-beta\.(?:[23456789]|10|11|12|13|14|15)\/|HandsFree-0\.1\.1-beta\.(?:[23456789]|10|11|12|13|14|15)-macos|Mac_beta-v0\.1\.1--beta\.(?:[23456789]|10|11|12|13|14|15)-/, `${path} must not advertise a stale Mac download; historical evidence links remain valid`);
   }
   const links = [...read('site/index.html').matchAll(/href="([^"]+\.dmg)"/g)].map(match => match[1]);
   assert.equal(links.length, 2, 'Primary and platform-card Mac links have no-JS defaults');
@@ -281,9 +292,9 @@ test('beta 11 publication records immutable source and pending deployment/accept
   }
   assert.doesNotMatch(notes, /Unpublished experimental|Current verified public downloads and signed feed remain/);
   const feed = JSON.parse(read('site/updates/macos-arm64.json'));
-  assert.equal(feed.version, '0.1.1-beta.15');
+  assert.equal(feed.version, '0.1.1-beta.16');
   assert.equal(feed.platforms['darwin-aarch64'].url,
-    'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.15/HandsFree-0.1.1-beta.15-macos-arm64.app.tar.gz');
+    'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.16/HandsFree-0.1.1-beta.16-macos-arm64.app.tar.gz');
   assert.equal(createHash('sha256').update(notes).digest('hex'),
     '7bac886586a6572df5547bf59ba19c02df39eeba1c52b2b1914e0dc789458276',
     'Historical beta 11 evidence remains byte-identical');
@@ -302,7 +313,7 @@ test('beta 7 publication evidence distinguishes artifact source, bootstrap and p
   assert.equal(createHash('sha256').update(read('docs/releases/v0.1.1-beta.6.md')).digest('hex'),
     '2f735b7e48de1d60d96fbe592987991796a05fa7d8510b6e4e3b63afbf715b30', 'Historical beta 6 notes remain byte-identical');
   assert.equal(createHash('sha256').update(read('site/updates/macos-arm64.json')).digest('hex'),
-    '580764c93b4aed5b68dae7ebd9df2f7362675939295321fa0d3aac8a4ae03e39', 'Activation preserves exact anonymously verified beta 15 feed bytes');
+    '8dfed02a2df4bac85ad5c09e2273bd0209d5d529435b994ede74dfcc29b6ac15', 'Activation preserves exact anonymously verified beta 16 feed bytes');
   for (const path of ['README.md', 'docs/INSTALL.md', 'SECURITY.md', 'docs/UPDATES.md']) {
     const source = read(path);
     assert.match(source, /Check for updates/);

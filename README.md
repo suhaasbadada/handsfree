@@ -7,7 +7,7 @@
 Say it while it’s clear. HandsFree turns your thoughts into text, without making typing the bottleneck.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-706b68.svg)](LICENSE)
-[![Mac beta: v0.1.1-beta.15](https://img.shields.io/badge/Mac_beta-v0.1.1--beta.15-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.15)
+[![Mac beta: v0.1.1-beta.16](https://img.shields.io/badge/Mac_beta-v0.1.1--beta.16-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.16)
 [![Platform: Apple Silicon Mac](https://img.shields.io/badge/Platform-Apple_Silicon_Mac-706b68.svg)](#platforms)
 
 ## Download & install
@@ -24,7 +24,7 @@ Homebrew simplifies installation; macOS security prompts may still appear. This 
 
 Open **Applications → HandsFree**, allow Microphone, Accessibility, and Input Monitoring, then download the English model (~148 MB) in Settings → Overview. [Complete Mac setup, security prompts & existing-app guidance](docs/INSTALL.md).
 
-### [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.15/HandsFree-0.1.1-beta.15-macos-arm64.dmg)
+### [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.16/HandsFree-0.1.1-beta.16-macos-arm64.dmg)
 
 **DMG alternative:** drag HandsFree to Applications before opening it or granting permissions. Intel Macs are unsupported. See [Open Anyway and installation guidance](docs/INSTALL.md). No developer tools needed.
 
@@ -57,7 +57,7 @@ No special integration is required: insertion depends on the focused field, with
 
 | Platform | Status |
 | --- | --- |
-| macOS 14+, Apple Silicon | [Mac beta 15 available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.15) · self-signed, not notarized |
+| macOS 14+, Apple Silicon | [Mac beta 16 available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.16) · self-signed, not notarized |
 | Intel Macs | Unsupported |
 | Windows | Paused; historical experimental implementation, not currently supported |
 | Linux | Not supported; no build or download available |
@@ -77,7 +77,7 @@ Focus a text field, briefly tap **Fn / 🌐**, speak, and tap again to finish. *
 
 **Optional push to talk:** choose **Settings → Recording mode → Push to talk**. Hold Fn or your custom combination; release to finish (the first required component released finishes a combination). Other keys, mouse actions during a hold, or observed focus changes cancel without paste. Toggle remains the default; updates preserve your preferences, model and statistics. See [behavior, focus limits and test notes](docs/PUSH-TO-TALK.md).
 
-[Full installation and troubleshooting guide](docs/INSTALL.md) · [Beta release notes](docs/releases/v0.1.1-beta.15.md)
+[Full installation and troubleshooting guide](docs/INSTALL.md) · [Beta release notes](docs/releases/v0.1.1-beta.16.md)
 
 **Updates (beta 7 onward):** choose footer **Updates → Check for updates**, then
 confirm **Download & restart…** when a newer version is offered. Opening the
