@@ -2,7 +2,7 @@ import Foundation
 import AVFoundation
 
 // Synthetic PCM only. Do not instantiate AVAudioEngine or request microphone.
-for rate in [16000.0, 44100.0, 48000.0] {
+for rate in [16000.0, 24000.0, 44100.0, 48000.0] {
     for interleaved in [false, true] {
       for (left, right) in [(Float(0.2), Float(0)), (Float(0), Float(0.2)), (Float(0.05), Float(0.15))] {
         let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: rate, channels: 2, interleaved: interleaved)!
@@ -136,3 +136,92 @@ do {
     } catch {}
     print("Microphone UID bind-before-format, missing/bind failure and delayed route revalidation passed without hardware")
 } catch { preconditionFailure("Synthetic microphone binding failed: \(error)") }
+
+// The real Objective-C throw stays entirely in Objective-C, not Swift frames.
+let exception = HFTestCaptureException()!
+precondition((exception as NSError).domain == "HandsFree capture exception")
+precondition(exception.localizedDescription == "Failed to create tap due to format mismatch")
+precondition(HFCaptureBoundary({}) == nil)
+for operation in 0..<6 {
+    precondition(HFTestCaptureAdapter(Int32(operation))?.localizedDescription == exception.localizedDescription)
+}
+
+for failure in ["none", "zero", "format-exception", "uid", "install", "prepare", "start", "format-race", "format-start", "route-install", "route-prepare", "route-start", "route-running", "cancel", "cancel-start", "stop", "remove"] {
+    var events = [String]()
+    var changed: (() -> Void)?
+    var retained: CapturePipeline?
+    var samples = 0, failures = 0
+    // Recorder was created before playback at 48kHz. The cue switches the
+    // hardware to 24kHz; production must not retain that pre-cue converter.
+    var current = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 1)!
+    var startup: CaptureStartup!
+    startup = CaptureStartup(operations: .init(observe: { callback in
+        events.append("observe"); changed = callback
+        return { events.append("unobserve"); changed = nil }
+    }, validate: {
+        events.append("validate")
+        try MicrophoneBinding.revalidate(expected: 42, resolve: { failure == "uid" ? 43 : 42 })
+    }, format: {
+        events.append("format")
+        if failure == "format-exception" { throw HFTestCaptureAdapter(0)! }
+        return current
+    }, install: { pipe in
+        events.append("install"); retained = pipe
+        let early = AVAudioPCMBuffer(pcmFormat: current, frameCapacity: 2048)!
+        early.frameLength = 2048
+        pipe.enqueue(early) // no samples may publish before final startup validation
+        if failure == "install" { throw HFTestCaptureAdapter(1)! }
+        if failure == "route-install" { changed?() }
+        if failure == "format-race" { current = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 1)! }
+        if failure == "cancel" { startup.stop() }
+    }, prepare: {
+        events.append("prepare")
+        if failure == "prepare" { throw HFTestCaptureAdapter(2)! }
+        if failure == "route-prepare" { changed?() }
+    }, start: {
+        events.append("start")
+        if failure == "start" { throw HFTestCaptureAdapter(3)! }
+        if failure == "route-start" { changed?() }
+        if failure == "cancel-start" { startup.stop() }
+        if failure == "format-start" { current = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 1)! }
+    }, stop: {
+        events.append("stop")
+        if failure == "stop" { throw HFTestCaptureAdapter(4)! }
+    }, remove: {
+        events.append("remove")
+        if failure == "remove" { throw HFTestCaptureAdapter(5)! }
+    })) { _, count in
+        if count < 0 { failures += 1 } else { samples += Int(count) }
+    }
+    current = AVAudioFormat(standardFormatWithSampleRate: failure == "zero" ? 0 : 24000, channels: 1)!
+    let success = ["none", "stop", "remove", "route-running"].contains(failure)
+    do {
+        try startup.start()
+        precondition(success && startup.started, "Unexpected start: \(failure)")
+        let pcm = AVAudioPCMBuffer(pcmFormat: current, frameCapacity: 24000)!
+        pcm.frameLength = 24000
+        memset(pcm.floatChannelData![0], 0, 24000 * MemoryLayout<Float>.size)
+        retained!.enqueue(pcm)
+        if failure == "route-running" { changed?() }
+    } catch { precondition(!success && !startup.started, "Unexpected failure: \(failure): \(error)") }
+    let healthy = startup.stop()
+    precondition(healthy == (failure == "none"))
+    precondition(!startup.stop() && !startup.started)
+    precondition(events.first == "observe" && events.filter { $0 == "unobserve" }.count == 1)
+    if ["zero", "format-exception", "uid"].contains(failure) {
+        precondition(!events.contains("install") && !events.contains("start"))
+    } else {
+        precondition(events.contains("stop") && events.contains("remove"), "Partial teardown: \(failure): \(events)")
+    }
+    if failure == "none" { precondition(abs(samples - 16000) <= 2 && failures == 0) }
+    else if success { precondition(samples <= 16002 && failures == 1) }
+    else { precondition(samples == 0 && failures == 0, "Bridge owns the one startup failure") }
+    let before = samples
+    let late = AVAudioPCMBuffer(pcmFormat: AVAudioFormat(standardFormatWithSampleRate: 24000, channels: 1)!, frameCapacity: 2048)!
+    late.frameLength = 2048
+    retained?.enqueue(late); retained?.drain()
+    changed?()
+    precondition(samples == before && !startup.started, "Late publish: \(failure)")
+    do { try startup.start(); preconditionFailure("Retired startup revived") } catch {}
+}
+print("Capture startup exception, post-cue format, teardown and stale producer contracts passed without hardware")

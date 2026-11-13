@@ -2,6 +2,39 @@
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
 
+## Beta 17 candidate preparation (unpublished)
+
+Candidate distribution **v0.1.1-beta.17** retains embedded version **0.1.1**.
+Distribution metadata, package/audit filenames and the disabled `candidateRelease`
+export select beta 17. The active public `release` export, static downloads,
+README, install guide and tracked signed feed remain on audited beta 16.
+Keep the tracked current-feed hash pinned to beta 16; source tests must not read
+ignored `release/` artifacts. Historical beta 11–16 notes and all four completed
+ledger groups remain byte-identical; the beta 16 receipts below stay historical
+evidence, not beta 17 receipts.
+
+The [beta 17 candidate notes](releases/v0.1.1-beta.17.md) record three November 12
+installed SIGABRT reports in `AudioCapture.start`, with AVFAudio hardware 24 kHz /
+client 48 kHz tap mismatch after the Bluetooth start cue. Candidate source uses
+fresh post-cue hardware format and nil tap negotiation on the validated device
+UID, an Objective-C exception boundary, pre-start observation with locked
+invalidation and PCM gating, and independent partial-failure teardown with
+generation-bound error reporting. No retries, silent device switches or changes
+to privacy/usage semantics are introduced.
+
+Primary-reported pre-metadata validation: Node 306 passed, 1 skipped; Rust 90
+passed, 3 ignored; frontend build, formatting and Clippy passed. Joffrey independently
+reported four targeted native tests passed and no findings. Synthetic 24 kHz
+conversion, 48-to-24 kHz format change and real thrown exceptions do not instantiate
+AVAudioEngine, access a microphone or launch the installed app. Actual Bluetooth
+on macOS 14 and installed OTA remain unverified; do not claim a proven hardware fix.
+
+No beta 17 clean-source commit, source CI, signing, artifact audits or publication
+are claimed by this preparation. The primary owns those gates, followed separately
+by feed/site activation, Pages/live readback and matching Homebrew/tap gates.
+Do not sign, install, launch or replace the installed app as part of metadata
+preparation. Preserve signing identity, updater keys, permissions and local data.
+
 ## Beta 16 publication and metadata activation
 
 Current public Mac distribution **v0.1.1-beta.16** retains embedded version

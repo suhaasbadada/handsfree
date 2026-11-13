@@ -6,6 +6,21 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+function captureShim(root, directory, sdk, testException = false) {
+  const object = join(directory, 'CaptureException.o');
+  execFileSync('xcrun', ['clang', '-fobjc-arc', '-fblocks', '-fobjc-exceptions', '-target', 'arm64-apple-macosx14.0',
+    '-isysroot', sdk, '-c', join(root, 'src-tauri/native/CaptureException.m'), '-o', object]);
+  const args = ['-target', 'arm64-apple-macosx14.0', '-import-objc-header', join(root,
+    testException ? 'tests/native-capture/ExceptionTests.h' : 'src-tauri/native/CaptureException.h'), object];
+  if (testException) {
+    const fixture = join(directory, 'ExceptionTests.o');
+    execFileSync('xcrun', ['clang', '-fobjc-arc', '-fblocks', '-fobjc-exceptions', '-target', 'arm64-apple-macosx14.0',
+      '-isysroot', sdk, '-c', join(root, 'tests/native-capture/ExceptionTests.m'), '-o', fixture]);
+    args.push(fixture);
+  }
+  return args;
+}
+
 test('memory capture converter drains hardware-rate stereo and bounds producer backlog without a microphone', { skip: process.platform !== 'darwin' }, () => {
   const directory = mkdtempSync(join(tmpdir(), 'handsfree-capture-'));
   const root = fileURLToPath(new URL('../', import.meta.url));
@@ -13,11 +28,12 @@ test('memory capture converter drains hardware-rate stereo and bounds producer b
     const sdk = execFileSync('xcrun', ['--show-sdk-path'], { encoding: 'utf8' }).trim();
     const binary = join(directory, 'capture-tests');
     execFileSync('swiftc', ['-O', '-sdk', sdk, '-Xcc', `-I${sdk}/usr/include`, '-swift-version', '5',
-      join(root, 'src-tauri/native/AudioCapture.swift'), join(root, 'tests/native-capture/main.swift'), '-o', binary]);
+      ...captureShim(root, directory, sdk, true), join(root, 'src-tauri/native/AudioCapture.swift'), join(root, 'tests/native-capture/main.swift'), '-o', binary]);
     const output = execFileSync(binary, { encoding: 'utf8', timeout: 10000 });
     assert.match(output, /bounded overload passed without microphone/);
     assert.match(output, /Microphone UID bind-before-format, missing\/bind failure and delayed route revalidation passed without hardware/);
     assert.match(output, /Finish once after drain; cancel\/error\/quit\/pending-start\/mute suppressed without playback/);
+    assert.match(output, /Capture startup exception, post-cue format, teardown and stale producer contracts passed without hardware/);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
@@ -29,7 +45,7 @@ test('compact capsule, native shortcuts and Clean cue signals with idle-only pre
     const binary = join(directory, 'capsule-tests');
     // Optimize the DFT signal checks; -O retains Swift preconditions.
     execFileSync('swiftc', ['-O', '-sdk', sdk, '-Xcc', `-I${sdk}/usr/include`, '-swift-version', '5',
-      join(root, 'src-tauri/native/Bridge.swift'), join(root, 'src-tauri/native/PastePolicy.swift'), join(root, 'src-tauri/native/AudioCapture.swift'),
+      ...captureShim(root, directory, sdk), join(root, 'src-tauri/native/Bridge.swift'), join(root, 'src-tauri/native/PastePolicy.swift'), join(root, 'src-tauri/native/AudioCapture.swift'),
       join(root, 'tests/native-capsule/main.swift'), '-framework', 'ServiceManagement', '-o', binary]);
     const output = execFileSync(binary, { encoding: 'utf8', timeout: 10000 });
     assert.match(output, /Native capsule geometry, state layout, nonactivation, shortcut matching and Clean cues passed without capture/);
@@ -65,7 +81,7 @@ test('native paste/copy guard cancellation; fallback survives restore timers and
     const sdk = execFileSync('xcrun', ['--show-sdk-path'], { encoding: 'utf8' }).trim();
     const binary = join(directory, 'delivery-tests');
     execFileSync('swiftc', ['-sdk', sdk, '-Xcc', `-I${sdk}/usr/include`, '-swift-version', '5',
-      join(root, 'src-tauri/native/Bridge.swift'), join(root, 'src-tauri/native/PastePolicy.swift'), join(root, 'src-tauri/native/AudioCapture.swift'),
+      ...captureShim(root, directory, sdk), join(root, 'src-tauri/native/Bridge.swift'), join(root, 'src-tauri/native/PastePolicy.swift'), join(root, 'src-tauri/native/AudioCapture.swift'),
       join(root, 'tests/native-delivery/main.swift'), '-framework', 'ServiceManagement', '-o', binary]);
     const output = execFileSync(binary, { encoding: 'utf8', timeout: 10000 });
     assert.match(output, /Native queued-main cancellation boundary passed/);

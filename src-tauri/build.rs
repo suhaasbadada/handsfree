@@ -48,12 +48,33 @@ fn build_macos() {
     println!("cargo:rerun-if-changed=native/Bridge.swift");
     println!("cargo:rerun-if-changed=native/PastePolicy.swift");
     println!("cargo:rerun-if-changed=native/AudioCapture.swift");
+    println!("cargo:rerun-if-changed=native/CaptureException.h");
+    println!("cargo:rerun-if-changed=native/CaptureException.m");
     let out = PathBuf::from(env::var("OUT_DIR").unwrap());
     let sdk = Command::new("xcrun")
         .args(["--show-sdk-path"])
         .output()
         .expect("macOS SDK required");
     let sdk = String::from_utf8(sdk.stdout).unwrap();
+    let exception_object = out.join("CaptureException.o");
+    let status = Command::new("xcrun")
+        .args([
+            "clang",
+            "-fobjc-arc",
+            "-fblocks",
+            "-fobjc-exceptions",
+            "-target",
+            "arm64-apple-macosx14.0",
+            "-isysroot",
+            sdk.trim(),
+            "-c",
+            "native/CaptureException.m",
+            "-o",
+        ])
+        .arg(&exception_object)
+        .status()
+        .expect("Clang required for capture exception boundary");
+    assert!(status.success(), "Capture exception boundary failed");
     // Prefer the actual SDK headers over stale headers in /usr/local/include.
     let status = Command::new("swiftc")
         .args([
@@ -63,6 +84,8 @@ fn build_macos() {
             &format!("-I{}/usr/include", sdk.trim()),
             "-swift-version",
             "5",
+            "-import-objc-header",
+            "native/CaptureException.h",
             "-O",
             "-emit-library",
             "-static",
@@ -73,8 +96,9 @@ fn build_macos() {
             "native/Bridge.swift",
             "native/PastePolicy.swift",
             "native/AudioCapture.swift",
-            "-o",
         ])
+        .arg(&exception_object)
+        .arg("-o")
         .arg(out.join("libHandsfreeNative.a"))
         .status()
         .expect("Swift compiler required (Xcode Command Line Tools)");

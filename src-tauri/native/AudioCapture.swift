@@ -93,12 +93,14 @@ final class CapturePipeline {
     // Closing it makes the enqueue -> EOS barrier valid even for an in-flight tap.
     private let producer = NSLock()
     private var accepting = true
+    private var enabled: Bool
     private var failed = false // conversion queue only
     private var db: Float = -60 // conversion queue only
-    init(input: AVAudioFormat, sink: @escaping (UnsafePointer<Float>?, Int32) -> Void) throws {
+    init(input: AVAudioFormat, enabled: Bool = true, sink: @escaping (UnsafePointer<Float>?, Int32) -> Void) throws {
         self.sink = sink
+        self.enabled = enabled
         inputFormat = input
-        guard input.sampleRate > 0, input.channelCount > 0,
+        guard input.sampleRate.isFinite, input.sampleRate > 0, input.channelCount > 0,
               let output = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false),
               let converter = AVAudioConverter(from: input, to: output) else {
             throw NSError(domain: "HandsFree capture format", code: 1)
@@ -110,7 +112,7 @@ final class CapturePipeline {
     }
     func enqueue(_ buffer: AVAudioPCMBuffer) {
         producer.lock(); defer { producer.unlock() }
-        guard accepting else { return }
+        guard accepting && enabled else { return }
         guard buffer.format == inputFormat else { accepting = false; queue.async { self.fail() }; return }
         guard slots.wait(timeout: .now()) == .success else {
             accepting = false; queue.async { self.fail() }; return
@@ -154,9 +156,16 @@ final class CapturePipeline {
         }
     }
     func close() { producer.lock(); accepting = false; producer.unlock() }
-    @discardableResult func drain() -> Bool {
+    func enable() { producer.lock(); enabled = true; producer.unlock() }
+    // Startup has no accepted audio. The Bridge's startup catch owns its one
+    // generation/epoch error; do not emit another failure or a final PCM tail.
+    func discardStartup() { close(); queue.sync { failed = true } }
+    @discardableResult func drain(failed: Bool = false) -> Bool {
         close()
-        return queue.sync { self.convert(nil, final: true); return !self.failed }
+        return queue.sync {
+            if failed { self.fail() }
+            self.convert(nil, final: true); return !self.failed
+        }
     }
     func captureFailed() {
         producer.lock(); defer { producer.unlock() }
@@ -166,58 +175,150 @@ final class CapturePipeline {
     func level() -> Float { queue.sync { db } }
 }
 
+// Main-thread lifecycle with an independently locked route-failure latch: engine
+// notifications can arrive on any thread, including during install/prepare/start.
+// Tests inject these same operations without constructing an AVAudioEngine.
+final class CaptureStartup {
+    struct Operations {
+        var observe: (@escaping () -> Void) -> () -> Void
+        var validate: () throws -> Void
+        var format: () throws -> AVAudioFormat
+        var install: (CapturePipeline) throws -> Void
+        var prepare: () throws -> Void
+        var start: () throws -> Void
+        var stop: () throws -> Void
+        var remove: () throws -> Void
+    }
+    private let operations: Operations
+    private let sink: (UnsafePointer<Float>?, Int32) -> Void
+    private let routeLock = NSLock()
+    private var invalidated = false
+    private var pipeline: CapturePipeline?
+    private var unobserve: (() -> Void)?
+    private var tapAttempted = false
+    private var attempted = false
+    private var starting = false // main thread; defer reentrant teardown until adapter returns
+    private(set) var started = false
+    init(operations: Operations, sink: @escaping (UnsafePointer<Float>?, Int32) -> Void) {
+        self.operations = operations; self.sink = sink
+    }
+    private func invalidate() {
+        routeLock.lock(); defer { routeLock.unlock() }
+        invalidated = true
+        // Linearize route failure with startup commit and stop. These producer
+        // methods only close/enqueue; they never call a sink under routeLock.
+        if started { pipeline?.captureFailed() } else { pipeline?.close() }
+    }
+    private func check() throws {
+        routeLock.lock(); let valid = !invalidated; routeLock.unlock()
+        guard valid else { throw NSError(domain: "Microphone changed during capture startup", code: 1) }
+    }
+    func start() throws {
+        guard !attempted else { throw NSError(domain: "Capture startup already retired", code: 1) }
+        attempted = true
+        starting = true
+        defer { starting = false }
+        unobserve = operations.observe { [weak self] in self?.invalidate() }
+        do {
+            try check()
+            try operations.validate()
+            let format = try operations.format() // after the cue, not at recorder creation
+            let pipeline = try CapturePipeline(input: format, enabled: false, sink: sink)
+            routeLock.lock(); self.pipeline = pipeline; routeLock.unlock()
+            try check()
+            tapAttempted = true // installation may throw after partially attaching
+            try operations.install(pipeline)
+            try check()
+            guard try operations.format() == format else { throw NSError(domain: "Microphone format changed", code: 1) }
+            try operations.prepare()
+            try check()
+            try operations.start()
+            try operations.validate()
+            guard try operations.format() == format else { throw NSError(domain: "Microphone format changed", code: 2) }
+            routeLock.lock()
+            let valid = !invalidated
+            if valid { started = true; pipeline.enable() }
+            routeLock.unlock()
+            guard valid else { throw NSError(domain: "Microphone changed during capture startup", code: 1) }
+        } catch {
+            starting = false
+            pipeline?.discardStartup()
+            stop()
+            throw error
+        }
+    }
+    @discardableResult func stop() -> Bool {
+        // Also tombstones reentrant cancellation during a pending startup.
+        routeLock.lock(); let wasStarted = started; started = false
+        invalidated = true; let pipeline = pipeline; routeLock.unlock()
+        pipeline?.close()
+        // Never stop/remove underneath a reentrant AV install/prepare/start.
+        // Its caller sees the tombstone and completes teardown in startup catch.
+        if starting { return false }
+        unobserve?(); unobserve = nil
+        var healthy = true
+        if tapAttempted {
+            // Both operations must be attempted even if one raises an exception.
+            do { try operations.stop() } catch { healthy = false }
+            do { try operations.remove() } catch { healthy = false }
+            tapAttempted = false
+        }
+        let drained = pipeline?.drain(failed: !healthy) ?? true
+        return wasStarted && healthy && drained
+    }
+    func level() -> Float { pipeline?.level() ?? -60 }
+}
+
+private func captureChecked(_ error: Error?) throws {
+    if let error { throw error }
+}
+
 final class AudioCapture {
     let generation: UInt64
     let epoch: UInt64
     private let engine: AVAudioEngine
-    private let pipeline: CapturePipeline
-    private var started = false // main thread only
-    private var routeObserver: NSObjectProtocol?
-    private let microphoneUID: String?
-    private let device: AudioDeviceID
+    private let startup: CaptureStartup
     init(generation: UInt64, epoch: UInt64, microphoneUID: String? = nil, sink: @escaping AudioSink) throws {
         self.generation = generation; self.epoch = epoch
-        self.microphoneUID = microphoneUID
         let engine = AVAudioEngine()
         self.engine = engine
-        let (device, format) = try MicrophoneBinding.prepare(resolve: { try Microphones.resolve(microphoneUID) }, bind: { id in
+        let (device, _) = try MicrophoneBinding.prepare(resolve: { try Microphones.resolve(microphoneUID) }, bind: { id in
             guard let unit = engine.inputNode.audioUnit else { throw NSError(domain: "Microphone audio unit unavailable", code: 1) }
             var id = id
             try Microphones.checked(AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &id, UInt32(MemoryLayout<AudioDeviceID>.size)))
-        }, format: { engine.inputNode.outputFormat(forBus: 0) })
-        self.device = device
-        pipeline = try CapturePipeline(input: format) { data, count in
+        }, format: { () })
+        let input = engine.inputNode
+        startup = CaptureStartup(operations: .init(observe: { changed in
+            let observer = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil) { _ in changed() }
+            return { NotificationCenter.default.removeObserver(observer) }
+        }, validate: {
+            try MicrophoneBinding.revalidate(expected: device, resolve: { try Microphones.resolve(microphoneUID) })
+            guard let unit = input.audioUnit else { throw NSError(domain: "Microphone audio unit unavailable", code: 1) }
+            var actual = AudioDeviceID(0), size = UInt32(MemoryLayout<AudioDeviceID>.size)
+            try Microphones.checked(AudioUnitGetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &actual, &size))
+            try MicrophoneBinding.revalidate(expected: device, resolve: { actual })
+        }, format: {
+            var format: AVAudioFormat?
+            try captureChecked(HFCaptureFormat(input, &format))
+            guard let format else { throw NSError(domain: "Microphone format unavailable", code: 1) }
+            return format
+        }, install: { pipeline in
+            try captureChecked(HFCaptureInstall(input) { buffer, _ in pipeline.enqueue(buffer) })
+        }, prepare: { try captureChecked(HFCapturePrepare(engine)) },
+           start: { try captureChecked(HFCaptureStart(engine)) },
+           stop: { try captureChecked(HFCaptureStop(engine)) },
+           remove: { try captureChecked(HFCaptureRemove(input)) })) { data, count in
             sink(generation, epoch, data, count)
         }
     }
     func start() throws {
-        try MicrophoneBinding.revalidate(expected: device, resolve: { try Microphones.resolve(microphoneUID) })
-        let input = engine.inputNode.outputFormat(forBus: 0)
-        let pipeline = self.pipeline
-        engine.inputNode.installTap(onBus: 0, bufferSize: 2048, format: input) { buffer, _ in pipeline.enqueue(buffer) }
-        started = true
-        // A format/route reset cannot silently turn into an endless recording.
-        routeObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil) { _ in pipeline.captureFailed() }
-        do {
-            try engine.start()
-            // Close the validation/observer/start gap; never accept a silent HAL fallback.
-            try MicrophoneBinding.revalidate(expected: device, resolve: { try Microphones.resolve(microphoneUID) })
-            guard let unit = engine.inputNode.audioUnit else { throw NSError(domain: "Microphone audio unit unavailable", code: 1) }
-            var actual = AudioDeviceID(0), size = UInt32(MemoryLayout<AudioDeviceID>.size)
-            try Microphones.checked(AudioUnitGetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &actual, &size))
-            try MicrophoneBinding.revalidate(expected: device, resolve: { actual })
-        } catch { stop(); throw error }
+        try startup.start()
     }
     @discardableResult func stop() -> Bool {
-        let wasStarted = started
-        if let observer = routeObserver { NotificationCenter.default.removeObserver(observer); routeObserver = nil }
-        pipeline.close()
-        if started { engine.inputNode.removeTap(onBus: 0); engine.stop(); started = false }
-        let healthy = pipeline.drain()
-        return wasStarted && healthy
+        startup.stop()
     }
-    func level() -> Float { pipeline.level() }
-    var isRecording: Bool { started }
+    func level() -> Float { startup.level() }
+    var isRecording: Bool { startup.started }
 }
 
 // Shared production/test barrier: producer closed, engine stopped, tap removed,

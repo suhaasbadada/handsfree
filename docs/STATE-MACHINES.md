@@ -145,7 +145,23 @@ prove discovery completeness or runtime correctness on an untested OS.
   and fails the existing pipeline on route changes. Hardware acceptance is separate.
   Both capsule and practice timers observe the existing Session's accepted sample
   count and frozen limit, not wall time (cue delay counts zero). Generation/epoch
-  and practice-token checks bound observations; no second recorder is created.
+   and practice-token checks bound observations; no second recorder is created.
+
+- Capture startup remains native-main-thread-owned. Device binding precedes the
+  cue, but the converter is created from fresh input hardware format **after**
+  playback. Observe configuration changes before format/tap/prepare/start, latch
+  changes across startup, and revalidate device and format before accepting PCM.
+  Install with nil tap format; never force a stale Bluetooth client sample rate.
+  A narrow Objective-C `@try/@catch` adapter turns AVAudioEngine tap/prepare/start
+  (and teardown) exceptions into errors on macOS 14, not a process abort. Swift
+  `catch` alone cannot catch NSException. Failed/retired startup publishes no PCM;
+  Bridge's existing generation/epoch sink owns the startup error, with no retry,
+  UID fallback, permission change or new recording owner. Partial installation
+  closes the producer, attempts both engine stop and tap removal independently,
+  and drains/discards before return. Runtime route failure still defeats partial
+  transcription. Synthetic adapter tests exercise these production operations
+  and real Objective-C throws without constructing an engine or opening hardware;
+  macOS 14/Bluetooth installed-app acceptance is a separate gate.
 
 - Practice owns stable bounded status/copy/action slots, including the native
   status header and overview diagnostic area. Contextual controls reuse grid
