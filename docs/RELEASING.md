@@ -2,38 +2,52 @@
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
 
-## Beta 17 candidate preparation (unpublished)
+## Beta 17 publication and metadata activation
 
-Candidate distribution **v0.1.1-beta.17** retains embedded version **0.1.1**.
-Distribution metadata, package/audit filenames and the disabled `candidateRelease`
-export select beta 17. The active public `release` export, static downloads,
-README, install guide and tracked signed feed remain on audited beta 16.
-Keep the tracked current-feed hash pinned to beta 16; source tests must not read
+Current public Mac distribution **v0.1.1-beta.17** retains embedded version **0.1.1**.
+[Published release](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.17)
+and the anonymous-public seven-asset audit passed for clean artifact source
+`9c0ab6affb8dca95d74fa48ae10248b51f765236`;
+[exact-source CI run 43522974823 passed](https://github.com/suhaasbadada/handsfree/actions/runs/43522974823).
+
+- DMG SHA-256: `580568cb5da52a42e26e4bbb247105eacbed2187dbc05733bcdd7d9f740fb82e`.
+- Updater archive SHA-256: `607dd8b4867712b68aa97f9d130e9bdb93c688dccca2b867d032cb0c17d65b62`.
+- Exact generated signed feed SHA-256: `cb298141bcaa187fe9203e648a27492552c9dc83b6eddfaeb191857bb06170e3`.
+
+The active public `release` export, static downloads, README, install guide and
+tracked signed feed select beta 17. The feed copies generated
+`release/macos-arm64.json` byte-for-byte, without reconstructing its signature.
+The disabled `candidateRelease` remains unchanged candidate-era audit coordinates,
+not a second availability switch. Keep the current-feed hash pinned to beta 17;
+source tests must not read
 ignored `release/` artifacts. Historical beta 11–16 notes and all four completed
 ledger groups remain byte-identical; the beta 16 receipts below stay historical
 evidence, not beta 17 receipts.
 
-The [beta 17 candidate notes](releases/v0.1.1-beta.17.md) record three November 12
+The [beta 17 release notes](releases/v0.1.1-beta.17.md) record three November 12
 installed SIGABRT reports in `AudioCapture.start`, with AVFAudio hardware 24 kHz /
-client 48 kHz tap mismatch after the Bluetooth start cue. Candidate source uses
+client 48 kHz tap mismatch after the Bluetooth start cue. Release source uses
 fresh post-cue hardware format and nil tap negotiation on the validated device
 UID, an Objective-C exception boundary, pre-start observation with locked
 invalidation and PCM gating, and independent partial-failure teardown with
 generation-bound error reporting. No retries, silent device switches or changes
 to privacy/usage semantics are introduced.
 
-Primary-reported pre-metadata validation: Node 306 passed, 1 skipped; Rust 90
+Pre-publication validation: full Node tests 307 passed, 1 skipped; Rust 90
 passed, 3 ignored; frontend build, formatting and Clippy passed. Joffrey independently
 reported four targeted native tests passed and no findings. Synthetic 24 kHz
 conversion, 48-to-24 kHz format change and real thrown exceptions do not instantiate
 AVAudioEngine, access a microphone or launch the installed app. Actual Bluetooth
 on macOS 14 and installed OTA remain unverified; do not claim a proven hardware fix.
 
-No beta 17 clean-source commit, source CI, signing, artifact audits or publication
-are claimed by this preparation. The primary owns those gates, followed separately
-by feed/site activation, Pages/live readback and matching Homebrew/tap gates.
-Do not sign, install, launch or replace the installed app as part of metadata
-preparation. Preserve signing identity, updater keys, permissions and local data.
+Artifacts and bundled preparation-era docs remain sourced from the immutable
+commit above. This metadata-only activation does not rebuild, sign, install,
+launch or replace the installed app. Beta 16 artifacts are retained under
+`release/history/beta16-before-beta17-fvlf54mz/`. Installed bundle, signing
+requirement, usage and model preservation were verified unchanged by the primary.
+Activation CI, Pages deployment/live website and feed byte readback, matching
+Homebrew publication, remote cask readback and tap CI remain separate pending gates.
+Preserve signing identity, updater keys, permissions and local data.
 
 ## Beta 16 publication and metadata activation
 
