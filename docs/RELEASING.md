@@ -2,39 +2,47 @@
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
 
-## Beta 20 candidate preparation
+## Beta 20 publication and metadata activation
 
-Candidate Mac distribution **v0.1.1-beta.20** retains embedded version **0.1.1**.
-See [candidate scope and limitations](releases/v0.1.1-beta.20.md): this is only a
+Current public Mac distribution **v0.1.1-beta.20** retains embedded version **0.1.1**.
+[Published release](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.20)
+and the anonymous-public seven-asset audit passed for clean artifact source
+`821f43dd3bb2143b9bc30cff6ab4c4346d5ff5bd`;
+[exact-source CI run 43960661087 passed](https://github.com/suhaasbadada/handsfree/actions/runs/43960661087).
+
+- DMG SHA-256: `843dcd138dd5230c07e9963a61e67775ef61be9f86e2def8dc2bd90140c5f950`.
+- Updater archive SHA-256: `67a6687d6148eaddd627afd014d17d2174d733f03ebcdb74546618e2d5375553`.
+- Exact generated signed feed SHA-256: `5c39f1994b7d4264a0b2d44e268247316b885208595e27a92c0d924a694473eb`.
+
+The active release, signed feed, static downloads, README and install guide select
+beta 20. The tracked feed copies generated `release/macos-arm64.json` byte-for-byte;
+source tests pin its audited hash without reading ignored `release/` artifacts.
+Disabled `candidateRelease` audit coordinates remain unchanged, not a second
+availability switch. Historical beta 11–19 notes, prior receipts below and all
+four completed release-ledger groups remain byte-identical. Beta 19 artifacts are
+retained under `release/history/beta19-before-beta20-fgo7exen/`.
+
+See [beta 20 scope and limitations](releases/v0.1.1-beta.20.md): this is only a
 capture startup configuration timing hotfix, recognizing initial configuration
 events through the locked startup commit. The existing bounded two-attempt
 reconciliation, UID/epoch/start-gate, cancellation, cleanup and watchdog contract
 is unchanged. Generic/Objective-C/cancellation/runtime errors do not grant retry.
 The beta 19 UI remains unchanged; no global hardware-rate or extra UI changes.
 
-Distribution metadata, installed-version assertion, packaging/audit filenames and
-disabled `candidateRelease` select beta 20. The active public release, signed
-feed, static downloads, README and install guide remain beta 19; the feed retains
-SHA-256 `f48b7b8d032e7e8a9e617f0dab174886af93d25a757ca4eae6cdf1aa5cf3d270`.
-Source tests must not depend on ignored `release/` artifacts. Historical beta
-11–19 notes, prior receipts below and all four completed release-ledger groups
-remain byte-identical; prior publication receipts are not beta 20 receipts.
+Pre-publication source validation reported Node 314 passed / 1 skipped, Rust 90
+passed / 3 ignored, frontend build, formatting and Clippy passing; the original
+regression was red and the hotfix green. Joffrey independently reported four
+native tests passing and no findings. Synthetic checks do not prove Bluetooth
+or installed dictation: no beta 20 hardware, installed end-to-end dictation or
+actual OTA acceptance has run. The owner reported beta 19 Starting/error despite
+ready permissions/model/hook; this is not a missing-setup diagnosis or a verified
+hardware fix. No microphone test, restart, settings change or installed-app
+replacement is part of this metadata-only activation; it does not rebuild or sign.
 
-The primary reported four native tests, Node 312 passed / 1 skipped, Rust 90
-passed / 3 ignored, frontend build, formatting and Clippy passing before metadata
-preparation. Joffrey independently reported four native tests passing and no
-findings. Synthetic evidence does not prove Bluetooth or installed dictation:
-no beta 20 hardware, installed end-to-end dictation or real OTA acceptance has run.
-No microphone test, restart, settings change or installed-app replacement is part
-of this preparation. No final beta 20 artifact source, signing, CI or publication
-receipt is claimed. The primary owns clean-source commit/push, signing,
-exact-source CI, local/draft/anonymous-public seven-asset audits and publication;
-metadata activation, Pages/live byte readback, matching Homebrew publication/
-readback and tap CI remain separate gates. Preserve identity, updater keys,
-permissions and local data; do not infer release or runtime acceptance from tests.
-Candidate metadata validation passed 73 targeted tests, full Node 314 passed /
-1 skipped, frontend build, shell syntax and diff whitespace checks. These are
-source checks, not signed artifact audits or release approval.
+Activation CI, Pages deployment/live website and feed byte readback, matching
+Homebrew publication/readback and tap CI remain separate pending gates owned by
+the primary. Preserve identity, updater keys, permissions and local data; do not
+infer runtime acceptance or deployment from source CI and publication receipts.
 
 ## Beta 19 publication and metadata activation
 

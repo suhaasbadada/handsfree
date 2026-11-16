@@ -2,10 +2,10 @@
 // The embedded app version is 0.1.1; this is the distribution label.
 export const release = Object.freeze({
   schemaVersion: 1,
-  version: '0.1.1-beta.19',
+  version: '0.1.1-beta.20',
   publicAvailable: true,
-  status: 'Experimental Mac beta 19 available. Session-owned audio and focused Practice/Settings UI; hardware acceptance pending; self-signed, not notarized.',
-  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.19/HandsFree-0.1.1-beta.19-macos-arm64.dmg',
+  status: 'Experimental Mac beta 20 available. Capture startup configuration timing hotfix; beta 19 UI unchanged; hardware and OTA acceptance unverified; self-signed, not notarized.',
+  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.20/HandsFree-0.1.1-beta.20-macos-arm64.dmg',
 });
 
 // Beta 20 candidate audit coordinates; the active release above is authoritative.
