@@ -2,20 +2,29 @@
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
 
-## Beta 18 candidate preparation (public beta 17 remains active)
+## Beta 18 publication and metadata activation
 
-Candidate distribution **v0.1.1-beta.18** retains embedded version **0.1.1**.
-Distribution/updater assertion, packaging/audit filenames and the disabled
-`candidateRelease` target beta 18; the active `release`, README, install guide,
-static download links and tracked signed feed remain byte-identical beta 17.
-Current-feed SHA-256 stays pinned to
-`cb298141bcaa187fe9203e648a27492552c9dc83b6eddfaeb191857bb06170e3`.
-Source tests must not read ignored `release/` artifacts. Preserve historical
-beta 11–17 notes and all four completed release-ledger groups unchanged.
+Current public Mac distribution **v0.1.1-beta.18** retains embedded version **0.1.1**.
+[Published release](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.18)
+and the anonymous-public seven-asset audit passed for clean artifact source
+`3f5c43c3cb5265950157f9801b06f3c83b6488e1`;
+[exact-source CI run 43802655931 passed](https://github.com/suhaasbadada/handsfree/actions/runs/43802655931).
+
+- DMG SHA-256: `16a1cf7e3e393b24057a7ddaddbb52fe60207f4077e1a4063c9b6e9ead5d40a9`.
+- Updater archive SHA-256: `c7a50a68b691296df08d5ef2331330903566d5cb596689f06621c45eeae8c6a8`.
+- Exact generated signed feed SHA-256: `d6986510ec05fee9b848cd50b0b4c32b53833e8684e6ca1c90f8ca566a25661d`.
+
+The active `release`, README, install guide and static downloads select beta 18.
+The tracked signed feed copies generated `release/macos-arm64.json` byte-for-byte,
+without reconstructing its signature. The disabled `candidateRelease` remains
+unchanged candidate-era audit coordinates, not a second availability switch.
+Current-feed tests pin the audited beta 18 hash without reading ignored `release/`
+artifacts. Historical beta 11–17 notes and all four completed release-ledger groups
+remain byte-identical; beta 17 receipts below remain historical.
 
 See [beta 18 scope and evidence](releases/v0.1.1-beta.18.md): November 15 hardware
 24 kHz / cached output 48 kHz and nil tap failure `-10868` left beta 17 open but
-unable to capture. The candidate explicitly supplies fresh post-cue hardware
+unable to capture. The release explicitly supplies fresh post-cue hardware
 format to the tap, reconciles an unconnected output and validates
 hardware/output/tap/converter agreement before prepare, before start and after
 start through exception-contained inspection. This is device-independent format
@@ -37,14 +46,17 @@ bundle unchanged, with installed PID 27303 reported still in error. Installed
 end-to-end dictation, OTA, macOS 14 hardware and comprehensive cross-device
 acceptance remain unverified.
 
-Bob reported pre-metadata Node 307 passed / 1 skipped, Rust 90 passed / 3 ignored,
+Pre-publication validation: Node 308 passed / 1 skipped, Rust 90 passed / 3 ignored,
 build/formatting/Clippy passing. Joffrey reported no findings and an independent
-capture test pass before the full Swift hardware attempt. No beta 18 artifact
-source, signing, exact-source CI, audit or publication receipt is claimed.
-The primary owns review, signing/CI, local/draft/public seven-asset audit,
-publication and activation. Activation CI, Pages/live bytes, Homebrew parity and
-tap CI remain separate gates. Do not install or replace the installed app during
-candidate preparation; preserve signing identity, updater keys and local data.
+capture test pass before the full Swift hardware attempt.
+Artifacts and bundled preparation-era docs retain the immutable source above.
+This metadata-only activation does not rebuild, sign, install or replace the app.
+Beta 17 artifacts are retained under `release/history/beta17-before-beta18-vjtrtyp6/`.
+Installed bundle/settings/model preservation remains a final primary verification
+gate against `handsfree-beta18-preservation-212kqyoe/before.json`.
+Activation CI, Pages deployment/live website and feed byte readback, matching
+Homebrew publication/readback and tap CI remain separate pending gates.
+Preserve signing identity, updater keys, permissions and local data.
 
 ## Beta 17 publication and metadata activation
 
