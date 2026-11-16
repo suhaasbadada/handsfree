@@ -2,15 +2,25 @@
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
 
-## Beta 19 candidate preparation
+## Beta 19 publication and metadata activation
 
-Candidate distribution **v0.1.1-beta.19** retains embedded version **0.1.1**.
-Packaging, updater distribution and disabled `candidateRelease` audit coordinates
-target beta 19. The active release, signed feed, static downloads, README and
-install guide remain on audited beta 18 until beta 19 passes the exact-source
-anonymous-public seven-asset audit. Keep the tracked beta 18 feed hash pinned;
-normal source tests must not read ignored `release/` artifacts. Historical beta
-11–18 notes and all four completed release-ledger groups remain byte-identical.
+Current public Mac distribution **v0.1.1-beta.19** retains embedded version **0.1.1**.
+[Published release](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.19)
+and the anonymous-public seven-asset audit passed for clean artifact source
+`280e3696a9ec3e89156fb0830cff1a583f34d609`;
+[exact-source CI run 43824451404 passed](https://github.com/suhaasbadada/handsfree/actions/runs/43824451404).
+
+- DMG SHA-256: `8658dab4ee0b4392891195b442d3aad9aaa4a9a6f465b228e8eb7a0cdac713be`.
+- Updater archive SHA-256: `c6c4d6dccbfe0c35a5c3d78eb53d420b469733dde6ca7cebc19d3a409a2c58a4`.
+- Exact generated signed feed SHA-256: `f48b7b8d032e7e8a9e617f0dab174886af93d25a757ca4eae6cdf1aa5cf3d270`.
+
+The active release, signed feed, static downloads, README and install guide select
+beta 19. The tracked feed copies generated `release/macos-arm64.json` byte-for-byte;
+source tests pin its audited hash without reading ignored `release/` artifacts.
+Disabled `candidateRelease` audit coordinates remain unchanged, not a second
+availability switch. Historical beta 11–18 notes and all four completed
+release-ledger groups remain byte-identical. Beta 18 artifacts are retained under
+`release/history/beta18-before-beta19-mtuif6ha/`.
 
 See [beta 19 scope and honest evidence](releases/v0.1.1-beta.19.md) for combined
 session-owned audio and Practice/Settings changes. Full hardware acceptance has
@@ -21,9 +31,12 @@ owner waived further hardware testing and requested experimental publication,
 planning to update and test the installed app personally. Do not claim audible
 cues, real Fn latency, device compatibility, real OTA or overall stability.
 
-This preparation is not publication or installed-app replacement. The primary
-owns final source validation/commit, exact-source CI, existing-identity signing,
-local/draft/public audits, activation and matching Homebrew parity/readback.
+Pre-publication validation reported Node 312 passed / 1 skipped, Rust 90 passed /
+3 ignored, build/formatting/Clippy and full UI smoke passing; Joffrey reported no
+findings. This metadata-only activation does not rebuild, sign, install or replace
+the app. Activation CI, Pages deployment/live website and feed byte readback,
+matching Homebrew publication/readback and tap CI remain separate pending gates.
+The primary owns these remaining gates and installed-app preservation verification.
 Preserve the existing identity, updater keys, permissions and local data; no new
 asset/profile bytes or volume defaults. Keep each distribution gate separate.
 

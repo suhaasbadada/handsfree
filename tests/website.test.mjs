@@ -7,7 +7,7 @@ import { homebrewCommand } from '../site/install.js';
 import { release, windowsRelease } from '../site/release.js';
 
 // Static defaults and JavaScript must select the same verified public release.
-const publishedMacUrl = 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.18/HandsFree-0.1.1-beta.18-macos-arm64.dmg';
+const publishedMacUrl = 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.19/HandsFree-0.1.1-beta.19-macos-arm64.dmg';
 
 const root = new URL('../', import.meta.url);
 const html = readFileSync(new URL('site/index.html', root), 'utf8');
