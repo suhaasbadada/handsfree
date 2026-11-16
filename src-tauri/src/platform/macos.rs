@@ -3,6 +3,7 @@ unsafe extern "C" {
     pub fn hf_input_level(generation: u64, epoch: u64, allowed: extern "C" fn(u64) -> bool) -> f32;
     pub fn hf_compatibility(enabled: bool) -> bool;
     fn hf_focus_diagnostic(buffer: *mut u8, capacity: i32) -> i32;
+    fn hf_audio_status(generation: u64, epoch: u64, buffer: *mut u8, capacity: i32) -> i32;
     pub fn hf_mode(mode: i32) -> bool;
     pub fn hf_start_gate(callback: extern "C" fn(u64) -> bool);
     pub fn hf_gesture_hook(callback: extern "C" fn(i32, i32, u64));
@@ -126,6 +127,17 @@ pub fn focus_diagnostic() -> Option<serde_json::Value> {
     let mut buffer = [0u8; 4096];
     let length = unsafe { hf_focus_diagnostic(buffer.as_mut_ptr(), buffer.len() as i32) };
     if length <= 0 || length as usize > buffer.len() {
+        return None;
+    }
+    serde_json::from_slice(&buffer[..length as usize]).ok()
+}
+
+// Exact-session, bounded metadata. Caller must recheck identity after dispatch.
+pub fn audio_status(generation: u64, epoch: u64) -> Option<serde_json::Value> {
+    let mut buffer = [0u8; 4096];
+    let length =
+        unsafe { hf_audio_status(generation, epoch, buffer.as_mut_ptr(), buffer.len() as i32) };
+    if length <= 0 || length as usize >= buffer.len() {
         return None;
     }
     serde_json::from_slice(&buffer[..length as usize]).ok()

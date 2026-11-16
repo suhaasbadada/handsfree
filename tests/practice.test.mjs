@@ -4,6 +4,20 @@ import { readFileSync } from 'node:fs';
 import { Practice } from '../src/practice.ts';
 
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b; }); return { promise, resolve, reject }; };
+test('admitted practice remains cancellable while native readiness gates speech guidance and meter', async () => {
+  const {practice:p,responses,calls} = harness(); await p.start();
+  assert.equal(p.view.phase,'recording');
+  assert.match(p.view.message,/Preparing microphone/);
+  for (const ready of [false,null,true,false]) {
+    responses.practice_status={generation:4,phase:'recording',text:'',audio_ready:ready,input_level:0.7,elapsed_seconds:1,limit_seconds:120};
+    await p.poll();
+    assert.equal(p.view.inputLevel,ready===true?0.7:null);
+    assert.equal(p.view.elapsedSeconds,ready===true?1:null);
+    assert.equal(p.view.message.includes('Speak now'),ready===true);
+  }
+  await p.finish();
+  assert.ok(calls.some(c=>c.command==='practice_finish'),'Finish still retires an admitted generation before readiness');
+});
 test('input meter is recording-only, bounded and retired on finish, mismatch, clear and stale polls', async () => {
   const {practice:p,responses} = harness();
   assert.equal(p.view.inputLevel,null);

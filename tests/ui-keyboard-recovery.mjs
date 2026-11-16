@@ -59,7 +59,7 @@ export async function checkKeyboardRecovery({send,evaluate,until,port}) {
     await evaluate(`window.statusObserver.disconnect()`);
   }
   await evaluate(`document.getElementById('practice-recovery').click()`);
-  assert.equal(await focused(),'microphone-choice','Explicit recovery uses existing picker');
+  assert.equal(await focused(),'preferences-title','Explicit recovery focuses the visible Dictation settings heading');
   await evaluate(`window.fixture.phase='idle';window.fixture.message='';window.rejectStart='';document.getElementById('nav-practice-page').click()`);
   await until(`!document.getElementById('practice-message').textContent && document.getElementById('message').hidden`);
   assert.equal(await evaluate(`['practice-message','message'].every(id=>!document.getElementById(id).hasAttribute('tabindex'))`),true,'Empty reserved status is not a tab stop');

@@ -10,6 +10,7 @@ import { checkPracticeEvents } from './ui-practice-events.mjs';
 import { checkKeyboardRecovery } from './ui-keyboard-recovery.mjs';
 import { checkUpdateIndicator } from './ui-update-indicator.mjs';
 import { checkAppearance } from './ui-appearance.mjs';
+import { checkRefinement } from './ui-refinement.mjs';
 
 const binary = process.env.BROWSER_BINARY;
 const port = process.env.UI_PORT ?? '5187';
@@ -24,7 +25,7 @@ const pending = new Map();
 function send(method, params = {}) {
   return new Promise((resolve, reject) => {
     const request = ++id;
-    const timer = setTimeout(() => { pending.delete(request); reject(new Error(`CDP timeout: ${method}`)); },15000);
+    const timer = setTimeout(() => { pending.delete(request); reject(new Error(`CDP timeout: ${method}${method==='Runtime.evaluate' ? `: ${params.expression?.slice(0,240)}` : ''}`)); },15000);
     pending.set(request, { resolve: value => { clearTimeout(timer); resolve(value); }, reject: error => { clearTimeout(timer); reject(error); } });
     socket.send(JSON.stringify({ id: request, method, params }));
   });
@@ -276,9 +277,9 @@ try {
   assert.match(await evaluate(`document.getElementById('message').title`), /start:no-original-focus/, 'Technical reason remains available without dominating the UI');
   await evaluate(`document.getElementById('nav-settings').click();document.getElementById('feedback').hidden=true;window.fixture.message='Select a text field and press Fn.'`);
   await until(`document.getElementById('message').textContent==='Select a text field and press Fn.'`);
-   await evaluate(`document.querySelector('footer').scrollIntoView({block:'end'})`);
+   await evaluate(`document.querySelector('main').scrollTop=document.querySelector('main').scrollHeight`);
    assert.equal(await evaluate(`(()=>{const footer=document.querySelector('footer').getBoundingClientRect(),data=document.querySelector('.local-data').getBoundingClientRect();return footer.bottom<=innerHeight+1 && footer.top>=data.bottom;})()`), true, 'Expanded Settings retains a reachable, non-overlapping footer');
-   await evaluate(`window.scrollTo(0,0)`);
+   await evaluate(`document.querySelector('main').scrollTop=0;window.scrollTo(0,0)`);
   await evaluate(`window.fixture.phase='idle'`);
   await evaluate(`window.fixture.transcript='A little less typing. A little more room to think.'; document.getElementById('feedback').hidden=true;`);
   await delay(900);
@@ -391,7 +392,7 @@ try {
       const luminance = value => rgb(value).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
       const contrast = (a,b) => {const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05)};
       const background = el => {for(;el;el=el.parentElement){const bg=getComputedStyle(el).backgroundColor;if(bg!=='rgba(0, 0, 0, 0)')return bg;}return getComputedStyle(document.documentElement).backgroundColor;};
-      return ['.primary','textarea','select','.test-badge','.beta-badge','#feedback','footer','.subtle','.danger'].map(selector=>{
+      return ['.primary','textarea','select','#shortcut-evidence','.beta-badge','#feedback','footer','.subtle','.danger'].map(selector=>{
         const el=document.querySelector(selector),s=getComputedStyle(el);
         return {selector,ratio:contrast(s.color,background(el))};
       });
@@ -573,7 +574,8 @@ try {
    assert.equal(await evaluate(`window.calls.slice(${windowsCallsStart}).some(c=>['request_permissions','start_recording','download_model','preview_sound'].includes(c.command))`), false, 'Windows setup never requests AX, starts recording, downloads or plays sound automatically');
    console.log('UI smoke: base/theme checks passed; checking practice events');
    await checkAppearance({send,evaluate,until,port});
-   await checkPracticeEvents({send,evaluate,until,port});
+    await checkPracticeEvents({send,evaluate,until,port});
+    await checkRefinement({send,evaluate,until,port});
    console.log('UI smoke: practice checks passed; checking keyboard/recovery');
     await checkKeyboardRecovery({send,evaluate,until,port});
     await checkUpdateIndicator({send,evaluate,until,port});

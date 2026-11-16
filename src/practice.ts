@@ -2,7 +2,7 @@
 // transcript or uses storage, clipboard, telemetry, or native dictation toggles.
 import type { PracticePhase } from './state.ts';
 type Invoke = <T>(command: string, args: Record<string, unknown>) => Promise<T>;
-type Result = { generation: number | null; phase: 'starting' | 'recording' | 'processing' | 'complete' | 'empty' | 'error' | 'cancelled'; text: string; input_level?: number | null; elapsed_seconds?: number | null; limit_seconds?: number | null };
+type Result = { generation: number | null; phase: 'starting' | 'recording' | 'processing' | 'complete' | 'empty' | 'error' | 'cancelled'; text: string; audio_ready?: boolean | null; input_level?: number | null; elapsed_seconds?: number | null; limit_seconds?: number | null };
 export type PracticeView = { phase: PracticePhase; text: string; message: string; inputLevel: number | null; elapsedSeconds: number | null; limitSeconds: number | null };
 let nextToken = Date.now() * 1000;
 export class Practice {
@@ -36,7 +36,9 @@ export class Practice {
       if (this.token !== token) { await this.invoke('practice_cancel', { token }); return; }
       if (!this.allowed()) { await this.clear(); return; }
       this.generation = generation;
-      this.show('recording', 'Speak now, then choose Finish.');
+      // An admitted generation owns Finish/Cancel, but native capture may still
+      // be preparing the route or playing its cue. Admission is not readiness.
+      this.show('recording', 'Preparing microphone and audio cues…');
       if (this.finishRequested) await this.finish();
     } catch (error) {
       if (this.token !== token) return;
@@ -87,17 +89,18 @@ export class Practice {
       if (result.phase === 'cancelled') { await this.clear(); return; }
       if (result.generation !== generation) { this.view.inputLevel = null; this.view.elapsedSeconds = null; this.view.limitSeconds = null; this.render(this.view); return; }
       const elapsed = result.elapsed_seconds, limit = result.limit_seconds;
-      const progressValid = result.phase === 'recording' && this.view.phase === 'recording' && typeof elapsed === 'number' && Number.isFinite(elapsed) && elapsed >= 0 && typeof limit === 'number' && [120,180,240,300].includes(limit) && elapsed <= limit;
+      const audioReady = !('audio_ready' in result) || result.audio_ready === true;
+      const progressValid = audioReady && result.phase === 'recording' && this.view.phase === 'recording' && typeof elapsed === 'number' && Number.isFinite(elapsed) && elapsed >= 0 && typeof limit === 'number' && [120,180,240,300].includes(limit) && elapsed <= limit;
       this.view.elapsedSeconds = progressValid ? elapsed : null;
       this.view.limitSeconds = progressValid ? limit : null;
-      this.view.inputLevel = result.phase === 'recording' && this.view.phase === 'recording' && typeof result.input_level === 'number' && Number.isFinite(result.input_level) && result.input_level >= 0 && result.input_level <= 1 ? result.input_level : null;
+      this.view.inputLevel = audioReady && result.phase === 'recording' && this.view.phase === 'recording' && typeof result.input_level === 'number' && Number.isFinite(result.input_level) && result.input_level >= 0 && result.input_level <= 1 ? result.input_level : null;
       if (result.phase === 'complete') {
         if (!this.edited) this.view.text = result.text;
         this.show('complete', this.edited ? 'Practice complete. Your edits were kept; clear to try again.' : 'Practice complete. Nothing was pasted or saved. Clear to try again.');
       } else if (result.phase === 'empty' || result.phase === 'error') {
         this.show(result.phase, result.phase === 'empty' ? 'No speech detected. Clear and try again.' : 'Practice could not record or transcribe. Reconnect the selected microphone or choose another in Settings, then clear and try again.');
       } else if (result.phase === 'processing') this.show('processing', 'Transcribing on this Mac…');
-      else if (result.phase === 'recording' && this.view.phase === 'recording') this.show('recording', 'Speak now, then choose Finish.');
+      else if (result.phase === 'recording' && this.view.phase === 'recording') this.show('recording', audioReady ? 'Speak now, then choose Finish.' : 'Preparing microphone and audio cues…');
       else this.render(this.view);
     } catch {
       if (this.token === token) await this.clearWithError('Practice connection lost. Please try again.');

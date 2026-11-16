@@ -140,7 +140,7 @@ do {
 // The real Objective-C throw stays entirely in Objective-C, not Swift frames.
 let exception = HFTestCaptureException()!
 precondition((exception as NSError).domain == "HandsFree capture exception")
-precondition(exception.localizedDescription == "Failed to create tap due to format mismatch")
+precondition((exception as NSError).userInfo.isEmpty, "Exception details must not leak route identity")
 precondition(HFCaptureBoundary({}) == nil)
 for operation in 0..<7 {
     precondition(HFTestCaptureAdapter(Int32(operation))?.localizedDescription == exception.localizedDescription)
@@ -273,3 +273,444 @@ for failure in ["none", "zero", "format-exception", "output-exception", "uid", "
     do { try startup.start(); preconditionFailure("Retired startup revived") } catch {}
 }
 print("Capture startup exception, post-cue format, teardown and stale producer contracts passed without hardware")
+
+// Exercise the actual session controller with fake device operations and a
+// deterministic scheduler. Nothing here constructs an engine or plays audio.
+final class SessionHarness {
+    let condition = NSCondition()
+    var events: [String] = []
+    var timers: [(Double, () -> Void)] = []
+    var completed: [() -> Void] = []
+    var routeFailure: (() -> Void)?
+    var failurePoint = ""
+    var boundary: ((String) -> Void)?
+    func event(_ name: String) {
+        condition.lock(); events.append(name); condition.broadcast(); condition.unlock()
+        boundary?(name)
+    }
+    func count(_ name: String) -> Int {
+        condition.lock(); defer { condition.unlock() }; return events.filter { $0 == name }.count
+    }
+    func wait(_ name: String) {
+        condition.lock(); defer { condition.unlock() }
+        let deadline = Date().addingTimeInterval(2)
+        while !events.contains(name) { precondition(condition.wait(until: deadline), "Missing \(name): \(events)") }
+    }
+    func schedule(_ seconds: Double, _ callback: @escaping () -> Void) {
+        condition.lock(); timers.append((seconds, callback)); condition.broadcast(); condition.unlock()
+    }
+    func fire(_ seconds: Double, before: () -> Void = {}) {
+        condition.lock()
+        let deadline = Date().addingTimeInterval(2)
+        while !timers.contains(where: { $0.0 == seconds }) { precondition(condition.wait(until: deadline), "Missing timer \(seconds): \(events)") }
+        let callbacks = timers.filter { $0.0 == seconds }.map { $0.1 }
+        timers.removeAll { $0.0 == seconds }; condition.unlock()
+        before(); callbacks.forEach { $0() }
+    }
+    func complete(_ index: Int = 0) {
+        condition.lock(); let callback = completed[index]; condition.unlock(); callback()
+    }
+    func routeChanged() { condition.lock(); let callback = routeFailure; condition.unlock(); callback?() }
+    func operations(_ routeFailure: @escaping () -> Void) throws -> AudioSession.Operations {
+        condition.lock(); self.routeFailure = routeFailure; condition.unlock()
+        event("factory")
+        if failurePoint == "factory" { throw NSError(domain: "synthetic", code: 1) }
+        return .init(prepare: {
+            self.event("prepare")
+            if self.failurePoint == "prepare" { throw NSError(domain: "synthetic", code: 1) }
+        }, enable: {
+            self.event("enable")
+            if self.failurePoint == "enable" { throw NSError(domain: "synthetic", code: 1) }
+        }, close: { self.event("close") }, drain: { self.event("drain"); return self.failurePoint != "drain" },
+        play: { ending, callback in
+            self.condition.lock(); self.completed.append(callback); self.condition.unlock()
+            self.event(ending ? "end" : "start")
+            if self.failurePoint == (ending ? "end" : "start") { throw NSError(domain: "synthetic", code: 1) }
+        }, stopCue: { self.event("stopCue") }, stop: { self.event("stop") },
+        level: { -30 }, outputRate: { 24000 }, cancel: { self.event("revoke") })
+    }
+    func session(sounds: Bool = true, authorized: @escaping () -> Bool = { true }, epochAllowed: @escaping () -> Bool = { true }) -> AudioSession {
+        AudioSession(generation: 77, epoch: 8, sounds: sounds, authorized: authorized,
+            epochAllowed: epochAllowed,
+            failure: { self.event("failure") }, retired: { _ in self.event("retired") }, scheduler: schedule)
+    }
+}
+
+do {
+    let h = SessionHarness(), s: AudioSession
+    s = h.session(); s.start(factory: h.operations)
+    h.wait("start")
+    precondition(!s.snapshot().audioReady && h.count("enable") == 0)
+    h.complete(); h.fire(0.18); h.wait("enable")
+    // finish() is an owner-queue barrier after enable has committed readiness.
+    s.finish(); h.wait("end")
+    precondition(!s.snapshot().audioReady && h.count("drain") == 1 && h.count("stop") == 0)
+    s.finish()
+    let stopped = DispatchSemaphore(value: 0)
+    DispatchQueue.global().async { s.stop(); stopped.signal() }
+    precondition(h.count("end") == 1 && h.count("stop") == 0)
+    h.complete(1); h.wait("retired")
+    precondition(stopped.wait(timeout: .now() + 2) == .success)
+    h.complete(); h.complete(1); h.fire(3)
+    precondition(h.count("stop") == 1 && h.count("failure") == 0)
+}
+for point in ["factory", "prepare", "start", "enable", "timeout"] {
+    let h = SessionHarness(); h.failurePoint = point
+    let s = h.session(); s.start(factory: h.operations)
+    if point == "enable" { h.wait("start"); h.complete(); h.fire(0.18) }
+    if point == "timeout" { h.wait("start"); h.fire(3) }
+    h.wait("failure"); precondition(!s.snapshot().audioReady && h.count("failure") == 1)
+    h.routeFailure?(); s.cancel(); s.stop()
+    precondition(h.count("failure") == 1 && h.count("end") == 0)
+}
+for boundary in ["factory", "prepare", "start", "quiet", "enable", "drain", "end"] {
+    let h = SessionHarness(); let s = h.session()
+    h.boundary = { if $0 == boundary { s.cancel() } }
+    s.start(factory: h.operations)
+    if ["quiet", "enable", "drain", "end"].contains(boundary) {
+        h.wait("start"); h.complete()
+        h.fire(0.18, before: { if boundary == "quiet" { s.cancel() } })
+        if ["drain", "end"].contains(boundary) { h.wait("enable"); s.finish() }
+    }
+    h.wait("retired"); s.stop()
+    precondition(!s.snapshot().audioReady && h.count("failure") == 0 && h.count("stop") == 1)
+    if boundary != "end" { precondition(h.count("end") == 0) }
+    if h.count("start") > 0 { h.complete() }
+}
+for endFailure in ["end", "timeout", "drain"] {
+    let h = SessionHarness(); let s = h.session(); s.start(factory: h.operations)
+    h.wait("start"); h.complete(); h.fire(0.18); h.wait("enable")
+    h.failurePoint = endFailure; s.finish()
+    if endFailure == "timeout" { h.wait("end"); h.fire(3) }
+    h.wait("retired")
+    precondition(h.count("failure") == (endFailure == "drain" ? 1 : 0) && h.count("drain") == 1 && !s.isRecording)
+}
+do {
+    let h = SessionHarness(); let s = h.session(sounds: false); s.start(factory: h.operations)
+    h.wait("enable"); s.finish(); h.wait("retired")
+    precondition(h.count("start") == 0 && h.count("end") == 0)
+    precondition(h.timers.allSatisfy { $0.0 == 3 }, "Muted sessions retain only the independent startup watchdog")
+    let denied = SessionHarness(); let d = denied.session(authorized: { false }); d.start(factory: denied.operations)
+    denied.wait("retired"); precondition(denied.count("factory") == 0)
+}
+do {
+    let format = AVAudioFormat(standardFormatWithSampleRate: 24000, channels: 1)!
+    var pipeline: CapturePipeline!, samples = 0
+    let startup = CaptureStartup(operations: .init(observe: { _ in {} }, validate: {}, format: { format },
+        outputFormat: { format }, install: { _, p in pipeline = p }, prepare: {}, start: {}, stop: {}, remove: {})) { _, n in
+        precondition(n >= 0); samples += Int(n)
+    }
+    let pcm = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 24000)!
+    pcm.frameLength = 24000; memset(pcm.floatChannelData![0], 0, 24000 * 4)
+    try startup.start(acceptAudio: false)
+    pipeline.enqueue(pcm); precondition(samples == 0)
+    try startup.enable(); pipeline.enqueue(pcm)
+    precondition(startup.closeAndDrain() && abs(samples - 16000) <= 2)
+    let before = samples; pipeline.enqueue(pcm); precondition(!startup.closeAndDrain())
+    precondition(startup.stop() && samples == before)
+}
+print("Session cue completion/deadline, cancellation boundaries, muted start, nonfatal end and gated PCM passed without hardware")
+
+do {
+    let h = SessionHarness(), release = DispatchSemaphore(value: 0)
+    h.boundary = { if $0 == "prepare" { release.wait() } }
+    let s = h.session(); s.start(factory: h.operations); h.wait("prepare")
+    h.fire(3); h.wait("failure")
+    precondition(!s.isRecording && h.count("revoke") == 1)
+    release.signal(); h.wait("retired")
+    precondition(h.count("start") == 0 && h.count("enable") == 0 && h.count("failure") == 1)
+}
+for boundary in ["start", "quiet", "listening", "drain", "end"] {
+    let h = SessionHarness(), s: AudioSession
+    s = h.session(); s.start(factory: h.operations); h.wait("start")
+    if boundary != "start" {
+        h.complete()
+        h.fire(0.18, before: { if boundary == "quiet" { h.routeChanged() } })
+        if boundary != "quiet" { h.wait("enable") }
+    }
+    if boundary == "drain" { h.boundary = { if $0 == "drain" { h.routeChanged() } }; s.finish() }
+    else if boundary == "end" { s.finish(); h.wait("end"); h.routeChanged() }
+    else if boundary != "quiet" { h.routeChanged() }
+    h.wait("retired"); s.stop()
+    precondition(h.count("failure") == (boundary == "end" ? 0 : 1), "Wrong route failure disposition: \(boundary)")
+    precondition(!s.isRecording && h.count("stop") == 1)
+}
+for profile in ["clean", "warm"] {
+    for ending in [false, true] {
+        let role = ending ? "end" : "start"
+        let data = try Data(contentsOf: URL(fileURLWithPath: "src-tauri/native/assets/sounds/\(profile)-\(role).wav"))
+        let pcm = try SessionCuePCM.decode(data)
+        precondition(pcm.format.sampleRate == 48000 && pcm.format.channelCount == 1)
+        precondition(pcm.frameLength == (ending ? 11520 : 5760))
+        precondition(pcm.floatChannelData![0][0] == 0)
+        var malformed = data; malformed[20] = 3
+        do { _ = try SessionCuePCM.decode(malformed); preconditionFailure("Non-PCM asset accepted") } catch {}
+    }
+}
+for malformed in [Data(), Data(repeating: 0, count: 44)] {
+    do { _ = try SessionCuePCM.decode(malformed); preconditionFailure("Malformed cue accepted") } catch {}
+}
+print("Independent startup deadline, route/drain error once-only disposition and production asset decoding passed without hardware")
+
+func awaitReady(_ session: AudioSession) {
+    let deadline = Date().addingTimeInterval(2)
+    while !session.isRecording && Date() < deadline { usleep(1000) }
+    precondition(session.isRecording)
+}
+for revoked in [false, true] {
+    let h = SessionHarness(), gate = NSLock()
+    var authorized = true, epochLive = true
+    let s = h.session(sounds: false,
+        authorized: { gate.lock(); defer { gate.unlock() }; return authorized },
+        epochAllowed: { gate.lock(); defer { gate.unlock() }; return epochLive })
+    s.start(factory: h.operations); awaitReady(s)
+    // Physical release closes startup authorization before Finish reaches FIFO.
+    gate.lock(); authorized = false; epochLive = !revoked; gate.unlock()
+    h.routeChanged(); s.finish(); s.stop()
+    precondition(h.count("failure") == (revoked ? 0 : 1))
+    precondition(h.count("retired") == 1)
+}
+for operation in ["finish", "stop", "cancel"] {
+    let h = SessionHarness(), release = DispatchSemaphore(value: 0), done = DispatchSemaphore(value: 0)
+    h.boundary = { if $0 == "prepare" { release.wait() } }
+    let s = h.session(); s.start(factory: h.operations); h.wait("prepare")
+    DispatchQueue.global().async {
+        if operation == "finish" { s.finish() }
+        else if operation == "cancel" { s.cancel() }
+        s.stop(); done.signal()
+    }
+    // The AppKit/runloop caller never owns the hardware wait.
+    var mainRan = false
+    DispatchQueue.main.async { mainRan = true }
+    let deadline = Date().addingTimeInterval(1)
+    while !mainRan && Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.001)) }
+    precondition(mainRan && h.count("retired") == 0)
+    precondition(s.level() == -60)
+    s.cancel(); precondition(!s.isRecording && h.count("revoke") >= 1)
+    release.signal()
+    precondition(done.wait(timeout: .now() + 2) == .success)
+    precondition(h.count("enable") == 0 && h.count("start") == 0)
+}
+for cancel in [false, true] {
+    let h = SessionHarness(), next = SessionHarness(), done = DispatchSemaphore(value: 0)
+    let s = h.session(); s.start(factory: h.operations)
+    h.wait("start"); h.complete(); h.fire(0.18); awaitReady(s)
+    s.finish(); h.wait("end")
+    let fifo = DispatchQueue(label: "synthetic.control.fifo")
+    let n = next.session(sounds: false)
+    fifo.async { s.stop(); n.start(factory: next.operations); done.signal() }
+    precondition(done.wait(timeout: .now() + 0.05) == .timedOut)
+    precondition(next.count("factory") == 0 && h.count("retired") == 0)
+    if cancel { s.cancel() } else { h.fire(3) }
+    precondition(done.wait(timeout: .now() + 2) == .success)
+    h.complete(1) // stale completion cannot rearm/retire the next owner
+    next.wait("enable"); n.cancel(); n.stop()
+    precondition(h.count("retired") == 1 && h.count("end") == 1 && h.count("enable") == 1)
+}
+print("Release/epoch failure facts, responsive main during blocked teardown and FIFO retirement admission passed without hardware")
+
+// Exercise the same concrete partial-resource owner used by Bridge. Model the
+// selected input AU as input-only (zero output channels); the independent system
+// output is 2ch/48k. Neither graph may monitor input or force a device/rate.
+for point in ["input_prepare", "input_start", "output_create", "output_prepare", "output_start", "output_route", "end_route", "none", "muted"] {
+    let h = SessionHarness()
+    let muted = point == "muted"
+    let s = h.session(sounds: !muted)
+    let pcm = AVAudioPCMBuffer(pcmFormat: AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 1)!, frameCapacity: 1)!
+    pcm.frameLength = 1
+    s.start { changed in
+        var input = try h.operations(changed)
+        input.prepare = {
+            h.event("input_prepare")
+            if point == "input_prepare" { throw AudioStageFailure("input_prepare", NSError(domain: "synthetic", code: -10875)) }
+            h.event("input_start")
+            if point == "input_start" { throw AudioStageFailure("input_start", NSError(domain: "synthetic", code: 7)) }
+        }
+        input.formats = { ["inputRate": 24000, "inputChannels": 1] }
+        let output: (() throws -> SessionAudioOwner.Output)? = muted ? nil : {
+            h.event("output_create")
+            if point == "output_create" {
+                // Like the real constructor's defer: no resource escapes a
+                // throwing factory without cleaning up its partial allocation.
+                h.event("output_stop")
+                throw NSError(domain: "synthetic", code: 8)
+            }
+            return .init(prepare: {
+                h.event("output_prepare")
+                if point == "output_prepare" { throw NSError(domain: "synthetic", code: -10875) }
+                h.event("output_start")
+                if point == "output_start" { throw AudioStageFailure("output_start", NSError(domain: "synthetic", code: 9)) }
+                if point == "output_route" { changed() }
+            }, play: { _, completed in
+                h.condition.lock(); let ending = !h.completed.isEmpty; h.completed.append(completed); h.condition.unlock()
+                h.event(ending ? "end" : "start")
+            }, stopCue: { h.event("output_stopCue") }, stop: { h.event("output_stop") },
+            formats: { ["outputRate": 48000, "outputChannels": 2, "cueRate": 48000] })
+        }
+        return SessionAudioOwner(input: input, makeOutput: output, cue: { _ in pcm }).operations()
+    }
+    if ["none", "end_route", "muted"].contains(point) {
+        if !muted { h.wait("start"); h.complete(); h.fire(0.18) }
+        awaitReady(s)
+        let ready = s.snapshot()
+        precondition(ready.formats["inputChannels"] == 1)
+        precondition(ready.formats["outputChannels"] == (muted ? nil : 2))
+        s.finish()
+        if !muted {
+            h.wait("end")
+            if point == "end_route" { h.routeChanged() } else { h.complete(1) }
+        }
+    }
+    h.wait("retired"); s.stop()
+    precondition(h.count("stop") == 1, "Input resource must retire: \(point)")
+    let madeOutput = !muted && !point.hasPrefix("input_")
+    precondition(h.count("output_stop") == (madeOutput ? 1 : 0), "Output must retire independently: \(point)")
+    precondition(h.count("failure") == (["none", "muted", "end_route"].contains(point) ? 0 : 1))
+    precondition(h.count("enable") == (["none", "muted", "end_route"].contains(point) ? 1 : 0))
+    if point != "none" && point != "muted" && point != "output_route" && point != "end_route" {
+        precondition(s.snapshot().failureStage == point)
+        precondition(s.snapshot().failureDomain == "synthetic")
+    }
+    if point == "output_prepare" {
+        precondition(s.snapshot().failureCode == -10875)
+        precondition(s.snapshot().formats["inputRate"] == 24000)
+    }
+    if muted { precondition(h.count("output_create") == 0 && h.count("start") == 0) }
+}
+let boundedError = AudioStageFailure("input_prepare", NSError(domain: String(repeating: "x", count: 200), code: -10875,
+    userInfo: [NSLocalizedDescriptionKey: "private-device-UID"]))
+precondition(boundedError.domain.count == 64 && boundedError.code == -10875)
+precondition(AudioStageFailure("output_prepare", exception).exceptionName == "NSException")
+print("Production split-engine owner partial starts, input-only topology, muted allocation, output route disposition and bounded first diagnostics passed without hardware")
+
+// Exercise the SAME production preparation controller/factory, real converter,
+// split owner and AudioSession watchdog; no AVAudioEngine or device is created.
+final class NegotiationHarness {
+    let session = SessionHarness()
+    let mode: String
+    var preparation: CapturePreparation!
+    var made = 0, installs = [Double](), starts = 0, samples = 0
+    var hardware = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 1)!
+    var output: AVAudioFormat
+    var callbacks = [() -> Void]()
+    var pipes = [CapturePipeline]()
+    var allowed = true
+    init(_ mode: String) {
+        self.mode = mode; output = hardware
+        preparation = CapturePreparation { [unowned self] in self.make() }
+    }
+    func packet(_ pipe: CapturePipeline, _ format: AVAudioFormat) {
+        let pcm = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 2048)!
+        pcm.frameLength = 2048
+        memset(pcm.floatChannelData![0], 0, 2048 * MemoryLayout<Float>.size)
+        pipe.enqueue(pcm)
+    }
+    func make() -> CaptureStartup {
+        made += 1; let attempt = made
+        if attempt == 2 {
+            precondition(session.count("unobserve1") == 1 && session.count("remove1") == 1)
+            if mode == "cancel-replacement" { preparation.revoke() }
+            callbacks.first?() // in-flight old notification must not touch the replacement
+        }
+        return CaptureStartup(operations: .init(observe: { callback in
+            self.callbacks.append(callback)
+            return { self.session.event("unobserve\(attempt)") }
+        }, validate: {
+            try MicrophoneBinding.revalidate(expected: 42, resolve: {
+                if self.mode == "uid-missing" && attempt == 2 { throw NSError(domain: "Missing selected input", code: 1) }
+                return self.mode == "uid-changed" && attempt == 2 ? 43 : 42
+            })
+        }, format: { self.hardware }, outputFormat: { self.output }, install: { fresh, pipe in
+            precondition(fresh === self.hardware)
+            precondition(HFTestCaptureExplicitFormat(fresh, self.output))
+            self.output = fresh; self.installs.append(fresh.sampleRate); self.pipes.append(pipe)
+            self.packet(pipe, fresh)
+        }, prepare: {
+            self.packet(self.pipes.last!, self.hardware)
+            if attempt == 1 {
+                if self.mode == "generic" { throw NSError(domain: "generic", code: 9) }
+                if self.mode == "exception" { throw HFTestCaptureAdapter(2)! }
+                self.hardware = AVAudioFormat(standardFormatWithSampleRate: 24000, channels: 1)!
+                self.callbacks.last?()
+                if self.mode == "generic-with-change" { throw NSError(domain: "generic", code: 9) }
+                if self.mode == "cancel-first" { self.preparation.revoke() }
+                if self.mode == "deadline-first" { self.session.fire(3) }
+            } else {
+                self.session.condition.lock()
+                precondition(self.session.timers.count == 1 && self.session.timers[0].0 == 3,
+                             "Negotiation must retain the original watchdog, never rearm it")
+                self.session.condition.unlock()
+                if self.mode == "second-config" { self.callbacks.last?() }
+                if self.mode == "deadline-second" { self.session.fire(3) }
+            }
+        }, start: { self.starts += 1 }, stop: {
+            self.session.event("stop\(attempt)")
+            if self.mode == "cleanup-stop" && attempt == 1 { throw HFTestCaptureAdapter(4)! }
+        }, remove: {
+            self.session.event("remove\(attempt)")
+            if self.mode == "cleanup-remove" && attempt == 1 { throw HFTestCaptureAdapter(5)! }
+            if self.mode == "cancel-cleanup" && attempt == 1 { self.preparation.revoke() }
+            if self.mode == "gate-cleanup" && attempt == 1 { self.allowed = false }
+        })) { _, count in
+            if count > 0 { self.samples += Int(count) }
+        }
+    }
+    func operations(_ failure: @escaping () -> Void) -> AudioSession.Operations {
+        preparation.routeFailed = failure
+        let input = AudioSession.Operations(prepare: { try self.preparation.prepare(allowed: { self.allowed }) },
+            enable: { try self.preparation.current.enable(); self.session.event("enabled") },
+            close: { self.preparation.current.closeAcceptance() }, drain: { self.preparation.current.closeAndDrain() },
+            play: { _, _ in }, stopCue: {}, stop: { self.preparation.revoke(); self.preparation.current.stop() },
+            level: { -60 }, outputRate: { 0 }, cancel: { self.preparation.revoke() }, formats: {
+                ["inputRate": self.preparation.current.inputFormat?.sampleRate ?? 0,
+                 "initial_config_change": self.preparation.initialConfigChange ? 1 : 0,
+                 "initialInputRate": self.preparation.initialRate,
+                 "negotiationAttempts": Double(self.preparation.attempts)]
+            })
+        return SessionAudioOwner(input: input, makeOutput: {
+            precondition(self.preparation.current.started && self.samples == 0)
+            self.session.event("output")
+            return .init(prepare: {}, play: { _, done in
+                self.session.condition.lock(); self.session.completed.append(done); self.session.condition.unlock()
+                self.session.event("cue")
+            }, stopCue: {}, stop: {}, formats: { ["outputRate": 24000] })
+        }, cue: { _ in AVAudioPCMBuffer(pcmFormat: self.hardware, frameCapacity: 2048)! }).operations()
+    }
+}
+for mode in ["success", "cue-route", "listening-route", "uid-missing", "uid-changed", "cancel-first", "cancel-cleanup", "cancel-replacement", "gate-cleanup", "cleanup-stop", "cleanup-remove", "generic", "exception", "generic-with-change", "second-config", "deadline-first", "deadline-second"] {
+    let h = NegotiationHarness(mode), s = h.session.session()
+    s.start(factory: h.operations)
+    let prepared = ["success", "cue-route", "listening-route"].contains(mode)
+    if prepared {
+        h.session.wait("cue")
+        precondition(h.samples == 0 && !s.snapshot().audioReady && h.starts == 1)
+        precondition(h.installs == [48000, 24000] && h.preparation.attempts == 2)
+        precondition(h.session.count("failure") == 0)
+        // Retired callbacks and producers cannot fail/accept for the live attempt.
+        h.callbacks[0](); h.packet(h.pipes[0], h.hardware)
+        precondition(h.session.count("failure") == 0)
+        if mode == "cue-route" { h.callbacks[1]() }
+        else {
+            h.session.complete(); h.session.fire(0.18); h.session.wait("enabled")
+            if mode == "listening-route" { h.callbacks[1]() }
+            else {
+                h.packet(h.pipes[1], h.hardware)
+                precondition(h.preparation.current.closeAndDrain() && h.samples > 0,
+                             "The fresh converter must accept PCM only after cue handoff")
+                s.cancel()
+            }
+        }
+    }
+    h.session.wait("retired"); s.stop()
+    precondition(mode == "success" ? h.samples > 0 : h.samples == 0)
+    let expectedFailures = mode == "success" ? 0 : 1
+    precondition(h.session.count("failure") == expectedFailures, mode)
+    precondition(h.session.count("output") == (prepared ? 1 : 0), mode)
+    if ["uid-missing", "uid-changed", "second-config", "deadline-second"].contains(mode) {
+        precondition(h.preparation.attempts == 2, mode)
+        precondition(s.snapshot().formats["initial_config_change"] == 1, mode)
+        precondition(s.snapshot().formats["initialInputRate"] == 48000, mode)
+    } else if !prepared { precondition(h.preparation.attempts == 1, mode) }
+    precondition(h.made <= 2)
+}
+print("Production preaccept negotiation: fresh 48-to-24k converter/tap, same UID, stale callbacks, cleanup/cancel/gate failures and one global 3s watchdog passed without hardware")

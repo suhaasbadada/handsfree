@@ -35,7 +35,7 @@ document.querySelector('#app')!.innerHTML = `
    <div class="header-right"><nav aria-label="Main navigation"><button id="nav-overview" class="nav active" aria-label="Overview" title="Overview" aria-current="page">${icon('words')}<span>Overview</span></button><button id="nav-practice-page" class="nav" aria-label="Practice" title="Practice">${icon('mic')}<span>Practice</span></button><button id="nav-settings" class="nav" aria-label="Settings" title="Settings">${icon('settings')}<span>Settings</span></button></nav><section class="status" aria-label="App status"><span id="dot" aria-hidden="true"></span><strong id="phase" aria-live="polite">Connecting…</strong><button id="cancel" hidden aria-label="Cancel dictation" title="Cancel dictation">×</button></section></div></aside>
  <main>
  <section id="overview" aria-labelledby="overview-title">
-     <div class="page-heading"><span class="eyebrow">Your workspace</span><h1 id="overview-title">Overview</h1><p>Voice typing, without the busywork.</p></div>
+     <div class="page-heading"><h1 id="overview-title">Overview</h1><p>Voice typing, without the busywork.</p></div>
      <div class="hero"><div class="hero-mark">${icon('wave')}</div><h2>Write wherever you work.</h2><p>Select a text field in another app.</p><p class="shortcut-instruction"><span id="recording-action">Press</span> <kbd id="overview-shortcut">…</kbd> <span id="recording-instruction">to dictate in any app</span></p><div class="hero-caption">${icon('shield')}Processed on this device. Never sent to a cloud.</div></div>
     <section class="card readiness"><div><h2 id="ready-title">Finish setting up</h2><p id="ready-detail">Connecting to HandsFree…</p></div><button id="setup" class="primary" disabled>Open settings</button></section>
    <section id="overview-model" class="card readiness" hidden aria-label="English model"><div><h2>English model</h2><p id="overview-model-state">One-time download · Works offline afterward</p></div><button id="overview-download" class="primary" disabled>Download English model (~148 MB)</button></section>
@@ -43,31 +43,31 @@ document.querySelector('#app')!.innerHTML = `
     <button id="overview-practice" class="practice-link"><span>${icon('mic')}<span><strong>Find your rhythm</strong><small>Try your microphone and shortcut in a private space.</small></span></span><span aria-hidden="true">→</span></button>
   </section>
   <section id="practice-page" hidden aria-labelledby="practice-page-title">
-    <div class="page-heading"><span class="eyebrow">A private workspace</span><h1 id="practice-page-title">Practice</h1><p>Get comfortable with voice typing. Nothing leaves this page.</p></div>
+     <div class="page-heading"><h1 id="practice-page-title">Practice</h1></div>
      <section id="get-started" class="card" aria-labelledby="get-started-title" hidden>
-     <div class="card-heading"><div><h2 id="get-started-title" tabindex="-1">Get started</h2><p>Set up once, then try your voice here. Checks never request access or start recording.</p></div><button id="started-close" class="text-action">Done</button></div>
+      <div class="card-heading"><div><h2 id="get-started-title" tabindex="-1">Get started</h2><p>Checks never request access or start recording.</p></div><button id="started-close" class="text-action">Done</button></div>
      <ol class="setup-checklist">
       <li><span id="check-microphone">Microphone · Checking…</span><button id="started-mic">Allow microphone</button></li>
       <li><span id="check-permissions">Accessibility &amp; Input Monitoring · Checking…</span><button id="started-permissions">Open permission settings</button></li>
       <li><span id="check-shortcut">Shortcut connection · Checking…</span><span id="started-hook-help" class="subtle">After granting access, quit and reopen HandsFree if the shortcut stays disconnected.</span></li>
       <li><span id="check-model">English model · Checking…</span><button id="started-model">Download (~148 MB)</button></li>
      </ol>
-     <p>Once all four are ready, use the private test below to check your microphone and shortcut. The model is required for this test; it works offline after download.</p>
+      <p class="subtle">When ready, open Practice to test your microphone and shortcut. The model works offline after download.</p>
     </section>
     <section id="practice" class="card practice" aria-labelledby="practice-title" hidden>
-     <div class="card-heading"><div><h2 id="practice-title">Try your voice</h2><p class="practice-instruction">Start a test or use your shortcut. Your words appear below.</p></div><span class="test-badge">${icon('shield')}Private</span></div>
-      <p class="practice-sample">Try saying: “A little less typing. A little more thinking.”</p>
-     <p id="shortcut-tutorial"></p><div class="stable-copy subtle"><span aria-hidden="true" class="copy-reserve">Shortcut received in this practice view. This confirms the key event, not microphone or transcription success.</span><p id="shortcut-evidence" role="status">Shortcut not tested here yet. Start test checks the microphone, not the shortcut.</p></div>
-     <div class="practice-meter"><label for="input-level">Microphone input</label><meter id="input-level" min="0" max="1" value="0" aria-describedby="input-level-help"></meter><span id="practice-timer" aria-label="Recording time">— / —</span><div class="stable-copy subtle"><span aria-hidden="true" class="copy-reserve">Start a private test to check input. No audio file is saved.</span><span id="input-level-help">Start a private test to check input. No audio file is saved.</span></div></div>
+      <h2 id="practice-title" class="sr-only">Try your voice</h2>
+      <p id="shortcut-tutorial"></p><p id="shortcut-evidence" class="subtle" role="status">Shortcut not tested yet.</p>
+      <div class="practice-meter"><label for="input-level">Input</label><meter id="input-level" min="0" max="1" value="0" aria-describedby="input-level-help"></meter><span id="practice-timer" aria-label="Recording time">— / —</span><span id="input-level-help" class="sr-only">Start a private test to check input. No audio file is saved.</span></div>
     <label for="practice-text" class="sr-only">Practice dictation</label>
     <textarea id="practice-text" rows="4" autocomplete="off" spellcheck="false" aria-describedby="practice-privacy" placeholder="Speak freely. This space is just for you."></textarea>
-    <div class="practice-bottom"><div class="practice-actions"><button id="practice-start" class="primary" disabled>${icon('mic')}<span>Start test</span></button><button id="practice-finish" class="primary" disabled hidden>${icon('check')}<span>Finish</span></button><button id="practice-cancel" class="icon-action" aria-label="Cancel practice" title="Cancel practice" disabled hidden>${icon('close')}</button><button id="practice-clear" class="icon-action" aria-label="Clear practice" title="Clear practice">${icon('clear')}</button><button id="practice-setup" class="icon-action" aria-label="Practice setup help" title="Practice setup help">${icon('settings')}</button></div><p id="practice-privacy" class="subtle">No clipboard. No usage counted.<br>Clears when you leave this view.</p></div>
+     <div class="practice-bottom"><div class="practice-actions"><button id="practice-start" class="primary" disabled>${icon('mic')}<span>Start test</span></button><button id="practice-finish" class="primary" disabled hidden>${icon('check')}<span>Finish</span></button><button id="practice-cancel" class="icon-action" aria-label="Cancel practice" title="Cancel practice" disabled hidden>${icon('close')}</button><button id="practice-clear" class="icon-action" aria-label="Clear practice" title="Clear practice">${icon('clear')}</button><button id="practice-setup" class="text-action" aria-label="Microphone settings" title="Microphone settings">${icon('settings')}<span>Settings</span></button></div></div>
+     <p id="practice-privacy" class="subtle">No clipboard or usage counted. Clears when you leave.</p>
     <div class="practice-status-slot"><p id="practice-message" role="status" aria-label="Practice status" aria-live="polite"></p><button id="practice-recovery" class="text-action" hidden>Microphone settings</button></div>
    </section>
     <p id="practice-platform-help" class="subtle" hidden>Private practice is available on macOS. Use Overview for your configured dictation shortcut.</p>
  </section>
  <section id="settings" hidden aria-labelledby="settings-title">
-    <div class="settings-intro page-heading"><span class="eyebrow">Preferences</span><h1 id="settings-title">Settings</h1><p>Configure how HandsFree works on your device.</p><button id="settings-started" class="text-action" hidden>Setup guide</button></div>
+     <div class="settings-intro page-heading"><h1 id="settings-title">Settings</h1><p>Make HandsFree work for you.</p><button id="settings-started" class="text-action" hidden>Setup guide</button></div>
     <section id="workflow" class="card" aria-labelledby="workflow-title" hidden><h2 id="workflow-title">General</h2>
      <div class="setting-row"><div><h3>Keyboard shortcuts</h3><p id="workflow-pause-state">Checking…</p><p>Pause shortcuts without interrupting a recording. Private tests stay available.</p></div><button id="workflow-pause" disabled>Pause shortcuts</button></div>
     <div class="setting-row"><div><h3>Launch at login</h3><p id="login-state" role="status">Checking…</p><button id="login-settings" class="text-action" hidden>Open Login Items</button><button id="login-cancel" class="text-action" hidden>Cancel pending registration</button></div><label class="switch"><input id="launch-at-login" type="checkbox" role="switch" aria-label="Launch at login" aria-describedby="login-state" disabled><span aria-hidden="true"></span></label></div>
@@ -105,11 +105,14 @@ document.querySelector('#app')!.innerHTML = `
 <dialog id="reset-dialog" aria-labelledby="reset-title"><h2 id="reset-title">Reset usage totals?</h2><p>Totals will return to zero. Your preferences and language model won’t change.</p><div class="dialog-actions"><button id="keep-stats" autofocus>Keep totals</button><button id="confirm-reset" class="danger">Reset totals</button></div></dialog>`;
 const el = (id: string) => document.getElementById(id)!;
 const button = (id: string) => el(id) as HTMLButtonElement;
+// Setup is a Settings destination, never extra content above the private editor.
+el('settings').insertBefore(el('get-started'), el('workflow'));
 document.body.insertAdjacentHTML('beforeend', `<dialog id="updates-dialog" aria-labelledby="updates-title">
- <h2 id="updates-title" tabindex="-1" autofocus>App updates</h2><p>Installed release: <strong id="installed-release">Connecting…</strong></p>
- <p id="updates-message" role="status" aria-live="polite"></p><p id="updates-version" hidden></p>
- <p id="updates-notes" class="update-notes" hidden></p><progress id="updates-progress" max="100" hidden aria-label="Update download progress"></progress>
- <p>Check for updates and Download &amp; restart refresh release metadata online. Download opens confirmation for the latest offer before downloading the signature-verified update. Your model, settings and usage totals are kept.</p>
+ <h2 id="updates-title" tabindex="-1" autofocus>App updates</h2>
+ <div class="update-releases"><p>Installed <strong id="installed-release">Connecting…</strong></p><p id="updates-version" hidden></p></div>
+ <p id="updates-message" role="status" aria-live="polite"></p>
+ <section class="release-notes"><h3>Release notes</h3><p id="updates-notes" class="update-notes" hidden></p></section><progress id="updates-progress" max="100" hidden aria-label="Update download progress"></progress>
+  <p class="update-consent">Checks refresh release metadata online. Download &amp; restart checks the latest offer, then asks for confirmation before downloading a signature-verified update. Your model, settings and usage totals are kept.</p>
  <button id="updates-check-again" class="text-action" hidden>Check again</button>
  <div class="dialog-actions"><button id="updates-close">Close</button><button id="updates-check">Check for updates</button><button id="updates-install" class="primary" hidden>Download &amp; restart…</button></div>
  </dialog>
@@ -120,7 +123,8 @@ document.body.insertAdjacentHTML('beforeend', `<dialog id="updates-dialog" aria-
 for (const id of ['started-mic', 'started-permissions', 'started-model', 'change-shortcut', 'mic', 'permissions', 'download', 'reset', 'sounds', 'sound-style', 'sound-volume', 'recording-limit', 'recording-mode']) {
   (el(id) as HTMLInputElement | HTMLButtonElement).disabled = true;
 }
-let current: Status | undefined;
+type AudioStatus = Status & { audio_ready?: boolean };
+let current: AudioStatus | undefined;
 const displayShortcut = (status: Status) => status.platform === 'windows' ? shortcutLabel(status.shortcut, 'windows') : status.shortcut_label;
 let refreshTask: Promise<void> | undefined;
 let soundsPending = false;
@@ -185,6 +189,8 @@ function navigate(tab: Page) {
     if (name === tab) el(`nav-${name}`).setAttribute('aria-current', 'page');
     else el(`nav-${name}`).removeAttribute('aria-current');
   }
+  document.querySelector('main')!.scrollTop = 0;
+  window.scrollTo(0, 0);
   renderPractice();
   if (tab === 'settings' && current?.platform === 'macos') { void workflow.refresh(); void workflow.runningApps(); }
 }
@@ -237,12 +243,12 @@ el('brand-overview').onclick=()=>{closeBrandMenu();navigate('overview');focusHea
 el('brand-settings').onclick=()=>{closeBrandMenu();navigate('settings');focusHeading('settings');};
 function openGettingStarted() {
   if (current?.platform !== 'macos') return;
-  closeBrandMenu(); navigate('practice-page'); el('get-started').hidden = false; renderGettingStarted();
+  closeBrandMenu(); navigate('settings'); el('get-started').hidden = false; renderGettingStarted();
   el('get-started-title').focus(); el('get-started').scrollIntoView({block:'nearest'});
 }
 el('brand-started').onclick = openGettingStarted;
 el('settings-started').onclick = openGettingStarted;
-el('started-close').onclick = () => { clearPractice(); el('get-started').hidden = true; practiceField.focus(); };
+el('started-close').onclick = () => { el('get-started').hidden = true; focusHeading('settings'); };
 el('started-mic').onclick = () => { if (!button('mic').disabled) { guidePermissionRequests |= 1; button('mic').click(); } };
 el('started-permissions').onclick = () => { if (!button('permissions').disabled) { guidePermissionRequests |= 2; button('permissions').click(); } };
 el('started-model').onclick = () => button('download').click();
@@ -296,8 +302,13 @@ function renderPractice() {
   }
   el('practice').hidden = current?.platform !== 'macos';
   el('practice-platform-help').hidden = current?.platform !== 'windows';
-  el('shortcut-tutorial').textContent = current ? shortcutTutorial(displayShortcut(current), current.recording_mode) : 'Waiting for your configured shortcut…';
-  el('shortcut-evidence').textContent = shortcutReceived ? 'Shortcut received in this practice view. This confirms the key event, not microphone or transcription success.' : 'Shortcut not tested here yet. Start test checks the microphone, not the shortcut.';
+  const tutorial = current ? shortcutTutorial(displayShortcut(current), current.recording_mode) : 'Waiting for your configured shortcut…';
+  el('shortcut-tutorial').textContent = current ? current.recording_mode === 'push_to_talk' ? `Hold ${displayShortcut(current)}; release to finish.` : `Press ${displayShortcut(current)} to start / finish.` : tutorial;
+  el('shortcut-tutorial').title = tutorial;
+  el('shortcut-tutorial').setAttribute('aria-label', tutorial);
+  el('shortcut-evidence').textContent = shortcutReceived ? 'Shortcut received.' : 'Shortcut not tested yet.';
+  el('shortcut-evidence').title = shortcutReceived ? 'Confirms the key event, not microphone or transcription success.' : 'Start test checks the microphone, not the shortcut.';
+  el('shortcut-evidence').setAttribute('aria-label', `${el('shortcut-evidence').textContent} ${el('shortcut-evidence').title}`);
   const level = practiceVisible() ? practice.view.inputLevel : null;
   const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2,'0')}`;
   el('practice-timer').textContent = practiceVisible() && practice.view.elapsedSeconds !== null && practice.view.limitSeconds !== null ? `${clock(practice.view.elapsedSeconds)} / ${clock(practice.view.limitSeconds)}` : '— / —';
@@ -324,8 +335,13 @@ el('practice-start').onclick = () => { if (!button('practice-start').disabled) v
 el('practice-finish').onclick = () => void practice.finish();
 el('practice-cancel').onclick = clearPractice;
 el('practice-clear').onclick = clearPractice;
-el('practice-setup').onclick = openGettingStarted;
-el('practice-recovery').onclick = () => { navigate('settings'); el('microphone-choice').focus(); };
+function openMicrophoneSettings() {
+  navigate('settings');
+  const target = el('preferences-title'); target.tabIndex = -1;
+  target.focus(); target.scrollIntoView({block:'start'});
+}
+el('practice-setup').onclick = openMicrophoneSettings;
+el('practice-recovery').onclick = openMicrophoneSettings;
 el('message-recovery').onclick = () => { navigate('settings'); focusHeading('settings'); };
 window.addEventListener('blur', () => { windowActive=false; syncPracticeContext(); clearPractice(); });
 window.addEventListener('pagehide', () => { windowActive=false; syncPracticeContext(); clearPractice(); });
@@ -429,7 +445,7 @@ function renderUpdates() {
   el('installed-release').textContent = view.installed_version || 'Connecting…';
   el('updates-message').textContent = view.message;
   el('updates-version').hidden = !view.available_version;
-  el('updates-version').textContent = view.available_version ? `Available release: ${view.available_version}` : '';
+  el('updates-version').textContent = view.available_version ? `Available ${view.available_version}` : '';
   el('updates-notes').hidden = !view.notes;
   el('updates-notes').textContent = view.notes;
   button('updates-check').disabled = updateBusy(view) || updateConfirmDialog.open;
@@ -728,16 +744,17 @@ async function refreshStatus() {
     const requests = (current as Status & { permission_requests?: number }).permission_requests ?? 0;
     if (requests !== seenPermissionRequests) {
       const added = requests & ~seenPermissionRequests;
-      const fromGuide = added !== 0 && (added & ~guidePermissionRequests) === 0 && !el('get-started').hidden && !el('practice-page').hidden;
+      const fromGuide = added !== 0 && (added & ~guidePermissionRequests) === 0 && !el('get-started').hidden && !el('settings').hidden;
       guidePermissionRequests &= ~requests;
       seenPermissionRequests = requests;
       if (!fromGuide) navigate('settings');
     }
-    el('phase').textContent = current.phase === 'idle' && !readiness(current) ? 'Setup needed' : phaseLabel(current.phase);
+    const audioStarting = current.platform === 'macos' && current.phase === 'recording' && current.audio_ready === false;
+    el('phase').textContent = audioStarting ? 'Starting…' : current.phase === 'idle' && !readiness(current) ? 'Setup needed' : phaseLabel(current.phase);
     // Keep diagnostics outside the compact header; never render dictation payloads.
     const idleHint = `Select a text field and press ${current.shortcut_label}.`;
     const message = current.message.startsWith('Copied.') ? 'Text copied. Switch to your app and paste when you’re ready.' : current.message.startsWith('Paste shortcut sent') ? 'Paste sent to your app. Check the original field.' : current.message;
-    statusText('message', current.phase === 'idle' && current.message === idleHint ? '' : message);
+    statusText('message', audioStarting ? 'Preparing microphone and audio cues…' : current.phase === 'idle' && current.message === idleHint ? '' : message);
     el('message').title = current.message;
     el('message').hidden = !el('message').textContent;
     button('message-recovery').hidden = current.phase !== 'error' && current.phase !== 'not_pasted' && el('feedback').hidden;

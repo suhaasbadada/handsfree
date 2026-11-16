@@ -2,6 +2,31 @@
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
 
+## Beta 19 candidate preparation
+
+Candidate distribution **v0.1.1-beta.19** retains embedded version **0.1.1**.
+Packaging, updater distribution and disabled `candidateRelease` audit coordinates
+target beta 19. The active release, signed feed, static downloads, README and
+install guide remain on audited beta 18 until beta 19 passes the exact-source
+anonymous-public seven-asset audit. Keep the tracked beta 18 feed hash pinned;
+normal source tests must not read ignored `release/` artifacts. Historical beta
+11–18 notes and all four completed release-ledger groups remain byte-identical.
+
+See [beta 19 scope and honest evidence](releases/v0.1.1-beta.19.md) for combined
+session-owned audio and Practice/Settings changes. Full hardware acceptance has
+not passed: physical Bluetooth attempts exposed the old topology and initial
+configuration failure; reviewed fixes passed synthetic checks, but the final
+hardware attempt hit a microphone-permission timeout with zero sessions. The
+owner waived further hardware testing and requested experimental publication,
+planning to update and test the installed app personally. Do not claim audible
+cues, real Fn latency, device compatibility, real OTA or overall stability.
+
+This preparation is not publication or installed-app replacement. The primary
+owns final source validation/commit, exact-source CI, existing-identity signing,
+local/draft/public audits, activation and matching Homebrew parity/readback.
+Preserve the existing identity, updater keys, permissions and local data; no new
+asset/profile bytes or volume defaults. Keep each distribution gate separate.
+
 ## Beta 18 publication and metadata activation
 
 Current public Mac distribution **v0.1.1-beta.18** retains embedded version **0.1.1**.

@@ -34,6 +34,10 @@ test('memory capture converter drains hardware-rate stereo and bounds producer b
     assert.match(output, /Microphone UID bind-before-format, missing\/bind failure and delayed route revalidation passed without hardware/);
     assert.match(output, /Finish once after drain; cancel\/error\/quit\/pending-start\/mute suppressed without playback/);
     assert.match(output, /Capture startup exception, post-cue format, teardown and stale producer contracts passed without hardware/);
+    assert.match(output, /Session cue completion\/deadline, cancellation boundaries, muted start, nonfatal end and gated PCM passed without hardware/);
+    assert.match(output, /Independent startup deadline, route\/drain error once-only disposition and production asset decoding passed without hardware/);
+    assert.match(output, /Production split-engine owner partial starts, input-only topology, muted allocation, output route disposition and bounded first diagnostics passed without hardware/);
+    assert.match(output, /Production preaccept negotiation: fresh 48-to-24k converter\/tap, same UID, stale callbacks, cleanup\/cancel\/gate failures and one global 3s watchdog passed without hardware/);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 

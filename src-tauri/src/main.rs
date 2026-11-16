@@ -277,6 +277,10 @@ fn enqueue_at(control: Control, epoch: u64) {
 
 #[derive(Clone, Serialize)]
 struct Status {
+    audio_ready: bool,
+    audio_reason: String,
+    audio_generation: u64,
+    audio_diagnostic: Option<serde_json::Value>,
     appearance: storage::Appearance,
     platform: &'static str,
     phase: String,
@@ -421,7 +425,34 @@ fn refresh_status() -> Status {
     let hook_state = unsafe { hf_hook_state() };
     let hook_reason = unsafe { hf_hook_reason() };
     let s = state();
+    #[cfg(target_os = "macos")]
+    let (audio_identity, audio_snapshot) = {
+        let identity = {
+            let inner = s.inner.lock().unwrap();
+            (inner.generation, inner.session_epoch)
+        };
+        (identity, platform::audio_status(identity.0, identity.1))
+    };
     let mut inner = s.inner.lock().unwrap();
+    inner.status.audio_ready = false;
+    inner.status.audio_reason = "inactive".into();
+    inner.status.audio_generation = inner.generation;
+    inner.status.audio_diagnostic = None;
+    #[cfg(target_os = "macos")]
+    if audio_identity == (inner.generation, inner.session_epoch)
+        && CANCELLATION.allows(inner.session_epoch)
+    {
+        if let Some(audio) = audio_snapshot {
+            inner.status.audio_ready = inner.status.phase == "recording"
+                && audio.get("audioReady").and_then(serde_json::Value::as_bool) == Some(true);
+            inner.status.audio_reason = audio
+                .get("reason")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("unknown")
+                .into();
+            inner.status.audio_diagnostic = Some(audio);
+        }
+    }
     inner.status.microphone = p & 1 != 0;
     inner.status.accessibility = p & 2 != 0;
     inner.status.input_monitoring = p & 4 != 0;
@@ -479,6 +510,10 @@ fn write_diagnostic(
         "model_expected_bytes": MODEL_SIZE,
         "model_expected_sha256": MODEL_HASH,
         "phase": status.phase,
+        "audio_ready": status.audio_ready,
+        "audio_reason": status.audio_reason,
+        "audio_generation": status.audio_generation,
+        "audio_session": status.audio_diagnostic,
         "activation_policy": unsafe { hf_activation_policy() },
         "message": status.message,
     });
@@ -634,6 +669,7 @@ struct PracticeStatus {
     input_level: Option<f32>,
     elapsed_seconds: Option<f64>,
     limit_seconds: Option<u32>,
+    audio_ready: Option<bool>,
 }
 #[tauri::command]
 async fn practice_status(token: u64) -> PracticeStatus {
@@ -643,6 +679,16 @@ async fn practice_status(token: u64) -> PracticeStatus {
     // Snapshot, dispatch without Rust locks, then recheck ownership. A main-thread
     // callback may revoke practice while the native observation is in flight.
     let identity = PRACTICE.lock().unwrap().meter_identity(token);
+    #[cfg(target_os = "macos")]
+    let audio_ready = identity.and_then(|(generation, epoch)| {
+        platform::audio_status(generation, epoch).and_then(|status| {
+            status
+                .get("audioReady")
+                .and_then(serde_json::Value::as_bool)
+        })
+    });
+    #[cfg(not(target_os = "macos"))]
+    let audio_ready = None;
     let level = identity.and_then(|(generation, epoch)| {
         let value = unsafe { hf_input_level(generation, epoch, delivery_allowed) };
         (value.is_finite() && (0.0..=1.0).contains(&value)).then_some(value)
@@ -656,6 +702,7 @@ async fn practice_status(token: u64) -> PracticeStatus {
             input_level: None,
             elapsed_seconds: None,
             limit_seconds: None,
+            audio_ready: None,
         };
     }
     let progress = identity
@@ -669,6 +716,13 @@ async fn practice_status(token: u64) -> PracticeStatus {
         text: gate.text.clone(),
         elapsed_seconds: progress.map(|p| p.0),
         limit_seconds: progress.map(|p| p.1),
+        audio_ready: if identity.is_some_and(|(_, epoch)| CANCELLATION.allows(epoch))
+            && gate.meter_identity(token) == identity
+        {
+            audio_ready
+        } else {
+            None
+        },
         input_level: if identity.is_some_and(|(_, epoch)| CANCELLATION.allows(epoch))
             && gate.meter_identity(token) == identity
         {
@@ -1568,6 +1622,7 @@ fn complete_transcription(session: Arc<streaming::Session>, result: Result<Strin
             hf_stop(); // Preserve an already-playing normal finish cue.
         } else {
             hf_cancel_audio();
+            hf_stop(); // Retirement barrier before releasing INGRESS/idle.
         }
     }
     session.finish(None);
@@ -2052,6 +2107,10 @@ fn main() {
                     session_epoch: CANCELLATION.current(),
                     practice: None,
                     status: Status {
+                        audio_ready: false,
+                        audio_reason: "inactive".into(),
+                        audio_generation: 0,
+                        audio_diagnostic: None,
                         appearance: store.appearance,
                         platform: std::env::consts::OS,
                         phase: "idle".into(),

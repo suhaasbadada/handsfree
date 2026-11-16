@@ -145,7 +145,10 @@ private var callback: Callback?
 private var tap: CFMachPort?
 private var source: CFRunLoopSource?
 private var hookReason: Int32 = 0 // 0 unattempted, 1 connected, 2 permission, 3 port, 4 source, 5 disabled
-private var recorder: AudioCapture?
+private var recorder: AudioSession?
+private var lastAudioGeneration: UInt64 = 0
+private var lastAudioEpoch: UInt64 = 0
+private var lastAudioObservation: AudioSession.Observation?
 private var recordingElapsed: (() -> Double)?
 private var recordingLimit: UInt32 = 120
 
@@ -178,7 +181,6 @@ private var overlayGeneration = 0
 private var clipboardGeneration = 0
 private var restoreClipboard: (() -> Void)?
 private var soundsEnabled = false
-private var cue: AVAudioPlayer?
 private var endCue: AVAudioPlayer?
 private var cueVolume: Float = 0.5
 private var audioBusy = false
@@ -366,24 +368,12 @@ enum EndCue {
     }
 }
 private var cueProfile = "clean"
-private var recordingCueProfile = "clean"
 @_cdecl("hf_sound_style") public func soundStyle(_ style: Int32) {
     // Only selects the next session. Never mutates an active player's profile.
     main { cueProfile = style == 1 ? "warm" : "clean" }
 }
-private func makeCue(ending: Bool = false) -> AVAudioPlayer? {
-    let profile = ending ? recordingCueProfile : cueProfile
-    guard let data = ending ? EndCue.data(profile: profile) : StartCue.data(profile: profile) else {
-        NSLog("HandsFree: missing bundled %@ %@ sound", profile, ending ? "end" : "start")
-        return nil
-    }
-    let player = try? AVAudioPlayer(data: data)
-    player?.volume = cueVolume
-    player?.prepareToPlay()
-    return player
-}
 @_cdecl("hf_sound_volume") public func soundVolume(_ volume: Float) {
-    main { cueVolume = volume.isFinite ? min(1, max(0, volume)) : 0.5; cue?.volume = cueVolume; endCue?.volume = cueVolume }
+    main { cueVolume = volume.isFinite ? min(1, max(0, volume)) : 0.5; endCue?.volume = cueVolume }
 }
 enum CuePolicy {
     static func canPreview(idle: Bool, busy: Bool, recording: Bool, playing: Bool) -> Bool {
@@ -393,7 +383,7 @@ enum CuePolicy {
 }
 @_cdecl("hf_preview_sound") public func previewSound() -> Bool {
     main {
-        guard CuePolicy.canPreview(idle: true, busy: audioBusy, recording: recorder != nil, playing: cue?.isPlaying == true || endCue?.isPlaying == true) else { return false }
+        guard CuePolicy.canPreview(idle: true, busy: audioBusy, recording: recorder != nil, playing: endCue?.isPlaying == true) else { return false }
         guard let data = EndCue.data(profile: cueProfile), let player = try? AVAudioPlayer(data: data) else { return false }
         endCue = player; player.volume = cueVolume
         return player.play()
@@ -402,7 +392,7 @@ enum CuePolicy {
 @_cdecl("hf_sounds") public func sounds(_ enabled: Bool) {
     main {
         soundsEnabled = enabled
-        if !enabled { cue?.stop(); endCue?.stop() }
+        if !enabled { endCue?.stop() }
     }
 }
 
@@ -473,6 +463,11 @@ class PillView: NSView {
     var tick: CGFloat = 0
     var elapsed: Double = 0
     var limit: UInt32 = 120
+    var audioReady = false {
+        didSet {
+            if phase == 1 { setAccessibilityLabel(audioReady ? "HandsFree listening" : "HandsFree starting") }
+        }
+    }
     static func timerText(elapsed: Double, limit: UInt32) -> String {
         let seconds = elapsed.isFinite ? Int(min(Double(limit), max(0, elapsed))) : 0
         return String(format: "%d:%02d / %d:%02d", seconds / 60, seconds % 60, limit / 60, limit % 60)
@@ -514,7 +509,7 @@ class PillView: NSView {
         cancelButton.isHidden = value != 1
         finishButton.isHidden = value != 1
         setAccessibilityValue(nil)
-        setAccessibilityLabel(value == 1 ? "HandsFree listening" : value == 2 ? "Transcribing" : value == 4 ? "No speech" : value == 5 ? "Copied" : "HandsFree needs attention. Open settings")
+        setAccessibilityLabel(value == 1 ? (audioReady ? "HandsFree listening" : "HandsFree starting") : value == 2 ? "Transcribing" : value == 4 ? "No speech" : value == 5 ? "Copied" : "HandsFree needs attention. Open settings")
         setAccessibilityHelp(value == 1 ? (pushToTalk ? "Release the shortcut to finish. Escape cancels." : "Press the shortcut again or use Finish dictation to finish. Escape cancels.") : value == 2 ? "Press Escape or use Cancel in HandsFree to cancel dictation." : nil)
     }
     override func draw(_ dirtyRect: NSRect) {
@@ -527,14 +522,14 @@ class PillView: NSView {
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         if phase == 1 {
             palette.accent.setFill()
-            for i in 0..<9 {
+            for i in 0..<(audioReady ? 9 : 0) {
                 let shape = CGFloat([0.35, 0.6, 0.85, 0.65, 1, 0.7, 0.9, 0.5, 0.3][i])
                 // Amplitude comes only from the recorder, never a fake sine wave.
                 let h = 3 + level * 16 * shape
                 NSBezierPath(roundedRect: NSRect(x: 49.5 + CGFloat(i) * 6, y: 28-h/2, width: 3, height: h), xRadius: 1.5, yRadius: 1.5).fill()
             }
             let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .center
-            (Self.timerText(elapsed: elapsed, limit: limit) as NSString).draw(in: NSRect(x: 40, y: 6, width: 70, height: 12), withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium), .foregroundColor: palette.text, .paragraphStyle: paragraph])
+            ((audioReady ? Self.timerText(elapsed: elapsed, limit: limit) : "Starting…") as NSString).draw(in: NSRect(x: 40, y: audioReady ? 6 : 21, width: 70, height: 12), withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium), .foregroundColor: palette.text, .paragraphStyle: paragraph])
         } else if phase == 2 {
             for i in 0..<3 {
                 let breath = reduceMotion ? 1 : 0.75 + 0.25 * (0.5 + 0.5 * sin(tick / 30 * 2 * .pi / 1.4 - CGFloat(i) * 0.8))
@@ -903,10 +898,23 @@ private func validateDelivery() -> PasteResult {
             // AX resolution can reenter the main runloop. Freeze admission only
             // after its final identity/policy recheck, before engine construction.
             guard admissionAllowed() else { clearTarget(); return false }
-            let r = try AudioCapture(generation: generation, epoch: epoch, microphoneUID: uid, sink: sink)
-            guard allowed(epoch) else { clearTarget(); return false }
-            let previewWasPlaying = cue?.isPlaying == true || endCue?.isPlaying == true
-            cue?.stop(); endCue?.stop()
+            guard allowed(epoch), startGate?(generation) ?? true else { clearTarget(); return false }
+            endCue?.stop()
+            let profile = cueProfile, volume = cueVolume
+            let sessionSounds = soundsEnabled && volume > 0
+            let gate = startGate
+            let r = AudioSession(generation: generation, epoch: epoch, sounds: sessionSounds,
+                authorized: { allowed(epoch) && (gate?(generation) ?? true) }, epochAllowed: { allowed(epoch) }, failure: {
+                    sink(generation, epoch, nil, -1)
+                }, retired: { session in
+                    main {
+                        if recorder === session {
+                            // Retain bounded metadata for status after teardown.
+                            lastAudioObservation = recorder?.snapshot()
+                            recorder = nil
+                        }
+                    }
+                })
             recorder = r
             recordingLimit = limit
             recordingElapsed = { [weak r] in
@@ -914,41 +922,52 @@ private func validateDelivery() -> PasteResult {
                 return elapsed(generation, epoch)
             }
             audioBusy = true
-            recordingCueProfile = cueProfile
-            if soundsEnabled {
-                cue = makeCue()
-                guard let player = cue, player.play() else {
-                    recorder = nil; audioBusy = false; clearTarget(); return false
+            lastAudioGeneration = generation; lastAudioEpoch = epoch; lastAudioObservation = nil
+            r.start { [weak r] routeFailure in
+                var startPCM: AVAudioPCMBuffer?, endData: Data?
+                if sessionSounds {
+                    guard let start = StartCue.data(profile: profile) else {
+                        throw NSError(domain: "Missing bundled cue", code: 1)
+                    }
+                    startPCM = try SessionCuePCM.decode(start)
+                    endData = EndCue.data(profile: profile)
                 }
+                let capture = try audioStage("input_create") { try AudioCapture(generation: generation, epoch: epoch, microphoneUID: uid,
+                    sink: { generation, epoch, data, count in
+                        if count < 0 { routeFailure() } else if allowed(epoch) {
+                            if count > 0 { r?.acceptedPCM() }
+                            sink(generation, epoch, data, count)
+                        }
+                    }) }
+                capture.routeFailed = routeFailure
+                let input = AudioSession.Operations(prepare: { try capture.prepareSession(allowed: { allowed(epoch) && (gate?(generation) ?? true) }) }, enable: { try capture.enable() },
+                    close: { capture.closeAcceptance() }, drain: { capture.closeAndDrain() },
+                    play: { _, _ in }, stopCue: {}, stop: { capture.stop() },
+                    level: { capture.level() }, outputRate: { 0 },
+                    cancel: { capture.revoke() }, formats: { capture.formatMetadata() })
+                let makeOutput: (() throws -> SessionAudioOwner.Output)? = startPCM.map { pcm in
+                    { try SessionCueOutput(format: pcm.format, volume: volume).operations(routeFailure: routeFailure) }
+                }
+                return SessionAudioOwner(input: input, makeOutput: makeOutput, cue: { ending in
+                        let pcm: AVAudioPCMBuffer?
+                        if ending { pcm = try endData.map(SessionCuePCM.decode) } else { pcm = startPCM }
+                        return pcm
+                }).operations()
             }
-            let startPlayer = soundsEnabled ? cue : nil
-            let cueLength = soundsEnabled ? (startPlayer?.duration ?? StartCue.duration) : 0
-            let quietTail = soundsEnabled || previewWasPlaying ? 0.18 : 0
-            func captureAllowed() -> Bool {
-                guard CuePolicy.canCapture(current: recorder === r, allowed: allowed(epoch) && (startGate?(generation) ?? true)) else {
-                    if recorder === r { r.stop(); recorder = nil; audioBusy = false; cue?.stop(); clearTarget() }
-                    return false
-                }
-                return true
-            }
-            // Never block AppKit. Check actual player completion as well as PCM
-            // duration: route startup/prebuffering must not eat into the quiet tail.
-            // 180 ms covers common output buffering, not every Bluetooth route.
-            func awaitCueCompletion() {
-                guard captureAllowed() else { return }
-                if startPlayer?.isPlaying == true {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.01, execute: awaitCueCompletion)
-                    return
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + quietTail) {
-                    guard captureAllowed() else { return }
-                    do { try r.start() }
-                    catch { recorder = nil; audioBusy = false; clearTarget(); sink(generation, epoch, nil, -1) }
-                }
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + cueLength, execute: awaitCueCompletion)
             return true
-        } catch { clearTarget(); return false }
+        }
+    }
+}
+// Metadata-only observation of this exact generation. Never waits on the audio
+// owner, constructs an engine, prompts, or infers readiness from cue playback.
+@_cdecl("hf_audio_status") public func audioStatus(_ generation: UInt64, _ epoch: UInt64, _ buffer: UnsafeMutablePointer<UInt8>?, _ capacity: Int32) -> Int32 {
+    main {
+        guard generation == lastAudioGeneration, epoch == lastAudioEpoch,
+              let snapshot = recorder?.snapshot() ?? lastAudioObservation,
+              let data = try? JSONEncoder().encode(snapshot), let buffer,
+              capacity > data.count else { return 0 }
+        data.copyBytes(to: buffer, count: data.count); buffer[data.count] = 0
+        return Int32(data.count)
     }
 }
 // Observation only: reuse the one explicitly started capture. Never create an engine.
@@ -965,23 +984,16 @@ private func validateDelivery() -> PasteResult {
 @_cdecl("hf_stop") public func stop() {
     // Stopping capture is not cancellation: inference still needs the original
     // target. Discard explicitly only on cancel, failure, empty result, or paste.
-    main { recorder?.stop(); recorder = nil; cue?.stop() }
+    let session = main { recorder }
+    session?.stop()
 }
 // Only explicit normal Finish/toggle/limit calls this, never generic teardown.
 @_cdecl("hf_finish") public func finish(_ epoch: UInt64, _ allowed: @convention(c) (UInt64) -> Bool) {
-    main {
-        CaptureEnd.finish(stop: {
-            let captured = recorder?.stop() ?? false
-            recorder = nil; cue?.stop()
-            return captured
-        }, allowed: { soundsEnabled && allowed(epoch) }, play: {
-            endCue = makeCue(ending: true)
-            endCue?.currentTime = 0; endCue?.play()
-        })
-    }
+    let session = main { recorder?.epoch == epoch ? recorder : nil }
+    if allowed(epoch) { session?.finish() } else { session?.cancel() }
 }
 @_cdecl("hf_cancel_audio") public func cancelAudio() {
-    main { stop(); endCue?.stop() }
+    main { recorder?.cancel(); endCue?.stop() }
 }
 @_cdecl("hf_overlay") public func overlay(_ phase: Int32) {
     main {
@@ -1008,13 +1020,17 @@ private func validateDelivery() -> PasteResult {
         // The backing window stays fixed to avoid clipping during the shrink;
         // its transparent area never intercepts clicks while processing.
         panel?.ignoresMouseEvents = phase == 2
+        let audioSession = recorder
+        pill?.audioReady = audioSession?.snapshot().audioReady ?? false
         pill?.setPhase(Int(phase)); pill?.level = 0; pill?.elapsed = 0; pill?.limit = recordingLimit; pill?.needsDisplay = true
         panel?.orderFrontRegardless()
         if phase == 1 || phase == 2 {
             meter = Timer.scheduledTimer(withTimeInterval: 1.0/30.0, repeats: true) { timer in
                 guard overlayGeneration == generation else { timer.invalidate(); return }
                 if phase == 1 {
-                    let db = recorder?.level() ?? -60
+                    guard recorder === audioSession else { timer.invalidate(); return }
+                    pill?.audioReady = audioSession?.snapshot().audioReady ?? false
+                    let db = audioSession?.level() ?? -60
                     pill?.level = CGFloat(max(0, min(1, (db + 55) / 45)))
                     pill?.elapsed = recordingElapsed?() ?? 0
                     if let pill { pill.setAccessibilityValue(PillView.timerText(elapsed: pill.elapsed, limit: pill.limit)) }
@@ -1149,8 +1165,10 @@ func publishCopy(_ value: String, board: NSPasteboard, allowed: () -> Bool) -> I
 @_cdecl("hf_cleanup") public func cleanup() {
     main {
         restoreClipboard?(); restoreClipboard = nil
-        recorder?.stop(); recorder = nil; clearTarget()
-        cue?.stop(); endCue?.stop()
+        // Quit may originate on AppKit. Revoke immediately, never wait for an
+        // in-flight OS call on main; the exact-owner retirement clears recorder.
+        recorder?.cancel(); clearTarget()
+        endCue?.stop()
         meter?.invalidate(); meter = nil; panel?.orderOut(nil)
         if let t = tap { CGEvent.tapEnable(tap: t, enable: false); CFMachPortInvalidate(t) }
         if let s = source { CFRunLoopRemoveSource(CFRunLoopGetMain(), s, .commonModes) }

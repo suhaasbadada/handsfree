@@ -75,7 +75,7 @@ prove discovery completeness or runtime correctness on an untested OS.
   away clears its ephemeral text/input owner and revokes the context; late native
   receipts cannot revive it. Overview never grants capture or external-delivery
   authority. Native dashboard own-app refusal remains the independent final guard.
-  The setup guide lives in Practice; tray Practice navigation selects that page.
+  The setup guide lives in Settings; tray Practice navigation selects Practice.
   Browser context, blur, pending-start and stale-receipt contracts cover this split.
 
 - Appearance is presentation, not readiness or capture authorization. One saved
@@ -129,7 +129,7 @@ prove discovery completeness or runtime correctness on an untested OS.
   Existing external dictation retains its ordinary completion route. Own-app
   delivery refusal code 15 exits before clipboard fallback and usage publication.
 
-- Inline Get started observes explicit native readiness only and reuses explicit
+- Settings-owned Get started observes explicit native readiness only and reuses explicit
   permission/download actions. Practice's input meter observes its existing
   recorder by token/generation/epoch; no Rust lock crosses synchronous native
   dispatch. Native focus, permission and cancellation checks and a post-dispatch
@@ -147,25 +147,35 @@ prove discovery completeness or runtime correctness on an untested OS.
   count and frozen limit, not wall time (cue delay counts zero). Generation/epoch
    and practice-token checks bound observations; no second recorder is created.
 
-- Capture startup remains native-main-thread-owned. Device binding precedes the
-  cue, but the converter is created from fresh input hardware format **after**
-  playback. Observe configuration changes before format/tap/prepare/start, latch
+- Capture hardware is owned by the admitted session's serial queue, not AppKit.
+  One session establishes an input engine and an optional output-only cue engine
+  before its start cue, with PCM
+  acceptance closed until cue completion and the quiet tail. Observe configuration changes before format/tap/prepare/start, latch
   changes across startup, and revalidate device and format before accepting PCM.
   Install the tap with that exact fresh hardware format, explicitly reconciling
   the input node's potentially stale output format. Hardware, node output and
   tap/converter input must agree before prepare, before start and after start;
-  nil tap format can retain a stale pre-cue output rate. Never write hardware
+  nil tap format can retain a stale cached output rate. Never write hardware
   sample rates or substitute a cached client format.
   A narrow Objective-C `@try/@catch` adapter turns AVAudioEngine tap/prepare/start
   (and teardown) exceptions into errors on macOS 14, not a process abort. Swift
   `catch` alone cannot catch NSException. Failed/retired startup publishes no PCM;
-  Bridge's existing generation/epoch sink owns the startup error, with no retry,
-  UID fallback, permission change or new recording owner. Partial installation
+  The session's existing generation/epoch sink owns the startup error. Initial
+  observed configuration negotiation may reconcile at most once on the same
+  input engine, before cues/accepted PCM, after healthy attempt teardown and
+  original UID/epoch/start-gate checks. Cancellation is a permanent tombstone;
+  generic exceptions, teardown failure, UID changes and live recording failures
+  never authorize another attempt. There is no UID fallback, permission change
+  or new recording owner. Partial installation
   closes the producer, attempts both engine stop and tap removal independently,
   and drains/discards before return. Runtime route failure still defeats partial
   transcription. Synthetic adapter tests exercise these production operations
   and real Objective-C throws without constructing an engine or opening hardware;
   macOS 14/Bluetooth installed-app acceptance is a separate gate.
+  Normal Finish closes/drains accepted PCM while keeping the engine alive for
+  its end cue; cancellation plays no end cue. Native retirement is a separate
+  barrier before Rust publishes idle or releases its slot. All synchronous owner
+  waits happen outside AppKit. See [audio session ownership](AUDIO-SESSION.md).
 
 - Practice owns stable bounded status/copy/action slots, including the native
   status header and overview diagnostic area. Contextual controls reuse grid

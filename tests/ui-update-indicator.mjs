@@ -8,6 +8,7 @@ export async function checkUpdateIndicator({send,evaluate,until,port}) {
   const checks = await evaluate(`window.calls.filter(c=>c.command==='check_for_updates').length`);
   const rects = () => evaluate(`['updates-open'].map(id=>{const r=document.getElementById(id).getBoundingClientRect();return [r.x,r.y+scrollY,r.width,r.height]})`);
   const originalRects = await rects();
+  assert.equal(originalRects[0][3],30,'Updater is a compact inline 30px utility action');
   await evaluate(`Object.assign(window.visibleUpdateState,{phase:'available',available_version:'0.1.1-beta.15',message:'Update available.'})`);
   await until(`document.getElementById('updates-indicator-label').textContent==='Update available' && document.getElementById('updates-indicator-detail').textContent==='0.1.1-beta.15'`);
   assert.equal(await evaluate(`!document.getElementById('updates-dialog').open && document.getElementById('updates-open').dataset.attention==='available'`),true,'Verified update stays visible outside the dialog');
@@ -24,4 +25,17 @@ export async function checkUpdateIndicator({send,evaluate,until,port}) {
   await until(`document.getElementById('updates-indicator-detail').textContent==='Not checked'`);
   assert.deepEqual(await rects(),originalRects,'Expired and failed checks keep the same status slot');
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='check_for_updates').length`),checks,'Persistent status observes local IPC only, never unsolicited feed requests');
+  for (const [width,height] of [[980,820],[560,650]]) {
+    await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
+    const geometry = await evaluate(`['footer','#updates-open'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [r.x,r.y,r.width,r.height]})`);
+    for (const phase of ['checking','available','downloading','installing','error','up_to_date','idle']) {
+      await evaluate(`window.visibleUpdateState={...window.visibleUpdateState,phase:'${phase}',available_version:'${phase==='available'?'0.1.1-beta.123456789012345678901234567890': ''}',message:'${phase==='error'?'A long network failure message. '.repeat(20):phase}',downloaded_bytes:50,total_bytes:100}`);
+      await until(`document.getElementById('updates-open').dataset.attention==='${phase==='available'?'available':phase==='error'?'error':'none'}'`);
+      // Wait for this exact phase rather than accepting the previous neutral projection.
+      await until(`document.getElementById('updates-open').title.includes('${phase==='checking'?'Checking':phase==='available'?'1234567890':phase==='downloading'?'Downloading':phase==='installing'?'Installing':phase==='error'?'failed':phase==='up_to_date'?'Up to date':'Not checked'}')`);
+      assert.deepEqual(await evaluate(`['footer','#updates-open'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [r.x,r.y,r.width,r.height]})`),geometry,`${width}px ${phase}: long offer/error cannot grow the footer`);
+      assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth && document.querySelector('footer').getBoundingClientRect().bottom<=innerHeight && document.getElementById('updates-open').scrollWidth<=document.getElementById('updates-open').clientWidth`),true,`${width}px ${phase}: compact contained update action`);
+    }
+  }
+  await send('Emulation.setDeviceMetricsOverride',{width:980,height:820,deviceScaleFactor:1,mobile:false});
 }

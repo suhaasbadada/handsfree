@@ -14,14 +14,52 @@ test('generator reproduces the committed cue byte-exactly', {
 
 test('native roles snapshot each recording profile and preview only the selected pair', () => {
   const source = readFileSync(new URL('../src-tauri/native/Bridge.swift', import.meta.url), 'utf8');
-  assert.match(source, /let profile = ending \? recordingCueProfile : cueProfile/);
-  assert.match(source, /recordingCueProfile = cueProfile\s+if soundsEnabled/);
+  assert.match(source, /let profile = cueProfile, volume = cueVolume/);
+  assert.match(source, /let sessionSounds = soundsEnabled && volume > 0/);
+  assert.match(source, /StartCue.data\(profile: profile\)/);
+  assert.match(source, /endData = EndCue.data\(profile: profile\)/);
+  assert.match(source, /SessionCueOutput\(format: pcm\.format, volume: volume\)/);
+  assert.match(source, /let makeOutput:[\s\S]*startPCM\.map/);
   const preview = source.slice(source.indexOf('@_cdecl("hf_preview_sound")'), source.indexOf('@_cdecl("hf_sounds")'));
   assert.match(preview, /CuePolicy.canPreview/);
   assert.match(preview, /EndCue.data\(profile: cueProfile\)/);
   assert.doesNotMatch(preview, /StartCue.data|AudioCapture/);
-  const style = source.slice(source.indexOf('@_cdecl("hf_sound_style")'), source.indexOf('private func makeCue'));
-  assert.doesNotMatch(style, /\.play\(|\.stop\(|recordingCueProfile =/);
+  const style = source.slice(source.indexOf('@_cdecl("hf_sound_style")'), source.indexOf('@_cdecl("hf_sound_volume")'));
+  assert.doesNotMatch(style, /\.play\(|\.stop\(/);
+});
+
+test('session separates explicit input-only and read-only default output topology', () => {
+  const source = readFileSync(new URL('../src-tauri/native/AudioCapture.swift', import.meta.url), 'utf8');
+  const input = source.slice(source.indexOf('final class AudioCapture'), source.indexOf('final class SessionCueOutput'));
+  assert.doesNotMatch(input, /mainMixerNode|outputNode|AVAudioPlayerNode|HFCue/);
+  const output = source.slice(source.indexOf('final class SessionCueOutput'), source.indexOf('final class SessionAudioOwner'));
+  assert.doesNotMatch(output, /inputNode|AudioUnitSetProperty|AudioObjectSetPropertyData/);
+  assert.match(output, /HFCueOutputDevice/);
+  const owner = source.slice(source.indexOf('final class SessionAudioOwner'));
+  assert.ok(owner.indexOf('self.input.prepare()') < owner.indexOf('self.output = try'));
+  const shim = readFileSync(new URL('../src-tauri/native/CaptureException.m', import.meta.url), 'utf8');
+  assert.match(shim, /AudioUnitGetProperty\(unit, kAudioOutputUnitProperty_CurrentDevice/);
+  assert.doesNotMatch(shim, /exception\.reason|exception\.name/);
+});
+
+test('native teardown snapshots on AppKit but waits on the FIFO; retirement precedes admission', () => {
+  const bridge = readFileSync(new URL('../src-tauri/native/Bridge.swift', import.meta.url), 'utf8');
+  const stop = bridge.slice(bridge.indexOf('@_cdecl("hf_stop")'), bridge.indexOf('@_cdecl("hf_cancel_audio")'));
+  assert.match(stop, /let session = main \{ recorder \}/);
+  assert.match(stop, /session\?\.stop\(\)/);
+  assert.match(stop, /let session = main \{ recorder\?\.epoch == epoch \? recorder : nil \}/);
+  assert.doesNotMatch(stop, /main \{[^}]*\.(?:stop|finish)\(/s);
+  const cleanup = bridge.slice(bridge.indexOf('@_cdecl("hf_cleanup")'));
+  assert.doesNotMatch(cleanup, /recorder\?\.stop\(/);
+  assert.match(bridge, /if recorder === session/);
+  const controller = readFileSync(new URL('../src-tauri/native/AudioCapture.swift', import.meta.url), 'utf8');
+  assert.match(controller, /retired\(self\); retirement\.leave\(\)/);
+  assert.match(controller, /func stop\(\) \{[\s\S]*retirement\.wait\(\)/);
+  const rust = readFileSync(new URL('../src-tauri/src/main.rs', import.meta.url), 'utf8');
+  assert.match(rust, /hf_cancel_audio\(\);\s*hf_stop\(\); \/\/ Retirement barrier/);
+  const practice = rust.slice(rust.indexOf('async fn practice_status'), rust.indexOf('async fn list_microphones'));
+  assert.ok(practice.indexOf('platform::audio_status') < practice.indexOf('let gate = PRACTICE.lock()'));
+  assert.match(practice, /audio_ready:[\s\S]*gate\.meter_identity\(token\) == identity/);
 });
 
 for (const [profile, pairHash, singleHash] of [['clean', 'a1eb8aeadfc425a5a217e3d35732762571c16d7e03969a5f3b0bfe41dbde6856', 'd9164cb188a469059517b60817e5acca1dd5121278c01ebd8193cfc79411e6c8'], ['warm', '0e59d9fd1a43491f6193760ce55eb96807c6b6b08e7549f1e8d3b760eff416b8', 'a8947c7505db50c240aae0fb76cfcd2ce69a3cdaf4b8387dd5e444d675a098ed']]) test(`${profile}: approved double end and identical single start packaged without playback`, () => {
