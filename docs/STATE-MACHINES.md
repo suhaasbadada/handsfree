@@ -161,10 +161,11 @@ prove discovery completeness or runtime correctness on an untested OS.
   (and teardown) exceptions into errors on macOS 14, not a process abort. Swift
   `catch` alone cannot catch NSException. Failed/retired startup publishes no PCM;
   The session's existing generation/epoch sink owns the startup error. Initial
-  observed configuration negotiation may reconcile at most once on the same
+  observed configuration negotiation throughout initial startup (observer install
+  through tap/prepare/start and the locked running-state commit) may reconcile at most once on the same
   input engine, before cues/accepted PCM, after healthy attempt teardown and
   original UID/epoch/start-gate checks. Cancellation is a permanent tombstone;
-  generic exceptions, teardown failure, UID changes and live recording failures
+  generic exceptions (even alongside an observed change), teardown failure, UID changes and live recording failures
   never authorize another attempt. There is no UID fallback, permission change
   or new recording owner. Partial installation
   closes the producer, attempts both engine stop and tap removal independently,

@@ -196,7 +196,6 @@ final class CaptureStartup {
     private let routeLock = NSLock()
     private var invalidated = false
     private var revoked = false
-    private var preparing = false
     private var initialConfigurationChange = false
     private var negotiating = false
     private(set) var cleanupHealthy = true
@@ -215,7 +214,9 @@ final class CaptureStartup {
     private func invalidate() {
         routeLock.lock()
         invalidated = true
-        if preparing && negotiating && !started { initialConfigurationChange = true }
+        // Profile negotiation can notify anywhere from observer installation to
+        // startup commit, not only inside prepare(). Revocation never grants retry.
+        if negotiating && !started && !revoked { initialConfigurationChange = true }
         let deferFailure = negotiating && !started
         // Linearize route failure with startup commit and stop. These producer
         // methods only close/enqueue; they never call a sink under routeLock.
@@ -224,14 +225,19 @@ final class CaptureStartup {
         if !deferFailure { routeFailed?() }
     }
     private func check() throws {
-        routeLock.lock(); let valid = !invalidated
-        let configuration = initialConfigurationChange && !revoked
-        routeLock.unlock()
-        if !valid && configuration { throw PreparationFailure.initialConfigurationChange }
-        guard valid else { throw NSError(domain: "Microphone changed during capture startup", code: 1) }
+        routeLock.lock(); defer { routeLock.unlock() }
+        try checkLocked()
+    }
+    // Call under routeLock, including the final startup commit, so a late
+    // notification gets the same typed classification as an earlier checkpoint.
+    private func checkLocked() throws {
+        if invalidated && initialConfigurationChange && !revoked { throw PreparationFailure.initialConfigurationChange }
+        guard !invalidated else { throw NSError(domain: "Microphone changed during capture startup", code: 1) }
     }
     private func checkFormats(_ format: AVAudioFormat) throws {
-        guard try operations.format() == format, try operations.outputFormat() == format else {
+        let hardware = try operations.format(), output = try operations.outputFormat()
+        try check() // a notification during format reads still belongs to precommit negotiation
+        guard hardware == format, output == format else {
             throw NSError(domain: "Microphone hardware/output/tap format changed", code: 1)
         }
     }
@@ -245,8 +251,10 @@ final class CaptureStartup {
         do {
             try check()
             try operations.validate()
+            try check()
             let format = try operations.format() // fresh after engine-local device binding
             negotiatedFormat = format
+            try check()
             let pipeline = try CapturePipeline(input: format, enabled: false, sink: sink)
             routeLock.lock(); self.pipeline = pipeline; routeLock.unlock()
             try check()
@@ -254,23 +262,28 @@ final class CaptureStartup {
             try operations.install(format, pipeline)
             try check()
             try checkFormats(format)
-            routeLock.lock(); preparing = true; routeLock.unlock()
-            do { try operations.prepare() }
-            catch {
-                routeLock.lock(); preparing = false; routeLock.unlock()
-                throw error // A generic/ObjC failure is never negotiation authority.
-            }
-            routeLock.lock(); preparing = false; routeLock.unlock()
+            // A thrown generic/ObjC failure is never negotiation authority,
+            // even when a configuration notification was also observed.
+            try operations.prepare()
             try check()
             try checkFormats(format)
-            try operations.start()
-            try operations.validate()
-            try checkFormats(format)
-            routeLock.lock()
-            let valid = !invalidated
-            if valid { started = true; if acceptAudio { pipeline.enable() } }
-            routeLock.unlock()
-            guard valid else { throw NSError(domain: "Microphone changed during capture startup", code: 1) }
+            do {
+                try operations.start()
+                try check() // classify observed negotiation before stale-format errors
+                try operations.validate()
+                try check()
+                try checkFormats(format)
+                routeLock.lock()
+                defer { routeLock.unlock() }
+                try checkLocked()
+                started = true; if acceptAudio { pipeline.enable() }
+            } catch PreparationFailure.initialConfigurationChange {
+                throw PreparationFailure.initialConfigurationChange
+            } catch let error as AudioStageFailure {
+                throw error
+            } catch {
+                throw AudioStageFailure("input_start", error)
+            }
         } catch {
             starting = false
             pipeline?.discardStartup()

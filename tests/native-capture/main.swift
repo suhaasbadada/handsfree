@@ -607,6 +607,12 @@ final class NegotiationHarness {
     }
     func make() -> CaptureStartup {
         made += 1; let attempt = made
+        var validations = 0, outputReads = 0
+        func configurationChange() {
+            self.hardware = AVAudioFormat(standardFormatWithSampleRate: 24000, channels: 1)!
+            self.callbacks.last?()
+            if self.mode == "cancel-start-change" { self.preparation.revoke() }
+        }
         if attempt == 2 {
             precondition(session.count("unobserve1") == 1 && session.count("remove1") == 1)
             if mode == "cancel-replacement" { preparation.revoke() }
@@ -616,18 +622,28 @@ final class NegotiationHarness {
             self.callbacks.append(callback)
             return { self.session.event("unobserve\(attempt)") }
         }, validate: {
+            validations += 1
             try MicrophoneBinding.revalidate(expected: 42, resolve: {
                 if self.mode == "uid-missing" && attempt == 2 { throw NSError(domain: "Missing selected input", code: 1) }
                 return self.mode == "uid-changed" && attempt == 2 ? 43 : 42
             })
-        }, format: { self.hardware }, outputFormat: { self.output }, install: { fresh, pipe in
+            if attempt == 1 && validations == 2 && self.mode == "config-poststart" { configurationChange() }
+        }, format: { self.hardware }, outputFormat: {
+            outputReads += 1
+            let result = self.output
+            // Deliver after the final format snapshot, immediately before commit.
+            if attempt == 1 && outputReads == 3 && self.mode == "config-commit" { configurationChange() }
+            return result
+        }, install: { fresh, pipe in
             precondition(fresh === self.hardware)
             precondition(HFTestCaptureExplicitFormat(fresh, self.output))
             self.output = fresh; self.installs.append(fresh.sampleRate); self.pipes.append(pipe)
             self.packet(pipe, fresh)
+            if attempt == 1 && self.mode == "config-install" { configurationChange() }
         }, prepare: {
             self.packet(self.pipes.last!, self.hardware)
             if attempt == 1 {
+                if ["config-install", "config-start", "config-poststart", "config-commit", "cancel-start-change", "generic-start", "generic-start-with-change"].contains(self.mode) { return }
                 if self.mode == "generic" { throw NSError(domain: "generic", code: 9) }
                 if self.mode == "exception" { throw HFTestCaptureAdapter(2)! }
                 self.hardware = AVAudioFormat(standardFormatWithSampleRate: 24000, channels: 1)!
@@ -643,7 +659,15 @@ final class NegotiationHarness {
                 if self.mode == "second-config" { self.callbacks.last?() }
                 if self.mode == "deadline-second" { self.session.fire(3) }
             }
-        }, start: { self.starts += 1 }, stop: {
+        }, start: {
+            self.starts += 1
+            if attempt == 1 {
+                if ["config-start", "cancel-start-change", "generic-start-with-change"].contains(self.mode) { configurationChange() }
+                if ["generic-start", "generic-start-with-change"].contains(self.mode) {
+                    throw NSError(domain: "generic", code: 9)
+                }
+            }
+        }, stop: {
             self.session.event("stop\(attempt)")
             if self.mode == "cleanup-stop" && attempt == 1 { throw HFTestCaptureAdapter(4)! }
         }, remove: {
@@ -677,13 +701,15 @@ final class NegotiationHarness {
         }, cue: { _ in AVAudioPCMBuffer(pcmFormat: self.hardware, frameCapacity: 2048)! }).operations()
     }
 }
-for mode in ["success", "cue-route", "listening-route", "uid-missing", "uid-changed", "cancel-first", "cancel-cleanup", "cancel-replacement", "gate-cleanup", "cleanup-stop", "cleanup-remove", "generic", "exception", "generic-with-change", "second-config", "deadline-first", "deadline-second"] {
+for mode in ["config-start", "config-install", "config-poststart", "config-commit", "cancel-start-change", "generic-start", "generic-start-with-change", "success", "cue-route", "listening-route", "uid-missing", "uid-changed", "cancel-first", "cancel-cleanup", "cancel-replacement", "gate-cleanup", "cleanup-stop", "cleanup-remove", "generic", "exception", "generic-with-change", "second-config", "deadline-first", "deadline-second"] {
     let h = NegotiationHarness(mode), s = h.session.session()
     s.start(factory: h.operations)
-    let prepared = ["success", "cue-route", "listening-route"].contains(mode)
+    let success = mode == "success" || mode.hasPrefix("config-")
+    let prepared = success || ["cue-route", "listening-route"].contains(mode)
     if prepared {
         h.session.wait("cue")
-        precondition(h.samples == 0 && !s.snapshot().audioReady && h.starts == 1)
+        precondition(h.samples == 0 && !s.snapshot().audioReady)
+        precondition(h.starts == (["config-start", "config-poststart", "config-commit"].contains(mode) ? 2 : 1), mode)
         precondition(h.installs == [48000, 24000] && h.preparation.attempts == 2)
         precondition(h.session.count("failure") == 0)
         // Retired callbacks and producers cannot fail/accept for the live attempt.
@@ -702,8 +728,8 @@ for mode in ["success", "cue-route", "listening-route", "uid-missing", "uid-chan
         }
     }
     h.session.wait("retired"); s.stop()
-    precondition(mode == "success" ? h.samples > 0 : h.samples == 0)
-    let expectedFailures = mode == "success" ? 0 : 1
+    precondition(success ? h.samples > 0 : h.samples == 0)
+    let expectedFailures = success ? 0 : 1
     precondition(h.session.count("failure") == expectedFailures, mode)
     precondition(h.session.count("output") == (prepared ? 1 : 0), mode)
     if ["uid-missing", "uid-changed", "second-config", "deadline-second"].contains(mode) {
@@ -712,5 +738,10 @@ for mode in ["success", "cue-route", "listening-route", "uid-missing", "uid-chan
         precondition(s.snapshot().formats["initialInputRate"] == 48000, mode)
     } else if !prepared { precondition(h.preparation.attempts == 1, mode) }
     precondition(h.made <= 2)
+    if ["generic-start", "generic-start-with-change"].contains(mode) {
+        precondition(s.snapshot().failureStage == "input_start" && s.snapshot().failureDomain == "generic")
+        precondition(s.snapshot().failureCode == 9 && h.made == 1)
+    }
+    if mode == "cancel-start-change" { precondition(h.made == 1 && h.preparation.attempts == 1) }
 }
 print("Production preaccept negotiation: fresh 48-to-24k converter/tap, same UID, stale callbacks, cleanup/cancel/gate failures and one global 3s watchdog passed without hardware")
