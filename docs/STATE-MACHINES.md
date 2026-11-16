@@ -157,6 +157,26 @@ prove discovery completeness or runtime correctness on an untested OS.
   tap/converter input must agree before prepare, before start and after start;
   nil tap format can retain a stale cached output rate. Never write hardware
   sample rates or substitute a cached client format.
+  Running with acceptance closed is not accepted capture. Post-start/preaccept
+  input notifications advance a locked revision only; after output preparation
+  and again before acceptance, the serial owner confirms frozen device identity,
+  hardware/node/converter format and actual engine running state. The final
+  revision/tombstone check and acceptance commit are atomic. No OS reads occur
+  in notification callbacks, no new preparation/retry is granted, and runtime
+  notification failure remains strict. Cancellation/deadline can never reopen
+  a producer through this validation. Output notification failures stay strict.
+  Startup deadlines are lock-protected phase facts, not reason strings: the
+  independent 3 s hardware budget covers factory/input/output preparation and
+  pre-cue validation through successful `route_ready`, which atomically retires
+  it and arms a separate independent 3 s cue-handoff budget. Handoff covers cue
+  completion, existing 180 ms quiet tail and enable/revalidation until actual
+  readiness, failure or cancellation. No completion extends that budget; stale
+  hardware deadlines cannot kill handoff. Muted sessions transfer budgets with
+  immediate enable and no cue/tail delay. Both deadlines can revoke/report while
+  the serial OS owner is blocked; cleanup/retirement still waits for that owner.
+  First failure retains `hardware_startup_timeout` or `cue_handoff_timeout` unless
+  an earlier cause already exists. Total logical startup is bounded by 3 + 3 s,
+  not a global 3 s whole-startup deadline; end-cue timeout stays nonfatal.
   A narrow Objective-C `@try/@catch` adapter turns AVAudioEngine tap/prepare/start
   (and teardown) exceptions into errors on macOS 14, not a process abort. Swift
   `catch` alone cannot catch NSException. Failed/retired startup publishes no PCM;

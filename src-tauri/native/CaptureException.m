@@ -64,6 +64,9 @@ NSError *HFCaptureStart(AVAudioEngine *engine) {
 NSError *HFCaptureStop(AVAudioEngine *engine) {
     return HFCaptureBoundary(^{ [engine stop]; });
 }
+NSError *HFCaptureRunning(AVAudioEngine *engine, BOOL *running) {
+    return HFCaptureBoundary(^{ *running = engine.isRunning; });
+}
 NSError *HFCaptureRemove(AVAudioInputNode *input) {
     return HFCaptureBoundary(^{ [input removeTapOnBus:0]; });
 }

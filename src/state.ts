@@ -14,13 +14,13 @@ const policy = (editConfiguration: boolean, previewSound: boolean, cancel: boole
 const blocked = policy(false, false, false, false);
 const policies: Record<DictationPhase, PhasePolicy> = {
   idle: policy(true, true, false, true),
-  setup_required: policy(true, false, false, true),
+  setup_required: policy(true, true, false, true),
   recording: policy(false, false, true, false),
   processing: policy(false, false, true, false),
   downloading: blocked,
   copied: policy(true, true, false, true),
-  not_pasted: policy(true, false, false, false),
-  error: policy(true, false, false, true),
+  not_pasted: policy(true, true, false, false),
+  error: policy(true, true, false, true),
 };
 // This is only the phase part of eligibility, never a grant to perform an effect.
 // Unknown/disconnected phases fail closed. Callers retain their domain guards.

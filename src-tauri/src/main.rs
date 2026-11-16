@@ -1102,7 +1102,12 @@ async fn set_sound_volume(volume: f32) -> Result<(), String> {
     .map_err(|e| e.to_string())?
 }
 fn preview_allowed(phase: &str) -> bool {
-    matches!(phase, "idle" | "copied")
+    // Output-only preview needs no capture readiness; native ownership is
+    // rechecked separately, including sessions that are still retiring.
+    matches!(
+        phase,
+        "idle" | "copied" | "error" | "setup_required" | "not_pasted"
+    )
 }
 fn shortcut_edit_allowed(phase: &str) -> bool {
     matches!(
@@ -1330,18 +1335,19 @@ mod sound_tests {
         }
     }
     #[test]
-    fn preview_only_while_idle() {
-        assert!(super::preview_allowed("idle"));
-        assert!(super::preview_allowed("copied"));
+    fn preview_allows_quiescent_phases_without_capture_readiness() {
+        for phase in ["idle", "copied", "error", "setup_required", "not_pasted"] {
+            assert!(super::preview_allowed(phase), "{phase}");
+        }
         for phase in [
             "recording",
             "processing",
             "downloading",
-            "setup_required",
-            "error",
-            "not_pasted",
+            "unknown",
+            "",
+            "new_phase",
         ] {
-            assert!(!super::preview_allowed(phase));
+            assert!(!super::preview_allowed(phase), "{phase}");
         }
     }
 }

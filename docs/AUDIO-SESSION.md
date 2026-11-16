@@ -23,19 +23,46 @@ explicitly idle-only AVAudioPlayer action with no idle input engine.
 
 Preparation installs the tap with acceptance closed and starts the input engine,
 then prepares/starts optional output.
-Start-cue completion plus the quiet tail permits acceptance, subject to the
-original epoch/start gate and route/format checks. Muted sessions skip playback
-and the quiet tail, not preparation or the independent three-second startup
-watchdog. The watchdog closes acceptance and reports failure even if a
-synchronous OS startup operation has not returned. It cannot safely interrupt
-that OS call; ownership remains occupied until cleanup actually completes.
+Input-start commit means running, not accepted capture. An input configuration
+notification after that commit and before acceptance only advances a locked
+revision; it never opens PCM or reads OS state in the notification callback.
+After output preparation, **before the start cue**, the serial owner revalidates
+the frozen selected/actual input device, hardware format, node output format,
+converter input format and engine `isRunning` (through the Objective-C exception
+boundary). It repeats that validation immediately before enabling acceptance.
+Unchanged, running input can proceed without a retry; changed identity/format or
+a stopped engine fails recoverably. A notification racing the validation fails
+the atomic revision check rather than accepting an unvalidated snapshot.
+Revocation/deadline tombstones cannot be cleared by validation. Once acceptance
+commits, notifications still close the producer immediately and fail capture;
+this preaccept confirmation never weakens runtime route failure.
+Start-cue completion plus the existing 180 ms quiet tail permits acceptance,
+subject to the original epoch/start gate and route/format checks. Startup has
+two phase-bounded, independent three-second budgets, not one global three-second
+whole-startup limit. The hardware deadline covers factory construction, input
+preparation (including at most one reconciliation), output preparation and
+post-output/pre-cue validation. Successful `route_ready` atomically retires that
+deadline and transfers to a separate three-second handoff deadline covering
+start-cue completion, quiet tail and enable/revalidation. Only actual
+`audioReady`, failure or cancellation retires the handoff; cue completion never
+extends/restarts it. Late/duplicate hardware callbacks cannot kill handoff, and
+retired callbacks cannot affect listening or end cues. Muted sessions transfer
+the same budgets but skip playback and quiet tail, enabling immediately.
+
+Both watchdogs run independently of the serial owner, so blocked factory,
+cue-play or enable OS calls cannot starve them. First-failure diagnostics identify
+`hardware_startup_timeout` or `cue_handoff_timeout`, preserving an earlier cause.
+The logical startup budget is at most 3 s hardware + 3 s handoff, with no added
+normal-path wait. Deadline/cancellation permanently close acceptance and report
+at most once subject to epoch/start authorization. They cannot safely interrupt
+a synchronous OS call; ownership stays occupied until real cleanup completes.
 
 ### Bounded preaccept input negotiation
 
 Production `AudioCapture.prepareSession` uses `CapturePreparation` for at most
 two input preparations under that same session, generation, epoch, frozen UID
-and original three-second watchdog. Only an observed engine configuration
-notification **inside initial input prepare**, before input-start commit or any
+and original three-second hardware watchdog (never reset between attempts). Only an observed engine configuration
+notification **during initial input startup**, before input-start commit or any
 cue/PCM acceptance, authorizes the second preparation. A generic NSError or
 contained Objective-C exception is terminal even if a notification also arrived.
 There is no timer, delay, device heuristic or retry of recording. Public legacy
@@ -55,8 +82,10 @@ Cancellation/watchdog revoke is permanently locked across replacement; retired
 attempt identities cannot report failure against the new attempt. Lost UID,
 binding/format/stop/remove failure, expired gate/deadline or cancellation never
 authorize another preparation. The second failure is final. Configuration
-changes after input-start commit (including cue, listening and end-cue periods)
-retain their existing failure disposition. No output engine is created until
+changes after input-start commit but before acceptance require the read-only
+confirmation above, not another preparation. Listening and end-cue periods
+retain their existing failure disposition. Output configuration notifications
+remain strict failures. No output engine is created until
 input negotiation succeeds, and neither input preparation accepts PCM.
 
 Bounded format diagnostics retain `negotiationAttempts`, `initial_config_change`
@@ -84,6 +113,10 @@ and a fixed `failureException` marker for contained Objective-C exceptions.
 Diagnostics are collected before owner teardown, including partial preparation;
 cleanup cannot replace the original error. No localized OS error/exception
 description, device UID or name is emitted.
+Asynchronous callback failures retain their first `input_configuration`,
+`output_configuration` or `capture_pipeline` cause, even if startup fails before
+`route_ready`; available input/output format metadata is snapshotted on the owner
+before the validity guard/cleanup. Notification callbacks perform no OS reads.
 Rust's normal status exposes `audio_ready`, `audio_reason`, `audio_generation`
 and `audio_diagnostic`. `practice_status` adds **`audio_ready: boolean | null`**
 to the existing reply, without changing `phase`, token/generation ownership or
@@ -121,13 +154,15 @@ false microphone error. No new global phase or early slot release is needed.
 Quit cleanup only revokes/queues teardown on AppKit; it must not block the
 runloop waiting for a synchronous OS call. Rust state locks do not cross these
 native waits. An OS call that never returns remains a real occupied owner, not
-fake idle; only cue completion has a safely bounded deadline.
+fake idle; startup watchdogs bound logical failure, not OS-call retirement.
 
 ## Verification and inventory handoff
 
 Permission-free native harnesses cover release-before-Finish failure, revoked
 epochs, drain failure, nonfatal end-cue errors, blocked preparation with runnable
-main-loop work, independent startup timeout, late callbacks, cancellation and
+main-loop work, independent hardware/handoff timeouts (including blocked
+factory/cue/enable), virtual 2.633 s preparation plus cue/tail crossing 3 s
+successfully, stale/duplicate deadlines, muted handoff, cancellation and
 withheld end-cue completion holding a queued restart until retirement. Capsule
 accessibility checks distinguish Starting from Listening. These are synthetic
 operations and in-memory conversion, not microphone, playback or audibility
@@ -137,7 +172,8 @@ behavior remain separate acceptance gates.
 Suggested shared inventory updates (owned by the coordinating agent):
 
 - `native-audio`: point to `AudioSession`; describe serial hardware ownership,
-  accepted/drained facts, independent startup watchdog and retirement barrier.
+  accepted/drained facts, independent phase-scoped hardware/handoff watchdogs
+  and retirement barrier.
   Remove obsolete claims of main-thread hardware startup.
 - `cue-capture-handoff`: describe one session's isolated input/output ownership, completion/deadline
   handoff, quiet tail, producer drain before end cue and full retirement before

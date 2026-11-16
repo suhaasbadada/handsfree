@@ -2,6 +2,20 @@
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
 
+## Beta 21 candidate preparation — unpublished
+
+Candidate **v0.1.1-beta.21** retains embedded app version **0.1.1**. See
+[candidate scope, evidence and acceptance limits](releases/v0.1.1-beta.21.md).
+Disabled `candidateRelease`, `src-tauri/distribution.json`, packaging and audit
+coordinates target beta 21. The updater packager reads distribution.json; it
+does not select the active website release or automatically publish its feed.
+Active release/downloads, tracked signed feed, README and install guide remain
+beta 20 until explicit publication and anonymous-public artifact audit succeed.
+This preparation is not a signed build, release receipt or installed-app update.
+Exact-source CI, clean-source packaging/signing, draft/public audits, metadata
+activation, Pages/feed readback and Homebrew parity are separate pending gates.
+Preserve all prior receipts and ledger entries below unchanged.
+
 ## Beta 20 publication and metadata activation
 
 Current public Mac distribution **v0.1.1-beta.20** retains embedded version **0.1.1**.

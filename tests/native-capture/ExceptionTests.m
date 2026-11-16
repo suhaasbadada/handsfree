@@ -19,8 +19,23 @@ NSError *HFTestCaptureException(void) {
 - (void)prepare { failCapture(); }
 - (BOOL)startAndReturnError:(NSError **)error { failCapture(); return NO; }
 - (void)stop { failCapture(); }
+- (BOOL)isRunning { failCapture(); return NO; }
 - (void)removeTapOnBus:(AVAudioNodeBus)bus { failCapture(); }
 @end
+@interface HFCaptureRunningAdapter : NSObject
+@property BOOL running;
+@end
+@implementation HFCaptureRunningAdapter
+- (BOOL)isRunning { return self.running; }
+@end
+BOOL HFTestCaptureRunningBoundary(void) {
+    HFCaptureRunningAdapter *fake = [HFCaptureRunningAdapter new];
+    BOOL running = YES;
+    if (HFCaptureRunning((id)fake, &running) || running) return NO;
+    fake.running = YES;
+    if (HFCaptureRunning((id)fake, &running) || !running) return NO;
+    return HFCaptureRunning((id)[HFCaptureThrowingAdapter new], &running) != nil;
+}
 NSError *HFTestCaptureAdapter(int operation) {
     id fake = [HFCaptureThrowingAdapter new];
     AVAudioFormat *format = nil;

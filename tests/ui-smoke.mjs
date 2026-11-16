@@ -10,6 +10,7 @@ import { checkPracticeEvents } from './ui-practice-events.mjs';
 import { checkKeyboardRecovery } from './ui-keyboard-recovery.mjs';
 import { checkUpdateIndicator } from './ui-update-indicator.mjs';
 import { checkAppearance } from './ui-appearance.mjs';
+import { checkRequestedFixes } from './ui-requested-fixes.mjs';
 import { checkRefinement } from './ui-refinement.mjs';
 
 const binary = process.env.BROWSER_BINARY;
@@ -577,7 +578,8 @@ try {
     await checkPracticeEvents({send,evaluate,until,port});
     await checkRefinement({send,evaluate,until,port});
    console.log('UI smoke: practice checks passed; checking keyboard/recovery');
-    await checkKeyboardRecovery({send,evaluate,until,port});
+     await checkKeyboardRecovery({send,evaluate,until,port});
+     await checkRequestedFixes({send,evaluate,until,port});
     await checkUpdateIndicator({send,evaluate,until,port});
    console.log('UI smoke passed: native practice event wiring, context races, Mac and Windows capabilities, shortcuts, privacy, preferences, downloads and responsive layout. No microphone capture.');
 } finally {

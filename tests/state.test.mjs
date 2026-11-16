@@ -18,6 +18,17 @@ test('every dictation phase has an exhaustive action policy shared with Rust', (
   }
   assert.ok(Object.isFrozen(phasePolicy('idle')), 'A caller cannot mutate shared eligibility');
 });
+test('output-only preview allows quiescent error/setup states without changing other action eligibility', () => {
+  for (const phase of ['idle', 'copied', 'error', 'setup_required', 'not_pasted']) {
+    assert.equal(phasePolicy(phase).previewSound, true, phase);
+    assert.equal(phasePolicy(phase).cancel, false, phase);
+  }
+  for (const phase of ['recording', 'processing', 'downloading', 'unknown', undefined]) {
+    assert.equal(phasePolicy(phase).previewSound, false, String(phase));
+  }
+  assert.equal(phaseLabel('error'), 'Needs attention', 'Preview eligibility must not disguise a capture failure as idle');
+  assert.equal(phasePolicy('not_pasted').installUpdate, false, 'Uncommitted work still blocks installation');
+});
 test('each domain keeps its own phase space; downloading is not a global phase', () => {
   for (const phases of [dictationPhases, practicePhases, updatePhases]) assert.ok(Object.isFrozen(phases));
   assert.equal(new Set(practicePhases).size, practicePhases.length);

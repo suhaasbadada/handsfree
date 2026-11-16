@@ -939,14 +939,15 @@ private func validateDelivery() -> PasteResult {
                             sink(generation, epoch, data, count)
                         }
                     }) }
-                capture.routeFailed = routeFailure
+                capture.routeFailed = { [weak r] in r?.configurationFailure("input_configuration") }
                 let input = AudioSession.Operations(prepare: { try capture.prepareSession(allowed: { allowed(epoch) && (gate?(generation) ?? true) }) }, enable: { try capture.enable() },
                     close: { capture.closeAcceptance() }, drain: { capture.closeAndDrain() },
                     play: { _, _ in }, stopCue: {}, stop: { capture.stop() },
                     level: { capture.level() }, outputRate: { 0 },
-                    cancel: { capture.revoke() }, formats: { capture.formatMetadata() })
+                    cancel: { capture.revoke() }, formats: { capture.formatMetadata() },
+                    validatePrepared: { try capture.validatePrepared() })
                 let makeOutput: (() throws -> SessionAudioOwner.Output)? = startPCM.map { pcm in
-                    { try SessionCueOutput(format: pcm.format, volume: volume).operations(routeFailure: routeFailure) }
+                    { try SessionCueOutput(format: pcm.format, volume: volume).operations(routeFailure: { [weak r] in r?.configurationFailure("output_configuration") }) }
                 }
                 return SessionAudioOwner(input: input, makeOutput: makeOutput, cue: { ending in
                         let pcm: AVAudioPCMBuffer?

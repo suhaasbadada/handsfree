@@ -57,11 +57,11 @@ document.querySelector('#app')!.innerHTML = `
     <section id="practice" class="card practice" aria-labelledby="practice-title" hidden>
       <h2 id="practice-title" class="sr-only">Try your voice</h2>
       <p id="shortcut-tutorial"></p><p id="shortcut-evidence" class="subtle" role="status">Shortcut not tested yet.</p>
-      <div class="practice-meter"><label for="input-level">Input</label><meter id="input-level" min="0" max="1" value="0" aria-describedby="input-level-help"></meter><span id="practice-timer" aria-label="Recording time">— / —</span><span id="input-level-help" class="sr-only">Start a private test to check input. No audio file is saved.</span></div>
+      <div class="practice-meter"><label for="input-level">Microphone</label><meter id="input-level" class="sr-only" min="0" max="1" value="0" aria-describedby="input-level-help"></meter><div id="practice-waveform" class="input-waveform" aria-hidden="true">${Array.from({length:9},()=>'<span></span>').join('')}</div><span id="practice-timer" aria-label="Recording time">— / —</span><span id="input-level-help" class="sr-only">Start a private test to check input. No audio file is saved.</span></div>
     <label for="practice-text" class="sr-only">Practice dictation</label>
     <textarea id="practice-text" rows="4" autocomplete="off" spellcheck="false" aria-describedby="practice-privacy" placeholder="Speak freely. This space is just for you."></textarea>
      <div class="practice-bottom"><div class="practice-actions"><button id="practice-start" class="primary" disabled>${icon('mic')}<span>Start test</span></button><button id="practice-finish" class="primary" disabled hidden>${icon('check')}<span>Finish</span></button><button id="practice-cancel" class="icon-action" aria-label="Cancel practice" title="Cancel practice" disabled hidden>${icon('close')}</button><button id="practice-clear" class="icon-action" aria-label="Clear practice" title="Clear practice">${icon('clear')}</button><button id="practice-setup" class="text-action" aria-label="Microphone settings" title="Microphone settings">${icon('settings')}<span>Settings</span></button></div></div>
-     <p id="practice-privacy" class="subtle">No clipboard or usage counted. Clears when you leave.</p>
+     <p id="practice-privacy" class="sr-only">No clipboard or usage counted. Clears when you leave.</p>
     <div class="practice-status-slot"><p id="practice-message" role="status" aria-label="Practice status" aria-live="polite"></p><button id="practice-recovery" class="text-action" hidden>Microphone settings</button></div>
    </section>
     <p id="practice-platform-help" class="subtle" hidden>Private practice is available on macOS. Use Overview for your configured dictation shortcut.</p>
@@ -294,6 +294,8 @@ const practice = new Practice(invoke, view => {
 const practiceInputs = new PracticeInputs(practice, practiceVisible);
 function clearPractice() { shortcutReceived = false; practiceInputs.reset(); void practice.clear(); }
 function renderPractice() {
+  statusText('practice-message', practice.view.message || 'No clipboard or usage counted. Clears when you leave.');
+  if (!practice.view.message) el('practice-message').removeAttribute('tabindex');
   const focusedAction = document.activeElement;
   if (focusedAction instanceof HTMLButtonElement && focusedAction.closest('.practice-actions')) {
     // Retire a contextual control without browser focus/scroll recovery.
@@ -310,6 +312,12 @@ function renderPractice() {
   el('shortcut-evidence').title = shortcutReceived ? 'Confirms the key event, not microphone or transcription success.' : 'Start test checks the microphone, not the shortcut.';
   el('shortcut-evidence').setAttribute('aria-label', `${el('shortcut-evidence').textContent} ${el('shortcut-evidence').title}`);
   const level = practiceVisible() ? practice.view.inputLevel : null;
+  const waveform = el('practice-waveform');
+  waveform.dataset.active = String(level !== null);
+  const weights = [0.25, 0.5, 0.8, 0.6, 1, 0.7, 0.9, 0.5, 0.3];
+  for (const [index, bar] of Array.from(waveform.children).entries()) {
+    (bar as HTMLElement).style.height = `${3 + 23 * (level ?? 0) * weights[index]}px`;
+  }
   const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2,'0')}`;
   el('practice-timer').textContent = practiceVisible() && practice.view.elapsedSeconds !== null && practice.view.limitSeconds !== null ? `${clock(practice.view.elapsedSeconds)} / ${clock(practice.view.limitSeconds)}` : '— / —';
   (el('input-level') as HTMLMeterElement).value = level ?? 0;

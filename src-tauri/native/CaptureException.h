@@ -13,6 +13,7 @@ NSError * _Nullable HFCaptureInstall(AVAudioInputNode *input, AVAudioFormat *for
 NSError * _Nullable HFCapturePrepare(AVAudioEngine *engine);
 NSError * _Nullable HFCaptureStart(AVAudioEngine *engine);
 NSError * _Nullable HFCaptureStop(AVAudioEngine *engine);
+NSError * _Nullable HFCaptureRunning(AVAudioEngine *engine, BOOL *running);
 NSError * _Nullable HFCaptureRemove(AVAudioInputNode *input);
 NSError * _Nullable HFCueConnect(AVAudioEngine *engine, AVAudioPlayerNode *player, AVAudioFormat *format);
 NSError * _Nullable HFCuePlay(AVAudioPlayerNode *player, AVAudioPCMBuffer *buffer, void (^completion)(void));

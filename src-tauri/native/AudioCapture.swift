@@ -167,10 +167,10 @@ final class CapturePipeline {
             self.convert(nil, final: true); return !self.failed
         }
     }
-    func captureFailed() {
+    func captureFailed(beforeFailure: (() -> Void)? = nil) {
         producer.lock(); defer { producer.unlock() }
         guard accepting else { return }
-        accepting = false; queue.async { self.fail() }
+        accepting = false; queue.async { beforeFailure?(); self.fail() }
     }
     func level() -> Float { queue.sync { db } }
 }
@@ -190,6 +190,7 @@ final class CaptureStartup {
         var start: () throws -> Void
         var stop: () throws -> Void
         var remove: () throws -> Void
+        var running: () throws -> Bool = { true }
     }
     private let operations: Operations
     private let sink: (UnsafePointer<Float>?, Int32) -> Void
@@ -206,6 +207,8 @@ final class CaptureStartup {
     private var starting = false // hardware owner; defer reentrant teardown until adapter returns
     private var drained = false
     private var negotiatedFormat: AVAudioFormat?
+    private var configurationRevision: UInt64 = 0
+    private var accepted = false
     var routeFailed: (() -> Void)?
     private(set) var started = false
     init(operations: Operations, sink: @escaping (UnsafePointer<Float>?, Int32) -> Void) {
@@ -213,6 +216,14 @@ final class CaptureStartup {
     }
     private func invalidate() {
         routeLock.lock()
+        guard !revoked else { routeLock.unlock(); return }
+        // Running is not acceptance. Starting the sibling output engine can
+        // notify an unchanged input engine. Only the serial owner reads OS facts.
+        if started && !accepted && !revoked {
+            configurationRevision &+= 1
+            routeLock.unlock()
+            return
+        }
         invalidated = true
         // Profile negotiation can notify anywhere from observer installation to
         // startup commit, not only inside prepare(). Revocation never grants retry.
@@ -220,7 +231,9 @@ final class CaptureStartup {
         let deferFailure = negotiating && !started
         // Linearize route failure with startup commit and stop. These producer
         // methods only close/enqueue; they never call a sink under routeLock.
-        if started { pipeline?.captureFailed() } else { pipeline?.close() }
+        // Also deliver the cause before the converter's generic failure sink if
+        // its queue wins the race with the synchronous notification disposition.
+        if started { pipeline?.captureFailed(beforeFailure: routeFailed) } else { pipeline?.close() }
         routeLock.unlock()
         if !deferFailure { routeFailed?() }
     }
@@ -276,7 +289,7 @@ final class CaptureStartup {
                 routeLock.lock()
                 defer { routeLock.unlock() }
                 try checkLocked()
-                started = true; if acceptAudio { pipeline.enable() }
+                started = true; if acceptAudio { accepted = true; pipeline.enable() }
             } catch PreparationFailure.initialConfigurationChange {
                 throw PreparationFailure.initialConfigurationChange
             } catch let error as AudioStageFailure {
@@ -291,15 +304,23 @@ final class CaptureStartup {
             throw error
         }
     }
-    func enable() throws {
-        try check()
+    func validatePrepared(acceptAudio: Bool = false) throws {
+        routeLock.lock()
+        let revision = configurationRevision
+        let live = started && !invalidated && !revoked && !drained
+        routeLock.unlock()
+        guard live else { throw NSError(domain: "Capture retired", code: 1) }
         try operations.validate()
         guard let format = negotiatedFormat else { throw NSError(domain: "Capture not prepared", code: 1) }
         try checkFormats(format)
+        guard try operations.running() else { throw NSError(domain: "Input engine stopped before acceptance", code: 1) }
         routeLock.lock(); defer { routeLock.unlock() }
-        guard started && !invalidated && !drained else { throw NSError(domain: "Capture retired", code: 1) }
-        pipeline?.enable()
+        guard started && !invalidated && !revoked && !drained && configurationRevision == revision else {
+            throw NSError(domain: "Input configuration changed during validation", code: 1)
+        }
+        if acceptAudio { accepted = true; pipeline?.enable() }
     }
+    func enable() throws { try validatePrepared(acceptAudio: true) }
     // Close the producer and drain transcription while keeping the established
     // input/output route alive for the end cue. No cue-period PCM is copied.
     func closeAndDrain() -> Bool {
@@ -440,12 +461,16 @@ final class AudioCapture {
         let (device, _) = try MicrophoneBinding.prepare(resolve: { try Microphones.resolve(microphoneUID) }, bind: { id in
             try captureChecked(HFCaptureBindInput(engine, id, &boundInput))
         }, format: { () })
+        let frozenUID = try Microphones.string(device, kAudioDevicePropertyDeviceUID)
         guard let input = boundInput else { throw NSError(domain: "Microphone input unavailable", code: 1) }
         preparation = CapturePreparation { CaptureStartup(operations: .init(observe: { changed in
             let observer = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil) { _ in changed() }
             return { NotificationCenter.default.removeObserver(observer) }
         }, validate: {
             try MicrophoneBinding.revalidate(expected: device, resolve: { try Microphones.resolve(microphoneUID) })
+            guard try Microphones.string(device, kAudioDevicePropertyDeviceUID) == frozenUID else {
+                throw NSError(domain: "Microphone identity changed", code: 1)
+            }
             var actual = AudioDeviceID(0)
             try captureChecked(HFCaptureInputDevice(input, &actual))
             try MicrophoneBinding.revalidate(expected: device, resolve: { actual })
@@ -464,7 +489,11 @@ final class AudioCapture {
         }, prepare: { try audioStage("input_prepare") { try captureChecked(HFCapturePrepare(engine)) } },
            start: { try audioStage("input_start") { try captureChecked(HFCaptureStart(engine)) } },
            stop: { try captureChecked(HFCaptureStop(engine)) },
-           remove: { try captureChecked(HFCaptureRemove(input)) })) { data, count in
+           remove: { try captureChecked(HFCaptureRemove(input)) }, running: {
+               var running = ObjCBool(false)
+               try captureChecked(HFCaptureRunning(engine, &running))
+               return running.boolValue
+           })) { data, count in
             sink(generation, epoch, data, count)
         } }
         constructed = true
@@ -474,6 +503,7 @@ final class AudioCapture {
     }
     func prepareSession(allowed: () -> Bool = { true }) throws { try preparation.prepare(allowed: allowed) }
     func enable() throws { try startup.enable() }
+    func validatePrepared() throws { try startup.validatePrepared() }
     func closeAndDrain() -> Bool { startup.closeAndDrain() }
     func closeAcceptance() { startup.closeAcceptance() }
     func revoke() { preparation.revoke() }
@@ -590,6 +620,7 @@ final class SessionAudioOwner {
                 self.output = try audioStage("output_create", make)
                 try audioStage("output_prepare") { try self.output?.prepare() }
             }
+            try audioStage("input_configuration") { try self.input.validatePrepared?() }
         }, enable: { try audioStage("input_revalidate") { try self.input.enable() } },
         close: { self.input.close() }, drain: { self.input.drain() },
         play: { ending, completed in
@@ -657,6 +688,7 @@ final class AudioSession {
         var outputRate: () -> Double
         var cancel: (() -> Void)? = nil
         var formats: () -> [String: Double] = { [:] }
+        var validatePrepared: (() throws -> Void)? = nil
     }
     struct Observation: Codable {
         var reason = "starting"
@@ -683,7 +715,9 @@ final class AudioSession {
     private var failureReported = false
     private var released = false
     private var firstPCM = false
-    private var startupPending = true
+    private enum StartupDeadline { case hardware, handoff }
+    private var startupDeadline: StartupDeadline? = .hardware
+    private var startRequested = false
     // Facts, not diagnostic strings: release closes admission, not the right to
     // report a failure of PCM already accepted by this generation.
     private var captureAccepted = false
@@ -714,8 +748,11 @@ final class AudioSession {
     }
     private func mark(_ name: String, ready: Bool = false) {
         lock.lock(); defer { lock.unlock() }
+        markLocked(name, ready: ready)
+    }
+    private func markLocked(_ name: String, ready: Bool = false) {
         observation.reason = name; observation.audioReady = ready && !cancelled && !captureFailed
-        if observation.audioReady { startupPending = false; captureAccepted = true }
+        if observation.audioReady { startupDeadline = nil; captureAccepted = true }
         if observation.events.count < 24 {
             observation.events.append(Event(name: name, milliseconds: Double(DispatchTime.now().uptimeNanoseconds - origin) / 1_000_000))
         }
@@ -723,29 +760,47 @@ final class AudioSession {
     func snapshot() -> Observation { lock.lock(); defer { lock.unlock() }; return observation }
     private func recordFailure(_ error: Error, stage: String) {
         let first = (error as? AudioStageFailure) ?? AudioStageFailure(stage, error)
-        let formats = operations?.formats() ?? [:]
         lock.lock(); defer { lock.unlock() }
-        guard observation.failureStage == nil else { return }
+        recordFailureLocked(first)
+    }
+    private func recordFailureLocked(_ first: AudioStageFailure) {
+        guard !released && observation.failureStage == nil else { return }
         observation.failureStage = first.stage
         observation.failureDomain = first.domain
         observation.failureCode = first.code
         observation.failureException = first.exceptionName
+    }
+    // Owner queue only. Preserve available route metadata even when an async
+    // callback invalidated startup before route_ready could be published.
+    private func snapshotFormats() {
+        let formats = operations?.formats() ?? [:]
+        lock.lock(); defer { lock.unlock() }
         observation.formats = formats
         observation.outputRate = formats["outputRate"] ?? 0
+    }
+    func configurationFailure(_ stage: String) {
+        recordFailure(NSError(domain: "Audio configuration notification", code: 1), stage: stage)
+        captureFailure()
     }
     private func valid() -> Bool {
         lock.lock(); let live = !cancelled && !captureFailed; lock.unlock()
         return live && epochAllowed() && (finishing || authorized())
     }
-    func start(factory: @escaping (@escaping () -> Void) throws -> Operations) {
+    private func armDeadline(_ phase: StartupDeadline) {
         let deadline = { [weak self] in
             guard let self else { return }
             self.lock.lock()
-            let expired = self.startupPending && !self.cancelled && !self.released && !self.captureFailed
-            if expired { self.captureFailed = true; self.observation.audioReady = false; self.closeProducer?() }
+            let expired = self.startupDeadline == phase && !self.cancelled && !self.released && !self.captureFailed
+            if expired {
+                let stage = phase == .hardware ? "hardware_startup_timeout" : "cue_handoff_timeout"
+                self.recordFailureLocked(AudioStageFailure(stage, NSError(domain: "Audio startup deadline", code: 1)))
+                self.startupDeadline = nil
+                self.captureFailed = true; self.observation.audioReady = false
+                self.markLocked(stage); self.closeProducer?()
+            }
             self.lock.unlock()
             guard expired else { return }
-            self.mark("startup_timeout"); self.reportFailure()
+            self.reportFailure()
             self.queue.async { self.teardown("failed") }
         }
         // Independent of the hardware owner: even a synchronous OS startup call
@@ -753,23 +808,41 @@ final class AudioSession {
         // themselves cannot safely be forcibly interrupted.
         if let scheduler { scheduler(3, deadline) }
         else { DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 3, execute: deadline) }
+    }
+    func start(factory: @escaping (@escaping () -> Void) throws -> Operations) {
+        lock.lock()
+        guard !startRequested, !cancelled, !released else { lock.unlock(); return }
+        startRequested = true
+        lock.unlock()
+        armDeadline(.hardware)
         queue.async { [self] in
             guard self.valid() else { self.teardown("cancelled"); return }
             do {
                 let ops = try factory { [weak self] in
                     guard let self else { return }
+                    self.recordFailure(NSError(domain: "Capture pipeline failed", code: 1), stage: "capture_pipeline")
                     self.captureFailure()
                 }
                 self.operations = ops
                 self.lock.lock(); self.closeProducer = ops.cancel ?? ops.close; self.lock.unlock()
                 guard self.valid() else { self.fail(); return }
                 try ops.prepare()
+                self.snapshotFormats()
                 guard self.valid() else { self.fail(); return }
                 let outputRate = ops.outputRate(), formats = ops.formats()
                 self.lock.lock(); self.observation.outputRate = outputRate; self.observation.formats = formats; self.lock.unlock()
-                self.mark("route_ready")
+                // Transfer under the same lock used by both independent timers.
+                // A queued/late hardware callback cannot revoke the handoff.
+                self.lock.lock()
+                guard self.startupDeadline == .hardware, !self.cancelled, !self.captureFailed, !self.released else {
+                    self.lock.unlock(); self.fail(); return
+                }
+                self.startupDeadline = .handoff
+                self.markLocked("route_ready")
+                self.lock.unlock()
+                self.armDeadline(.handoff)
                 if self.sounds { self.play(ending: false) } else { self.enable() }
-            } catch { self.recordFailure(error, stage: "session_create"); self.fail() }
+            } catch { self.recordFailure(error, stage: "session_create"); self.snapshotFormats(); self.fail() }
         }
     }
     func acceptedPCM() {
@@ -797,7 +870,7 @@ final class AudioSession {
             return
         }
         let accepted = captureAccepted
-        captureFailed = true; observation.audioReady = false
+        captureFailed = true; startupDeadline = nil; observation.audioReady = false
         closeProducer?(); lock.unlock()
         // A converter/drain failure must defeat partial inference even during
         // Finish. Unlike an end-cue playback error this is not nonfatal.
@@ -837,11 +910,14 @@ final class AudioSession {
                     }
                 }
             }
-            // No isPlaying polling, retries or route/volume fallback. Deadline
-            // bounds missing completion; it is not a claimed audibility proof.
-            after(3) { [weak self] in
-                guard let self, ticket == self.cueTicket, !self.terminal else { return }
-                if ending { self.teardown("end_cue_timeout") } else { self.fail() }
+            // Startup uses the independent handoff deadline, including a blocked
+            // play/enable call and the quiet tail. End-cue expiry is nonfatal and
+            // retains its owner-queue ticket. Neither proves acoustic audibility.
+            if ending {
+                after(3) { [weak self] in
+                    guard let self, ticket == self.cueTicket, !self.terminal else { return }
+                    self.teardown("end_cue_timeout")
+                }
             }
         } catch {
             recordFailure(error, stage: ending ? "end_cue" : "start_cue")
@@ -850,6 +926,7 @@ final class AudioSession {
     }
     private func fail() {
         guard !terminal else { return }
+        lock.lock(); startupDeadline = nil; lock.unlock()
         if !finishing { reportFailure() }
         lock.lock(); let reported = failureReported; lock.unlock()
         teardown(reported ? "failed" : "cancelled")
@@ -857,7 +934,8 @@ final class AudioSession {
     private func teardown(_ reason: String) {
         guard !terminal else { return }
         terminal = true; cueTicket &+= 1
-        lock.lock(); closeProducer = nil; released = true; lock.unlock()
+        snapshotFormats()
+        lock.lock(); startupDeadline = nil; closeProducer = nil; released = true; lock.unlock()
         operations?.close(); operations?.stopCue(); operations?.stop(); operations = nil
         mark(reason); retired(self); retirement.leave()
     }
@@ -879,7 +957,7 @@ final class AudioSession {
         }
     }
     func cancel() {
-        lock.lock(); cancelled = true; observation.audioReady = false
+        lock.lock(); cancelled = true; startupDeadline = nil; observation.audioReady = false
         closeProducer?(); lock.unlock()
         queue.async { self.teardown("cancelled") }
     }
