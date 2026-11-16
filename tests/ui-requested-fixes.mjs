@@ -53,7 +53,7 @@ export async function checkRequestedFixes({send,evaluate,until,port}) {
     await send('Emulation.setEmulatedMedia',{features:[]});
     await evaluate(`document.getElementById('nav-overview').click();window.fixture.phase='error';window.fixture.message='Microphone capture failed. Please check your input device.'`);
     await until(`!document.getElementById('message-recovery').hidden`);
-    assert.equal(await evaluate(`(()=>{const c=document.getElementById('overview-practice'),r=document.getElementById('message-recovery'),m=document.getElementById('message');return parseFloat(getComputedStyle(c).paddingLeft)>=20 && parseFloat(getComputedStyle(c).borderRadius)>=10 && r.getBoundingClientRect().top>c.getBoundingClientRect().bottom && m.getBoundingClientRect().right<r.getBoundingClientRect().left;})()`),true,'Practice link and recovery form separate, aligned surfaces');
+    assert.equal(await evaluate(`(()=>{const c=document.getElementById('overview-practice'),r=document.getElementById('message-recovery'),m=document.getElementById('message'),s=getComputedStyle(c);return s.backgroundColor==='rgba(0, 0, 0, 0)' && s.borderTopWidth==='0px' && r.getBoundingClientRect().top>c.getBoundingClientRect().bottom && m.getBoundingClientRect().right<r.getBoundingClientRect().left;})()`),true,'Lightweight Practice link and recovery remain separate and aligned without boxed cards');
     await shot(`${theme}-overview-error`);
     await evaluate(`window.fixture.phase='idle';window.fixture.message=''`);
     await until(`document.getElementById('phase').textContent==='Ready'`);

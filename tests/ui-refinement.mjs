@@ -19,6 +19,7 @@ export async function checkRefinement({send,evaluate,until,port}) {
       await until(`document.documentElement.dataset.appearance==='${theme}'`);
       for (const tab of ['overview','practice-page','settings']) {
         await evaluate(`document.getElementById('nav-${tab}').click()`);
+        assert.equal(await evaluate(`Array.from(document.querySelectorAll('.hero,.metrics,.card')).every(e=>{const s=getComputedStyle(e);return s.backgroundColor==='rgba(0, 0, 0, 0)' && s.borderLeftWidth==='0px' && s.borderRightWidth==='0px' && s.boxShadow==='none';})`),true,'Page sections use typography and spacing, not filled rectangular containers');
         if (tab==='practice-page') await until(`window.context>0 && !document.getElementById('practice-start').disabled`);
         await screenshot(`${width}-${theme}-${tab}`);
         const fit = await evaluate(`(()=>{const main=document.querySelector('main'),footer=document.querySelector('footer').getBoundingClientRect();return {body:document.documentElement.scrollHeight<=innerHeight+1,main:main.scrollHeight<=main.clientHeight+1,footer:footer.bottom<=innerHeight+1,horizontal:document.documentElement.scrollWidth<=innerWidth,heights:[main.scrollHeight,main.clientHeight]};})()`);

@@ -22,9 +22,13 @@
   it never opens a microphone or animates invented speech. The accessible meter
   remains available and reduced-motion disables bar transitions. Privacy is the
   idle status fallback, with a persistent editor description for screen readers.
-- Buttons center labels with equal inline padding. The app picker clears its row
-  divider; Overview's padded Practice link and recovery panel are separate aligned
-  surfaces. Long recovery text remains scrollable rather than overlapping actions.
+- Page hierarchy uses typography, whitespace and subtle dividers, not filled,
+  bordered cards around every section. Overview metrics are unboxed; the Practice
+  link is a lightweight row. Practice retains only its functional editor surface.
+  Settings sections have no enclosing rectangles. Buttons center labels with equal
+  inline padding, primary controls are compact capsules and secondary actions are
+  quiet text controls. The app picker clears its divider; recovery remains separate
+  and aligned. Long recovery text stays scrollable rather than overlapping actions.
 - Sound preview remains usable in quiescent idle/result/error/setup phases, without
   clearing that state. UI eligibility does not authorize native audio: recorder,
   active-owner, preview and installer guards still apply.
