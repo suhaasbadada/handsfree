@@ -2,6 +2,50 @@
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
 
+## Beta 18 candidate preparation (public beta 17 remains active)
+
+Candidate distribution **v0.1.1-beta.18** retains embedded version **0.1.1**.
+Distribution/updater assertion, packaging/audit filenames and the disabled
+`candidateRelease` target beta 18; the active `release`, README, install guide,
+static download links and tracked signed feed remain byte-identical beta 17.
+Current-feed SHA-256 stays pinned to
+`cb298141bcaa187fe9203e648a27492552c9dc83b6eddfaeb191857bb06170e3`.
+Source tests must not read ignored `release/` artifacts. Preserve historical
+beta 11–17 notes and all four completed release-ledger groups unchanged.
+
+See [beta 18 scope and evidence](releases/v0.1.1-beta.18.md): November 15 hardware
+24 kHz / cached output 48 kHz and nil tap failure `-10868` left beta 17 open but
+unable to capture. The candidate explicitly supplies fresh post-cue hardware
+format to the tap, reconciles an unconnected output and validates
+hardware/output/tap/converter agreement before prepare, before start and after
+start through exception-contained inspection. This is device-independent format
+negotiation, not a named-device special case. UID/cancellation/observer, disabled
+PCM until commit and drain boundaries remain; no retries, fallback-rate writes,
+usage or privacy changes.
+
+Primary-reported user-approved scratch diagnostics are not installed replacement:
+the first production Objective-C Bluetooth adapter attempt measured 24/48,
+corrected to 24 kHz and delivered 15 callbacks / 36,000 frames with stop/disposal.
+A second start passed but watchdog termination before cleanup is not a pass.
+One full production Swift AudioCapture/CaptureStartup observer-enabled attempt
+passed commit, 16 sink callbacks / 24,000 converted frames in 1.5 seconds,
+healthyStop true, isRecording false, device-running 0 and normal exit. Its
+before-init 48/48 and after-stop 24/24 metadata does not prove exact 24/48 at tap
+installation in that full Swift scenario. Bluetooth transport, not AirPods model,
+was independently verified. No PCM files or transcription; installed app/settings/
+bundle unchanged, with installed PID 27303 reported still in error. Installed
+end-to-end dictation, OTA, macOS 14 hardware and comprehensive cross-device
+acceptance remain unverified.
+
+Bob reported pre-metadata Node 307 passed / 1 skipped, Rust 90 passed / 3 ignored,
+build/formatting/Clippy passing. Joffrey reported no findings and an independent
+capture test pass before the full Swift hardware attempt. No beta 18 artifact
+source, signing, exact-source CI, audit or publication receipt is claimed.
+The primary owns review, signing/CI, local/draft/public seven-asset audit,
+publication and activation. Activation CI, Pages/live bytes, Homebrew parity and
+tap CI remain separate gates. Do not install or replace the installed app during
+candidate preparation; preserve signing identity, updater keys and local data.
+
 ## Beta 17 publication and metadata activation
 
 Current public Mac distribution **v0.1.1-beta.17** retains embedded version **0.1.1**.

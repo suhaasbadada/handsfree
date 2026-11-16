@@ -13,9 +13,16 @@ NSError *HFCaptureFormat(AVAudioInputNode *input, AVAudioFormat **format) {
     *format = current;
     return error;
 }
-NSError *HFCaptureInstall(AVAudioInputNode *input, AVAudioNodeTapBlock tap) {
-    // Do not force yesterday's client rate onto a Bluetooth hardware route.
-    return HFCaptureBoundary(^{ [input installTapOnBus:0 bufferSize:2048 format:nil block:tap]; });
+NSError *HFCaptureOutputFormat(AVAudioInputNode *input, AVAudioFormat **format) {
+    __block AVAudioFormat *current = nil;
+    NSError *error = HFCaptureBoundary(^{ current = [input outputFormatForBus:0]; });
+    *format = current;
+    return error;
+}
+NSError *HFCaptureInstall(AVAudioInputNode *input, AVAudioFormat *format, AVAudioNodeTapBlock tap) {
+    // The unconnected input node cannot convert hardware to a cached output
+    // format. Explicitly reconcile its output to the fresh post-cue hardware.
+    return HFCaptureBoundary(^{ [input installTapOnBus:0 bufferSize:2048 format:format block:tap]; });
 }
 NSError *HFCapturePrepare(AVAudioEngine *engine) {
     return HFCaptureBoundary(^{ [engine prepare]; });

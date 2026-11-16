@@ -151,7 +151,11 @@ prove discovery completeness or runtime correctness on an untested OS.
   cue, but the converter is created from fresh input hardware format **after**
   playback. Observe configuration changes before format/tap/prepare/start, latch
   changes across startup, and revalidate device and format before accepting PCM.
-  Install with nil tap format; never force a stale Bluetooth client sample rate.
+  Install the tap with that exact fresh hardware format, explicitly reconciling
+  the input node's potentially stale output format. Hardware, node output and
+  tap/converter input must agree before prepare, before start and after start;
+  nil tap format can retain a stale pre-cue output rate. Never write hardware
+  sample rates or substitute a cached client format.
   A narrow Objective-C `@try/@catch` adapter turns AVAudioEngine tap/prepare/start
   (and teardown) exceptions into errors on macOS 14, not a process abort. Swift
   `catch` alone cannot catch NSException. Failed/retired startup publishes no PCM;

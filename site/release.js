@@ -8,14 +8,14 @@ export const release = Object.freeze({
   dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.17/HandsFree-0.1.1-beta.17-macos-arm64.dmg',
 });
 
-// Beta 17 candidate-era audit coordinates; the active release above is authoritative.
+// Beta 18 candidate audit coordinates; the active beta 17 release above is authoritative.
 // Disabled even after publication; not a second availability switch.
 export const candidateRelease = Object.freeze({
   schemaVersion: 1,
-  version: '0.1.1-beta.17',
+  version: '0.1.1-beta.18',
   publicAvailable: false,
-  status: 'Mac beta 17 candidate: capture format negotiation and exception containment. Publication and public audit pending; not an availability switch.',
-  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.17/HandsFree-0.1.1-beta.17-macos-arm64.dmg',
+  status: 'Mac beta 18 candidate: device-independent capture format reconciliation. Publication and public audit pending; not an availability switch.',
+  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.18/HandsFree-0.1.1-beta.18-macos-arm64.dmg',
 });
 
 // Historical coordinates only. Windows development and public promotion are paused.

@@ -183,7 +183,8 @@ final class CaptureStartup {
         var observe: (@escaping () -> Void) -> () -> Void
         var validate: () throws -> Void
         var format: () throws -> AVAudioFormat
-        var install: (CapturePipeline) throws -> Void
+        var outputFormat: () throws -> AVAudioFormat
+        var install: (AVAudioFormat, CapturePipeline) throws -> Void
         var prepare: () throws -> Void
         var start: () throws -> Void
         var stop: () throws -> Void
@@ -213,6 +214,11 @@ final class CaptureStartup {
         routeLock.lock(); let valid = !invalidated; routeLock.unlock()
         guard valid else { throw NSError(domain: "Microphone changed during capture startup", code: 1) }
     }
+    private func checkFormats(_ format: AVAudioFormat) throws {
+        guard try operations.format() == format, try operations.outputFormat() == format else {
+            throw NSError(domain: "Microphone hardware/output/tap format changed", code: 1)
+        }
+    }
     func start() throws {
         guard !attempted else { throw NSError(domain: "Capture startup already retired", code: 1) }
         attempted = true
@@ -227,14 +233,15 @@ final class CaptureStartup {
             routeLock.lock(); self.pipeline = pipeline; routeLock.unlock()
             try check()
             tapAttempted = true // installation may throw after partially attaching
-            try operations.install(pipeline)
+            try operations.install(format, pipeline)
             try check()
-            guard try operations.format() == format else { throw NSError(domain: "Microphone format changed", code: 1) }
+            try checkFormats(format)
             try operations.prepare()
             try check()
+            try checkFormats(format)
             try operations.start()
             try operations.validate()
-            guard try operations.format() == format else { throw NSError(domain: "Microphone format changed", code: 2) }
+            try checkFormats(format)
             routeLock.lock()
             let valid = !invalidated
             if valid { started = true; pipeline.enable() }
@@ -302,8 +309,13 @@ final class AudioCapture {
             try captureChecked(HFCaptureFormat(input, &format))
             guard let format else { throw NSError(domain: "Microphone format unavailable", code: 1) }
             return format
-        }, install: { pipeline in
-            try captureChecked(HFCaptureInstall(input) { buffer, _ in pipeline.enqueue(buffer) })
+        }, outputFormat: {
+            var format: AVAudioFormat?
+            try captureChecked(HFCaptureOutputFormat(input, &format))
+            guard let format else { throw NSError(domain: "Microphone output format unavailable", code: 1) }
+            return format
+        }, install: { format, pipeline in
+            try captureChecked(HFCaptureInstall(input, format) { buffer, _ in pipeline.enqueue(buffer) })
         }, prepare: { try captureChecked(HFCapturePrepare(engine)) },
            start: { try captureChecked(HFCaptureStart(engine)) },
            stop: { try captureChecked(HFCaptureStop(engine)) },
