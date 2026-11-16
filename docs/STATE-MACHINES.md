@@ -30,6 +30,12 @@ prove discovery completeness or runtime correctness on an untested OS.
 
 ## The important boundaries
 
+The top-right product-status dialog is an observation/recovery surface, not a new
+native lifecycle. Opening it uses the existing modal Practice-context revocation;
+closing can re-establish eligibility but never starts capture. Permission/download/
+device changes require explicit actions and retain their existing native guards.
+Failure details remain distinct from setup readiness; disconnected status is unknown.
+
 1. **Observation is not authorization.** `src/state.ts` describes phase-level UI
    eligibility. Rust checks current ownership under its FIFO/locks before effects.
    Native owners recheck permission/focus/cancellation immediately before delivery.

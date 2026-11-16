@@ -1,5 +1,13 @@
 # Desktop interface contracts
 
+- Product status is an interactive control at the top right on every destination,
+  not a passive sidebar footer. Its accessible dialog explains the current failure
+  separately from permission/model/shortcut checks and provides direct permission,
+  model-download, input-device and private-test actions. Opening/refreshing it never
+  records, prompts, downloads or changes preferences. Unknown/disconnected status
+  clears stale readiness. Native guards remain authoritative; private testing still
+  needs explicit Start. The dialog follows existing Practice-context revocation,
+  restores focus on dismissal, and keeps recovery actions reachable in small windows.
 - Overview and Practice fit the default 980×820 and minimum 560×650 windows in
   their normal ready states. Settings has one content scroller; the sidebar and
   compact footer stay in place. Small/zoomed viewports use normal reachable

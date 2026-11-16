@@ -97,7 +97,7 @@ button:disabled { opacity: .45; cursor: default; }
 :where(button, a, input, textarea, select, [tabindex]):focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 a { color: inherit; }
 svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-.shell { max-width: 1160px; height: 100dvh; margin: 0 auto; padding: 0 32px 0 24px; display: grid; grid-template-columns: 172px minmax(0,1fr); grid-template-rows: minmax(0,1fr) auto; column-gap: 32px; }
+.shell { position: relative; max-width: 1160px; height: 100dvh; margin: 0 auto; padding: 0 32px 0 24px; display: grid; grid-template-columns: 172px minmax(0,1fr); grid-template-rows: minmax(0,1fr) auto; column-gap: 32px; }
 aside { position: relative; min-height: 0; grid-row: 1 / 3; display: flex; flex-direction: column; gap: 32px; padding: 28px 18px 24px 0; border-right: 1px solid var(--line); }
 .brand { min-height: 40px; }
 .header-right { display: flex; flex: 1; width: 100%; flex-direction: column; gap: 24px; min-width: 0; }
@@ -116,7 +116,7 @@ nav { display: flex; flex-direction: column; width: 100%; gap: 6px; flex: none; 
 main { width: 100%; max-width: 760px; margin: 0 auto; padding: 28px 4px 16px; min-width: 0; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
 h1 { margin: 0 0 12px; }
 h2, h3 { margin: 0; }
-.page-heading { position: relative; margin: 0 0 22px; }
+.page-heading { position: relative; margin: 0 0 22px; padding-inline-end: 210px; min-height: 40px; }
 .page-heading p { color: var(--muted); margin: 8px 0 0; font-size: 13px; }
 .hero { display: grid; grid-template-columns: 34px minmax(0,1fr); column-gap: 12px; margin: 0 0 20px; padding: 20px 24px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .hero > h2 { align-self: center; }
@@ -207,11 +207,14 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); margin-top: 10
 .local-data > p { margin: 12px 0 0; }
 .danger { color: var(--danger); }
 .danger:hover:not(:disabled) { background: var(--active); }
-.status { display: flex; align-items: center; gap: 7px; min-height: 36px; color: var(--muted); margin-top: auto; }
+.product-header { position: absolute; z-index: 5; top: 28px; right: 36px; max-width: calc(100% - 60px); }
+.status { display: flex; align-items: center; gap: 4px; min-height: 36px; color: var(--muted); }
 .status strong { display: block; overflow-wrap: anywhere; }
-.status button { width: 36px; height: 36px; min-width: 36px; padding: 0; font-size: 22px; }
+.status #product-status { gap: 8px; min-width: 0; padding: 7px 10px; background: transparent; border-color: var(--line); font-size: 12px; }
+.status #product-status:hover { background: var(--active); }
+#product-status svg { width: 13px; height: 13px; }
+.status #cancel { width: 32px; height: 36px; min-width: 32px; padding: 0; font-size: 22px; }
 .status-detail { color: var(--muted); line-height: 1.65; overflow-wrap: anywhere; margin: 0 0 12px; }
-#cancel[hidden] { display: block !important; visibility: hidden; pointer-events: none; }
 .general-status-slot { position: relative; margin-top: 16px; }
 .general-status-slot:has(#message[hidden]):has(#message-recovery[hidden]) { margin-top: 0; }
 .general-status-slot:has(#message-recovery:not([hidden])) { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
@@ -233,6 +236,17 @@ footer { grid-column: 2; width: 100%; max-width: 760px; min-height: 58px; displa
 .footer-brand { display: flex; align-items: center; gap: 6px; }
 dialog { width: 420px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); overflow-y: auto; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 16px; padding: 24px; box-shadow: 0 20px 90px #0003; }
 dialog::backdrop { background: #0005; backdrop-filter: blur(5px); }
+#health-dialog { width: 520px; }
+.health-checks { padding: 0; margin: 16px 0; list-style: none; }
+.health-checks li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.health-checks li > div { min-width: 0; }
+.health-checks strong, .health-checks span { display: block; overflow-wrap: anywhere; }
+.health-checks span { color: var(--muted); font-size: 12px; line-height: 1.6; margin-top: 4px; }
+.health-checks button { flex: none; max-width: 48%; white-space: normal; }
+.health-input-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.health-input-controls select { min-width: 0; max-width: 100%; flex: 1 1 180px; }
+#health-summary { overflow-wrap: anywhere; }
+#health-dialog .dialog-actions { position: sticky; bottom: -24px; margin-inline: -24px; padding: 12px 24px; margin-bottom: -24px; background: var(--surface); border-top: 1px solid var(--line); flex-wrap: wrap; }
 dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .dialog-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
 @keyframes pulse { 50% { opacity: .4; } }
@@ -244,6 +258,9 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
   .nav { justify-content: center; }
   .status { margin: 0 0 0 auto; }
   .brand-menu { top: 64px; }
+  .brand { margin-right: 190px; min-width: 0; }
+  .product-header { top: 18px; right: 24px; }
+  .page-heading { padding-inline-end: 0; }
   main { padding-top: 18px; }
   footer { grid-column: 1; }
   .hero { padding: 20px; }
@@ -260,6 +277,8 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
   .shell { padding: 0 16px; }
   aside { gap: 8px; padding: 18px 0; }
   .brand { gap: 6px; }
+  .brand > span { display: none; }
+  .product-header { right: 16px; }
   nav { gap: 2px; }
   .metrics article { padding: 10px; }
   .metrics svg, .metrics small { display: none; }
@@ -363,6 +382,7 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 /* Minimum native window: compact utility layout, not nested scrolling cards. */
 @media (min-width: 480px) and (max-height: 700px) {
   aside { padding-top: 12px; padding-bottom: 10px; gap: 8px; }
+  .product-header { top: 14px; }
   main { padding-top: 14px; padding-bottom: 10px; }
   .page-heading { margin-bottom: 14px; }
   .page-heading p { margin-top: 4px; }

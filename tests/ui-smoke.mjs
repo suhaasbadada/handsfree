@@ -11,6 +11,7 @@ import { checkKeyboardRecovery } from './ui-keyboard-recovery.mjs';
 import { checkUpdateIndicator } from './ui-update-indicator.mjs';
 import { checkAppearance } from './ui-appearance.mjs';
 import { checkRequestedFixes } from './ui-requested-fixes.mjs';
+import { checkProductStatus } from './ui-product-status.mjs';
 import { checkRefinement } from './ui-refinement.mjs';
 
 const binary = process.env.BROWSER_BINARY;
@@ -424,7 +425,7 @@ try {
         assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('button, select, input')).filter(e=>e.getClientRects().length && (e.getBoundingClientRect().right>innerWidth || e.getBoundingClientRect().left<0)).map(e=>e.id)`), [], 'All controls fit');
         if (tab==='settings') assert.equal(await evaluate(`(() => {const label=document.querySelector('.shortcut-row h3').getBoundingClientRect(),value=document.querySelector('.shortcut-value').getBoundingClientRect();return value.top>=label.bottom || value.left>=label.right;})()`), true, 'Shortcut value never overlaps its label');
         assert.equal(await evaluate(`['words','saved','count'].every(id=>{const s=getComputedStyle(document.getElementById(id));return s.color==='${theme==='dark'?'rgb(243, 239, 234)':'rgb(48, 46, 45)'}' && s.opacity==='1'})`), true, 'Readable appearance-specific activity numbers, not faded opacity');
-        assert.equal(await evaluate(`(() => {const status=document.querySelector('.status').getBoundingClientRect(),nav=document.querySelector('nav').getBoundingClientRect();return (innerWidth<=760?status.bottom<=nav.top:status.top>=nav.bottom) && !document.querySelector('main .status');})()`), true, 'Status remains in the responsive navigation shell without overlap');
+        assert.equal(await evaluate(`(() => {const status=document.querySelector('.status').getBoundingClientRect(),nav=document.querySelector('nav').getBoundingClientRect();return status.top<60 && status.right>innerWidth/2 && (innerWidth>760 || status.bottom<=nav.top) && !document.querySelector('aside .status') && !document.querySelector('main .status');})()`), true, 'Interactive status remains at the top right without navigation overlap');
       }
       await evaluate(`document.getElementById('change-shortcut').click()`);
       await until(recording);
@@ -580,6 +581,7 @@ try {
    console.log('UI smoke: practice checks passed; checking keyboard/recovery');
      await checkKeyboardRecovery({send,evaluate,until,port});
      await checkRequestedFixes({send,evaluate,until,port});
+     await checkProductStatus({send,evaluate,until,port});
     await checkUpdateIndicator({send,evaluate,until,port});
    console.log('UI smoke passed: native practice event wiring, context races, Mac and Windows capabilities, shortcuts, privacy, preferences, downloads and responsive layout. No microphone capture.');
 } finally {

@@ -32,7 +32,8 @@ document.querySelector('#app')!.innerHTML = `
 <div class="shell">
  <aside><button class="brand" aria-label="HandsFree menu" aria-haspopup="menu" aria-expanded="false" aria-controls="brand-menu"><img src="${logo}" alt="" width="36" height="36"><span>HandsFree</span>${icon('chevron')}</button>
    <div id="brand-menu" class="brand-menu" role="menu" aria-label="HandsFree" hidden><button id="brand-overview" role="menuitem">Overview</button><button id="brand-started" role="menuitem" hidden>Get started</button><button id="brand-settings" role="menuitem">Settings</button><button id="brand-pause" role="menuitem" disabled hidden>Pause shortcuts</button><button id="brand-updates" role="menuitem">App updates…</button></div>
-   <div class="header-right"><nav aria-label="Main navigation"><button id="nav-overview" class="nav active" aria-label="Overview" title="Overview" aria-current="page">${icon('words')}<span>Overview</span></button><button id="nav-practice-page" class="nav" aria-label="Practice" title="Practice">${icon('mic')}<span>Practice</span></button><button id="nav-settings" class="nav" aria-label="Settings" title="Settings">${icon('settings')}<span>Settings</span></button></nav><section class="status" aria-label="App status"><span id="dot" aria-hidden="true"></span><strong id="phase" aria-live="polite">Connecting…</strong><button id="cancel" hidden aria-label="Cancel dictation" title="Cancel dictation">×</button></section></div></aside>
+   <div class="header-right"><nav aria-label="Main navigation"><button id="nav-overview" class="nav active" aria-label="Overview" title="Overview" aria-current="page">${icon('words')}<span>Overview</span></button><button id="nav-practice-page" class="nav" aria-label="Practice" title="Practice">${icon('mic')}<span>Practice</span></button><button id="nav-settings" class="nav" aria-label="Settings" title="Settings">${icon('settings')}<span>Settings</span></button></nav></div></aside>
+ <header class="product-header"><section class="status" aria-label="App status"><button id="product-status" aria-haspopup="dialog" aria-controls="health-dialog" title="View product status and resolve problems"><span id="dot" aria-hidden="true"></span><strong id="phase" aria-live="polite">Connecting…</strong>${icon('chevron')}</button><button id="cancel" hidden aria-label="Cancel dictation" title="Cancel dictation">×</button></section></header>
  <main>
  <section id="overview" aria-labelledby="overview-title">
      <div class="page-heading"><h1 id="overview-title">Overview</h1><p>Voice typing, without the busywork.</p></div>
@@ -97,12 +98,24 @@ document.querySelector('#app')!.innerHTML = `
   </section>
     <section class="local-data" aria-labelledby="data-title"><div class="setting-row"><div><h2 id="data-title">Usage totals</h2></div><button id="reset" class="danger" aria-haspopup="dialog">Reset totals</button></div><p id="privacy-detail" class="subtle">Audio and transcription stay on this device.</p></section>
  </section>
- <div class="general-status-slot"><p id="message" class="status-detail" role="status" aria-label="Dictation status" aria-live="polite" hidden></p><button id="message-recovery" class="text-action" hidden>Open settings</button></div>
+  <div class="general-status-slot"><p id="message" class="status-detail" role="status" aria-label="Dictation status" aria-live="polite" hidden></p><button id="message-recovery" class="text-action" hidden>View problem</button></div>
  <p id="feedback" class="feedback" role="status" hidden></p><p id="storage-error" class="feedback" role="status" hidden></p>
   </main>
   <footer><span class="footer-privacy">${icon('shield')}On-device · English</span><div class="footer-meta"><span class="footer-brand"><span class="sr-only">HandsFree</span><span id="app-version">0.1.1</span><span class="beta-badge">BETA</span></span><button id="updates-open" class="text-action" hidden>${icon('update')}<span class="update-summary"><strong id="updates-indicator-label">Updates</strong><span id="updates-indicator-detail">Not checked</span></span><span id="updates-announcement" class="sr-only" role="status" aria-live="polite"></span></button></div></footer>
 </div>
-<dialog id="reset-dialog" aria-labelledby="reset-title"><h2 id="reset-title">Reset usage totals?</h2><p>Totals will return to zero. Your preferences and language model won’t change.</p><div class="dialog-actions"><button id="keep-stats" autofocus>Keep totals</button><button id="confirm-reset" class="danger">Reset totals</button></div></dialog>`;
+ <dialog id="reset-dialog" aria-labelledby="reset-title"><h2 id="reset-title">Reset usage totals?</h2><p>Totals will return to zero. Your preferences and language model won’t change.</p><div class="dialog-actions"><button id="keep-stats" autofocus>Keep totals</button><button id="confirm-reset" class="danger">Reset totals</button></div></dialog>
+ <dialog id="health-dialog" aria-labelledby="health-title" aria-describedby="health-summary">
+  <h2 id="health-title" tabindex="-1" autofocus>Product status</h2><p id="health-summary" role="status" aria-live="polite">Connecting to HandsFree…</p>
+  <ul class="health-checks" aria-label="Dictation requirements">
+   <li><div><strong>Microphone access</strong><span id="health-mic-state">Checking…</span></div><button id="health-mic" hidden>Allow microphone</button></li>
+   <li id="health-permissions-row"><div><strong>Shortcuts &amp; paste access</strong><span id="health-permissions-state">Checking…</span></div><button id="health-permissions" hidden>Open macOS permissions</button></li>
+   <li><div><strong>Shortcut connection</strong><span id="health-hook-state">Checking…</span></div></li>
+   <li><div><strong>English model</strong><span id="health-model-state">Checking…</span></div><button id="health-model" hidden>Download model</button></li>
+  </ul>
+  <section id="health-input" hidden><h3><label for="health-microphone">Input device</label></h3><p>Used for the next recording. An unavailable saved device never switches silently.</p><div class="health-input-controls"><select id="health-microphone" disabled></select><button id="health-microphone-refresh" disabled>Refresh devices</button></div></section>
+  <p id="health-error" class="feedback" role="status" hidden></p><p class="subtle">These checks don’t record audio. Permission checks are not proof that microphone capture works.</p>
+  <div class="dialog-actions"><button id="health-close">Close</button><button id="health-refresh">Refresh status</button><button id="health-practice" class="primary" hidden>Open private test</button></div>
+ </dialog>`;
 const el = (id: string) => document.getElementById(id)!;
 const button = (id: string) => el(id) as HTMLButtonElement;
 // Setup is a Settings destination, never extra content above the private editor.
@@ -125,6 +138,7 @@ for (const id of ['started-mic', 'started-permissions', 'started-model', 'change
 }
 type AudioStatus = Status & { audio_ready?: boolean };
 let current: AudioStatus | undefined;
+let connectionError = '';
 const displayShortcut = (status: Status) => status.platform === 'windows' ? shortcutLabel(status.shortcut, 'windows') : status.shortcut_label;
 let refreshTask: Promise<void> | undefined;
 let soundsPending = false;
@@ -196,6 +210,7 @@ function navigate(tab: Page) {
 }
 function feedback(message: string) {
   el('feedback').hidden = !message; statusText('feedback', message);
+  el('health-error').hidden = !message; el('health-error').textContent = message;
   el('feedback').setAttribute('aria-label','Action feedback');
   button('message-recovery').hidden = !message && current?.phase !== 'error' && current?.phase !== 'not_pasted';
 }
@@ -207,6 +222,51 @@ el('nav-overview').onclick = () => navigate('overview');
 el('nav-practice-page').onclick = () => navigate('practice-page');
 el('overview-practice').onclick = () => { navigate('practice-page'); focusHeading('practice-page'); };
 el('nav-settings').onclick = () => navigate('settings');
+const healthDialog = el('health-dialog') as HTMLDialogElement;
+function renderHealth() {
+  const s = current;
+  const mac = s?.platform === 'macos';
+  statusText('health-summary', !s ? connectionError ? 'Couldn’t connect to HandsFree. Refresh status to try again.' : 'Connecting to HandsFree…'
+    : s.phase === 'error' || s.phase === 'not_pasted' ? el('message').textContent || 'The last dictation failed. Review the checks below, then try a private test.'
+    : s.phase === 'recording' ? s.audio_ready === false ? 'Preparing the microphone and audio cues…' : 'Dictation is listening. Close this panel to continue.'
+    : s.phase === 'processing' ? 'Finishing the current dictation. Wait before testing again.'
+    : s.phase === 'downloading' ? `Downloading the English model… ${Math.round(s.progress)}%.`
+    : readiness(s) ? 'Permissions, shortcut and model are ready. Use a private test to check actual capture.' : readinessDetail(s));
+  el('health-mic-state').textContent = !s ? 'Unknown' : s.microphone ? 'Allowed' : 'Access needed';
+  el('health-permissions-row').hidden = !mac;
+  el('health-permissions-state').textContent = !s ? 'Unknown' : s.accessibility && s.input_monitoring ? 'Allowed' : [!s.accessibility && 'Accessibility needed', !s.input_monitoring && 'Input Monitoring needed'].filter(Boolean).join(' · ');
+  el('health-hook-state').textContent = !s ? 'Unknown' : s.hotkey ? 'Connected' : mac ? 'Disconnected. Quit and reopen HandsFree after granting access.' : 'Unavailable. Choose another shortcut in Settings.';
+  el('health-model-state').textContent = !s ? 'Unknown' : s.model_ready ? 'Ready offline' : s.phase === 'downloading' ? `Downloading… ${Math.round(s.progress)}%` : 'Download needed · ~148 MB';
+  button('health-mic').hidden = !s || s.microphone;
+  button('health-mic').disabled = !s || installingUpdate() || !phasePolicy(s.phase).editConfiguration;
+  button('health-permissions').hidden = !mac || Boolean(s?.accessibility && s.input_monitoring);
+  button('health-permissions').disabled = button('health-mic').disabled;
+  button('health-model').hidden = !s || s.model_ready;
+  button('health-model').disabled = !s || installingUpdate() || button('download').disabled;
+  button('health-practice').hidden = !mac;
+  button('health-practice').disabled = !s || !readiness(s) || !phasePolicy(s.phase).previewSound || installingUpdate();
+  el('health-input').hidden = !mac;
+}
+button('product-status').onclick = () => {
+  closeBrandMenu(); renderHealth(); healthDialog.showModal(); renderPractice();
+  void refresh();
+};
+button('health-close').onclick = () => healthDialog.close();
+healthDialog.addEventListener('close', () => {
+  renderPractice();
+  if (document.activeElement === document.body || healthDialog.contains(document.activeElement)) button('product-status').focus({preventScroll:true});
+});
+button('health-refresh').onclick = async () => {
+  button('health-refresh').disabled = true;
+  await refresh(); renderHealth(); button('health-refresh').disabled = false;
+};
+button('health-mic').onclick = () => { if (!button('health-mic').disabled) void action('request_microphone'); };
+button('health-permissions').onclick = () => { if (!button('health-permissions').disabled && current?.platform === 'macos') void action('request_permissions'); };
+button('health-model').onclick = () => { if (!button('health-model').disabled) button('download').click(); };
+button('health-practice').onclick = () => {
+  if (button('health-practice').disabled) return;
+  healthDialog.close(); navigate('practice-page'); focusHeading('practice-page');
+};
 const brand = document.querySelector('.brand') as HTMLButtonElement;
 function closeBrandMenu(restore = false) {
   el('brand-menu').hidden = true; brand.setAttribute('aria-expanded','false');
@@ -350,7 +410,7 @@ function openMicrophoneSettings() {
 }
 el('practice-setup').onclick = openMicrophoneSettings;
 el('practice-recovery').onclick = openMicrophoneSettings;
-el('message-recovery').onclick = () => { navigate('settings'); focusHeading('settings'); };
+el('message-recovery').onclick = () => button('product-status').click();
 window.addEventListener('blur', () => { windowActive=false; syncPracticeContext(); clearPractice(); });
 window.addEventListener('pagehide', () => { windowActive=false; syncPracticeContext(); clearPractice(); });
 window.addEventListener('focus', () => { windowActive=true; renderPractice(); });
@@ -661,6 +721,11 @@ function renderMicrophones() {
   }
   microphoneChoice.disabled = microphonePending || microphonesLoading || !canEditShortcut() || capturing || captureStopping || current?.platform !== 'macos';
   button('microphone-refresh').disabled = microphonesLoading || microphonePending || current?.platform !== 'macos';
+  const healthChoice = el('health-microphone') as HTMLSelectElement;
+  if (healthChoice.innerHTML !== microphoneChoice.innerHTML) healthChoice.replaceChildren(...Array.from(microphoneChoice.options, option => option.cloneNode(true)));
+  healthChoice.value = microphoneChoice.value;
+  healthChoice.disabled = microphoneChoice.disabled;
+  button('health-microphone-refresh').disabled = button('microphone-refresh').disabled;
 }
 async function refreshMicrophones() {
   if (microphonesLoading || current?.platform !== 'macos') return;
@@ -672,6 +737,13 @@ async function refreshMicrophones() {
   finally { microphonesLoading = false; renderMicrophones(); }
 }
 button('microphone-refresh').onclick = () => void refreshMicrophones();
+button('health-microphone-refresh').onclick = () => void refreshMicrophones();
+el('health-microphone').onchange = () => {
+  const select = el('health-microphone') as HTMLSelectElement;
+  if (select.disabled || microphoneChoice.disabled) return;
+  microphoneChoice.value = select.value;
+  microphoneChoice.dispatchEvent(new Event('change'));
+};
 microphoneChoice.onchange = async () => {
   if (microphonePending || microphoneChoice.disabled) return;
   const uid = microphoneChoice.value || null;
@@ -727,6 +799,11 @@ async function refreshStatus() {
   const appearanceRevision = appearance.revision;
   try {
       current = await invoke<Status>('status');
+      if (connectionError) {
+        // Retire only our connection failure, not a newer independent action error.
+        if (el('feedback').textContent === connectionError) feedback('');
+        connectionError = '';
+      }
       appearance.observe(current.appearance, appearanceRevision);
       renderMicrophones();
       if (current.platform === 'macos' && !microphonesLoaded) { microphonesLoaded = true; void refreshMicrophones(); }
@@ -755,7 +832,7 @@ async function refreshStatus() {
       const fromGuide = added !== 0 && (added & ~guidePermissionRequests) === 0 && !el('get-started').hidden && !el('settings').hidden;
       guidePermissionRequests &= ~requests;
       seenPermissionRequests = requests;
-      if (!fromGuide) navigate('settings');
+      if (!fromGuide && !healthDialog.open) navigate('settings');
     }
     const audioStarting = current.platform === 'macos' && current.phase === 'recording' && current.audio_ready === false;
     el('phase').textContent = audioStarting ? 'Starting…' : current.phase === 'idle' && !readiness(current) ? 'Setup needed' : phaseLabel(current.phase);
@@ -818,8 +895,9 @@ async function refreshStatus() {
     el('ready-detail').textContent = readinessDetail(current);
     el('setup').textContent = 'Open settings';
     el('storage-error').hidden = !current.persistence_error;
-    el('storage-error').textContent = current.persistence_error;
-  } catch (e) { current = undefined; clearPractice(); renderPractice(); renderWorkflow(); feedback(`Couldn’t connect to HandsFree: ${String(e)}`); }
+     el('storage-error').textContent = current.persistence_error;
+     renderHealth();
+  } catch (e) { current = undefined; clearPractice(); renderPractice(); renderWorkflow(); el('phase').textContent = 'Disconnected'; el('dot').className = 'error'; connectionError = `Couldn’t connect to HandsFree: ${String(e)}`; renderHealth(); renderMicrophones(); feedback(connectionError); }
 }
 void refresh();
 void getVersion().then(version => { el('app-version').textContent = version; }).catch(() => { /* Packaged version fallback for browser previews. */ });
