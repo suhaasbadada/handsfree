@@ -37,8 +37,8 @@ export class Practice {
       if (!this.allowed()) { await this.clear(); return; }
       this.generation = generation;
       // An admitted generation owns Finish/Cancel, but native capture may still
-      // be preparing the route or playing its cue. Admission is not readiness.
-      this.show('recording', 'Preparing microphone and audio cues…');
+       // be preparing the route. Admission is not readiness.
+       this.show('recording', 'Preparing microphone…');
       if (this.finishRequested) await this.finish();
     } catch (error) {
       if (this.token !== token) return;
@@ -100,7 +100,7 @@ export class Practice {
       } else if (result.phase === 'empty' || result.phase === 'error') {
         this.show(result.phase, result.phase === 'empty' ? 'No speech detected. Clear and try again.' : 'Practice could not record or transcribe. Reconnect the selected microphone or choose another in Settings, then clear and try again.');
       } else if (result.phase === 'processing') this.show('processing', 'Transcribing on this Mac…');
-      else if (result.phase === 'recording' && this.view.phase === 'recording') this.show('recording', audioReady ? 'Speak now, then choose Finish.' : 'Preparing microphone and audio cues…');
+      else if (result.phase === 'recording' && this.view.phase === 'recording') this.show('recording', audioReady ? 'Speak now, then choose Finish.' : 'Preparing microphone…');
       else this.render(this.view);
     } catch {
       if (this.token === token) await this.clearWithError('Practice connection lost. Please try again.');

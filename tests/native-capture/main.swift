@@ -697,6 +697,50 @@ precondition(boundedError.domain.count == 64 && boundedError.code == -10875)
 precondition(AudioStageFailure("output_prepare", exception).exceptionName == "NSException")
 print("Production split-engine owner partial starts, input-only topology, muted allocation, output route disposition and bounded first diagnostics passed without hardware")
 
+// The production resolver seam cannot enumerate names: only the current UID's
+// translation and input-stream availability are injected. No engine/hardware.
+do {
+    var defaults = 0, translations = [String](), inputs = [UInt32]()
+    var currentDefault = "one", inputAvailable = true, translated: UInt32 = 42
+    func resolve(_ saved: String?) throws -> UInt32 {
+        try Microphones.resolve(saved, defaultUID: { defaults += 1; return currentDefault }, translate: {
+            translations.append($0); return translated
+        }, hasInput: { inputs.append($0); return inputAvailable })
+    }
+    let saved = try resolve("saved-exact"); precondition(saved == 42)
+    precondition(defaults == 0 && translations == ["saved-exact"] && inputs == [42])
+    for malformed in ["", " ", "\n", "bad\0uid"] {
+        do { _ = try resolve(malformed); preconditionFailure("Malformed UID accepted") } catch {}
+    }
+    precondition(translations.count == 1 && defaults == 0)
+    translated = 0
+    do { _ = try resolve("missing"); preconditionFailure("Missing UID fell back") } catch {}
+    precondition(defaults == 0 && inputs.count == 1)
+    translated = 42; inputAvailable = false
+    do { _ = try resolve("output-only"); preconditionFailure("Noninput accepted") } catch {}
+    inputAvailable = true
+    let firstDefault = try resolve(nil); precondition(firstDefault == 42)
+    currentDefault = "two"; translated = 43
+    let secondDefault = try resolve(nil); precondition(secondDefault == 43)
+    precondition(defaults == 2 && Array(translations.suffix(2)) == ["one", "two"])
+    inputAvailable = false
+    do { _ = try resolve(nil); preconditionFailure("Input availability cached") } catch {}
+    currentDefault = ""
+    do { _ = try resolve(nil); preconditionFailure("Empty default accepted") } catch {}
+    for stage in ["default", "translate", "input"] {
+        do {
+            _ = try Microphones.resolve(stage == "default" ? nil : "saved", defaultUID: {
+                throw NSError(domain: "metadata", code: 1)
+            }, translate: { _ in
+                if stage == "translate" { throw NSError(domain: "metadata", code: 1) }
+                return 42
+            }, hasInput: { _ in throw NSError(domain: "metadata", code: 1) })
+            preconditionFailure("Metadata error accepted")
+        } catch {}
+    }
+}
+print("Production targeted UID resolver: exact saved UID, fresh default/input metadata, malformed/missing/noninput fail closed without names or hardware")
+
 // Exercise the SAME production preparation controller/factory, real converter,
 // split owner and AudioSession watchdog; no AVAudioEngine or device is created.
 final class NegotiationHarness {
@@ -739,7 +783,7 @@ final class NegotiationHarness {
             validations += 1
             try MicrophoneBinding.revalidate(expected: 42, resolve: {
                 if self.mode == "uid-missing" && attempt == 2 { throw NSError(domain: "Missing selected input", code: 1) }
-                return self.mode == "uid-changed" && attempt == 2 ? 43 : 42
+                return ["uid-changed", "default-changed"].contains(self.mode) && attempt == 2 ? 43 : 42
             })
             if attempt == 1 && validations == 2 && self.mode == "config-poststart" { configurationChange() }
         }, format: { self.hardware }, outputFormat: {
@@ -757,7 +801,7 @@ final class NegotiationHarness {
         }, prepare: {
             self.packet(self.pipes.last!, self.hardware)
             if attempt == 1 {
-                if ["config-install", "config-start", "config-poststart", "config-commit", "cancel-start-change", "generic-start", "generic-start-with-change"].contains(self.mode) { return }
+                if ["single", "config-install", "config-start", "config-poststart", "config-commit", "cancel-start-change", "generic-start", "generic-start-with-change"].contains(self.mode) { return }
                 if self.mode == "generic" { throw NSError(domain: "generic", code: 9) }
                 if self.mode == "exception" { throw HFTestCaptureAdapter(2)! }
                 self.hardware = AVAudioFormat(standardFormatWithSampleRate: 24000, channels: 1)!
@@ -800,10 +844,9 @@ final class NegotiationHarness {
             close: { self.preparation.current.closeAcceptance() }, drain: { self.preparation.current.closeAndDrain() },
             play: { _, _ in }, stopCue: {}, stop: { self.preparation.revoke(); self.preparation.current.stop() },
             level: { -60 }, outputRate: { 0 }, cancel: { self.preparation.revoke() }, formats: {
-                ["inputRate": self.preparation.current.inputFormat?.sampleRate ?? 0,
-                 "initial_config_change": self.preparation.initialConfigChange ? 1 : 0,
-                 "initialInputRate": self.preparation.initialRate,
-                  "negotiationAttempts": Double(self.preparation.attempts)]
+                var facts = self.preparation.formatMetadata()
+                facts["inputRate"] = self.preparation.current.inputFormat?.sampleRate ?? 0
+                return facts
             }, validatePrepared: { try self.preparation.current.validatePrepared() },
             prepareDrainCertificate: { try self.preparation.current.prepareDrainCertificate() })
         return SessionAudioOwner(input: input, makeOutput: {
@@ -816,7 +859,7 @@ final class NegotiationHarness {
         }, cue: { _ in AVAudioPCMBuffer(pcmFormat: self.hardware, frameCapacity: 2048)! }).operations()
     }
 }
-for mode in ["config-start", "config-install", "config-poststart", "config-commit", "cancel-start-change", "generic-start", "generic-start-with-change", "success", "cue-route", "listening-route", "uid-missing", "uid-changed", "cancel-first", "cancel-cleanup", "cancel-replacement", "gate-cleanup", "cleanup-stop", "cleanup-remove", "generic", "exception", "generic-with-change", "second-config", "deadline-first", "deadline-second"] {
+for mode in ["config-start", "config-install", "config-poststart", "config-commit", "cancel-start-change", "generic-start", "generic-start-with-change", "success", "cue-route", "listening-route", "uid-missing", "uid-changed", "default-changed", "cancel-first", "cancel-cleanup", "cancel-replacement", "gate-cleanup", "cleanup-stop", "cleanup-remove", "generic", "exception", "generic-with-change", "second-config", "deadline-first", "deadline-second"] {
     let h = NegotiationHarness(mode), s = h.session.session()
     s.start(factory: h.operations)
     let success = mode == "success" || mode.hasPrefix("config-")
@@ -826,6 +869,10 @@ for mode in ["config-start", "config-install", "config-poststart", "config-commi
         precondition(h.samples == 0 && h.session.count("output") == 0)
         precondition(h.starts == (["config-start", "config-poststart", "config-commit"].contains(mode) ? 2 : 1), mode)
         precondition(h.installs == [48000, 24000] && h.preparation.attempts == 2)
+        precondition(releaseSmokePreparationValid(h.preparation.formatMetadata()), "Real production preparation must mint the smoke certificate")
+        // Even after acceptance, reentry cannot reset attempts or restart input.
+        do { try h.preparation.prepare(allowed: { true }); preconditionFailure("Postaccept preparation restarted") } catch {}
+        precondition(h.preparation.attempts == 2 && h.made == 2)
         precondition(h.session.count("failure") == 0)
         // Retired callbacks and producers cannot fail/accept for the live attempt.
         h.callbacks[0](); h.packet(h.pipes[0], h.hardware)
@@ -849,10 +896,10 @@ for mode in ["config-start", "config-install", "config-poststart", "config-commi
     let expectedFailures = success ? 0 : 1
     precondition(h.session.count("failure") == expectedFailures, mode)
     precondition(h.session.count("output") == 0, mode)
-    if ["uid-missing", "uid-changed", "second-config", "deadline-second"].contains(mode) {
+    if ["uid-missing", "uid-changed", "default-changed", "second-config", "deadline-second"].contains(mode) {
         precondition(h.preparation.attempts == 2, mode)
-        precondition(s.snapshot().formats["initial_config_change"] == 1, mode)
-        precondition(s.snapshot().formats["initialInputRate"] == 48000, mode)
+        precondition(!releaseSmokePreparationValid(s.snapshot().formats), mode)
+        precondition(s.snapshot().formats["secondPreparationSucceeded"] == nil, mode)
     } else if !prepared { precondition(h.preparation.attempts == 1, mode) }
     precondition(h.made <= 2)
     if ["generic-start", "generic-start-with-change"].contains(mode) {
@@ -860,8 +907,52 @@ for mode in ["config-start", "config-install", "config-poststart", "config-commi
         precondition(s.snapshot().failureCode == 9 && h.made == 1)
     }
     if mode == "cancel-start-change" { precondition(h.made == 1 && h.preparation.attempts == 1) }
+    if !prepared { precondition(h.preparation.formatMetadata()["secondPreparationSucceeded"] == nil, mode) }
+}
+do {
+    let h = NegotiationHarness("single"), s = h.session.session()
+    s.start(factory: h.operations); h.session.wait("enabled"); awaitReady(s)
+    precondition(h.preparation.formatMetadata() == ["negotiationAttempts": 1])
+    precondition(releaseSmokePreparationValid(h.preparation.formatMetadata()))
+    do { try h.preparation.prepare(allowed: { true }); preconditionFailure("Single attempt restarted") } catch {}
+    precondition(h.made == 1 && h.preparation.attempts == 1)
+    s.cancel(); h.session.wait("retired"); s.stop()
 }
 print("Production preaccept negotiation: fresh 48-to-24k converter/tap, same UID, stale callbacks, cleanup/cancel/gate failures and one hardware 3s watchdog passed without hardware")
+
+// Exercise the SAME native predicate called by Bridge, including contradictory
+// one-attempt certificates and every absent/non-numeric two-attempt fact.
+do {
+    precondition(releaseSmokePreparationValid(["negotiationAttempts": 1]))
+    let certificate: [String: Double] = ["negotiationAttempts": 2, "initial_config_change": 1,
+        "initialInputRate": 48000, "firstPreparationRetiredHealthy": 1,
+        "sameEnginePreacceptTransaction": 1, "secondPreparationSucceeded": 1]
+    precondition(releaseSmokePreparationValid(certificate))
+    var earlyChange = certificate; earlyChange["initialInputRate"] = 0
+    precondition(releaseSmokePreparationValid(earlyChange))
+    for key in certificate.keys {
+        var missing = certificate; missing.removeValue(forKey: key)
+        precondition(!releaseSmokePreparationValid(missing), key)
+        for invalid in [-1.0, Double.nan, Double.infinity] {
+            var changed = certificate; changed[key] = invalid
+            precondition(!releaseSmokePreparationValid(changed), key)
+        }
+        if key != "negotiationAttempts" {
+            precondition(!releaseSmokePreparationValid(["negotiationAttempts": 1, key: certificate[key]!]), key)
+        }
+        if key != "initialInputRate" && key != "negotiationAttempts" {
+            for invalid in [0.0, 2] {
+                var changed = certificate; changed[key] = invalid
+                precondition(!releaseSmokePreparationValid(changed), key)
+            }
+        }
+    }
+    for count in [0.0, 1.5, 3, 4] {
+        var changed = certificate; changed["negotiationAttempts"] = count
+        precondition(!releaseSmokePreparationValid(changed))
+    }
+}
+print("Production smoke preparation certificate: single clean attempt or typed healthy same-engine preaccept reconciliation only; postaccept reentry sealed without hardware")
 
 // Running input remains closed until atomic read-only validation. Completion
 // output notifications occur only after drain and cannot poison final PCM.

@@ -48,7 +48,7 @@ evaluate(`
   document.getElementById('saved-shortcut').textContent = 'Fn';
   for(const select of document.querySelectorAll('select')) {
     const wrapper=document.createElement('span');wrapper.className='select-wrap';
-    select.before(wrapper);wrapper.append(select);wrapper.innerHTML+='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg>';
+    select.before(wrapper);wrapper.append(select);wrapper.innerHTML+=${JSON.stringify(icon('chevron'))};
   }
   document.head.appendChild(Object.assign(document.createElement('style'), {id:'probe-mode'}));
   window.measure = () => {
@@ -63,8 +63,10 @@ evaluate(`
       controls:metric(document.querySelector('.microphone-controls')),mainOverflow:getComputedStyle(main).overflowX,
       selectOverflow:getComputedStyle(document.getElementById('microphone-choice')).overflow,
       chevrons:['recording-mode','appearance-choice','sound-style'].every(id=>{
-        const e=document.getElementById(id),c=e.parentElement.querySelector('svg'),s=getComputedStyle(c);
-        return e.tagName==='SELECT' && c.getBoundingClientRect().width>=12 && s.display!=='none' && s.pointerEvents==='none' && s.color===getComputedStyle(document.body).color;
+        const e=document.getElementById(id),c=e.parentElement.querySelector('svg'),s=getComputedStyle(c),r=e.getBoundingClientRect(),a=c.getBoundingClientRect(),canvas=document.createElement('canvas').getContext('2d');
+        canvas.font=getComputedStyle(e).font;
+        const gap=r.width-canvas.measureText(e.selectedOptions[0].textContent).width;
+        return e.tagName==='SELECT' && a.width>=12 && s.display!=='none' && s.pointerEvents==='none' && s.color===getComputedStyle(document.body).color && Math.abs(a.top+a.height/2-r.top-r.height/2)<1 && gap>=24 && gap<=42;
       }),
       refreshFits:[['microphone-choice','microphone-refresh'],['health-microphone','health-microphone-refresh']].every(pair=>{
         const s=document.getElementById(pair[0]).getBoundingClientRect(),b=document.getElementById(pair[1]).getBoundingClientRect();
@@ -74,7 +76,7 @@ evaluate(`
 `);
 const sizes = [[980,820],[980,600],[560,650],[320,650]];
 const labels = ['System default · MacBook Air Microphone','Saved microphone · Unavailable','Extremely long running application option '.repeat(12)];
-const forcedCSS = 'main,dialog{overflow-y:scroll;scrollbar-width:auto}main::-webkit-scrollbar,dialog::-webkit-scrollbar{width:16px;height:16px}';
+const forcedCSS = 'main,dialog{overflow-y:scroll;scrollbar-width:auto}main::-webkit-scrollbar,dialog::-webkit-scrollbar{display:block;width:16px;height:16px}';
 function configure(size, theme, mode, label) {
   web.setFrameSize($.NSMakeSize(size[0], size[1]));
   evaluate(`

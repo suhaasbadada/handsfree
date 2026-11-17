@@ -68,6 +68,12 @@ export async function checkProductStatus({send,evaluate,until,port}) {
   await evaluate(`window.fixture.phase='recording';window.fixture.audio_ready=false`);
   await until(`document.getElementById('health-mic').disabled && document.getElementById('health-microphone').disabled`);
   assert.match(await evaluate(`document.getElementById('health-summary').textContent`),/Preparing/,'Starting is not listening');
+  await evaluate(`Object.assign(window.fixture,{microphone:true,accessibility:true,model_ready:true,hotkey:true})`);
+  await until(`document.getElementById('dot').className==='starting' && document.getElementById('phase').classList.contains('sr-only')`);
+  assert.equal(await evaluate(`document.getElementById('phase').textContent==='Preparing microphone' && document.getElementById('message').textContent==='' && getComputedStyle(document.getElementById('dot')).backgroundColor==='rgba(0, 0, 0, 0)'`),true,'Pending capture is a quiet neutral indicator with an accessible description, not visible Starting copy or a false recording signal');
+  await evaluate(`window.fixture.audio_ready=true`);
+  await until(`document.getElementById('dot').className==='recording' && !document.getElementById('phase').classList.contains('sr-only')`);
+  assert.equal(await evaluate(`document.getElementById('phase').textContent==='Listening'`),true,'Real audio readiness alone retires the startup indicator');
   await evaluate(`Object.assign(window.fixture,{phase:'idle',message:'',audio_ready:true,microphone:true,accessibility:true,model_ready:true,hotkey:true})`);
   await until(`!document.getElementById('health-practice').disabled`);
   await evaluate(`window.statusBeforeDevice=window.calls.filter(c=>c.command==='set_microphone').length;document.getElementById('health-microphone').value='';document.getElementById('health-microphone').dispatchEvent(new Event('change'))`);

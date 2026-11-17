@@ -105,7 +105,7 @@ test('beta 24 checkpoints distinguish implementation, earlier verification and p
     'Remove sidebar', 'Settings entry', 'Prioritize Settings', 'select affordances',
     'microphone help', 'Honest health colors', 'Remove Setup guide', 'Minimal copy',
     'Home context merge is intentional', 'eligibility is **not** native authorization',
-    'Updates.installing', 'pending-check revocation', 'No native capture implementation changes',
+    'Updates.installing', 'pending-check revocation', 'certified preaccept reconciliation',
     'beta 24 checkpoints', 'Beta 23 receipts cannot substitute',
     'node scripts/publish-release.mjs --publish release', "installed app's in-app OTA/restart",
     'Exit beta only after user satisfaction', '943c87c']) assert.ok(notes.includes(checkpoint), checkpoint);

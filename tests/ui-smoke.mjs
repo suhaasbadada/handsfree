@@ -49,7 +49,7 @@ async function until(expression) {
 try {
   let page;
   for (let attempt = 0; attempt < 100; attempt++) {
-    try { page = await (await fetch(`http://127.0.0.1:9237/json/new?http://127.0.0.1:${port}`, { method: 'PUT' })).json(); break; }
+    try { page = await (await fetch('http://127.0.0.1:9237/json/new?about:blank', { method: 'PUT' })).json(); break; }
     catch { await delay(50); }
   }
   assert.ok(page?.webSocketDebuggerUrl, `Headless browser started: ${browserErrors}`);
@@ -62,6 +62,10 @@ try {
       if (message.error) request.reject(new Error(JSON.stringify(message.error))); else request.resolve(message.result);
     }
   };
+  // Newer Chromium may return the target before its initial navigation commits.
+  await send('Page.enable');
+  await send('Page.navigate', {url:`http://127.0.0.1:${port}`});
+  await send('Page.bringToFront');
   await send('Emulation.setDeviceMetricsOverride', { width: 980, height: 820, deviceScaleFactor: 1, mobile: false });
   await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-color-scheme',value:'light'},{name:'prefers-reduced-motion',value:'no-preference'}]});
   await until(`Boolean(document.getElementById('nav-settings'))`);

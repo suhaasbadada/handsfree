@@ -54,7 +54,31 @@ enum Microphones {
         return id == 0 ? nil : try string(id, kAudioDevicePropertyDeviceUID)
     }
     static func resolve(_ uid: String?) throws -> AudioDeviceID {
-        let uid = try selectedUID(saved: uid, available: devices(), defaultUID: defaultUID)
+        try resolve(uid, defaultUID: defaultUID, translate: translate, hasInput: hasInput)
+    }
+    // Production metadata seam: resolve only this UID, never enumerate/sort names.
+    // Re-read default, translation and input availability on EVERY validation.
+    static func resolve(_ saved: String?, defaultUID: () throws -> String?,
+                        translate: (String) throws -> AudioDeviceID,
+                        hasInput: (AudioDeviceID) throws -> Bool) throws -> AudioDeviceID {
+        guard let uid = try saved ?? defaultUID(), !uid.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !uid.contains("\0") else { throw NSError(domain: "Selected microphone unavailable", code: 1) }
+        let id = try translate(uid)
+        guard id != kAudioObjectUnknown, try hasInput(id) else {
+            throw NSError(domain: "Selected microphone unavailable", code: 2)
+        }
+        return id
+    }
+    private static func hasInput(_ id: AudioDeviceID) throws -> Bool {
+        var address = property(kAudioDevicePropertyStreamConfiguration, scope: kAudioDevicePropertyScopeInput), bytes: UInt32 = 0
+        try checked(AudioObjectGetPropertyDataSize(id, &address, 0, nil, &bytes))
+        guard bytes >= MemoryLayout<AudioBufferList>.size else { return false }
+        let data = UnsafeMutableRawPointer.allocate(byteCount: Int(bytes), alignment: MemoryLayout<AudioBufferList>.alignment)
+        defer { data.deallocate() }
+        try checked(AudioObjectGetPropertyData(id, &address, 0, nil, &bytes, data))
+        return UnsafeMutableAudioBufferListPointer(data.assumingMemoryBound(to: AudioBufferList.self)).contains { $0.mNumberChannels > 0 }
+    }
+    private static func translate(_ uid: String) throws -> AudioDeviceID {
         var address = property(kAudioHardwarePropertyTranslateUIDToDevice), id = AudioDeviceID(0)
         let value = uid as CFString
         var size = UInt32(MemoryLayout<AudioDeviceID>.size)
@@ -399,9 +423,10 @@ final class CapturePreparation {
     private let make: () -> CaptureStartup
     private(set) var current: CaptureStartup
     private var closed = false
+    private var consumed = false
+    private var reconciled = false
     private(set) var attempts = 0
-    private(set) var initialRate: Double = 0
-    private(set) var initialConfigChange = false
+    private var initialRate: Double = 0
     var routeFailed: (() -> Void)? {
         didSet { wire(current) }
     }
@@ -429,11 +454,15 @@ final class CapturePreparation {
         guard live && allowed() else { throw NSError(domain: "Capture preparation revoked", code: 1) }
     }
     func prepare(allowed: () -> Bool) throws {
+        lock.lock()
+        guard !consumed && !closed else { lock.unlock(); throw NSError(domain: "Capture preparation already consumed", code: 1) }
+        consumed = true
+        lock.unlock()
         try check(allowed)
         attempts = 1
         do { try current.start(acceptAudio: false, negotiate: true) }
         catch CaptureStartup.PreparationFailure.initialConfigurationChange {
-            initialConfigChange = true; initialRate = current.inputFormat?.sampleRate ?? 0
+            initialRate = current.inputFormat?.sampleRate ?? 0
             guard current.cleanupHealthy else { throw NSError(domain: "Initial configuration cleanup failed", code: 1) }
             try check(allowed)
             let replacement = make() // constructs only the controller, no hardware effects
@@ -446,7 +475,35 @@ final class CapturePreparation {
             try current.start(acceptAudio: false, negotiate: true)
         }
         try check(allowed)
+        // Only this typed/healthy/guarded path can mint the certificate. The
+        // immutable factory replaces controllers, not the captured input engine.
+        lock.lock(); defer { lock.unlock() }
+        guard !closed else { throw NSError(domain: "Capture preparation revoked", code: 1) }
+        reconciled = attempts == 2
     }
+    func formatMetadata() -> [String: Double] {
+        var facts = ["negotiationAttempts": Double(attempts)]
+        if reconciled {
+            facts["initial_config_change"] = 1
+            facts["initialInputRate"] = initialRate
+            facts["firstPreparationRetiredHealthy"] = 1
+            facts["sameEnginePreacceptTransaction"] = 1
+            facts["secondPreparationSucceeded"] = 1
+        }
+        return facts
+    }
+}
+
+// Shared native smoke policy; external format observations never mint authority.
+// Keep the numeric receipt policy identical to validatePreparation in JS.
+func releaseSmokePreparationValid(_ facts: [String: Double]) -> Bool {
+    let certificate = ["initial_config_change", "firstPreparationRetiredHealthy",
+                       "sameEnginePreacceptTransaction", "secondPreparationSucceeded"]
+    if facts["negotiationAttempts"] == 1 {
+        return (certificate + ["initialInputRate"]).allSatisfy { facts[$0] == nil }
+    }
+    return facts["negotiationAttempts"] == 2 && certificate.allSatisfy { facts[$0] == 1 } &&
+        facts["initialInputRate"].map { $0.isFinite && $0 >= 0 } == true
 }
 
 private func captureChecked(_ error: Error?) throws {
@@ -562,15 +619,10 @@ final class AudioCapture {
         set { preparation.validationRequested = newValue }
     }
     func formatMetadata() -> [String: Double] {
-        var result: [String: Double] = [:]
-        result["negotiationAttempts"] = Double(preparation.attempts)
+        var result = preparation.formatMetadata()
         if let format = startup.convertedFormat {
             result["convertedRate"] = format.sampleRate
             result["convertedChannels"] = Double(format.channelCount)
-        }
-        if preparation.initialConfigChange {
-            result["initial_config_change"] = 1
-            result["initialInputRate"] = preparation.initialRate
         }
         if let input = startup.inputFormat {
             result["inputRate"] = input.sampleRate; result["inputChannels"] = Double(input.channelCount)

@@ -43,6 +43,39 @@ test('public receipt policy accepts normalized complete production evidence, not
   }
   assert.doesNotThrow(() => validateReceipt(f, identity, now), 'Actual deferred completion is required only when saved preferences enable it');
 });
+const reconciliation = { negotiationAttempts: 2, initial_config_change: 1, initialInputRate: 48000,
+  firstPreparationRetiredHealthy: 1, sameEnginePreacceptTransaction: 1, secondPreparationSucceeded: 1 };
+test('validateProbe accepts certified bounded Bluetooth reconciliation, including first-PCM cancellation', () => {
+  const f = fixture(); f.probe.inputTransport = 'bluetooth';
+  for (const attempt of f.probe.attempts) Object.assign(attempt.observation.formats, reconciliation, { inputRate: 24000 });
+  assert.doesNotThrow(() => validateProbe(f.probe));
+  f.probe.attempts[0].observation.formats.initialInputRate = 0;
+  assert.doesNotThrow(() => validateProbe(f.probe), 'Notification may precede the first format read');
+});
+for (const key of Object.keys(reconciliation)) {
+  for (const value of [undefined, -1, NaN, Infinity, '1', true, null]) {
+    test(`validateProbe rejects invalid reconciliation ${key}=${String(value)}`, () => {
+      const f = fixture(), formats = f.probe.attempts[0].observation.formats;
+      Object.assign(formats, reconciliation);
+      if (value === undefined) delete formats[key]; else formats[key] = value;
+      assert.throws(() => validateProbe(f.probe));
+    });
+  }
+  if (key !== 'negotiationAttempts') test(`validateProbe rejects contradictory single-attempt ${key}`, () => {
+    const f = fixture(); f.probe.attempts[0].observation.formats[key] = reconciliation[key];
+    assert.throws(() => validateProbe(f.probe));
+  });
+}
+for (const key of ['initial_config_change', 'firstPreparationRetiredHealthy', 'sameEnginePreacceptTransaction', 'secondPreparationSucceeded']) {
+  for (const value of [0, 2]) test(`validateProbe rejects non-certificate ${key}=${value}`, () => {
+    const f = fixture(); Object.assign(f.probe.attempts[0].observation.formats, reconciliation, { [key]: value });
+    assert.throws(() => validateProbe(f.probe));
+  });
+}
+for (const count of [0, 1.5, 3, 4]) test(`validateProbe rejects reconciliation attempt count ${count}`, () => {
+  const f = fixture(); Object.assign(f.probe.attempts[0].observation.formats, reconciliation, { negotiationAttempts: count });
+  assert.throws(() => validateProbe(f.probe));
+});
 for (const [label, mutate] of [
   ['missing receipt', () => null], ['malformed receipt', () => ({ passed: true })],
   ['failed probe', f => { f.probe.passed = false; }], ['permission blocked', f => { f.probe.permission = 'denied'; }],

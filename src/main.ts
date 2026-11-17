@@ -28,7 +28,7 @@ const glyphs: Record<string,string> = {
  words:'<path d="M4 5h16M4 10h12M4 15h16M4 20h9"/>',
  wave:'<path d="M4 10v4M8 6v12M12 3v18M16 6v12M20 10v4"/>',
  update:'<path d="M20 4v6h-6"/><path d="M20 10a8 8 0 1 0 0 4"/>',
-  play:'<path d="m9 5 10 7-10 7Z"/>', pause:'<path d="M8 5v14M16 5v14"/>', plus:'<path d="M12 5v14M5 12h14"/>', chevron:'<path d="m8 10 4 4 4-4"/>'
+   play:'<path d="m9 5 10 7-10 7Z"/>', pause:'<path d="M8 5v14M16 5v14"/>', plus:'<path d="M12 5v14M5 12h14"/>', chevron:'<path d="m6 9 6 6 6-6"/>'
 };
 const icon = (name: string) => `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${glyphs[name]}</svg>`;
 document.querySelector('#app')!.innerHTML = `
@@ -211,12 +211,16 @@ function renderHealth() {
   const mac = s?.platform === 'macos';
   if (s) {
     const broken = !readiness(s) || inputUnavailable() || Boolean(s.persistence_error) || ['error','not_pasted','setup_required'].includes(s.phase);
-    el('dot').className = broken ? 'error' : s.phase;
-    el('phase').textContent = s.phase === 'recording' && s.audio_ready === false ? 'Starting…' : s.phase === 'idle' && (inputUnavailable() || s.persistence_error) ? 'Needs attention' : s.phase === 'idle' && !readiness(s) ? 'Setup needed' : phaseLabel(s.phase);
+    const starting = s.phase === 'recording' && s.audio_ready === false;
+    el('dot').className = broken ? 'error' : starting ? 'starting' : s.phase;
+    el('phase').classList.toggle('sr-only', starting && !broken);
+    el('phase').textContent = starting ? 'Preparing microphone' : s.phase === 'idle' && (inputUnavailable() || s.persistence_error) ? 'Needs attention' : s.phase === 'idle' && !readiness(s) ? 'Setup needed' : phaseLabel(s.phase);
+  } else {
+    el('phase').classList.remove('sr-only');
   }
   statusText('health-summary', !s ? connectionError ? 'Couldn’t connect to HandsFree. Refresh status to try again.' : 'Connecting to HandsFree…'
     : s.phase === 'error' || s.phase === 'not_pasted' ? el('message').textContent || 'The last dictation failed. Review the checks below, then try a private test.'
-    : s.phase === 'recording' ? s.audio_ready === false ? 'Preparing the microphone and audio cues…' : 'Dictation is listening. Close this panel to continue.'
+    : s.phase === 'recording' ? s.audio_ready === false ? 'Preparing the microphone. Capture is not ready yet.' : 'Dictation is listening. Close this panel to continue.'
     : s.phase === 'processing' ? 'Finishing the current dictation. Wait before testing again.'
     : s.phase === 'downloading' ? `Downloading the English model… ${Math.round(s.progress)}%.`
     : s.persistence_error ? `Settings or usage couldn’t be saved. ${s.persistence_error}`
@@ -285,7 +289,9 @@ const practiceInputs = new PracticeInputs(practice, practiceVisible);
 function clearPractice() { shortcutReceived = false; practiceInputs.reset(); void practice.clear(); }
 function renderPractice() {
   statusText('practice-message', practice.view.message);
-  if (!practice.view.message) el('practice-message').removeAttribute('tabindex');
+  const preparing = practice.view.phase === 'starting' || practice.view.phase === 'recording' && practice.view.elapsedSeconds === null && practice.view.inputLevel === null;
+  el('practice-message').classList.toggle('quiet-status', preparing);
+  if (preparing || !practice.view.message) el('practice-message').removeAttribute('tabindex');
   const focusedAction = document.activeElement;
   if (focusedAction instanceof HTMLButtonElement && focusedAction.closest('.practice-actions')) {
     // Retire a contextual control without browser focus/scroll recovery.
@@ -731,7 +737,7 @@ async function refreshStatus() {
     // Keep diagnostics outside the compact header; never render dictation payloads.
     const idleHint = `Select a text field and press ${current.shortcut_label}.`;
     const message = current.message.startsWith('Copied.') ? 'Text copied. Switch to your app and paste when you’re ready.' : current.message.startsWith('Paste shortcut sent') ? 'Paste sent to your app. Check the original field.' : current.message;
-    statusText('message', audioStarting ? 'Preparing microphone and audio cues…' : current.phase === 'idle' && current.message === idleHint ? '' : message);
+    statusText('message', audioStarting ? '' : current.phase === 'idle' && current.message === idleHint ? '' : message);
     el('message').title = current.message;
     el('message').hidden = !el('message').textContent;
     button('message-recovery').hidden = current.phase !== 'error' && current.phase !== 'not_pasted' && el('feedback').hidden;

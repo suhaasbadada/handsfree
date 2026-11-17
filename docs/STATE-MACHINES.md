@@ -35,6 +35,11 @@ only the exact `--release-smoke` CLI may enter it, before hooks/plugins/models.
 Its injected effects drive the same production audio factory through three
 PCM-backed finishes and a first-PCM cancellation, independent watchdogs and full
 retirement. It grants no paste, inference, settings or permission authority.
+Native and JavaScript smoke gates accept one preparation without reconciliation
+facts, or exactly two with the production preparation owner's complete typed-change,
+healthy-first-retirement, same-engine/preaccept and successful-second certificate.
+Missing/contradictory facts or additional attempts fail closed; this never grants
+runtime restart or changes exact-candidate evidence/freshness requirements.
 Publication evidence is a different fail-closed policy: every release audit mode
 requires a fresh exact-source/artifact/signature/OS receipt; packaging can precede
 evidence, but publication cannot. CI, hardware smoke, installed dictation and OTA
@@ -164,7 +169,10 @@ cannot paint green Ready or enable the Record action; metadata never proves capt
 
 - Recording controls persist an optional CoreAudio **UID**, never a device ID or
   name. Null follows system default at the next recording; an unavailable saved
-  UID remains selected and fails closed. Listing is metadata-only. The configure
+  UID remains selected and fails closed. Listing is metadata-only. Capture resolves
+  only the selected UID via CoreAudio translation and input-stream availability;
+  default selection re-reads the current default each time. No names enumeration,
+  cross-session/default/input cache or idle engine is needed. The configure
   FIFO saves a merged Store before publishing; no native setting/global default
   is changed. A frozen UID goes to the existing recorder, which binds its engine
    before format/converter creation, revalidates after engine startup,
@@ -191,7 +199,8 @@ cannot paint green Ready or enable the Record action; metadata never proves capt
   and again before acceptance, the serial owner confirms frozen device identity,
   hardware/node/converter format and actual engine running state. The final
   revision/tombstone check and acceptance commit are atomic. No OS reads occur
-  in notification callbacks, no new preparation/retry is granted, and runtime
+   in notification callbacks, no new preparation/retry is granted by these
+   post-start notifications, and runtime
    accepted-input notifications also advance the revision and request read-only
    certification on the existing owner after route-lock release. Actual selected/
    default device, frozen UID/AU binding, fresh hardware/node versus frozen tap/
@@ -223,7 +232,9 @@ cannot paint green Ready or enable the Record action; metadata never proves capt
   original UID/epoch/start-gate checks. Cancellation is a permanent tombstone;
   generic exceptions (even alongside an observed change), teardown failure, UID changes and live recording failures
   never authorize another attempt. There is no UID fallback, permission change
-  or new recording owner. Partial installation
+   or new recording owner. Preparation is single-use, including after acceptance;
+   successful second preparation alone publishes its numeric reconciliation
+   certificate for both release gates. Partial installation
   closes the producer, attempts both engine stop and tap removal independently,
   and drains/discards before return. Runtime route failure still defeats partial
   transcription. Synthetic adapter tests exercise these production operations

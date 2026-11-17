@@ -329,7 +329,9 @@ axPill.onAction = { axActions.append($0) }
 axPill.setPhase(1)
 precondition(axPill.accessibilityRole() == .group)
 precondition(axPill.accessibilityLabel() == "HandsFree starting")
+precondition(axPill.showsStartupIndicator && !axPill.showsCaptureMeter && axPill.captureTimerText == nil)
 axPill.audioReady = true
+precondition(!axPill.showsStartupIndicator && axPill.showsCaptureMeter && axPill.captureTimerText != nil)
 precondition(axPill.accessibilityLabel() == "HandsFree listening")
 precondition(axPill.accessibilityHelp()?.contains("shortcut again") == true)
 let axButtons = axPill.subviews.compactMap { $0 as? NSButton }

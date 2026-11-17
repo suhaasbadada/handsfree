@@ -31,6 +31,14 @@ export function bundleHash(app) {
 
 // Public behavioral policy seam. Fixtures are normalized real probe output, not
 // a separate mock policy. Every acceptance fact is validated, never just passed.
+export function validatePreparation(facts) {
+  const certificate = ['initial_config_change', 'firstPreparationRetiredHealthy', 'sameEnginePreacceptTransaction', 'secondPreparationSucceeded'];
+  requireThat(facts && (facts.negotiationAttempts === 1
+    ? [...certificate, 'initialInputRate'].every(key => !Object.hasOwn(facts, key))
+    : facts.negotiationAttempts === 2 && certificate.every(key => facts[key] === 1) &&
+      Number.isFinite(facts.initialInputRate) && facts.initialInputRate >= 0), 'uncertified/contradictory input preparation');
+}
+
 export function validateProbe(probe) {
   requireThat(probe?.schemaVersion === 1 && probe.probe === 'production-audio-v1' && probe.passed === true, 'missing/failed/malformed native probe');
   requireThat(probe.permission === 'authorized', 'microphone permission not already granted');
@@ -55,9 +63,10 @@ export function validateProbe(probe) {
       !trace.runtimeRejected && !trace.finalRejected && !trace.routeFailures, 'cleanup/certification failed');
     for (const [key, value] of Object.entries(trace)) requireThat(Number.isSafeInteger(value) && value >= 0, `invalid trace ${key}`);
     requireThat(observation && !observation.failureStage && !observation.failureDomain && observation.audioReady === false, 'native failure/not retired');
-    requireThat(observation.formats?.negotiationAttempts === 1 && Number.isFinite(observation.formats.inputRate) && observation.formats.inputRate > 0 &&
+    validatePreparation(observation.formats);
+    requireThat(Number.isFinite(observation.formats.inputRate) && observation.formats.inputRate > 0 &&
       Number.isInteger(observation.formats.inputChannels) && observation.formats.inputChannels > 0 && observation.formats.convertedRate === 16000 &&
-      observation.formats.convertedChannels === 1, 'one preparation with actual mono 16k conversion required');
+      observation.formats.convertedChannels === 1, 'certified preparation with actual mono 16k conversion required');
     requireThat(Array.isArray(observation.events) && observation.events.length <= 24, 'native timing missing');
     const firstPCM = observation.events.filter(event => event.name === 'first_accepted_pcm');
     requireThat(firstPCM.length === 1 && firstPCM[0].milliseconds > 0 && firstPCM[0].milliseconds < 12000, 'first actual PCM timing missing');

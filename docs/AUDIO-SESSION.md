@@ -23,6 +23,13 @@ Disabled sounds or zero volume create no output engine and add no cue tail.
 Profile and volume are frozen at admission. Preview remains an independent,
 explicitly idle-only AVAudioPlayer action with no idle input engine.
 
+Capture-time resolution translates only the exact saved UID (or freshly read
+system-default UID) and queries that device's input-stream availability. It never
+enumerates/sorts unrelated device names. Empty/malformed UID, unknown device,
+metadata errors and output-only devices fail closed without default fallback.
+There is no cached default/input availability. Frozen UID, input AU binding and
+route checks still run before and after startup and during live certification.
+
 Preparation installs the tap with acceptance closed and starts the input engine,
 then immediately validates and enables input; no output work is on this path.
 Input-start commit means running, not accepted capture. An input configuration
@@ -101,10 +108,24 @@ certification, not additional negotiation. After certified drain, input/output n
 retire completion nonfatally after drain. No output engine is created until
 Finish has closed, drained and certified accepted PCM; neither input preparation accepts PCM.
 
-Bounded format diagnostics retain `negotiationAttempts`, `initial_config_change`
-and `initialInputRate` alongside the terminal failure metadata/current input rate;
-successful reconciliation has no intermediate visible failure. These fields
-contain no device identity or localized speech/error description.
+Preparation is single-use: calling it again cannot reset the attempt count or
+restart accepted capture. Bounded diagnostics always retain `negotiationAttempts`.
+Only a successful guarded second preparation publishes `initial_config_change: 1`,
+`initialInputRate` (zero if negotiation preceded the first format read),
+`firstPreparationRetiredHealthy: 1`, `sameEnginePreacceptTransaction: 1` and
+`secondPreparationSucceeded: 1`. These facts are minted at the real preparation
+boundary, not inferred from observed rate changes. The immutable production
+factory captures the same bound engine/input node; replacement constructs only
+its controller/observer/converter. Successful reconciliation has no intermediate
+visible failure. These fields contain no device identity or speech/error description.
+
+The native smoke predicate and JavaScript `validateProbe` apply identical rules:
+one preparation requires all reconciliation fields absent; exactly two require
+every certificate fact equal to numeric one and a finite nonnegative initial
+rate. Missing, contradictory or malformed facts and more than two preparations
+are rejected. All PCM, final/runtime certification, independent cleanup, identity,
+freshness and exact signed-candidate gates remain required. This policy does not
+authorize runtime retries or establish hardware acceptance/latency improvement.
 
 ## Admission is not observation
 

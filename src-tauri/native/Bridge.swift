@@ -216,7 +216,7 @@ private func smokeRunning(_ id: AudioDeviceID) throws -> UInt32 {
                 state.trace.frozenUID == selectedUID && after == baseline && unchanged && observation.failureStage == nil &&
                 trace["cleanupPassed"] == 1 && trace["cleanupFailed"] == nil && trace["outputCleanupFailed"] == nil &&
                 (trace["outputCreated"] == nil || trace["outputCleanupPassed"] == 1) && (trace["runtimeRejected"] ?? 0) == 0 &&
-                observation.formats["negotiationAttempts"] == 1 && state.frames >= (index == 3 ? 1 : 16000) &&
+                releaseSmokePreparationValid(observation.formats) && state.frames >= (index == 3 ? 1 : 16000) &&
                 (index == 3 ? (observation.reason == "cancelled" && trace["outputCreated"] == nil) :
                     (trace["finalCertified"] == 1 && observation.reason == "finished" &&
                      (!(sounds && volume.floatValue > 0) || trace["outputCreated"] == 1)))
@@ -702,6 +702,9 @@ class PillView: NSView {
             if phase == 1 { setAccessibilityLabel(audioReady ? "HandsFree listening" : "HandsFree starting") }
         }
     }
+    var showsStartupIndicator: Bool { phase == 1 && !audioReady }
+    var showsCaptureMeter: Bool { phase == 1 && audioReady }
+    var captureTimerText: String? { showsCaptureMeter ? Self.timerText(elapsed: elapsed, limit: limit) : nil }
     static func timerText(elapsed: Double, limit: UInt32) -> String {
         let seconds = elapsed.isFinite ? Int(min(Double(limit), max(0, elapsed))) : 0
         return String(format: "%d:%02d / %d:%02d", seconds / 60, seconds % 60, limit / 60, limit % 60)
@@ -756,14 +759,23 @@ class PillView: NSView {
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         if phase == 1 {
             palette.accent.setFill()
-            for i in 0..<(audioReady ? 9 : 0) {
+            for i in 0..<(showsCaptureMeter ? 9 : 0) {
                 let shape = CGFloat([0.35, 0.6, 0.85, 0.65, 1, 0.7, 0.9, 0.5, 0.3][i])
                 // Amplitude comes only from the recorder, never a fake sine wave.
                 let h = 3 + level * 16 * shape
                 NSBezierPath(roundedRect: NSRect(x: 49.5 + CGFloat(i) * 6, y: 28-h/2, width: 3, height: h), xRadius: 1.5, yRadius: 1.5).fill()
             }
-            let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .center
-            ((audioReady ? Self.timerText(elapsed: elapsed, limit: limit) : "Starting…") as NSString).draw(in: NSRect(x: 40, y: audioReady ? 6 : 21, width: 70, height: 12), withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium), .foregroundColor: palette.text, .paragraphStyle: paragraph])
+            if let text = captureTimerText {
+                let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .center
+                (text as NSString).draw(in: NSRect(x: 40, y: 6, width: 70, height: 12), withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium), .foregroundColor: palette.text, .paragraphStyle: paragraph])
+            } else if showsStartupIndicator {
+                // Pending is neither fake listening bars nor an elapsed recording clock.
+                palette.text.withAlphaComponent(0.65).setStroke()
+                let arc = NSBezierPath()
+                let angle: CGFloat = reduceMotion ? 0 : -tick * 12
+                arc.appendArc(withCenter: NSPoint(x: 75, y: 28), radius: 5, startAngle: angle, endAngle: angle + 260)
+                arc.lineWidth = 1.5; arc.lineCapStyle = .round; arc.stroke()
+            }
         } else if phase == 2 {
             for i in 0..<3 {
                 let breath = reduceMotion ? 1 : 0.75 + 0.25 * (0.5 + 0.5 * sin(tick / 30 * 2 * .pi / 1.4 - CGFloat(i) * 0.8))
