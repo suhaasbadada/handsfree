@@ -2,7 +2,43 @@
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
 
-## Beta 21 candidate preparation — unpublished
+## Beta 21 publication and metadata activation
+
+Current public Mac distribution **v0.1.1-beta.21** retains embedded version **0.1.1**.
+[Published release](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.21)
+uses clean artifact source `26b07229cd8013df0a0f19af3f647f313245205b`;
+[exact-source CI run 43984857612 passed](https://github.com/suhaasbadada/handsfree/actions/runs/43984857612).
+Local, draft and anonymous-public seven-asset audits passed; local receipts are
+`handsfree-beta21-{local,draft,public}-audit.log` in
+`/private/var/folders/2y/n6f_6bjj2q1_3byq_z4dk9640000gn/T/opencode/`, with
+payload hashes in `release/SHA256SUMS`.
+
+- DMG SHA-256: `b1bafe4f75418fef6b73062a237ee64be0eb8596b989699e3b5e3c3fbd4888d0`.
+- Updater archive SHA-256: `8cc430e337f6565d9d8bacd6e1a4cf81ea8ae2314f1b46ea0fe5e57e2e3e6500`.
+- Exact generated signed feed SHA-256: `9589d08c6dac19ef60cfc6bbbfd4e52f07d4cde615346a6485162ee464a8cb27`.
+
+Active downloads/docs select beta 21; the tracked feed is an exact byte copy of
+generated `release/macos-arm64.json`. Disabled candidate21 coordinates remain
+unchanged and are not an availability switch. See [scope and evidence](releases/v0.1.1-beta.21.md):
+preaccept validation, independent 3s hardware/handoff budgets, top-right health
+recovery, flatter layout and inline exact-version updates without update modals.
+Final source validation passed Node 322 / 1 skipped, Rust 90 / 3 ignored, frontend
+build, formatting, Clippy and full CDP checks; independent reviews had no remaining
+findings. Production startup capture/release diagnostic passed, not installed
+dictation, audibility or OTA acceptance. Self-signed, not notarized.
+
+This is metadata-only: no rebuild/sign/install, app replacement/restart,
+microphone use or preference writes. Activation push/source CI, Pages/live website
+and feed byte readback, Homebrew publication/readback and tap CI remain separate
+pending gates owned by the primary. Preserve beta 20 artifacts under
+`release/history/beta20-before-beta21-zp8vy_yg/` and separate interrupted beta 21
+snapshots. All historical beta 6–20 notes, prior receipts and FEATURE-RELEASES
+ledger bytes remain unchanged.
+
+## Beta 21 candidate preparation — historical, before publication
+
+The following preparation record predates the publication receipts above; its
+then-pending gates are historical, not the current publication status.
 
 Candidate **v0.1.1-beta.21** retains embedded app version **0.1.1**. See
 [candidate scope, evidence and acceptance limits](releases/v0.1.1-beta.21.md).

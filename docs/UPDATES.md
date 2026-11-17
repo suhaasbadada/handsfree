@@ -1,6 +1,6 @@
 # Signed in-app updates (Mac beta 7 onward)
 
-The beta 21 candidate keeps updates entirely inline in the footer. Click **Updates**
+Published beta 21 keeps updates entirely inline in the footer. Click **Updates**
 to check; the refresh icon spins while checking. A verified offer changes the same
 action to **Download & update** with its version. Clicking that offer authorizes
 only that displayed version, freshly rechecked before download. Progress and retry
@@ -8,8 +8,9 @@ errors stay inline; there are no update or confirmation modals. Local status rea
 never contact the feed, and there is no unsolicited background download.
 
 Published older betas still use their **Check for updates** dialog and **Download & restart**
-action until upgraded. Candidate UI changes are not a claim of publication or
-installed-app replacement/restart acceptance.
+action until upgraded. Publication does not establish installed-app
+replacement/restart acceptance. Activation CI, Pages/feed byte readback and
+Homebrew publication/readback and tap CI remain separate distribution gates.
 
 Introduced in [published Mac beta 7](releases/v0.1.1-beta.7.md), not a retroactive
 change to beta 6. Beta 6 and earlier need one initial DMG/Homebrew bootstrap
