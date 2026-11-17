@@ -1,8 +1,8 @@
 ## Stable v0.1.1 publication and distribution activation — 2026-11-17
 
 The [stable release record](releases/v0.1.1.md) owns publication provenance,
-asset hashes, candidate acceptance evidence, limitations and outstanding
-distribution/installed-app gates. Follow [the release process](RELEASE-PROCESS.md)
+asset hashes, candidate acceptance evidence, completed distribution/installed-app
+gates and remaining hardware limits. Follow [the release process](RELEASE-PROCESS.md)
 for publication and activation; publication is not installed-app acceptance.
 
 ## Historical stable preparation checkpoint

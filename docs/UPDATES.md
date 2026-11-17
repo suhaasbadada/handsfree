@@ -8,15 +8,16 @@ errors stay inline; there are no update or confirmation modals. Local status rea
 never contact the feed, and there is no unsolicited background download.
 
 Published older betas still use their **Check for updates** dialog and **Download & restart**
-action until upgraded. Publication does not establish installed-app
-replacement/restart acceptance. Activation CI, Pages/feed byte readback and
-Homebrew publication/readback and tap CI remain separate distribution gates.
+action until upgraded. Stable v0.1.1 installed-app replacement/restart and private
+dictation acceptance passed, alongside activation CI, Pages/feed byte readback and
+Homebrew publication/readback and tap CI. See the [completion record](releases/v0.1.1.md)
+for exact evidence and limits; publication alone does not establish these gates.
 
 Introduced in [published Mac beta 7](releases/v0.1.1-beta.7.md), not a retroactive
 change to beta 6. Beta 6 and earlier need one initial DMG/Homebrew bootstrap
 upgrade. [Beta 8](releases/v0.1.1-beta.8.md) fixes initial Updates dialog focus and
-provides the first forward OTA test opportunity. Actual replacement/restart is
-not completed. The first beta 7 → beta 8 attempt failed before installation;
+provided the first forward OTA test opportunity. At that checkpoint, replacement/restart
+was not completed. The first beta 7 → beta 8 attempt failed before installation;
 see the repair evidence below. Publication, feed deployment and OTA acceptance
 are separate gates.
 
@@ -165,5 +166,5 @@ requires a separately authorized bootstrap/key-rotation plan for installed users
 
 Historical beta publication and bootstrap evidence remain in their release notes.
 The [stable release record](releases/v0.1.1.md) owns current hardware evidence and
-remaining installed OTA/restart and separate-Mac acceptance limits. Windows work
+completed installed OTA/restart and remaining separate-Mac acceptance limits. Windows work
 remains paused.

@@ -6,7 +6,7 @@
 
 Keep the existing **Tauri 2 / Rust / TypeScript / Swift** stack: TypeScript UI and shared Rust application logic remain reusable, while `src-tauri/src/platform` selects native behavior. Swift implements Mac capture, shortcuts, permissions, overlay and delivery. Keep OS APIs and dependencies target-specific behind that facade; do not spread Mac assumptions through shared orchestration or remove the retained Windows backend to narrow product focus. Those seams make future ports possible, not supported today. See [paused Windows implementation records](WINDOWS-NATIVE.md).
 
-Developer reference. For the prebuilt beta, see [the main README](../README.md). Commands below run from the repository root. See also [release packaging](RELEASING.md).
+Developer reference. For the prebuilt stable release, see [the main README](../README.md). Commands below run from the repository root. See also [release packaging](RELEASING.md).
 
 A native macOS menu-bar dictation app for Apple Silicon (macOS 14+). Tap **Fn / 🌐** to record, tap again to transcribe locally and paste into the original text field. **Escape** cancels. The compact **150 × 44 pt** bottom-center capsule is an AppKit **non-activating NSPanel**, not a web window; it does not take keyboard focus. Its off-white surface has graphite text/controls and muted-red recording bars. While recording, its circular **×** cancels, its graphite **✓** finishes, and its red bars respond to actual microphone power. Processing shrinks over 220 ms to a text-free **54 × 28 pt** capsule with three softly breathing graphite dots; Reduce Motion skips the shrink and keeps the dots static. The transparent backing panel remains fixed to avoid clipping and passes clicks through during processing. Escape and the dashboard's Cancel still work, and the native accessibility label is “Transcribing.” Silence shows **“No speech”** briefly on a single centered line, while detailed errors remain in the dashboard.
 
@@ -60,38 +60,22 @@ and the source-linked [machine inventory](state-machines.json). UI phase policie
 are observations, not native command authorization; shared Node/Rust fixtures
 protect existing eligibility while domain owners retain their own guards.
 
-Published beta 7 adds [signed in-app updates](UPDATES.md) via the footer's
-**Updates** dialog. Opening it reads the embedded distribution locally;
-**Check for updates** is the separate explicit network action. Published beta 6
-and its installed copies do not gain this feature until a bootstrap upgrade.
-Then explicitly check, choose **Download & restart…** when a newer release is
-offered, and confirm its version. Opening the dialog never checks online.
-See [beta 7 evidence](releases/v0.1.1-beta.7.md) for verified manual bootstrap and
-preservation, and [beta 8 evidence](releases/v0.1.1-beta.8.md) for the dialog focus
-fix and the failed first forward attempt. [Beta 9](releases/v0.1.1-beta.9.md)
-repairs the download TLS initialization; manual bootstrap preservation and native
-readiness are verified. Actual forward OTA replacement/restart,
-live audio and separate-Mac QA remain unperformed. Feed deployment is a separate
-operational check.
+See [signed in-app updates](UPDATES.md) for current controls, explicit-network
+policy and older-beta bootstrap requirements. The [stable release record](releases/v0.1.1.md)
+owns installed OTA/dictation acceptance, distribution evidence and hardware limits.
 
 1. Open **Settings** in the dashboard. Click **Allow** for Microphone. If denied, enable HandsFree under System Settings → Privacy & Security → Microphone.
 2. Click **Open settings** for Accessibility / Input Monitoring and enable HandsFree in **both** Privacy & Security panes. Accessibility is needed to inspect the original text field and post Paste; Input Monitoring is needed for the global Fn event tap. Quit/relaunch after changing grants. The app never changes preferences itself.
-3. Click **Download English model (~148 MB)** on Overview (or **Download** in Settings → Setup) to explicitly fetch **Whisper base.en (147,964,211 bytes)** from `huggingface.co/ggerganov/whisper.cpp`. SHA-256 is pinned and verified before atomic installation. No model download happens on launch. Subsequent dictation works offline. Retry a failed download; partial files are discarded rather than resumed.
+3. Follow the [first-launch model download instructions](INSTALL.md#first-launch--both-install-methods). The model is **Whisper base.en (147,964,211 bytes)** from `huggingface.co/ggerganov/whisper.cpp`. SHA-256 is pinned and verified before atomic installation. No model download happens on launch. Subsequent dictation works offline. Retry a failed download; partial files are discarded rather than resumed.
 4. In Keyboard settings, set **“Press 🌐 key to” → Do Nothing**. Also disable macOS Dictation's Fn/double-Fn shortcut if enabled. Select a text box in another app and briefly tap Fn (under 450 ms). Fn held down, key repeats, Fn+arrows/F-keys, and modifier chords must not toggle recording. External keyboards that do not expose hardware Fn events are unsupported.
 
-Close settings to keep the app in the menu bar. Left-click its waveform icon for settings / last transcript; right-click for the menu, cancel, or quit. There is no login-item auto-start in v1.
+Close the dashboard to keep the app in the menu bar. See [workflow controls](WORKFLOW.md) for tray actions and opt-in launch at login.
 
-### Practice field (Mac beta 6)
+### Private practice
 
-Overview now includes **Try your voice**: explicitly start a practice recording,
-speak the sample phrase, then choose **Finish**. Results appear in an editable,
-temporary field without paste, clipboard changes, normal-transcript replacement,
-or usage tracking. Cancel, Clear, leaving Overview, and window focus loss clear it.
-This tests microphone capture and the model, not shortcuts or external insertion.
-See [practice behavior and safeguards](practice.md). This feature is available in
-published Mac beta 6 with the same embedded app version (`0.1.1`). Historical
-beta 5 artifacts are unchanged. See [release evidence](releases/v0.1.1-beta.6.md);
-live microphone practice acceptance and separate-Mac QA were not performed.
+See [practice behavior and safeguards](practice.md) for the Home workflow and
+historical implementation notes; [desktop interface contracts](UI.md) owns the
+current layout and controls.
 
 ## Dashboard, sounds, and local usage
 
@@ -102,7 +86,9 @@ on the combination keydown. All existing saved bindings, including Ctrl+Shift+Sp
 remain unchanged. See [Windows gesture and upgrade instructions](WINDOWS.md#right-ctrl-and-upgrades).
 The Fn, CGEvent and permission details below apply to macOS and are unchanged.
 
-The main window intentionally stays light regardless of the system appearance: warm white surfaces, graphite text/actions, muted-red active/recording accents, rounded top navigation with SVG icons, and native system type. There are no blue/purple interface accents. The original liked rounded-square waveform logo is unchanged; the menu-bar template remains monochrome. Overview shows real local usage totals, the saved shortcut, and the last transcript with manual **Copy text**. Setup appears only when something is missing. Settings groups shortcuts, sound, permissions/model, and local privacy controls. The native pill shares the light palette without changing its dimensions, actions, or animation.
+See [desktop interface contracts](UI.md) for Home and Settings layout and
+[appearance](APPEARANCE.md) for the saved Light/Dark/System preference. The menu-bar
+template remains monochrome.
 
 **Dock lifecycle:** `LSUIElement` remains the background default. Initial dashboard display and explicit reopen use the main-thread native `hf_dashboard_visible(true)` helper to set regular activation policy and load the bundled app icon. Closing the main window hides it and sets accessory policy, leaving the menu-bar app running. Only explicit dashboard opens focus its window; recording/processing never change activation policy or activate the app. Diagnostics includes the actual native `activation_policy` (0 regular, 1 accessory). Native tests exercise both policies and assert that recording preserves accessory mode and its non-key capsule.
 
@@ -114,11 +100,11 @@ Combinations are observed globally through the existing native CGEvent tap, incl
 
 **Completion sound (optional, off by default):** Settings offers **Clean** (default) and **Warm**. Capture starts after input validation without a start cue or acoustic tail. Completion playback is prepared only after accepted input closes and drains. Each completion is the exact approved external pair: Clean `01-clean-pair.wav`, SHA-256 `a1eb8aeadfc425a5a217e3d35732762571c16d7e03969a5f3b0bfe41dbde6856`; Warm `02-warm-pair.wav`, SHA-256 `0e59d9fd1a43491f6193760ce55eb96807c6b6b08e7549f1e8d3b760eff416b8`. Both are mono PCM16 at 48 kHz, with identical 80 ms grains at 20 and 120 ms, a silent 20 ms gap, 40 ms final silence, no overlap and -10 dBFS peak. Legacy start assets retain their original first grain with 20 ms lead/trail silence for artifact/history consistency, but are not played during capture startup. `python3 scripts/generate-listening-cue.py --check` reproduces all four original synthetic assets using only the standard library. They remain bundled as `sounds/{clean,warm}-{start,end}.wav`; missing completion assets never substitute another cue or prevent microphone readiness.
 
-Fn, a custom shortcut, the capsule tick, and the automatic duration limit use the normal finish path. Exactly one finish cue can play, only after actual capture started successfully and the producer is closed, tap removed, engine stopped and converter drained successfully. Cancellation is checked again after draining. Escape/cancel, capture errors, quit/cleanup, duplicate finishes, and finishing during the pending start cue do not play a finish cue. Inference teardown preserves an already-playing finish cue; cancellation interrupts it. No microphone remains active during that playback. Device-level acoustic timing still requires interactive testing.
+Fn, a custom shortcut, the capsule tick, and the automatic duration limit use the normal finish path. Exactly one finish cue can play, only after actual capture started successfully and the producer is closed, tap removed, engine stopped and converter drained successfully. Cancellation is checked again after draining. Escape/cancel, capture errors, quit/cleanup, duplicate finishes, and finishing before capture starts do not play a finish cue. Inference teardown preserves an already-playing finish cue; cancellation interrupts it. No microphone remains active during that playback. Device-level acoustic timing still requires interactive testing.
 
-Both cues share the existing enabled preference and **Volume** (0–100%, default **50%**), independent of system volume; muting stops both players. Existing preferences, shortcuts and usage are unchanged. Deprecated `tap`/`bell` and unknown saved styles migrate to Clean without resetting other fields; IPC accepts only `clean`/`warm`. Profile selection saves only while idle, never autoplays, and is disabled during preview. The native session snapshots its profile so even a racing setting change cannot alter its finish. **Preview** explicitly auditions the selected double-tap pair, idle-only, even while sounds are off (0% stays silent), without opening the microphone. Starting dictation interrupts preview/previous playback. Capture waits for start duration and actual player completion, then a 180 ms quiet tail (normally about 300 ms plus route startup). Cancellation and recorder identity are checked throughout. The tail covers common output buffering, not every high-latency Bluetooth route; disable sounds if your route leaks the start cue into capture. Muted starts without active playback skip that wait. No system volume changes or automatic previews occur.
+Both profiles share the existing enabled preference and **Volume** (0–100%, default **50%**), independent of system volume; muting stops playback. Existing preferences, shortcuts and usage are unchanged. Deprecated `tap`/`bell` and unknown saved styles migrate to Clean without resetting other fields; IPC accepts only `clean`/`warm`. Profile selection saves only while idle, never autoplays, and is disabled during preview. The native session snapshots its profile so even a racing setting change cannot alter its finish. **Preview** explicitly auditions the selected double-tap pair while quiescent, even while sounds are off (0% stays silent), without opening the microphone. Starting dictation interrupts preview/previous playback. No system volume changes or automatic previews occur.
 
-Sound is **off by default** for new or missing preferences; explicitly saved on/off preferences are preserved, not reset on launch. Settings shows **Off/On** beside the toggle. Preview remains an explicit audition even while muted and never plays automatically. If sound is enabled, once the recorder is prepared the cue plays once without blocking the main thread. Speak after the optional cue, or when the listening capsule appears if muted. Stopping invalidates a pending capture start. Only intentional finish plays an end sound, never cancellation. Reduced Motion removes processing pulsing, and the waveform always represents actual metering rather than a fabricated animation.
+Sound is **off by default** for new or missing preferences; explicitly saved on/off preferences are preserved, not reset on launch. There is no start cue; speak when the listening capsule appears. Only intentional finish plays a completion sound, never cancellation. Reduced Motion removes processing pulsing, and the waveform always represents actual metering rather than a fabricated animation.
 
 **Recording limit:** Settings offers **2, 3, 4, or 5 minutes**, default **2 minutes**. The persisted choice is snapshotted at session start; changing it applies to the next recording. The limit counts unique captured 16-kHz samples, not cue delay, inference time, or overlapping chunk durations. At the limit, capture finishes automatically.
 

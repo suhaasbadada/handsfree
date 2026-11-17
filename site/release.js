@@ -4,7 +4,7 @@ export const release = Object.freeze({
   schemaVersion: 1,
   version: '0.1.1',
   publicAvailable: true,
-  status: 'Stable Mac v0.1.1 published and public bytes verified. Exact signed-candidate hardware and private Practice checks passed on the built-in Mac microphone; installed OTA/restart acceptance and separate Homebrew publication remain pending. Self-signed, not notarized; separate-Mac installation unverified.',
+  status: 'Stable Mac v0.1.1 published and public bytes verified. Homebrew offers the same release. Installed in-app update/restart and private dictation checks passed on the built-in Mac microphone. Self-signed, not notarized; separate-Mac installation, physical Fn and universal Bluetooth behavior are not verified.',
   dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1/HandsFree-0.1.1-macos-arm64.dmg',
 });
 
