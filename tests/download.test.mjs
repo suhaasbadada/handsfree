@@ -104,7 +104,8 @@ test('visible release status identifies the active stable channel and preserves 
   assert.ok(status.textContent.startsWith('Mac stable v0.1.1 · DMG · Self-signed, not notarized.'));
   assert.ok(status.textContent.includes(release.status));
   assert.match(status.textContent, /built-in Mac microphone/);
-  assert.match(status.textContent, /installed OTA\/restart acceptance and separate Homebrew publication remain pending/);
+  assert.match(status.textContent, /Installed in-app update\/restart and private dictation checks passed/);
+  assert.match(status.textContent, /Homebrew offers the same release/);
   const beta = { ...release, version: '0.1.1-beta.24',
     dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.24/HandsFree-0.1.1-beta.24-macos-arm64.dmg', status: 'Historical beta fixture.' };
   renderDownload(document, { os: 'mac', arch: 'arm64' }, beta);

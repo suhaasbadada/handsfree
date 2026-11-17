@@ -172,7 +172,12 @@ try {
     assert.equal(await evaluate(`document.querySelector('.site-header .beta-badge').textContent==='STABLE' && document.querySelector('.site-header .beta-badge').getBoundingClientRect().width>0`), true, 'Visible uppercase stable identity at every width');
     assert.equal(await evaluate(`document.getElementById('primary-download').getBoundingClientRect().bottom < innerHeight`), true, `Primary action above fold at ${width}px`);
     console.log(`Light ${width}px: layout and assets passed`);
-    if (width === 1280) await screenshot('desktop');
+    if (width === 1280) {
+      await screenshot('desktop');
+      await evaluate(`document.querySelector('details.release-note').open = true`);
+      await screenshot('release-details');
+      await evaluate(`document.querySelector('details.release-note').open = false`);
+    }
   }
   await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 844, deviceScaleFactor: 1, mobile: true });
   await send('Emulation.setTouchEmulationEnabled', { enabled: true });
@@ -197,6 +202,19 @@ try {
   assert.equal(dark.background, 'rgb(247, 246, 243)');
   assert.equal(dark.animation, 'none');
   assert.equal(dark.scroll, dark.width);
+  const contrast = await evaluate(`(() => {
+    const rgb = value => value.match(/[\\d.]+/g).slice(0, 3).map(Number);
+    const luminance = value => rgb(value).map(x => { x /= 255; return x <= .04045 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4; })
+      .reduce((sum, x, i) => sum + x * [.2126, .7152, .0722][i], 0);
+    return [...document.querySelectorAll('#why p, #why a, #install-mac p, #install-mac a, #install-mac code, #hero-homebrew p, #primary-download')].map(node => {
+      let ancestor = node;
+      while (ancestor && getComputedStyle(ancestor).backgroundColor === 'rgba(0, 0, 0, 0)') ancestor = ancestor.parentElement;
+      const foreground = luminance(getComputedStyle(node).color);
+      const background = luminance(getComputedStyle(ancestor).backgroundColor);
+      return { text: node.textContent.slice(0, 60), ratio: (Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05) };
+    });
+  })()`);
+  for (const { text, ratio } of contrast) assert.ok(ratio >= 4.5, `Public journey text contrast: ${text} (${ratio.toFixed(2)}:1)`);
   await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
   await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
   assert.equal(await evaluate('document.activeElement.textContent'), 'Skip to content');

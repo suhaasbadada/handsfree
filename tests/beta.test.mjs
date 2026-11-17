@@ -567,9 +567,11 @@ test('Mac stable activation coordinates current docs and all static download lin
   for (const path of ['README.md', 'docs/INSTALL.md', 'docs/UPDATES.md', 'site/index.html']) {
     const source = read(path);
     assert.match(source, /Download &(?:amp;)? update/, `${path} describes published stable inline updates`);
-    assert.match(source, /another click/, `${path} explains changed-version consent`);
-    assert.match(source, /[Oo]lder betas/, `${path} labels the legacy modal flow`);
   }
+  // Detailed legacy controls and changed-version consent belong in the linked guide,
+  // not duplicated in the concise README and landing page.
+  assert.match(read('docs/UPDATES.md'), /another click/);
+  assert.match(read('docs/UPDATES.md'), /older betas/);
 });
 
 test('beta 11 publication records immutable source and pending deployment/acceptance gates', () => {
@@ -607,7 +609,7 @@ test('beta 7 publication evidence distinguishes artifact source, bootstrap and p
     '2f735b7e48de1d60d96fbe592987991796a05fa7d8510b6e4e3b63afbf715b30', 'Historical beta 6 notes remain byte-identical');
   assert.equal(createHash('sha256').update(read('site/updates/macos-arm64.json')).digest('hex'),
     '783a4c1ac21a69e5da782b06e59e29a3716d051bd92973182da434d30ca52fa7', 'Activation preserves exact anonymously verified stable feed bytes');
-  for (const path of ['README.md', 'docs/INSTALL.md', 'SECURITY.md', 'docs/UPDATES.md']) {
+  for (const path of ['docs/INSTALL.md', 'docs/UPDATES.md']) {
     const source = read(path);
     assert.match(source, /Check for updates/);
     assert.match(source, /Download & restart/);
@@ -628,7 +630,7 @@ test('beta 8 evidence separates published focus fix from pending real OTA accept
 });
 
 test('Mac Compatibility paste release guidance discloses opt-in and once-only delivery limits', () => {
-  for (const path of ['README.md', 'docs/INSTALL.md', 'docs/COMPATIBILITY-PASTE.md', 'docs/releases/v0.1.1-beta.5.md']) {
+  for (const path of ['docs/INSTALL.md', 'docs/COMPATIBILITY-PASTE.md', 'docs/releases/v0.1.1-beta.5.md']) {
     const source = read(path).replace(/\s+/g, ' ');
     assert.match(source, /Settings → Compatibility paste/);
     assert.match(source, /off by default|Default off/i);

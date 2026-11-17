@@ -1,4 +1,29 @@
-# Practice in Overview
+# Private practice on Home
+
+On a ready Mac, Home combines usage totals and **Try your voice**, marked
+**Private**. Choose **Record**, speak, then **Finish**. The editable result is
+temporary: no paste, clipboard change or usage is counted; leaving Home, losing
+window focus or restarting clears it. **Clear practice** removes the text;
+**Record again** starts over. Escape or **Cancel practice** discards the session.
+Your configured shortcut also works while Home is focused; this tests private
+capture, not external insertion. The gear opens Settings. Setup/model download
+lives under **Settings → Setup**; the status button opens **Product status** for
+readiness and recovery, with **Private test** when ready. Appearance is under
+**Settings → Dictation → Appearance**.
+
+Stable v0.1.1 passed installed private known-speech checks with the Record button
+and synthetic Fn using the built-in Mac microphone. This does not establish
+physical Fn, external insertion, separate-Mac or universal Bluetooth acceptance.
+See the [stable completion record](releases/v0.1.1.md) and [current interface
+contract](UI.md). No permission check or visible meter alone proves recognition.
+
+## Historical beta implementation notes
+
+The following checkpoints are preserved as history. Overview, Get started,
+Preferences and Start test refer to earlier interfaces, not current navigation;
+their unperformed acceptance statements describe those checkpoints.
+
+### Practice in Overview
 
 Extended shortcut instructions and receipt evidence are shown while **Get started**
 is open. Returning ready users keep a compact practice panel with the input meter
