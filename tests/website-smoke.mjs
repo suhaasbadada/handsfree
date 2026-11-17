@@ -30,6 +30,15 @@ async function evaluate(expression) {
   if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails));
   return result.result.value;
 }
+async function waitForDemoState(state) {
+  const deadline = Date.now() + 8000;
+  while (Date.now() < deadline) {
+    if (await evaluate(`document.querySelector('.dictation-demo').dataset.state`) === state) return;
+    await delay(25);
+  }
+  assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), state,
+    `Demo reaches ${state} within eight seconds`);
+}
 async function screenshot(name) {
   const { data } = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
   const path = join(tmpdir(), `handsfree-website-${name}.png`);
@@ -58,6 +67,8 @@ try {
     if (message.method === 'Runtime.exceptionThrown') errors.push(message.params);
   };
   await send('Page.enable');
+  // The CDP-created page otherwise starts behind about:blank and its timers may be throttled.
+  await send('Page.bringToFront');
   await send('Runtime.enable');
   await send('Emulation.setEmulatedMedia', { features: [
     { name: 'prefers-reduced-motion', value: 'reduce' },
@@ -242,7 +253,7 @@ try {
     // Classic scrollbars reduce clientWidth; innerWidth includes their gutter.
     assert.equal(await evaluate(`new Promise(resolve => requestAnimationFrame(() => resolve(document.documentElement.scrollWidth === document.documentElement.clientWidth && document.getElementById('primary-download').getBoundingClientRect().bottom < innerHeight)))`), true, `Normal motion: visible download and no overflow at ${width}px`);
   }
-  await delay(100);
+  await waitForDemoState('listening');
   assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'listening', 'Motion change starts automatic loop without a play action');
   await activate(' ');
   assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'done', 'Space pauses animation on a meaningful static result');
@@ -251,13 +262,13 @@ try {
   await delay(2500);
   assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'done', 'Paused animation has no stale transitions');
   await activate();
-  await delay(1700);
+  await waitForDemoState('processing');
   assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'processing');
   assert.equal(await evaluate(`getComputedStyle(document.querySelector('.demo-dots')).display`), 'flex', 'Three processing dots shown');
-  await delay(800);
+  await waitForDemoState('done');
   assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'done');
   assert.equal(await evaluate(`document.getElementById('demo-text').value`), sample, 'Complete transcript appears');
-  await delay(2500);
+  await waitForDemoState('listening');
   assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'listening', 'Result hold resets into the next automatic loop');
   assert.equal(await evaluate(`document.activeElement.id==='demo-pause' && !document.querySelector('.dictation-demo [aria-live],.dictation-demo [role="status"]')`), true, 'Loops preserve focus without live announcement spam');
   await evaluate(`window.dispatchEvent(new PageTransitionEvent('pagehide'))`);
@@ -272,7 +283,7 @@ try {
   await evaluate(`delete document.hidden;document.dispatchEvent(new Event('visibilitychange'))`);
   assert.equal(await evaluate(`document.querySelector('.dictation-demo').dataset.state`), 'listening');
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
-  await delay(100);
+  await waitForDemoState('done');
   assert.equal(await evaluate(`document.getElementById('demo-text').value`), sample, 'Changing to reduced motion cancels the loop');
   assert.deepEqual(errors, []);
   await send('Emulation.setScriptExecutionDisabled', { value: true });

@@ -1,6 +1,6 @@
 # Appearance
 
-Settings → Preferences has one Appearance select: **Light**, **Dark**, **System**.
+Settings → Dictation has one Appearance select: **Light**, **Dark**, **System**.
 System is the default for older settings and an absent or malformed appearance
 field. Other saved preferences and usage totals are preserved. No localStorage,
 theme navigation, capture permission or recording-state change is involved.
