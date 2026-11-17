@@ -12,9 +12,11 @@ can remove that engine's output capability; accessing its mixer/output would
 therefore create an invalid zero-channel output graph. Input never accesses a
 player, mixer or output node. Output never accesses an input node.
 
-Input negotiation/start completes first, with PCM acceptance disabled, so a
-Bluetooth input profile settles before the fresh output-only engine is created.
-Output freezes the system-default output UID read-only and checks both the live
+Input negotiation/start completes with PCM acceptance disabled, followed immediately
+by input revalidation and atomic acceptance. There is no start cue or quiet tail.
+Completion asset read/decode and output construction/prepare/start happen only after
+accepted PCM closes and drains. Admission freezes the system-default output UID
+read-only (without constructing output) and completion checks both the live
 default and actual output AU device plus nonzero rate/channels. There is no
 default/device/rate write, aggregate creation, automatic fallback, or recording retry.
 Disabled sounds or zero volume create no output engine and add no cue tail.
@@ -22,11 +24,11 @@ Profile and volume are frozen at admission. Preview remains an independent,
 explicitly idle-only AVAudioPlayer action with no idle input engine.
 
 Preparation installs the tap with acceptance closed and starts the input engine,
-then prepares/starts optional output.
+then immediately validates and enables input; no output work is on this path.
 Input-start commit means running, not accepted capture. An input configuration
 notification after that commit and before acceptance only advances a locked
 revision; it never opens PCM or reads OS state in the notification callback.
-After output preparation, **before the start cue**, the serial owner revalidates
+After input preparation the serial owner revalidates
 the frozen selected/actual input device, hardware format, node output format,
 converter input format and engine `isRunning` (through the Objective-C exception
 boundary). It repeats that validation immediately before enabling acceptance.
@@ -36,21 +38,20 @@ the atomic revision check rather than accepting an unvalidated snapshot.
 Revocation/deadline tombstones cannot be cleared by validation. Once acceptance
 commits, notifications still close the producer immediately and fail capture;
 this preaccept confirmation never weakens runtime route failure.
-Start-cue completion plus the existing 180 ms quiet tail permits acceptance,
-subject to the original epoch/start gate and route/format checks. Startup has
+Acceptance follows immediately, subject to the original epoch/start gate and
+route/format checks. Startup has
 two phase-bounded, independent three-second budgets, not one global three-second
 whole-startup limit. The hardware deadline covers factory construction, input
-preparation (including at most one reconciliation), output preparation and
-post-output/pre-cue validation. Successful `route_ready` atomically retires that
+preparation (including at most one reconciliation) and input validation.
+Successful `route_ready` atomically retires that
 deadline and transfers to a separate three-second handoff deadline covering
-start-cue completion, quiet tail and enable/revalidation. Only actual
-`audioReady`, failure or cancellation retires the handoff; cue completion never
-extends/restarts it. Late/duplicate hardware callbacks cannot kill handoff, and
-retired callbacks cannot affect listening or end cues. Muted sessions transfer
-the same budgets but skip playback and quiet tail, enabling immediately.
+immediate enable/revalidation. Only actual `audioReady`, failure or cancellation
+retires the handoff. Late/duplicate hardware callbacks cannot kill handoff, and
+retired callbacks cannot affect listening or end cues. Audible and muted sessions
+use the same immediate enable path, without an intentional wait.
 
 Both watchdogs run independently of the serial owner, so blocked factory,
-cue-play or enable OS calls cannot starve them. First-failure diagnostics identify
+input-prepare or enable OS calls cannot starve them. First-failure diagnostics identify
 `hardware_startup_timeout` or `cue_handoff_timeout`, preserving an earlier cause.
 The logical startup budget is at most 3 s hardware + 3 s handoff, with no added
 normal-path wait. Deadline/cancellation permanently close acceptance and report
@@ -85,8 +86,8 @@ authorize another preparation. The second failure is final. Configuration
 changes after input-start commit but before acceptance require the read-only
 confirmation above, not another preparation. Listening and end-cue periods
 retain their existing failure disposition. Output configuration notifications
-remain strict failures. No output engine is created until
-input negotiation succeeds, and neither input preparation accepts PCM.
+retire completion nonfatally after drain. No output engine is created until
+Finish has closed and drained accepted PCM; neither input preparation accepts PCM.
 
 Bounded format diagnostics retain `negotiationAttempts`, `initial_config_change`
 and `initialInputRate` alongside the terminal failure metadata/current input rate;
@@ -106,8 +107,8 @@ cached value and schedule at most one owner refresh, never wait on hardware.
 `hf_audio_status(generation, epoch)` returns bounded metadata for that exact
 identity: `audioReady`, diagnostic `reason`, format/rate metadata and bounded
 timing events. It neither constructs an engine nor authorizes capture.
-Ready format metadata includes `inputRate`, `inputChannels`, and, when audible,
-`outputRate`, `outputChannels`, `cueRate`. First startup/playback failure preserves
+Ready format metadata includes `inputRate` and `inputChannels`; completion later
+adds available `outputRate`, `outputChannels`, `cueRate`. First startup/playback failure preserves
 `failureStage`, sanitized/truncated (64-character) `failureDomain`, `failureCode`
 and a fixed `failureException` marker for contained Objective-C exceptions.
 Diagnostics are collected before owner teardown, including partial preparation;
@@ -140,8 +141,14 @@ the session but cannot corrupt already-final PCM or fail transcription.
 
 Normal `hf_finish` snapshots the exact session on AppKit, then closes and drains
 the producer on the calling FIFO worker, **outside AppKit**. Rust publishes EOS
-after this drain. Both engines stay alive for the end cue; completion or its
-three-second deadline tears it down. Generic `hf_stop` preserves that cue and
+after this drain. Only after successful drain with actual accepted PCM does
+optional completion read/decode/create/prepare run asynchronously on the same
+serial owner. Missing assets/output metadata, changed frozen output UID, output
+failure or its three-second deadline are nonfatal to final PCM. No current-default
+fallback is permitted. The deadline starts before deferred construction and
+prevents late playback even if an OS call returns late; cancellation does likewise.
+No-PCM, failed and cancelled sessions perform no completion work. Both engines
+retire together. Generic `hf_stop` preserves that cue and
 waits for full retirement outside AppKit. Cancellation closes acceptance
 immediately under the short session lock, then queues hardware cleanup.
 
@@ -161,8 +168,8 @@ fake idle; startup watchdogs bound logical failure, not OS-call retirement.
 Permission-free native harnesses cover release-before-Finish failure, revoked
 epochs, drain failure, nonfatal end-cue errors, blocked preparation with runnable
 main-loop work, independent hardware/handoff timeouts (including blocked
-factory/cue/enable), virtual 2.633 s preparation plus cue/tail crossing 3 s
-successfully, stale/duplicate deadlines, muted handoff, cancellation and
+factory/enable), virtual 2.633 s preparation with immediate acceptance,
+stale/duplicate deadlines, muted handoff, cancellation and
 withheld end-cue completion holding a queued restart until retirement. Capsule
 accessibility checks distinguish Starting from Listening. These are synthetic
 operations and in-memory conversion, not microphone, playback or audibility
@@ -175,8 +182,8 @@ Suggested shared inventory updates (owned by the coordinating agent):
   accepted/drained facts, independent phase-scoped hardware/handoff watchdogs
   and retirement barrier.
   Remove obsolete claims of main-thread hardware startup.
-- `cue-capture-handoff`: describe one session's isolated input/output ownership, completion/deadline
-  handoff, quiet tail, producer drain before end cue and full retirement before
+- `cue-capture-handoff`: describe capture-first immediate input acceptance and deferred completion/deadline
+  output, producer drain before end cue and full retirement before
   admitting another FIFO start.
 - `overlay` and `practice-lease`: readiness is exact-session observation, not a
   new phase or authorization; native meter access does not wait on hardware.

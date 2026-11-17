@@ -82,12 +82,12 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
-  min-width: 104px;
-  padding: 7px 12px;
+  min-height: 32px;
+  min-width: 0;
+  padding: 5px 10px;
   border: 1px solid transparent;
-  border-radius: 18px;
-  background: var(--button);
+  border-radius: 6px;
+  background: transparent;
   line-height: 20px;
   cursor: pointer;
   transition: background .15s;
@@ -116,6 +116,9 @@ nav { display: flex; flex-direction: column; width: 100%; gap: 6px; flex: none; 
 .nav svg { width: 17px; height: 17px; }
 .nav.active { background: var(--active); color: var(--text); font-weight: 500; }
 main { width: 100%; max-width: 760px; margin: 0 auto; padding: 28px 12px 16px 4px; min-width: 0; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-gutter: stable; }
+main::-webkit-scrollbar, dialog::-webkit-scrollbar { width: 6px; height: 6px; }
+main::-webkit-scrollbar-thumb, dialog::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+main::-webkit-scrollbar-track, dialog::-webkit-scrollbar-track { background: transparent; }
 h1 { margin: 0 0 12px; }
 h2, h3 { margin: 0; }
 .page-heading { position: relative; margin: 0 0 22px; padding-inline-end: 210px; min-height: 40px; }
@@ -141,7 +144,7 @@ h2, h3 { margin: 0; }
 .practice-link small { margin-top: 3px; font-size: 12px; color: var(--muted); }
 .hero p { color: var(--muted); margin: 0; line-height: 1.8; }
 .hero .hint { margin-top: 4px; font-size: 12px; }
-kbd { display: inline-block; max-width: 100%; background: var(--button); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; padding: 1px 7px; overflow-wrap: anywhere; }
+kbd { display: inline-block; max-width: 100%; color: var(--accent); background: var(--button); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; padding: 1px 7px; overflow-wrap: anywhere; }
 .activity { margin-top: 24px; }
 .activity > h2 { margin-bottom: 10px; font-size: 12px; color: var(--muted); font-weight: 500; }
 .metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; padding: 0; margin: 0; border: 0; background: transparent; }
@@ -167,7 +170,7 @@ kbd { display: inline-block; max-width: 100%; background: var(--button); border:
 .preferences > h2 { margin-bottom: 0; }
 .setting-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .setting-row:last-child { border-bottom: 0; padding-bottom: 0; }
-.preferences .setting-row { padding-top: 16px; padding-bottom: 16px; }
+.preferences .setting-row { padding-top: 12px; padding-bottom: 12px; }
 .preferences .setting-row:last-child { padding-bottom: 0; }
 .preference-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; border-bottom: 1px solid var(--line); }
 .preferences .preference-pair .setting-row { border: 0; padding-bottom: 7px; }
@@ -181,14 +184,17 @@ kbd { display: inline-block; max-width: 100%; background: var(--button); border:
 .shortcut-row { flex-wrap: wrap; }
 .shortcut-row > div:first-child { min-width: 60px; }
 .shortcut-value { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; min-width: 0; max-width: 75%; }
-#change-shortcut { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 132px; max-width: 100%; border-color: var(--line); text-align: left; }
+#change-shortcut { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 88px; max-width: 100%; border-color: var(--line); background: var(--button); text-align: left; }
 #change-shortcut svg { width: 16px; height: 16px; }
 #change-shortcut[aria-pressed=true] { border-color: var(--accent); color: var(--accent); background: var(--active); }
-#saved-shortcut { overflow-wrap: anywhere; }
+#saved-shortcut { color: var(--accent); overflow-wrap: anywhere; }
 .shortcut-value .text-action { background: transparent; min-width: 0; color: var(--muted); padding-inline: 6px; }
 #stop-shortcut { min-width: 0; }
 #shortcut-feedback { flex-basis: 100%; color: var(--danger); margin: 0; }
-select { height: 36px; width: 132px; max-width: 100%; border: 1px solid var(--line); border-radius: 9px; background: var(--button); padding: 0 10px; }
+/* WebKit native option text can leak scrollable overflow despite a bounded
+   select border box. Contain the control, not the main scroller or its content. */
+select { height: 32px; width: 132px; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; appearance: none; -webkit-appearance: none; border: 1px solid transparent; border-radius: 4px; background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%23817a74' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 6px center / 14px; padding: 0 24px 0 6px; }
+select:hover:not(:disabled) { background-color: var(--button); }
 .state { color: var(--muted); }
 .switch { position: relative; width: 40px; height: 24px; flex: none; }
 .switch input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; z-index: 1; }
@@ -252,10 +258,14 @@ dialog::backdrop { background: #0005; backdrop-filter: blur(5px); }
 .health-checks li:has(button:not([hidden])) > div { display: block; }
 .health-checks li:has(button:not([hidden])) span { text-align: left; }
 .health-checks button { flex: none; max-width: 48%; white-space: normal; }
-.health-input-controls { display: flex; gap: 8px; flex-wrap: wrap; }
-.health-input-controls select { min-width: 0; max-width: 100%; flex: 1 1 180px; }
+.health-heading, .health-tools { display: flex; align-items: center; gap: 4px; }
+.health-heading { justify-content: space-between; gap: 12px; }
+#health-input .health-input-controls { display: flex; flex: 0 1 280px; gap: 4px; align-items: center; }
+.health-input-controls select { min-width: 0; max-width: 100%; width: 100%; flex: 1 1 140px; }
+#health-input > div:first-child { flex: 0 1 auto; }
 #health-summary { overflow-wrap: anywhere; }
-#health-dialog .dialog-actions { position: sticky; bottom: -24px; margin-inline: -24px; padding: 12px 24px; margin-bottom: -24px; background: var(--surface); border-top: 1px solid var(--line); flex-wrap: wrap; }
+#health-dialog .dialog-actions { position: sticky; bottom: -24px; margin-inline: -24px; padding: 12px 24px; margin-bottom: -24px; background: var(--surface); flex-wrap: wrap; }
+#health-dialog .dialog-actions:has(#health-practice[hidden]) { display: none; }
 dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .dialog-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
 @keyframes pulse { 50% { opacity: .4; } }
@@ -311,18 +321,16 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .test-badge svg { width: 12px; height: 12px; }
 .practice-bottom { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 .practice-bottom .subtle { text-align: right; font-size: 10px; line-height: 1.6; }
-.icon-action { display: inline-flex; align-items: center; justify-content: center; width: 36px; min-width: 36px; height: 36px; padding: 0; background: transparent; }
+.icon-action { display: inline-flex; align-items: center; justify-content: center; width: 32px; min-width: 32px; height: 32px; padding: 0; background: transparent; }
 .icon-action svg { width: 17px; height: 17px; }
-.practice-actions .primary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding-inline: 10px; white-space: nowrap; }
+.practice-actions .primary, #health-practice { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 32px; padding-inline: 10px; white-space: nowrap; }
 .practice-actions .primary svg { width: 16px; height: 16px; }
 .practice label { font-weight: 600; }
 .practice textarea { width: 100%; box-sizing: border-box; resize: vertical; height: clamp(112px, 16vh, 152px); min-height: 104px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 9px; background: var(--input); color: inherit; font: inherit; line-height: 1.65; }
 .practice textarea:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
-.practice-actions { display: grid; width: 100%; grid-template-columns: 125px 36px minmax(0,1fr); grid-template-rows: 40px; gap: 8px; align-items: center; }
-#practice-start, #practice-finish { grid-area: 1 / 1; width: 125px; }
+.practice-actions { display: grid; width: 100%; grid-template-columns: 104px 32px; grid-template-rows: 32px; gap: 8px; align-items: center; }
+#practice-start, #practice-finish { grid-area: 1 / 1; width: 104px; }
 #practice-cancel, #practice-clear { grid-area: 1 / 2; }
-#practice-setup { grid-area: 1 / 3; justify-self: end; display: inline-flex; align-items: center; gap: 6px; min-width: 0; background: transparent; color: var(--muted); }
-#practice-setup svg { width: 16px; height: 16px; }
 #practice-message { block-size: 2.6em; color: var(--muted); font-size: 12px; line-height: 1.3; overflow-y: auto; overflow-wrap: anywhere; }
 .practice-status-slot { position: relative; }
 .practice-status-slot:has(#practice-recovery:not([hidden])) #practice-message { padding-inline-end: 145px; }
@@ -331,7 +339,8 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .stable-copy { display: grid; min-width: 0; }
 .stable-copy > * { grid-area: 1 / 1; }
 .copy-reserve { visibility: hidden; pointer-events: none; }
-.microphone-controls { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 55%; }
+.microphone-controls { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 0 1 280px; max-width: 60%; }
+.microphone-controls select { flex: 1; }
 .microphone-controls select { min-width: 0; max-width: 100%; }
 .practice-sample { color: var(--muted); font-size: 13px; line-height: 1.6; }
 #updates-open { display: inline-flex; align-items: center; gap: 5px; min-width: 0; min-height: 24px; height: auto; padding: 0; background: transparent; color: var(--muted); }

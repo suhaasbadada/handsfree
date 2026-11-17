@@ -25,7 +25,7 @@ const glyphs: Record<string,string> = {
  words:'<path d="M4 5h16M4 10h12M4 15h16M4 20h9"/>',
  wave:'<path d="M4 10v4M8 6v12M12 3v18M16 6v12M20 10v4"/>',
  update:'<path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/>',
- play:'<path d="m9 5 10 7-10 7Z"/>', chevron:'<path d="m8 10 4 4 4-4"/>'
+  play:'<path d="m9 5 10 7-10 7Z"/>', pause:'<path d="M8 5v14M16 5v14"/>', plus:'<path d="M12 5v14M5 12h14"/>', chevron:'<path d="m8 10 4 4 4-4"/>'
 };
 const icon = (name: string) => `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${glyphs[name]}</svg>`;
 document.querySelector('#app')!.innerHTML = `
@@ -57,35 +57,35 @@ document.querySelector('#app')!.innerHTML = `
     </section>
     <section id="practice" class="card practice" aria-labelledby="practice-title" hidden>
       <h2 id="practice-title" class="sr-only">Try your voice</h2>
-      <p id="shortcut-tutorial"></p><p id="shortcut-evidence" class="subtle" role="status">Shortcut not tested yet.</p>
+      <p id="shortcut-tutorial"><span id="practice-gesture">Press</span> <kbd id="practice-shortcut">…</kbd><span id="practice-instruction"> to start / finish.</span></p><p id="shortcut-evidence" class="subtle" role="status">Shortcut not tested yet.</p>
       <div class="practice-meter"><label for="input-level">Microphone</label><meter id="input-level" class="sr-only" min="0" max="1" value="0" aria-describedby="input-level-help"></meter><div id="practice-waveform" class="input-waveform" aria-hidden="true">${Array.from({length:9},()=>'<span></span>').join('')}</div><span id="practice-timer" aria-label="Recording time">— / —</span><span id="input-level-help" class="sr-only">Start a private test to check input. No audio file is saved.</span></div>
     <label for="practice-text" class="sr-only">Practice dictation</label>
     <textarea id="practice-text" rows="4" autocomplete="off" spellcheck="false" aria-describedby="practice-privacy" placeholder="Speak freely. This space is just for you."></textarea>
-     <div class="practice-bottom"><div class="practice-actions"><button id="practice-start" class="primary" disabled>${icon('mic')}<span>Start test</span></button><button id="practice-finish" class="primary" disabled hidden>${icon('check')}<span>Finish</span></button><button id="practice-cancel" class="icon-action" aria-label="Cancel practice" title="Cancel practice" disabled hidden>${icon('close')}</button><button id="practice-clear" class="icon-action" aria-label="Clear practice" title="Clear practice">${icon('clear')}</button><button id="practice-setup" class="text-action" aria-label="Microphone settings" title="Microphone settings">${icon('settings')}<span>Settings</span></button></div></div>
+     <div class="practice-bottom"><div class="practice-actions"><button id="practice-start" class="primary" disabled>${icon('mic')}<span>Start test</span></button><button id="practice-finish" class="primary" disabled hidden>${icon('check')}<span>Finish</span></button><button id="practice-cancel" class="icon-action" aria-label="Cancel practice" title="Cancel practice" disabled hidden>${icon('close')}</button><button id="practice-clear" class="icon-action" aria-label="Clear practice" title="Clear practice">${icon('clear')}</button></div></div>
      <p id="practice-privacy" class="sr-only">No clipboard or usage counted. Clears when you leave.</p>
-    <div class="practice-status-slot"><p id="practice-message" role="status" aria-label="Practice status" aria-live="polite"></p><button id="practice-recovery" class="text-action" hidden>Microphone settings</button></div>
+    <div class="practice-status-slot"><p id="practice-message" role="status" aria-label="Practice status" aria-live="polite"></p><button id="practice-recovery" class="text-action" hidden>View problem</button></div>
    </section>
     <p id="practice-platform-help" class="subtle" hidden>Private practice is available on macOS. Use Overview for your configured dictation shortcut.</p>
  </section>
  <section id="settings" hidden aria-labelledby="settings-title">
      <div class="settings-intro page-heading"><h1 id="settings-title">Settings</h1><p>Make HandsFree work for you.</p><button id="settings-started" class="text-action" hidden>Setup guide</button></div>
     <section id="workflow" class="card" aria-labelledby="workflow-title" hidden><h2 id="workflow-title">General</h2>
-     <div class="setting-row"><div><h3>Keyboard shortcuts</h3><p id="workflow-pause-state">Checking…</p><p>Pause shortcuts without interrupting a recording. Private tests stay available.</p></div><button id="workflow-pause" disabled>Pause shortcuts</button></div>
+     <div class="setting-row"><div><h3>Keyboard shortcuts</h3><p id="workflow-pause-state">Checking…</p><p>Pause shortcuts without interrupting a recording. Private tests stay available.</p></div><button id="workflow-pause" class="icon-action" aria-label="Pause shortcuts" title="Pause shortcuts" disabled>${icon('pause')}</button></div>
     <div class="setting-row"><div><h3>Launch at login</h3><p id="login-state" role="status">Checking…</p><button id="login-settings" class="text-action" hidden>Open Login Items</button><button id="login-cancel" class="text-action" hidden>Cancel pending registration</button></div><label class="switch"><input id="launch-at-login" type="checkbox" role="switch" aria-label="Launch at login" aria-describedby="login-state" disabled><span aria-hidden="true"></span></label></div>
     <div class="setting-row"><div><h3><label for="excluded-app-choice">Excluded apps</label></h3><p>Prevent external dictation starts in these apps. Existing recordings are unaffected.</p></div></div>
-    <div class="workflow-app-controls"><select id="excluded-app-choice" aria-label="Running app to exclude" disabled><option value="">Choose a running app</option></select><button id="excluded-app-add" disabled>Add</button><button id="excluded-app-refresh" class="text-action" disabled>Refresh</button></div>
+    <div class="workflow-app-controls"><select id="excluded-app-choice" aria-label="Running app to exclude" disabled><option value="">Choose a running app</option></select><button id="excluded-app-add" class="icon-action" aria-label="Add excluded app" title="Add excluded app" disabled>${icon('plus')}</button><button id="excluded-app-refresh" class="icon-action" aria-label="Refresh running apps" title="Refresh running apps" disabled>${icon('update')}</button></div>
     <ul id="excluded-apps" aria-label="Excluded apps"></ul><p id="workflow-error" class="feedback" role="status" hidden></p>
    </section>
    <section class="card preferences" aria-labelledby="preferences-title"><h2 id="preferences-title">Dictation</h2>
      <div class="setting-row"><div><h3><label for="recording-limit">Recording limit</label></h3><p>Maximum length of each recording.</p></div><select id="recording-limit" title="Applies to the next recording"><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="240">4 minutes</option><option value="300">5 minutes</option></select></div>
-    <div id="microphone-choice-row" class="setting-row" hidden><div><h3><label for="microphone-choice">Microphone</label></h3><p id="microphone-choice-help">Applies to the next recording. Unavailable selections never fall back silently.</p></div><div class="microphone-controls"><select id="microphone-choice" aria-describedby="microphone-choice-help" disabled><option value="">System default</option></select><button id="microphone-refresh" class="text-action" disabled>Refresh</button></div></div>
+    <div id="microphone-choice-row" class="setting-row" hidden><div><h3><label for="microphone-choice">Microphone</label></h3><p id="microphone-choice-help">Applies to the next recording. Unavailable selections never fall back silently.</p></div><div class="microphone-controls"><select id="microphone-choice" aria-describedby="microphone-choice-help" disabled><option value="">System default</option></select><button id="microphone-refresh" class="icon-action" aria-label="Refresh microphones" title="Refresh microphones" disabled>${icon('update')}</button></div></div>
     <div class="setting-row"><div><h3><label for="recording-mode">Recording mode</label></h3><p id="recording-mode-help" hidden>Hold the shortcut; release to finish. Other keys or focus changes cancel.</p></div><select id="recording-mode" aria-describedby="recording-mode-help"><option value="toggle">Toggle</option><option value="push_to_talk">Push to talk</option></select></div>
     <div id="compatibility-row" class="setting-row" hidden><div><h3>Compatibility paste</h3><p id="compatibility-help">For apps that hide their text field. Pastes once into the same active app/window; the exact field cannot be verified.</p></div><label class="switch"><input id="compatibility-paste" type="checkbox" role="switch" aria-label="Compatibility paste" aria-describedby="compatibility-help"><span aria-hidden="true"></span></label></div>
      <div class="setting-row shortcut-row"><div><h3>Shortcut</h3></div><div class="shortcut-value"><button id="change-shortcut" aria-label="Record shortcut" title="Record shortcut" aria-pressed="false" aria-describedby="shortcut-feedback"><span id="saved-shortcut">…</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/></svg></button><button id="stop-shortcut" hidden>Cancel</button><button id="shortcut-fn" class="text-action" hidden>Use default</button></div><p id="shortcut-feedback" role="status" hidden></p></div>
    </section>
    <section class="card preferences" aria-labelledby="experience-title"><h2 id="experience-title">Appearance &amp; sound</h2>
      <div class="setting-row"><div><h3><label for="appearance-choice">Appearance</label></h3><p>Light, dark, or follow your system.</p></div><select id="appearance-choice" disabled><option value="light">Light</option><option value="dark">Dark</option><option value="system" selected>System</option></select></div>
-     <div class="setting-row listening-row"><div><h3>Recording sounds</h3></div><select id="sound-style" aria-label="Sound"><option value="clean">Clean</option><option value="warm">Warm</option></select><span id="sound-state" class="state">Off</span><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Recording sounds"><span aria-hidden="true"></span></label></div>
+     <div class="setting-row listening-row"><div><h3>Completion sound</h3></div><select id="sound-style" aria-label="Sound"><option value="clean">Clean</option><option value="warm">Warm</option></select><span id="sound-state" class="state">Off</span><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Completion sound"><span aria-hidden="true"></span></label></div>
     <div class="setting-row volume-row"><h3><label for="sound-volume">Volume</label></h3><div class="sound-controls"><input id="sound-volume" type="range" min="0" max="100" step="1" value="50" aria-describedby="volume-percent"><output id="volume-percent" for="sound-volume">50%</output></div><button id="preview-sound" class="icon-action" aria-label="Preview sound" title="Preview sound" disabled>${icon('play')}</button></div>
   </section>
    <section class="card setup-card" aria-labelledby="setup-title"><div class="card-heading"><h2 id="setup-title">Setup</h2><span id="setup-state" class="subtle" role="status">Checking…</span></div>
@@ -96,7 +96,7 @@ document.querySelector('#app')!.innerHTML = `
     </div>
      <div id="model-row" class="setting-row" tabindex="-1"><div><h3>English model <span id="model-ready" class="subtle" hidden>· Ready</span></h3><p id="model-state">148 MB · One-time download</p><progress id="progress" max="100" value="0" hidden aria-label="Model download progress"></progress></div><button id="download">Download</button></div>
   </section>
-     <section class="local-data" aria-labelledby="data-title"><div class="setting-row"><div><h2 id="data-title">Usage totals</h2><p id="privacy-detail" class="subtle">Private tests are never counted.</p></div><button id="reset" class="text-action danger" aria-haspopup="dialog">Reset totals</button></div></section>
+     <section class="local-data" aria-labelledby="data-title"><div class="setting-row"><div><h2 id="data-title">Usage totals</h2><p id="privacy-detail" class="subtle">Private tests are never counted.</p></div><button id="reset" class="icon-action danger" aria-label="Reset usage totals" title="Reset usage totals" aria-haspopup="dialog">${icon('clear')}</button></div></section>
  </section>
   <div class="general-status-slot"><p id="message" class="status-detail" role="status" aria-label="Dictation status" aria-live="polite" hidden></p><button id="message-recovery" class="text-action" hidden>View problem</button></div>
  <p id="feedback" class="feedback" role="status" hidden></p><p id="storage-error" class="feedback" role="status" hidden></p>
@@ -105,16 +105,16 @@ document.querySelector('#app')!.innerHTML = `
 </div>
  <dialog id="reset-dialog" aria-labelledby="reset-title"><h2 id="reset-title">Reset usage totals?</h2><p>Totals will return to zero. Your preferences and language model won’t change.</p><div class="dialog-actions"><button id="keep-stats" autofocus>Keep totals</button><button id="confirm-reset" class="danger">Reset totals</button></div></dialog>
  <dialog id="health-dialog" aria-labelledby="health-title" aria-describedby="health-summary">
-  <h2 id="health-title" tabindex="-1" autofocus>Product status</h2><p id="health-summary" role="status" aria-live="polite">Connecting to HandsFree…</p>
+  <div class="health-heading"><h2 id="health-title" tabindex="-1" autofocus>Product status</h2><div class="health-tools"><button id="health-refresh" class="icon-action" aria-label="Refresh status" title="Refresh status">${icon('update')}</button><button id="health-close" class="icon-action" aria-label="Close product status" title="Close product status">${icon('close')}</button></div></div><p id="health-summary" role="status" aria-live="polite">Connecting to HandsFree…</p>
   <ul class="health-checks" aria-label="Dictation requirements">
    <li><div><strong>Microphone access</strong><span id="health-mic-state">Checking…</span></div><button id="health-mic" hidden>Allow microphone</button></li>
    <li id="health-permissions-row"><div><strong>Shortcuts &amp; paste access</strong><span id="health-permissions-state">Checking…</span></div><button id="health-permissions" hidden>Open macOS permissions</button></li>
    <li><div><strong>Shortcut connection</strong><span id="health-hook-state">Checking…</span></div></li>
    <li><div><strong>English model</strong><span id="health-model-state">Checking…</span></div><button id="health-model" hidden>Download model</button></li>
+   <li id="health-input" hidden><div><strong><label for="health-microphone">Microphone</label></strong><span id="health-input-help" class="sr-only">Applies to the next recording. An unavailable saved device never switches silently.</span></div><div class="health-input-controls"><select id="health-microphone" aria-describedby="health-input-help" disabled></select><button id="health-microphone-refresh" class="icon-action" aria-label="Refresh microphones" title="Refresh microphones" disabled>${icon('update')}</button></div></li>
   </ul>
-  <section id="health-input" hidden><h3><label for="health-microphone">Input device</label></h3><p>Used for the next recording. An unavailable saved device never switches silently.</p><div class="health-input-controls"><select id="health-microphone" disabled></select><button id="health-microphone-refresh" disabled>Refresh devices</button></div></section>
-  <p id="health-error" class="feedback" role="status" hidden></p><p class="subtle">These checks don’t record audio. Permission checks are not proof that microphone capture works.</p>
-  <div class="dialog-actions"><button id="health-close">Close</button><button id="health-refresh">Refresh status</button><button id="health-practice" class="primary" hidden>Open private test</button></div>
+  <p id="health-error" class="feedback" role="status" hidden></p><p class="sr-only">These checks don’t record audio. Permission checks are not proof that microphone capture works.</p>
+  <div class="dialog-actions"><button id="health-practice" class="primary" hidden>${icon('mic')}<span>Private test</span></button></div>
  </dialog>`;
 const el = (id: string) => document.getElementById(id)!;
 const button = (id: string) => el(id) as HTMLButtonElement;
@@ -193,7 +193,7 @@ function navigate(tab: Page) {
   document.querySelector('main')!.scrollTop = 0;
   window.scrollTo(0, 0);
   renderPractice();
-  if (tab === 'settings' && current?.platform === 'macos') { void workflow.refresh(); void workflow.runningApps(); }
+  if (tab === 'settings' && current?.platform === 'macos') { void workflow.refresh(); void workflow.runningApps(); void refreshMicrophones(); }
 }
 function feedback(message: string) {
   el('feedback').hidden = !message; statusText('feedback', message);
@@ -236,7 +236,7 @@ function renderHealth() {
 }
 button('product-status').onclick = () => {
   closeBrandMenu(); renderHealth(); healthDialog.showModal(); renderPractice();
-  void refresh();
+  void refresh(); void refreshMicrophones();
 };
 button('health-close').onclick = () => healthDialog.close();
 healthDialog.addEventListener('close', () => {
@@ -352,7 +352,9 @@ function renderPractice() {
   el('practice').hidden = current?.platform !== 'macos';
   el('practice-platform-help').hidden = current?.platform !== 'windows';
   const tutorial = current ? shortcutTutorial(displayShortcut(current), current.recording_mode) : 'Waiting for your configured shortcut…';
-  el('shortcut-tutorial').textContent = current ? current.recording_mode === 'push_to_talk' ? `Hold ${displayShortcut(current)}; release to finish.` : `Press ${displayShortcut(current)} to start / finish.` : tutorial;
+  el('practice-gesture').textContent = current?.recording_mode === 'push_to_talk' ? 'Hold' : 'Press';
+  el('practice-shortcut').textContent = current ? displayShortcut(current) : '…';
+  el('practice-instruction').textContent = current?.recording_mode === 'push_to_talk' ? '; release to finish.' : ' to start / finish.';
   el('shortcut-tutorial').title = tutorial;
   el('shortcut-tutorial').setAttribute('aria-label', tutorial);
   el('shortcut-evidence').textContent = shortcutReceived ? 'Shortcut received.' : 'Shortcut not tested yet.';
@@ -379,7 +381,6 @@ function renderPractice() {
   button('practice-cancel').disabled = !active;
   button('practice-cancel').hidden = !active;
   button('practice-clear').hidden = active || practice.view.phase==='cancelling';
-  button('practice-setup').hidden = false;
   if (practice.view.phase !== 'error' && document.activeElement === el('practice-recovery')) practiceField.focus({preventScroll:true});
   button('practice-recovery').hidden = practice.view.phase !== 'error';
   renderGettingStarted();
@@ -391,17 +392,11 @@ el('practice-start').onclick = () => { if (!button('practice-start').disabled) v
 el('practice-finish').onclick = () => void practice.finish();
 el('practice-cancel').onclick = clearPractice;
 el('practice-clear').onclick = clearPractice;
-function openMicrophoneSettings() {
-  navigate('settings');
-  const target = el('preferences-title'); target.tabIndex = -1;
-  target.focus(); target.scrollIntoView({block:'start'});
-}
-el('practice-setup').onclick = openMicrophoneSettings;
-el('practice-recovery').onclick = openMicrophoneSettings;
+el('practice-recovery').onclick = () => button('product-status').click();
 el('message-recovery').onclick = () => button('product-status').click();
 window.addEventListener('blur', () => { windowActive=false; syncPracticeContext(); clearPractice(); });
 window.addEventListener('pagehide', () => { windowActive=false; syncPracticeContext(); clearPractice(); });
-window.addEventListener('focus', () => { windowActive=true; renderPractice(); });
+window.addEventListener('focus', () => { windowActive=true; renderPractice(); void refreshMicrophones(); });
 // WebKit does not always dispatch pagehide when a native window is hidden.
 void listen('practice-cleared', () => { practiceContext=0; clearPractice(); }).catch(() => { /* Browser-only preview has no native events. */ });
 void listen<PracticeInput>('practice-input', ({payload}) => {
@@ -428,7 +423,14 @@ function renderWorkflow() {
   el('brand-pause').hidden = current?.platform !== 'macos';
   for(const id of ['workflow-pause','brand-pause']) {
     button(id).disabled = !allowed || !status || workflow.pending.pause;
-    button(id).textContent = status?.paused ? 'Resume shortcuts' : 'Pause shortcuts';
+    const label = status?.paused ? 'Resume shortcuts' : 'Pause shortcuts';
+    if (id === 'brand-pause') button(id).textContent = label;
+    else {
+      button(id).setAttribute('aria-label', label); button(id).title = label;
+      if (button(id).dataset.paused !== String(Boolean(status?.paused))) {
+        button(id).dataset.paused = String(Boolean(status?.paused)); button(id).innerHTML = icon(status?.paused ? 'play' : 'pause');
+      }
+    }
   }
   el('workflow-pause-state').textContent = status ? status.paused ? 'Paused until resumed or app restarts' : 'Shortcuts active' : 'Checking…';
   const login = el('launch-at-login') as HTMLInputElement;
@@ -454,7 +456,8 @@ function renderWorkflow() {
       const name = item.querySelector('span') ?? document.createElement('span'), remove = item.querySelector('button') ?? document.createElement('button');
       const app = workflow.apps.find(app=>app.bundle_id===id);
       name.textContent = app ? `${app.name} · ${id}` : id;
-      remove.textContent = 'Remove'; remove.setAttribute('aria-label',`Remove ${id}`);
+      if (!remove.firstElementChild) remove.innerHTML = icon('clear');
+      remove.className = 'icon-action'; remove.setAttribute('aria-label',`Remove ${id}`); remove.title = app ? `Remove ${app.name}` : `Remove ${id}`;
       remove.onclick = () => {
         const index = Array.from(el('excluded-apps').children).indexOf(item);
         void workflowFocus(remove, () => workflow.exclusions(workflow.status!.excluded_bundle_ids.filter(saved=>saved!==id)), () => {
@@ -685,6 +688,8 @@ function renderMicrophones() {
   const healthChoice = el('health-microphone') as HTMLSelectElement;
   if (healthChoice.innerHTML !== microphoneChoice.innerHTML) healthChoice.replaceChildren(...Array.from(microphoneChoice.options, option => option.cloneNode(true)));
   healthChoice.value = microphoneChoice.value;
+  microphoneChoice.title = microphoneChoice.selectedOptions[0]?.textContent ?? 'Microphone';
+  healthChoice.title = healthChoice.selectedOptions[0]?.textContent ?? 'Microphone';
   healthChoice.disabled = microphoneChoice.disabled;
   button('health-microphone-refresh').disabled = button('microphone-refresh').disabled;
 }

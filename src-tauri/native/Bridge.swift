@@ -902,6 +902,8 @@ private func validateDelivery() -> PasteResult {
             endCue?.stop()
             let profile = cueProfile, volume = cueVolume
             let sessionSounds = soundsEnabled && volume > 0
+            // Metadata only: failure affects the later completion cue, not input.
+            let outputUID = sessionSounds ? (try? Microphones.string(SessionCueOutput.defaultDevice(), kAudioDevicePropertyDeviceUID)) : nil
             let gate = startGate
             let r = AudioSession(generation: generation, epoch: epoch, sounds: sessionSounds,
                 authorized: { allowed(epoch) && (gate?(generation) ?? true) }, epochAllowed: { allowed(epoch) }, failure: {
@@ -924,14 +926,6 @@ private func validateDelivery() -> PasteResult {
             audioBusy = true
             lastAudioGeneration = generation; lastAudioEpoch = epoch; lastAudioObservation = nil
             r.start { [weak r] routeFailure in
-                var startPCM: AVAudioPCMBuffer?, endData: Data?
-                if sessionSounds {
-                    guard let start = StartCue.data(profile: profile) else {
-                        throw NSError(domain: "Missing bundled cue", code: 1)
-                    }
-                    startPCM = try SessionCuePCM.decode(start)
-                    endData = EndCue.data(profile: profile)
-                }
                 let capture = try audioStage("input_create") { try AudioCapture(generation: generation, epoch: epoch, microphoneUID: uid,
                     sink: { generation, epoch, data, count in
                         if count < 0 { routeFailure() } else if allowed(epoch) {
@@ -946,13 +940,17 @@ private func validateDelivery() -> PasteResult {
                     level: { capture.level() }, outputRate: { 0 },
                     cancel: { capture.revoke() }, formats: { capture.formatMetadata() },
                     validatePrepared: { try capture.validatePrepared() })
-                let makeOutput: (() throws -> SessionAudioOwner.Output)? = startPCM.map { pcm in
-                    { try SessionCueOutput(format: pcm.format, volume: volume).operations(routeFailure: { [weak r] in r?.configurationFailure("output_configuration") }) }
-                }
+                var endPCM: AVAudioPCMBuffer?
+                let makeOutput: (() throws -> SessionAudioOwner.Output)? = sessionSounds ? {
+                    guard let outputUID, let data = EndCue.data(profile: profile) else {
+                        throw NSError(domain: "Completion cue unavailable", code: 1)
+                    }
+                    let pcm = try SessionCuePCM.decode(data)
+                    endPCM = pcm
+                    return try SessionCueOutput(format: pcm.format, volume: volume, frozenUID: outputUID).operations(routeFailure: { [weak r] in r?.configurationFailure("output_configuration") })
+                } : nil
                 return SessionAudioOwner(input: input, makeOutput: makeOutput, cue: { ending in
-                        let pcm: AVAudioPCMBuffer?
-                        if ending { pcm = try endData.map(SessionCuePCM.decode) } else { pcm = startPCM }
-                        return pcm
+                        ending ? endPCM : nil
                 }).operations()
             }
             return true

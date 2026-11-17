@@ -149,16 +149,19 @@ Failure details remain distinct from setup readiness; disconnected status is unk
   UID remains selected and fails closed. Listing is metadata-only. The configure
   FIFO saves a merged Store before publishing; no native setting/global default
   is changed. A frozen UID goes to the existing recorder, which binds its engine
-  before format/converter creation, revalidates after the cue and engine startup,
+   before format/converter creation, revalidates after engine startup,
   and fails the existing pipeline on route changes. Hardware acceptance is separate.
   Both capsule and practice timers observe the existing Session's accepted sample
-  count and frozen limit, not wall time (cue delay counts zero). Generation/epoch
+   count and frozen limit, not wall time (hardware startup counts zero). Generation/epoch
    and practice-token checks bound observations; no second recorder is created.
 
 - Capture hardware is owned by the admitted session's serial queue, not AppKit.
-  One session establishes an input engine and an optional output-only cue engine
-  before its start cue, with PCM
-  acceptance closed until cue completion and the quiet tail. Observe configuration changes before format/tap/prepare/start, latch
+   One session establishes input only and accepts PCM immediately after validated
+   readiness, without a start cue or quiet tail. Completion asset loading and
+   optional output-only engine construction/prepare/start are deferred until
+   accepted PCM is closed and drained. Freeze completion output UID metadata at
+   admission; unavailable/changed output never prevents listening or falls back.
+   Observe configuration changes before format/tap/prepare/start, latch
   changes across startup, and revalidate device and format before accepting PCM.
   Install the tap with that exact fresh hardware format, explicitly reconciling
   the input node's potentially stale output format. Hardware, node output and
@@ -166,21 +169,21 @@ Failure details remain distinct from setup readiness; disconnected status is unk
   nil tap format can retain a stale cached output rate. Never write hardware
   sample rates or substitute a cached client format.
   Running with acceptance closed is not accepted capture. Post-start/preaccept
-  input notifications advance a locked revision only; after output preparation
+   input notifications advance a locked revision only; after input preparation
   and again before acceptance, the serial owner confirms frozen device identity,
   hardware/node/converter format and actual engine running state. The final
   revision/tombstone check and acceptance commit are atomic. No OS reads occur
   in notification callbacks, no new preparation/retry is granted, and runtime
   notification failure remains strict. Cancellation/deadline can never reopen
-  a producer through this validation. Output notification failures stay strict.
+   a producer through this validation. Deferred output failures cannot poison drained PCM.
   Startup deadlines are lock-protected phase facts, not reason strings: the
-  independent 3 s hardware budget covers factory/input/output preparation and
-  pre-cue validation through successful `route_ready`, which atomically retires
-  it and arms a separate independent 3 s cue-handoff budget. Handoff covers cue
-  completion, existing 180 ms quiet tail and enable/revalidation until actual
+   independent 3 s hardware budget covers factory/input preparation and
+   validation through successful `route_ready`, which atomically retires
+   it and arms a separate independent 3 s acceptance-handoff budget. Handoff covers
+    immediate enable/revalidation until actual
   readiness, failure or cancellation. No completion extends that budget; stale
-  hardware deadlines cannot kill handoff. Muted sessions transfer budgets with
-  immediate enable and no cue/tail delay. Both deadlines can revoke/report while
+   hardware deadlines cannot kill handoff. Audible and muted sessions both enable
+   immediately with no cue/tail delay. Both deadlines can revoke/report while
   the serial OS owner is blocked; cleanup/retirement still waits for that owner.
   First failure retains `hardware_startup_timeout` or `cue_handoff_timeout` unless
   an earlier cause already exists. Total logical startup is bounded by 3 + 3 s,
@@ -201,8 +204,11 @@ Failure details remain distinct from setup readiness; disconnected status is unk
   transcription. Synthetic adapter tests exercise these production operations
   and real Objective-C throws without constructing an engine or opening hardware;
   macOS 14/Bluetooth installed-app acceptance is a separate gate.
-  Normal Finish closes/drains accepted PCM while keeping the engine alive for
-  its end cue; cancellation plays no end cue. Native retirement is a separate
+   Normal Finish closes/drains accepted PCM before deferred end-cue work; no PCM,
+   cancellation and failed drain play no end cue. Completion output errors/timeouts
+   are nonfatal; its independently armed deadline precedes deferred construction
+   and prevents late playback. Blocked OS calls retain the real owner until cleanup.
+   Native retirement is a separate
   barrier before Rust publishes idle or releases its slot. All synchronous owner
   waits happen outside AppKit. See [audio session ownership](AUDIO-SESSION.md).
 

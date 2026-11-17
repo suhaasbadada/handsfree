@@ -217,8 +217,8 @@ final class CaptureStartup {
     private func invalidate() {
         routeLock.lock()
         guard !revoked else { routeLock.unlock(); return }
-        // Running is not acceptance. Starting the sibling output engine can
-        // notify an unchanged input engine. Only the serial owner reads OS facts.
+        // Running is not acceptance. Preaccept negotiation can notify an
+        // unchanged input engine. Only the serial owner reads OS facts.
         if started && !accepted && !revoked {
             configurationRevision &+= 1
             routeLock.unlock()
@@ -532,7 +532,7 @@ final class AudioCapture {
 }
 
 // An output-only engine: never touch inputNode, set a device, or change a rate.
-// Created only AFTER input negotiation has settled the selected mic's profile.
+// Created only AFTER accepted input has closed and drained on normal Finish.
 final class SessionCueOutput {
     private let engine: AVAudioEngine
     private let player: AVAudioPlayerNode
@@ -547,9 +547,18 @@ final class SessionCueOutput {
         guard id != 0 else { throw NSError(domain: "Output unavailable", code: 1) }
         return id
     }
-    init(format: AVAudioFormat, volume: Float) throws {
+    // Shared read-only identity check; never resolve a replacement default UID.
+    static func validateIdentity(_ frozenUID: String, current: () throws -> String) throws {
+        guard !frozenUID.isEmpty, try current() == frozenUID else {
+            throw NSError(domain: "Output route changed", code: 1)
+        }
+    }
+    init(format: AVAudioFormat, volume: Float, frozenUID: String) throws {
         self.format = format
-        uid = try Microphones.string(Self.defaultDevice(), kAudioDevicePropertyDeviceUID)
+        uid = frozenUID
+        try Self.validateIdentity(uid) {
+            try Microphones.string(Self.defaultDevice(), kAudioDevicePropertyDeviceUID)
+        }
         engine = try makeAudioEngine()
         player = try makeAudioPlayer()
         var constructed = false
@@ -560,8 +569,8 @@ final class SessionCueOutput {
     }
     private func validate() throws {
         let expected = try Self.defaultDevice()
-        guard try Microphones.string(expected, kAudioDevicePropertyDeviceUID) == uid else {
-            throw NSError(domain: "Output route changed", code: 1)
+        try Self.validateIdentity(uid) {
+            try Microphones.string(expected, kAudioDevicePropertyDeviceUID)
         }
         var actual = AudioDeviceID(0)
         try captureChecked(HFCueOutputDevice(engine, &actual))
@@ -582,9 +591,10 @@ final class SessionCueOutput {
                 try captureChecked(HFCapturePrepare(self.engine))
             }
             try audioStage("output_start") { try captureChecked(HFCaptureStart(self.engine)); try self.validate() }
-        }, play: { buffer, completion in
-            try self.validate()
-            try captureChecked(HFCuePlay(self.player, buffer, completion))
+        }, play: { buffer, allowed, completion in
+            try Self.playIfAllowed(validate: { try self.validate() }, allowed: allowed) {
+                try captureChecked(HFCuePlay(self.player, buffer, completion))
+            }
         }, stopCue: { _ = HFCueStop(self.player) }, stop: {
             if let observer = self.observer { NotificationCenter.default.removeObserver(observer); self.observer = nil }
             _ = HFCueStop(self.player)
@@ -594,14 +604,19 @@ final class SessionCueOutput {
             return ["outputRate": output.sampleRate, "outputChannels": Double(output.channelCount), "cueRate": self.format.sampleRate]
         })
     }
+    static func playIfAllowed(validate: () throws -> Void, allowed: () -> Bool, play: () throws -> Void) throws {
+        try validate()
+        guard allowed() else { return }
+        try play()
+    }
 }
 
 // Production partial-start owner, injectable without constructing any hardware.
-// The session retains it through both cues and retires both engines independently.
+// Completion output is deferred until accepted input has closed and drained.
 final class SessionAudioOwner {
     struct Output {
         var prepare: () throws -> Void
-        var play: (AVAudioPCMBuffer, @escaping () -> Void) throws -> Void
+        var play: (AVAudioPCMBuffer, () -> Bool, @escaping () -> Void) throws -> Void
         var stopCue: () -> Void
         var stop: () -> Void
         var formats: () -> [String: Double]
@@ -610,22 +625,20 @@ final class SessionAudioOwner {
     private let makeOutput: (() throws -> Output)?
     private let cue: (Bool) throws -> AVAudioPCMBuffer?
     private var output: Output?
+    private var completionAllowed: () -> Bool = { false }
     init(input: AudioSession.Operations, makeOutput: (() throws -> Output)?, cue: @escaping (Bool) throws -> AVAudioPCMBuffer?) {
         self.input = input; self.makeOutput = makeOutput; self.cue = cue
     }
     func operations() -> AudioSession.Operations {
         .init(prepare: {
             try audioStage("input_prepare") { try self.input.prepare() }
-            if let make = self.makeOutput {
-                self.output = try audioStage("output_create", make)
-                try audioStage("output_prepare") { try self.output?.prepare() }
-            }
             try audioStage("input_configuration") { try self.input.validatePrepared?() }
         }, enable: { try audioStage("input_revalidate") { try self.input.enable() } },
         close: { self.input.close() }, drain: { self.input.drain() },
         play: { ending, completed in
+            guard ending else { throw NSError(domain: "Start cues are disabled", code: 1) }
             guard let output = self.output, let pcm = try self.cue(ending) else { throw NSError(domain: "Cue unavailable", code: 1) }
-            try audioStage(ending ? "end_cue" : "start_cue") { try output.play(pcm, completed) }
+            try audioStage("end_cue") { try output.play(pcm, self.completionAllowed, completed) }
         }, stopCue: { self.output?.stopCue() }, stop: {
             self.input.close()
             _ = self.input.drain()
@@ -634,6 +647,14 @@ final class SessionAudioOwner {
         }, level: { self.input.level() }, outputRate: { self.output?.formats()["outputRate"] ?? 0 },
         cancel: { (self.input.cancel ?? self.input.close)() }, formats: {
             self.input.formats().merging(self.output?.formats() ?? [:]) { _, output in output }
+        }, prepareCompletion: { allowed in
+            self.completionAllowed = allowed
+            guard allowed() else { return }
+            if let make = self.makeOutput {
+                self.output = try audioStage("output_create", make)
+                guard allowed() else { return }
+                try audioStage("output_prepare") { try self.output?.prepare() }
+            }
         })
     }
 }
@@ -689,6 +710,7 @@ final class AudioSession {
         var cancel: (() -> Void)? = nil
         var formats: () -> [String: Double] = { [:] }
         var validatePrepared: (() throws -> Void)? = nil
+        var prepareCompletion: ((_ allowed: @escaping () -> Bool) throws -> Void)? = nil
     }
     struct Observation: Codable {
         var reason = "starting"
@@ -722,6 +744,8 @@ final class AudioSession {
     // report a failure of PCM already accepted by this generation.
     private var captureAccepted = false
     private var producerDrained = false
+    private var completionExpired = false
+    private var completionFailed = false
     private var cachedLevel: Float = -60
     private var levelPending = false
     private let retirement = DispatchGroup()
@@ -841,7 +865,7 @@ final class AudioSession {
                 self.markLocked("route_ready")
                 self.lock.unlock()
                 self.armDeadline(.handoff)
-                if self.sounds { self.play(ending: false) } else { self.enable() }
+                self.enable()
             } catch { self.recordFailure(error, stage: "session_create"); self.snapshotFormats(); self.fail() }
         }
     }
@@ -865,6 +889,7 @@ final class AudioSession {
         lock.lock()
         guard !released else { lock.unlock(); return }
         if producerDrained {
+            completionFailed = true
             lock.unlock()
             queue.async { self.teardown("end_cue_route_failed") }
             return
@@ -876,10 +901,6 @@ final class AudioSession {
         // Finish. Unlike an end-cue playback error this is not nonfatal.
         reportFailure(startGateRequired: !accepted)
         queue.async { self.teardown("failed") }
-    }
-    private func after(_ seconds: Double, _ action: @escaping () -> Void) {
-        if let scheduler { scheduler(seconds) { self.queue.async(execute: action) } }
-        else { queue.asyncAfter(deadline: .now() + seconds, execute: action) }
     }
     private func enable() {
         guard valid(), !terminal, !finishing else { fail(); return }
@@ -894,34 +915,44 @@ final class AudioSession {
         guard valid(), !terminal, let ops = operations else { teardown("cancelled"); return }
         cueTicket &+= 1
         let ticket = cueTicket
-        mark(ending ? "end_cue" : "start_cue")
+        mark("end_cue")
+        // Arm before deferred construction/prepare, which may block the owner.
+        let deadline = { [weak self] in
+            guard let self else { return }
+            self.lock.lock()
+            guard !self.released else { self.lock.unlock(); return }
+            self.completionExpired = true
+            self.lock.unlock()
+            self.queue.async {
+                guard ticket == self.cueTicket, !self.terminal else { return }
+                self.teardown("end_cue_timeout")
+            }
+        }
+        if let scheduler { scheduler(3, deadline) }
+        else { DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 3, execute: deadline) }
         do {
+            try ops.prepareCompletion? { [weak self] in
+                guard let self else { return false }
+                self.lock.lock(); let live = !self.completionExpired && !self.completionFailed; self.lock.unlock()
+                return live && self.valid()
+            }
+            lock.lock(); let expired = completionExpired, failed = completionFailed; lock.unlock()
+            guard !expired else { teardown("end_cue_timeout"); return }
+            guard !failed else { teardown("end_cue_route_failed"); return }
+            guard valid(), !terminal else { teardown("cancelled"); return }
             try ops.play(ending) { [weak self] in
                 guard let self else { return }
                 self.queue.async {
                     guard ticket == self.cueTicket, !self.terminal else { return }
                     guard self.valid() else { self.teardown("cancelled"); return }
                     self.cueTicket &+= 1 // completion is once-only; retire deadline
-                    self.mark(ending ? "end_cue_completed" : "start_cue_completed")
-                    if ending { self.teardown("finished") }
-                    else {
-                        self.mark("quiet_tail")
-                        self.after(0.18) { self.enable() }
-                    }
-                }
-            }
-            // Startup uses the independent handoff deadline, including a blocked
-            // play/enable call and the quiet tail. End-cue expiry is nonfatal and
-            // retains its owner-queue ticket. Neither proves acoustic audibility.
-            if ending {
-                after(3) { [weak self] in
-                    guard let self, ticket == self.cueTicket, !self.terminal else { return }
-                    self.teardown("end_cue_timeout")
+                    self.mark("end_cue_completed")
+                    self.teardown("finished")
                 }
             }
         } catch {
-            recordFailure(error, stage: ending ? "end_cue" : "start_cue")
-            if ending { teardown("end_cue_failed") } else { fail() }
+            recordFailure(error, stage: "end_cue")
+            teardown("end_cue_failed")
         }
     }
     private func fail() {
@@ -940,7 +971,7 @@ final class AudioSession {
         mark(reason); retired(self); retirement.leave()
     }
     // Synchronous drain is the Rust EOS barrier, not a playback wait. The engine
-    // remains running until the end cue's callback/deadline, then releases.
+    // remains owned through deferred completion preparation/playback and teardown.
     func finish() {
         lock.lock(); observation.audioReady = false; lock.unlock()
         queue.sync {
@@ -951,9 +982,10 @@ final class AudioSession {
             operations?.close()
             let healthy = operations?.drain() ?? false
             if wasReady && !healthy { reportFailure(startGateRequired: false) }
-            lock.lock(); producerDrained = true; lock.unlock()
+            lock.lock(); producerDrained = true; let hasPCM = firstPCM; lock.unlock()
             guard valid(), wasReady, healthy else { teardown("finished_without_cue"); return }
-            if sounds { play(ending: true) } else { teardown("finished") }
+            guard hasPCM else { teardown("finished_without_cue"); return }
+            if sounds { queue.async { self.play(ending: true) } } else { teardown("finished") }
         }
     }
     func cancel() {

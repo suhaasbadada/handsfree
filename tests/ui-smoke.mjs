@@ -12,6 +12,7 @@ import { checkUpdateIndicator } from './ui-update-indicator.mjs';
 import { checkAppearance } from './ui-appearance.mjs';
 import { checkRequestedFixes } from './ui-requested-fixes.mjs';
 import { checkProductStatus } from './ui-product-status.mjs';
+import { checkCompactControls } from './ui-compact-controls.mjs';
 import { checkRefinement } from './ui-refinement.mjs';
 
 const binary = process.env.BROWSER_BINARY;
@@ -79,7 +80,7 @@ try {
     await until(`document.getElementById('mic-row').hidden===${!!(mask&1)} && document.getElementById('permissions-row').hidden===${!!((mask&2)&&(mask&4))} && document.getElementById('hotkey-row').hidden===${!!(mask&8)}`);
     assert.equal(await evaluate(`document.getElementById('overview-download').getBoundingClientRect().width>0 && document.getElementById('overview-download').textContent.includes('Download English model')`), true);
     await evaluate(`document.getElementById('nav-settings').click()`);
-    assert.equal(await evaluate(`['mic','permissions','download'].every(id=>{const b=document.getElementById(id);return !b.getClientRects().length || b.getBoundingClientRect().height===36})`), true, `Uniform setup action heights in readiness combination ${mask}`);
+    assert.equal(await evaluate(`['mic','permissions','download'].every(id=>{const b=document.getElementById(id);return !b.getClientRects().length || b.getBoundingClientRect().height===32})`), true, `Compact setup action heights in readiness combination ${mask}`);
     await evaluate(`document.getElementById('nav-overview').click()`);
   }
   assert.equal(await evaluate(`window.calls.some(c=>c.command==='download_model')`), false, 'Never downloads automatically');
@@ -126,7 +127,7 @@ try {
   assert.equal(await evaluate(`document.getElementById('setup-state').textContent==='Ready' && document.getElementById('setup-missing').hidden`), true, 'Ready setup is a single row, details optional');
   assert.equal(await evaluate(`document.getElementById('shortcut-dialog')`), null);
   assert.equal(await evaluate(`['change-shortcut','recording-limit','sounds','sound-volume','preview-sound','reset'].every(id=>document.getElementById(id).getBoundingClientRect().height>0)`), true, 'Every essential preference is visible without expansion');
-  assert.deepEqual(await evaluate(`['change-shortcut','recording-limit','preview-sound','reset'].map(id=>document.getElementById(id).getBoundingClientRect().height)`), [36,36,36,36], 'Settings actions and select share one control height');
+  assert.deepEqual(await evaluate(`['change-shortcut','recording-limit','preview-sound','reset'].map(id=>document.getElementById(id).getBoundingClientRect().height)`), [32,32,32,32], 'Settings actions and select share one compact control height');
   const recording = `document.getElementById('change-shortcut').getAttribute('aria-pressed')==='true'`;
   const stopped = `document.getElementById('change-shortcut').getAttribute('aria-pressed')==='false' && !document.getElementById('change-shortcut').disabled`;
   const key = (code, mods = '') => evaluate(`['keydown','keyup'].forEach(type=>document.getElementById('change-shortcut').dispatchEvent(new KeyboardEvent(type,{code:'${code}',${mods}bubbles:true,cancelable:true})))`);
@@ -186,7 +187,7 @@ try {
    await until(recording); await key('Escape'); await until(stopped);
   await evaluate(`window.rejectShortcut=false;window.fixture.sound_style='clean'`);
   assert.deepEqual(await evaluate(`Array.from(document.getElementById('sound-style').options,o=>[o.value,o.textContent])`), [['clean','Clean'],['warm','Warm']], 'Only approved profiles are offered');
-  assert.equal(await evaluate(`document.getElementById('sound-style').getBoundingClientRect().height`), 36);
+  assert.equal(await evaluate(`document.getElementById('sound-style').getBoundingClientRect().height`), 32);
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='preview_sound').length`), 0, 'Visible sound controls never autoplay');
   await evaluate(`document.getElementById('sounds').click()`);
   await until(`window.fixture.sounds===false && !document.getElementById('sounds').disabled`);
@@ -367,7 +368,7 @@ try {
       for (const tab of ['settings','overview']) {
         await evaluate(`document.getElementById('nav-${tab}').click()`);
         assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth`), true, `First-run ${tab} fits ${width}px`);
-        assert.equal(await evaluate(`['mic','permissions','download','overview-download'].every(id=>{const b=document.getElementById(id),r=b.getBoundingClientRect();return !r.width || (r.left>=0&&r.right<=innerWidth&&r.height>=36)})`), true, 'First-run actions fit without clipping');
+        assert.equal(await evaluate(`['mic','permissions','download','overview-download'].every(id=>{const b=document.getElementById(id),r=b.getBoundingClientRect();return !r.width || (r.left>=0&&r.right<=innerWidth&&r.height>=32)})`), true, 'First-run actions fit without clipping');
       }
       await evaluate(`Object.assign(window.fixture,{microphone:true,accessibility:true,input_monitoring:true,hotkey:true,model_ready:true})`);
       await until(`document.getElementById('setup-state').textContent==='Ready'`);
@@ -513,6 +514,7 @@ try {
      await checkKeyboardRecovery({send,evaluate,until,port});
      await checkRequestedFixes({send,evaluate,until,port});
      await checkProductStatus({send,evaluate,until,port});
+     await checkCompactControls({send,evaluate,until,port});
     await checkUpdateIndicator({send,evaluate,until,port});
    console.log('UI smoke passed: native practice event wiring, context races, Mac and Windows capabilities, shortcuts, privacy, preferences, downloads and responsive layout. No microphone capture.');
 } finally {

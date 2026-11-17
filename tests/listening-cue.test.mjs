@@ -12,14 +12,16 @@ test('generator reproduces the committed cue byte-exactly', {
   execFileSync('python3', [fileURLToPath(new URL('../scripts/generate-listening-cue.py', import.meta.url)), '--check']);
 });
 
-test('native roles snapshot each recording profile and preview only the selected pair', () => {
+test('native roles freeze completion identity without startup cue work; preview auditions completion', () => {
   const source = readFileSync(new URL('../src-tauri/native/Bridge.swift', import.meta.url), 'utf8');
   assert.match(source, /let profile = cueProfile, volume = cueVolume/);
   assert.match(source, /let sessionSounds = soundsEnabled && volume > 0/);
-  assert.match(source, /StartCue.data\(profile: profile\)/);
-  assert.match(source, /endData = EndCue.data\(profile: profile\)/);
-  assert.match(source, /SessionCueOutput\(format: pcm\.format, volume: volume\)/);
-  assert.match(source, /let makeOutput:[\s\S]*startPCM\.map/);
+  const admission = source.slice(source.indexOf('let profile = cueProfile'), source.indexOf('r.start {'));
+  assert.match(admission, /let outputUID = sessionSounds \? \(try\? Microphones.string/);
+  assert.doesNotMatch(admission, /Cue.data|SessionCuePCM.decode|SessionCueOutput\(format/);
+  assert.doesNotMatch(source, /StartCue.data\(profile: profile\)/);
+  assert.match(source, /SessionCueOutput\(format: pcm\.format, volume: volume, frozenUID: outputUID\)/);
+  assert.match(source, /let makeOutput:[\s\S]*sessionSounds \? \{[\s\S]*EndCue.data\(profile: profile\)/);
   const preview = source.slice(source.indexOf('@_cdecl("hf_preview_sound")'), source.indexOf('@_cdecl("hf_sounds")'));
   assert.match(preview, /CuePolicy.canPreview/);
   assert.match(preview, /EndCue.data\(profile: cueProfile\)/);
@@ -35,8 +37,12 @@ test('session separates explicit input-only and read-only default output topolog
   const output = source.slice(source.indexOf('final class SessionCueOutput'), source.indexOf('final class SessionAudioOwner'));
   assert.doesNotMatch(output, /inputNode|AudioUnitSetProperty|AudioObjectSetPropertyData/);
   assert.match(output, /HFCueOutputDevice/);
+  assert.match(output, /uid = frozenUID/);
   const owner = source.slice(source.indexOf('final class SessionAudioOwner'));
   assert.ok(owner.indexOf('self.input.prepare()') < owner.indexOf('self.output = try'));
+  const preparation = owner.slice(owner.indexOf('.init(prepare:'), owner.indexOf('}, enable:'));
+  assert.doesNotMatch(preparation, /makeOutput|self.output|self.cue/);
+  assert.doesNotMatch(source, /quiet_tail|after\(0\.18\)|play\(ending: false\)/);
   const shim = readFileSync(new URL('../src-tauri/native/CaptureException.m', import.meta.url), 'utf8');
   assert.match(shim, /AudioUnitGetProperty\(unit, kAudioOutputUnitProperty_CurrentDevice/);
   assert.doesNotMatch(shim, /exception\.reason|exception\.name/);

@@ -1,0 +1,108 @@
+ObjC.import('Cocoa');
+ObjC.import('WebKit');
+
+const root = ObjC.unwrap($.NSFileManager.defaultManager.currentDirectoryPath);
+function read(path) {
+  return ObjC.unwrap($.NSString.stringWithContentsOfFileEncodingError(root + '/' + path, $.NSUTF8StringEncoding, null));
+}
+// Evaluate only repository-owned markup/glyphs, never the app backend or app JS.
+const source = read('src/main.ts');
+const template = source.split("document.querySelector('#app')!.innerHTML = `")[1].split('`;\nconst el')[0];
+const glyphText = source.split('const glyphs: Record<string,string> = ')[1].split(';\nconst icon')[0];
+const glyphs = Function('return (' + glyphText + ')')();
+const icon = name => '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + glyphs[name] + '</svg>';
+const html = Function('logo', 'icon', 'return `' + template + '`')('', icon);
+const css = read('src/style.css') + read('src/typography.css');
+const app = $.NSApplication.sharedApplication;
+app.setActivationPolicy($.NSApplicationActivationPolicyProhibited);
+const config = $.WKWebViewConfiguration.new;
+config.websiteDataStore = $.WKWebsiteDataStore.nonPersistentDataStore;
+const web = $.WKWebView.alloc.initWithFrameConfiguration($.NSMakeRect(0, 0, 980, 820), config);
+web.loadHTMLStringBaseURL('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>' + css + '</style></head><body><div id="app">' + html + '</div></body></html>', $.NSURL.URLWithString('about:blank'));
+const deadline = Date.now() + 45000;
+function tick() {
+  $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.01));
+}
+function evaluate(js) {
+  let done = false, result = null, error = null;
+  web.evaluateJavaScriptCompletionHandler(js, (value, failure) => {
+    if (value) result = ObjC.unwrap(value);
+    if (failure) error = ObjC.unwrap(failure.localizedDescription);
+    done = true;
+  });
+  while (!done && Date.now() < deadline) tick();
+  if (!done) throw Error('Bounded WKWebView deadline exceeded');
+  if (error) throw Error(error);
+  return result;
+}
+let ready = false;
+while (!ready && Date.now() < deadline) {
+  ready = Boolean(evaluate('Boolean(document.getElementById("settings"))'));
+  if (!ready) tick();
+}
+if (!ready) throw Error('WKWebView fixture did not load');
+evaluate(`
+  document.getElementById('overview').hidden = true;
+  for (const id of ['settings','workflow','microphone-choice-row','health-input']) document.getElementById(id).hidden = false;
+  document.querySelector('.setup-card').hidden = true;
+  document.getElementById('saved-shortcut').textContent = 'Fn';
+  document.getElementById('settings').insertBefore(document.getElementById('get-started'), document.getElementById('workflow'));
+  document.head.appendChild(Object.assign(document.createElement('style'), {id:'probe-mode'}));
+  window.measure = () => {
+    const metric = element => {
+      const style = getComputedStyle(element);
+      return {client:element.clientWidth,scroll:element.scrollWidth,box:element.offsetWidth,
+        gutter:element.offsetWidth-element.clientWidth-parseFloat(style.borderLeftWidth||0)-parseFloat(style.borderRightWidth||0)};
+    };
+    const main = document.querySelector('main');
+    return {viewport:[innerWidth,innerHeight],doc:metric(document.documentElement),main:metric(main),
+      dialog:metric(document.getElementById('health-dialog')),healthInput:metric(document.getElementById('health-input')),
+      controls:metric(document.querySelector('.microphone-controls')),mainOverflow:getComputedStyle(main).overflowX,
+      selectOverflow:getComputedStyle(document.getElementById('microphone-choice')).overflow};
+  }; true
+`);
+const sizes = [[980,820],[980,600],[560,650],[320,650]];
+const labels = ['System default · MacBook Air Microphone','Saved microphone · Unavailable','Extremely long running application option '.repeat(12)];
+const forcedCSS = 'main,dialog{overflow-y:scroll;scrollbar-width:auto}main::-webkit-scrollbar,dialog::-webkit-scrollbar{width:16px;height:16px}';
+function configure(size, theme, mode, label) {
+  web.setFrameSize($.NSMakeSize(size[0], size[1]));
+  evaluate(`
+    document.documentElement.dataset.appearance=${JSON.stringify(theme)};
+    document.getElementById('probe-mode').textContent=${JSON.stringify(mode==='native'?'':forcedCSS)};
+    for (const id of ['microphone-choice','health-microphone','excluded-app-choice']) {
+      const select=document.getElementById(id);
+      select.replaceChildren(new Option(${JSON.stringify(label)},'a'),new Option('Second option','b'));
+      select.disabled=false;
+    }
+    document.getElementById('health-dialog').showModal(); true
+  `);
+}
+function fits(result) {
+  return ['doc','main','dialog','healthInput'].every(key=>result[key].scroll<=result[key].client);
+}
+let failures = 0, cases = 0;
+for (const size of sizes)
+for (const theme of ['light','dark'])
+for (const mode of ['native','forced-css-scrollbars'])
+for (const label of labels) {
+  configure(size,theme,mode,label);
+  const result=JSON.parse(evaluate('JSON.stringify(measure())'));
+  const guttersOK=mode==='native'||(result.main.gutter===16&&result.dialog.gutter===16);
+  const ok=fits(result)&&guttersOK;
+  cases++; if(!ok) failures++;
+  console.log(JSON.stringify({size,theme,mode,label:label.length>80?'extreme-long':label,ok,...result}));
+  evaluate("document.getElementById('health-dialog').close(); true");
+}
+// Reversibly remove control containment: the old WebKit inner overflow must recur.
+configure([980,600],'light','native',labels[2]);
+const fixed=JSON.parse(evaluate('JSON.stringify(measure())'));
+const broken=JSON.parse(evaluate("for(const select of document.querySelectorAll('select'))select.style.overflow='visible';JSON.stringify(measure())"));
+const restored=JSON.parse(evaluate("for(const select of document.querySelectorAll('select'))select.style.overflow='';JSON.stringify(measure())"));
+console.log('NEGATIVE_CONTROL='+JSON.stringify({fixed,broken,restored}));
+evaluate("document.getElementById('health-dialog').close(); true");
+if(!fits(fixed)||!fits(restored))throw Error('Fixed/restored fixture overflows');
+if(broken.main.scroll<=broken.main.client)throw Error('Negative control did not reproduce inner overflow');
+if(broken.doc.scroll>broken.doc.client)throw Error('Negative control unexpectedly overflowed document');
+console.log('CASES='+cases);
+console.log('FAILURES='+failures);
+if(cases!==48||failures!==0)throw Error('WKWebView layout regression');

@@ -2,6 +2,27 @@
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
 
+## Beta 22 candidate preparation
+
+The unpublished **v0.1.1-beta.22** candidate retains embedded version **0.1.1**.
+Only candidate distribution, packaging/audit coordinates and disabled candidate
+metadata advance; active public downloads and the signed feed stay on beta 21.
+See [candidate scope and evidence](releases/v0.1.1-beta.22.md): capture-first
+startup removes the start cue/tail, keeps completion-only sound after capture
+close/drain, and introduces no idle microphone. Compact controls, WebKit select
+containment and explicit microphone metadata refresh are part of this candidate.
+
+Intermediate focused tests are not final integrated validation. The approved
+instrumented attempt was blocked by permission timeout with zero admissions;
+there is no new beta 22 hardware measurement. Removing roughly 400 ms of
+avoidable cue/tail plus output preparation does not promise instant cold
+Bluetooth route startup. Final tests/browser checks, independent review,
+clean-source CI, signing/packaging, artifact audits, publication, installed
+dictation/audibility/latency and actual OTA/preservation remain separate pending
+gates. No beta 22 source, CI or checksum receipt is claimed. Do not promote the
+active site, README/install links or signed feed as part of candidate preparation.
+The following historical sections retain their original publication evidence.
+
 ## Beta 21 publication and metadata activation
 
 Current public Mac distribution **v0.1.1-beta.21** retains embedded version **0.1.1**.

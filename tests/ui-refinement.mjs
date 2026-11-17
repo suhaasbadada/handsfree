@@ -36,9 +36,9 @@ export async function checkRefinement({send,evaluate,until,port}) {
       await evaluate(`document.querySelector('main').scrollTop=document.querySelector('main').scrollHeight;document.getElementById('nav-practice-page').click()`);
       await until(`window.context>0 && !document.getElementById('practice-start').disabled`);
       assert.equal(await evaluate(`document.querySelector('main').scrollTop===0 && document.querySelector('main').scrollHeight<=document.querySelector('main').clientHeight+1`),true,'Switch from long Settings leaves Practice at its natural, unscrolled start');
-      await evaluate(`window.savedContext=window.context;document.getElementById('practice-text').value='Private draft';document.getElementById('practice-text').dispatchEvent(new Event('input'));document.getElementById('practice-setup').click()`);
+       await evaluate(`window.savedContext=window.context;document.getElementById('practice-text').value='Private draft';document.getElementById('practice-text').dispatchEvent(new Event('input'));document.getElementById('nav-settings').click()`);
       await until(`window.context===0 && document.getElementById('practice-text').value===''`);
-      assert.equal(await evaluate(`!document.getElementById('settings').hidden && document.activeElement.id==='preferences-title' && document.activeElement.getClientRects().length>0`),true,'Visible Settings action focuses Dictation, clearing the private draft and grant');
+       assert.equal(await evaluate(`!document.getElementById('settings').hidden && !document.getElementById('practice-setup')`),true,'Sidebar Settings clears the private draft and grant without a redundant Practice button');
       await evaluate(`document.getElementById('nav-practice-page').click()`);
       await until(`window.context>window.savedContext && !document.getElementById('practice-start').disabled`);
       if (width===980) {

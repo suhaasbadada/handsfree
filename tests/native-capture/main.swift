@@ -272,7 +272,7 @@ for failure in ["none", "zero", "format-exception", "output-exception", "uid", "
     precondition(samples == before && !startup.started, "Late publish: \(failure)")
     do { try startup.start(); preconditionFailure("Retired startup revived") } catch {}
 }
-print("Capture startup exception, post-cue format, teardown and stale producer contracts passed without hardware")
+print("Capture startup exception, preaccept format, teardown and stale producer contracts passed without hardware")
 
 // Exercise the actual session controller with fake device operations and a
 // deterministic scheduler. Nothing here constructs an engine or plays audio.
@@ -284,6 +284,7 @@ final class SessionHarness {
     var routeFailure: (() -> Void)?
     var failurePoint = ""
     var boundary: ((String) -> Void)?
+    var accepted: (() -> Void)?
     func event(_ name: String) {
         condition.lock(); events.append(name); condition.broadcast(); condition.unlock()
         boundary?(name)
@@ -321,6 +322,7 @@ final class SessionHarness {
         }, enable: {
             self.event("enable")
             if self.failurePoint == "enable" { throw NSError(domain: "synthetic", code: 1) }
+            self.accepted?()
         }, close: { self.event("close") }, drain: { self.event("drain"); return self.failurePoint != "drain" },
         play: { ending, callback in
             self.condition.lock(); self.completed.append(callback); self.condition.unlock()
@@ -330,18 +332,19 @@ final class SessionHarness {
         level: { -30 }, outputRate: { 24000 }, cancel: { self.event("revoke") })
     }
     func session(sounds: Bool = true, authorized: @escaping () -> Bool = { true }, epochAllowed: @escaping () -> Bool = { true }) -> AudioSession {
-        AudioSession(generation: 77, epoch: 8, sounds: sounds, authorized: authorized,
+        let s = AudioSession(generation: 77, epoch: 8, sounds: sounds, authorized: authorized,
             epochAllowed: epochAllowed,
             failure: { self.event("failure") }, retired: { _ in self.event("retired") }, scheduler: schedule)
+        accepted = { [weak s] in s?.acceptedPCM() }
+        return s
     }
 }
 
 do {
     let h = SessionHarness(), s: AudioSession
     s = h.session(); s.start(factory: h.operations)
-    h.wait("start")
-    precondition(!s.snapshot().audioReady && h.count("enable") == 0)
-    h.complete(); h.fire(0.18); h.wait("enable")
+    h.wait("enable")
+    precondition(h.count("start") == 0 && h.timers.allSatisfy { $0.0 == 3 })
     // finish() is an owner-queue barrier after enable has committed readiness.
     s.finish(); h.wait("end")
     precondition(!s.snapshot().audioReady && h.count("drain") == 1 && h.count("stop") == 0)
@@ -349,29 +352,23 @@ do {
     let stopped = DispatchSemaphore(value: 0)
     DispatchQueue.global().async { s.stop(); stopped.signal() }
     precondition(h.count("end") == 1 && h.count("stop") == 0)
-    h.complete(1); h.wait("retired")
+    h.complete(); h.wait("retired")
     precondition(stopped.wait(timeout: .now() + 2) == .success)
-    h.complete(); h.complete(1); h.fire(3)
+    h.complete(); h.complete(); h.fire(3)
     precondition(h.count("stop") == 1 && h.count("failure") == 0)
 }
-for point in ["factory", "prepare", "start", "enable", "timeout"] {
+for point in ["factory", "prepare", "enable"] {
     let h = SessionHarness(); h.failurePoint = point
     let s = h.session(); s.start(factory: h.operations)
-    if point == "enable" { h.wait("start"); h.complete(); h.fire(0.18) }
-    if point == "timeout" { h.wait("start"); h.fire(3) }
     h.wait("failure"); precondition(!s.snapshot().audioReady && h.count("failure") == 1)
     h.routeFailure?(); s.cancel(); s.stop()
     precondition(h.count("failure") == 1 && h.count("end") == 0)
 }
-for boundary in ["factory", "prepare", "start", "quiet", "enable", "drain", "end"] {
+for boundary in ["factory", "prepare", "enable", "drain", "end"] {
     let h = SessionHarness(); let s = h.session()
     h.boundary = { if $0 == boundary { s.cancel() } }
     s.start(factory: h.operations)
-    if ["quiet", "enable", "drain", "end"].contains(boundary) {
-        h.wait("start"); h.complete()
-        h.fire(0.18, before: { if boundary == "quiet" { s.cancel() } })
-        if ["drain", "end"].contains(boundary) { h.wait("enable"); s.finish() }
-    }
+    if ["drain", "end"].contains(boundary) { h.wait("enable"); s.finish() }
     h.wait("retired"); s.stop()
     precondition(!s.snapshot().audioReady && h.count("failure") == 0 && h.count("stop") == 1)
     if boundary != "end" { precondition(h.count("end") == 0) }
@@ -379,7 +376,7 @@ for boundary in ["factory", "prepare", "start", "quiet", "enable", "drain", "end
 }
 for endFailure in ["end", "timeout", "drain"] {
     let h = SessionHarness(); let s = h.session(); s.start(factory: h.operations)
-    h.wait("start"); h.complete(); h.fire(0.18); h.wait("enable")
+    h.wait("enable")
     h.failurePoint = endFailure; s.finish()
     if endFailure == "timeout" { h.wait("end"); h.fire(3) }
     h.wait("retired")
@@ -420,17 +417,12 @@ do {
     release.signal(); h.wait("retired")
     precondition(h.count("start") == 0 && h.count("enable") == 0 && h.count("failure") == 1)
 }
-for boundary in ["start", "quiet", "listening", "drain", "end"] {
+for boundary in ["listening", "drain", "end"] {
     let h = SessionHarness(), s: AudioSession
-    s = h.session(); s.start(factory: h.operations); h.wait("start")
-    if boundary != "start" {
-        h.complete()
-        h.fire(0.18, before: { if boundary == "quiet" { h.routeChanged() } })
-        if boundary != "quiet" { h.wait("enable") }
-    }
+    s = h.session(); s.start(factory: h.operations); h.wait("enable")
     if boundary == "drain" { h.boundary = { if $0 == "drain" { h.routeChanged() } }; s.finish() }
     else if boundary == "end" { s.finish(); h.wait("end"); h.routeChanged() }
-    else if boundary != "quiet" { h.routeChanged() }
+    else { h.routeChanged() }
     h.wait("retired"); s.stop()
     precondition(h.count("failure") == (boundary == "end" ? 0 : 1), "Wrong route failure disposition: \(boundary)")
     precondition(!s.isRecording && h.count("stop") == 1)
@@ -494,12 +486,9 @@ do {
     let h = SessionHarness(), clock = SessionClock()
     let s = clockSession(h, clock)
     h.boundary = { if $0 == "prepare" { clock.advance(2.633) } }
-    s.start(factory: h.operations); h.wait("start"); clock.waitCount(2)
-    precondition(!s.isRecording && h.count("enable") == 0)
-    clock.advance(2.857); h.complete(); clock.waitCount(3)
-    clock.advance(3.038); awaitReady(s)
-    // The old global 3s callback has fired; only the existing cue/tail delayed
-    // readiness. No third startup timer is granted by cue completion.
+    s.start(factory: h.operations); awaitReady(s); clock.waitCount(2)
+    precondition(h.count("start") == 0)
+    clock.advance(3.038)
     precondition(h.count("failure") == 0 && h.count("enable") == 1)
     clock.replay(0); clock.replay(1); clock.advance(9)
     precondition(s.isRecording && h.count("failure") == 0)
@@ -509,33 +498,29 @@ do {
     let h = SessionHarness(), clock = SessionClock(), s: AudioSession
     s = clockSession(h, clock)
     h.boundary = { if $0 == "prepare" { clock.advance(2.6) } }
-    s.start(factory: h.operations); h.wait("start"); clock.waitCount(2)
+    s.start(factory: h.operations); awaitReady(s); clock.waitCount(2)
     clock.advance(3.048); clock.replay(0)
-    precondition(!s.isRecording && h.count("failure") == 0, "Hardware deadline must not kill a pending cue")
-    h.complete(); clock.waitCount(3); clock.advance(3.229); awaitReady(s)
+    precondition(s.isRecording && h.count("failure") == 0, "Retired deadlines cannot kill listening")
     s.cancel(); s.stop()
 }
 for completeNearDeadline in [false, true] {
     let h = SessionHarness(), clock = SessionClock(), s: AudioSession
-    s = clockSession(h, clock); s.start(factory: h.operations)
-    h.wait("start"); clock.waitCount(2)
-    if completeNearDeadline {
-        clock.advance(2.9); h.complete(); clock.waitCount(3)
-    }
-    clock.advance(3); h.wait("failure"); h.wait("retired"); s.stop()
-    precondition(s.snapshot().failureStage == "cue_handoff_timeout" && h.count("enable") == 0)
-    h.complete(); clock.advance(9)
+    s = clockSession(h, clock)
+    let release = DispatchSemaphore(value: 0)
+    h.boundary = { if $0 == "enable" { release.wait() } }
+    s.start(factory: h.operations); h.wait("enable"); clock.waitCount(2)
+    if completeNearDeadline { clock.advance(2.9); clock.replay(0) }
+    clock.advance(3); h.wait("failure"); release.signal(); h.wait("retired"); s.stop()
+    precondition(s.snapshot().failureStage == "cue_handoff_timeout" && !s.isRecording)
+    clock.advance(9)
     precondition(!s.isRecording && h.count("failure") == 1, "Cue completion/tail cannot extend or revive expired handoff")
 }
-for blocked in ["factory", "prepare", "start", "enable", "muted-enable"] {
+for blocked in ["factory", "prepare", "enable", "muted-enable"] {
     let h = SessionHarness(), clock = SessionClock(), release = DispatchSemaphore(value: 0)
     let point = blocked == "muted-enable" ? "enable" : blocked
     h.boundary = { if $0 == point { release.wait() } }
     let s = clockSession(h, clock, sounds: blocked != "muted-enable")
     s.start(factory: h.operations)
-    if blocked == "enable" {
-        h.wait("start"); h.complete(); clock.waitCount(3); clock.advance(0.18)
-    }
     h.wait(point)
     clock.advance(3); h.wait("failure")
     let hardware = ["factory", "prepare"].contains(blocked)
@@ -552,12 +537,11 @@ for blocked in ["factory", "prepare", "start", "enable", "muted-enable"] {
     clock.advance(9)
     precondition(!s.isRecording && h.count("failure") == 1 && h.count("retired") == 1)
 }
-for boundary in ["prepare", "start", "enable"] {
+for boundary in ["prepare", "enable"] {
     let h = SessionHarness(), clock = SessionClock()
     let s = clockSession(h, clock)
     h.boundary = { if $0 == boundary { s.cancel(); clock.replay(0) } }
     s.start(factory: h.operations)
-    if boundary == "enable" { h.wait("start"); h.complete(); clock.waitCount(3); clock.advance(0.18) }
     h.wait("retired"); s.stop(); clock.advance(9)
     precondition(!s.isRecording && h.count("failure") == 0)
 }
@@ -565,12 +549,14 @@ do {
     let h = SessionHarness(), clock = SessionClock(), gate = NSLock()
     var live = true
     let s = clockSession(h, clock, epochAllowed: { gate.lock(); defer { gate.unlock() }; return live })
-    s.start(factory: h.operations); h.wait("start"); clock.waitCount(2)
+    let release = DispatchSemaphore(value: 0)
+    h.boundary = { if $0 == "enable" { release.wait() } }
+    s.start(factory: h.operations); h.wait("enable"); clock.waitCount(2)
     gate.lock(); live = false; gate.unlock()
-    clock.advance(3); h.complete(); h.wait("retired"); s.stop()
-    precondition(!s.isRecording && h.count("failure") == 0 && h.count("enable") == 0)
+    clock.advance(3); release.signal(); h.wait("retired"); s.stop()
+    precondition(!s.isRecording && h.count("failure") == 0)
 }
-print("Production phase deadline transfer: virtual 2.633s hardware plus cue/tail, stale timers, blocked factory/cue/enable, muted handoff and cancellation/epoch gates passed without hardware")
+print("Production phase deadline transfer: virtual 2.633s hardware with immediate capture, stale timers, blocked factory/enable, muted handoff and cancellation/epoch gates passed without hardware")
 for revoked in [false, true] {
     let h = SessionHarness(), gate = NSLock()
     var authorized = true, epochLive = true
@@ -608,7 +594,7 @@ for operation in ["finish", "stop", "cancel"] {
 for cancel in [false, true] {
     let h = SessionHarness(), next = SessionHarness(), done = DispatchSemaphore(value: 0)
     let s = h.session(); s.start(factory: h.operations)
-    h.wait("start"); h.complete(); h.fire(0.18); awaitReady(s)
+    awaitReady(s)
     s.finish(); h.wait("end")
     let fifo = DispatchQueue(label: "synthetic.control.fifo")
     let n = next.session(sounds: false)
@@ -617,7 +603,7 @@ for cancel in [false, true] {
     precondition(next.count("factory") == 0 && h.count("retired") == 0)
     if cancel { s.cancel() } else { h.fire(3) }
     precondition(done.wait(timeout: .now() + 2) == .success)
-    h.complete(1) // stale completion cannot rearm/retire the next owner
+    h.complete() // stale completion cannot rearm/retire the next owner
     next.wait("enable"); n.cancel(); n.stop()
     precondition(h.count("retired") == 1 && h.count("end") == 1 && h.count("enable") == 1)
 }
@@ -655,32 +641,32 @@ for point in ["input_prepare", "input_start", "output_create", "output_prepare",
                 h.event("output_start")
                 if point == "output_start" { throw AudioStageFailure("output_start", NSError(domain: "synthetic", code: 9)) }
                 if point == "output_route" { changed() }
-            }, play: { _, completed in
-                h.condition.lock(); let ending = !h.completed.isEmpty; h.completed.append(completed); h.condition.unlock()
-                h.event(ending ? "end" : "start")
+            }, play: { _, _, completed in
+                h.condition.lock(); h.completed.append(completed); h.condition.unlock()
+                h.event("end")
             }, stopCue: { h.event("output_stopCue") }, stop: { h.event("output_stop") },
             formats: { ["outputRate": 48000, "outputChannels": 2, "cueRate": 48000] })
         }
         return SessionAudioOwner(input: input, makeOutput: output, cue: { _ in pcm }).operations()
     }
-    if ["none", "end_route", "muted"].contains(point) {
-        if !muted { h.wait("start"); h.complete(); h.fire(0.18) }
+    if !point.hasPrefix("input_") {
         awaitReady(s)
         let ready = s.snapshot()
         precondition(ready.formats["inputChannels"] == 1)
-        precondition(ready.formats["outputChannels"] == (muted ? nil : 2))
+        precondition(ready.formats["outputChannels"] == nil && h.count("output_create") == 0,
+                     "Audible startup must not construct, prepare or start output")
         s.finish()
-        if !muted {
+        if ["none", "end_route"].contains(point) {
             h.wait("end")
-            if point == "end_route" { h.routeChanged() } else { h.complete(1) }
+            if point == "end_route" { h.routeChanged() } else { h.complete() }
         }
     }
     h.wait("retired"); s.stop()
     precondition(h.count("stop") == 1, "Input resource must retire: \(point)")
     let madeOutput = !muted && !point.hasPrefix("input_")
     precondition(h.count("output_stop") == (madeOutput ? 1 : 0), "Output must retire independently: \(point)")
-    precondition(h.count("failure") == (["none", "muted", "end_route"].contains(point) ? 0 : 1))
-    precondition(h.count("enable") == (["none", "muted", "end_route"].contains(point) ? 1 : 0))
+    precondition(h.count("failure") == (point.hasPrefix("input_") ? 1 : 0))
+    precondition(h.count("enable") == (point.hasPrefix("input_") ? 0 : 1))
     if point != "none" && point != "muted" && point != "output_route" && point != "end_route" {
         precondition(s.snapshot().failureStage == point)
         precondition(s.snapshot().failureDomain == "synthetic")
@@ -806,9 +792,9 @@ final class NegotiationHarness {
                   "negotiationAttempts": Double(self.preparation.attempts)]
             }, validatePrepared: { try self.preparation.current.validatePrepared() })
         return SessionAudioOwner(input: input, makeOutput: {
-            precondition(self.preparation.current.started && self.samples == 0)
+            precondition(self.preparation.current.started)
             self.session.event("output")
-            return .init(prepare: {}, play: { _, done in
+            return .init(prepare: {}, play: { _, _, done in
                 self.session.condition.lock(); self.session.completed.append(done); self.session.condition.unlock()
                 self.session.event("cue")
             }, stopCue: {}, stop: {}, formats: { ["outputRate": 24000] })
@@ -821,8 +807,8 @@ for mode in ["config-start", "config-install", "config-poststart", "config-commi
     let success = mode == "success" || mode.hasPrefix("config-")
     let prepared = success || ["cue-route", "listening-route"].contains(mode)
     if prepared {
-        h.session.wait("cue")
-        precondition(h.samples == 0 && !s.snapshot().audioReady)
+        h.session.wait("enabled"); awaitReady(s)
+        precondition(h.samples == 0 && h.session.count("output") == 0)
         precondition(h.starts == (["config-start", "config-poststart", "config-commit"].contains(mode) ? 2 : 1), mode)
         precondition(h.installs == [48000, 24000] && h.preparation.attempts == 2)
         precondition(h.session.count("failure") == 0)
@@ -832,10 +818,8 @@ for mode in ["config-start", "config-install", "config-poststart", "config-commi
         if mode == "cue-route" {
             h.hardware = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 1)!
             h.callbacks[1]()
-            h.session.complete(); h.session.fire(0.18)
         }
         else {
-            h.session.complete(); h.session.fire(0.18); h.session.wait("enabled")
             if mode == "listening-route" { h.callbacks[1]() }
             else {
                 h.packet(h.pipes[1], h.hardware)
@@ -849,7 +833,7 @@ for mode in ["config-start", "config-install", "config-poststart", "config-commi
     precondition(success ? h.samples > 0 : h.samples == 0)
     let expectedFailures = success ? 0 : 1
     precondition(h.session.count("failure") == expectedFailures, mode)
-    precondition(h.session.count("output") == (prepared ? 1 : 0), mode)
+    precondition(h.session.count("output") == 0, mode)
     if ["uid-missing", "uid-changed", "second-config", "deadline-second"].contains(mode) {
         precondition(h.preparation.attempts == 2, mode)
         precondition(s.snapshot().formats["initial_config_change"] == 1, mode)
@@ -864,9 +848,8 @@ for mode in ["config-start", "config-install", "config-poststart", "config-commi
 }
 print("Production preaccept negotiation: fresh 48-to-24k converter/tap, same UID, stale callbacks, cleanup/cancel/gate failures and one hardware 3s watchdog passed without hardware")
 
-// Installed beta20 ordering: input has committed RUNNING with its PCM gate
-// closed; starting the output engine posts an input configuration notification.
-// Exercise the actual startup, split owner AND session, without audio hardware.
+// Running input remains closed until atomic read-only validation. Completion
+// output notifications occur only after drain and cannot poison final PCM.
 precondition(HFTestCaptureRunningBoundary())
 for mode in ["benign", "cue-notice", "cue-format", "format", "node-format", "uid", "stopped", "validation-notice", "commit-notice", "cancel", "timeout", "cancel-commit", "timeout-commit", "runtime", "pipeline", "output"] {
     let h = SessionHarness(), s = h.session()
@@ -897,7 +880,7 @@ for mode in ["benign", "cue-notice", "cue-format", "format", "node-format", "uid
         }
         return running
     })) { _, count in
-        if count > 0 { samples += Int(count) }
+        if count > 0 { samples += Int(count); s.acceptedPCM() }
         if count < 0 { pipelineFailure?() }
     }
     startup.routeFailed = { s.configurationFailure("input_configuration") }
@@ -908,36 +891,39 @@ for mode in ["benign", "cue-notice", "cue-format", "format", "node-format", "uid
         }, close: { startup.closeAcceptance() }, drain: { startup.closeAndDrain() }, play: { _, _ in },
         stopCue: {}, stop: { startup.stop() }, level: { -60 }, outputRate: { 0 },
         cancel: { startup.revoke() }, formats: { ["inputRate": format.sampleRate] },
-        validatePrepared: { validating = true; defer { validating = false }; try startup.validatePrepared() })
+        validatePrepared: {
+            changed() // unchanged preaccept configuration revision is valid
+            if mode == "format" { hardware = changedFormat }
+            if mode == "node-format" { node = changedFormat }
+            if mode == "uid" { uid = 43 }
+            if mode == "stopped" { running = false }
+            validating = true; defer { validating = false }; try startup.validatePrepared()
+        })
         return SessionAudioOwner(input: input, makeOutput: {
             .init(prepare: {
-                precondition(startup.started && samples == 0)
+                precondition(startup.started && samples > 0)
                 pipeline.enqueue(pcm) // must remain discarded
-                changed()
-                if mode == "format" { hardware = changedFormat }
-                if mode == "node-format" { node = changedFormat }
-                if mode == "uid" { uid = 43 }
-                if mode == "stopped" { running = false }
                 if mode == "output" { s.configurationFailure("output_configuration") }
-            }, play: { _, completion in
+            }, play: { _, _, completion in
                 if mode == "cue-notice" { changed() }
                 if mode == "cue-format" { hardware = changedFormat; changed() }
                 h.condition.lock(); h.completed.append(completion); h.condition.unlock(); h.event("cue")
             }, stopCue: {}, stop: {}, formats: { ["outputRate": 44100] })
         }, cue: { _ in pcm }).operations()
     }
-    if mode == "cue-format" {
-        h.wait("cue"); h.complete(); h.fire(0.18); h.wait("retired"); s.stop()
-        precondition(samples == 0 && h.count("failure") == 1 && s.snapshot().failureStage == "input_revalidate")
-    } else if ["benign", "cue-notice", "runtime", "pipeline"].contains(mode) {
-        h.wait("cue"); precondition(samples == 0 && !s.snapshot().audioReady)
-        h.complete(); h.fire(0.18); h.wait("enabled"); awaitReady(s)
+    if ["benign", "cue-notice", "cue-format", "output", "runtime", "pipeline"].contains(mode) {
+        h.wait("enabled"); awaitReady(s)
+        precondition(h.count("cue") == 0)
         if mode == "runtime" { changed(); h.wait("retired") }
         else if mode == "pipeline" {
             let bad = AVAudioPCMBuffer(pcmFormat: changedFormat, frameCapacity: 1)!
             bad.frameLength = 1; pipeline.enqueue(bad); h.wait("retired")
         }
-        else { s.finish(); h.wait("cue"); h.complete(1); h.wait("retired") }
+        else {
+            s.finish()
+            if mode != "output" { h.wait("cue"); h.complete() }
+            h.wait("retired")
+        }
         s.stop()
         precondition(samples > 0 && h.count("failure") == (["runtime", "pipeline"].contains(mode) ? 1 : 0))
         if mode == "runtime" { precondition(s.snapshot().failureStage == "input_configuration") }
@@ -947,10 +933,78 @@ for mode in ["benign", "cue-notice", "cue-format", "format", "node-format", "uid
         precondition(samples == 0 && h.count("cue") == 0)
         precondition(h.count("failure") == (mode.hasPrefix("cancel") ? 0 : 1))
         if !mode.hasPrefix("cancel") && !mode.hasPrefix("timeout") {
-            precondition(s.snapshot().failureStage == (mode == "output" ? "output_configuration" : "input_configuration"))
-            precondition(s.snapshot().formats["inputRate"] == 44100 && s.snapshot().outputRate == 44100)
+            precondition(s.snapshot().failureStage == "input_configuration")
+            precondition(s.snapshot().formats["inputRate"] == 44100 && s.snapshot().outputRate == 0)
         }
     }
     let failures = h.count("failure"); stale(); precondition(h.count("failure") == failures && starts == 1)
 }
-print("Production post-output preaccept validation: benign notification, cue revalidation, UID/formats/running failures, atomic revision, cancellation/timeout tombstones and strict runtime failure passed without hardware")
+print("Production input-only preaccept validation: benign notification, UID/formats/running failures, atomic revision, cancellation/timeout tombstones and strict runtime failure passed without hardware")
+
+// Deferred work cannot block EOS, manufacture retirement or revive cancelled
+// playback. Include the final production validation-to-play authorization boundary.
+for blocked in ["decode", "output_prepare", "play_validate"] {
+    for disposition in ["cancel", "timeout"] {
+        let h = SessionHarness(), release = DispatchSemaphore(value: 0), done = DispatchSemaphore(value: 0)
+        let s = h.session()
+        let pcm = AVAudioPCMBuffer(pcmFormat: AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 1)!, frameCapacity: 1)!
+        s.start { failed in
+            let input = try h.operations(failed)
+            return SessionAudioOwner(input: input, makeOutput: {
+                precondition(h.count("close") > 0 && h.count("drain") > 0)
+                h.event("decode")
+                if blocked == "decode" { release.wait() }
+                return .init(prepare: {
+                    h.event("output_prepare")
+                    if blocked == "output_prepare" { release.wait() }
+                }, play: { _, allowed, _ in
+                    try SessionCueOutput.playIfAllowed(validate: {
+                        h.event("play_validate")
+                        if blocked == "play_validate" { release.wait() }
+                    }, allowed: allowed, play: { h.event("unexpected_play") })
+                }, stopCue: {}, stop: { h.event("output_stop") }, formats: { [:] })
+            }, cue: { _ in pcm }).operations()
+        }
+        awaitReady(s)
+        precondition(h.count("decode") == 0 && h.count("output_prepare") == 0)
+        s.finish(); h.wait(blocked) // Finish/EOS returned despite blocked output.
+        DispatchQueue.global().async { s.stop(); done.signal() }
+        if disposition == "cancel" { s.cancel() } else { h.fire(3) }
+        precondition(done.wait(timeout: .now() + 0.02) == .timedOut && h.count("retired") == 0)
+        release.signal()
+        precondition(done.wait(timeout: .now() + 2) == .success)
+        precondition(h.count("unexpected_play") == 0 && h.count("failure") == 0 && h.count("output_stop") == 1)
+    }
+}
+for suppression in ["no_pcm", "cancel", "drain_failure", "missing_asset"] {
+    let h = SessionHarness(), s = h.session()
+    if suppression == "no_pcm" { h.accepted = nil }
+    if suppression == "drain_failure" { h.failurePoint = "drain" }
+    s.start { failed in
+        SessionAudioOwner(input: try h.operations(failed), makeOutput: {
+            h.event("completion_load")
+            throw NSError(domain: "Missing completion asset", code: 1)
+        }, cue: { _ in nil }).operations()
+    }
+    awaitReady(s)
+    precondition(h.count("completion_load") == 0)
+    if suppression == "cancel" { s.cancel() } else { s.finish() }
+    h.wait("retired"); s.stop()
+    precondition(h.count("completion_load") == (suppression == "missing_asset" ? 1 : 0))
+    precondition(h.count("failure") == (suppression == "drain_failure" ? 1 : 0))
+}
+print("Capture-first deferred completion: no startup cue work/tail, EOS before blocked output, cancel/deadline retirement barriers and no-PCM/missing-asset disposition passed without hardware")
+for frozen in ["admitted-output", ""] {
+    for live in ["admitted-output", "replacement-output", "missing"] {
+        var reads = 0
+        do {
+            try SessionCueOutput.validateIdentity(frozen) {
+                reads += 1
+                if live == "missing" { throw NSError(domain: "Output unavailable", code: 1) }
+                return live
+            }
+            precondition(frozen == live && !frozen.isEmpty)
+        } catch { precondition(frozen != live || live == "missing" || frozen.isEmpty) }
+        precondition(reads == (frozen.isEmpty ? 0 : 1), "Never reselect/fall back to a new output")
+    }
+}

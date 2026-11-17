@@ -33,13 +33,14 @@ test('memory capture converter drains hardware-rate stereo and bounds producer b
     assert.match(output, /bounded overload passed without microphone/);
     assert.match(output, /Microphone UID bind-before-format, missing\/bind failure and delayed route revalidation passed without hardware/);
     assert.match(output, /Finish once after drain; cancel\/error\/quit\/pending-start\/mute suppressed without playback/);
-    assert.match(output, /Capture startup exception, post-cue format, teardown and stale producer contracts passed without hardware/);
+    assert.match(output, /Capture startup exception, preaccept format, teardown and stale producer contracts passed without hardware/);
     assert.match(output, /Session cue completion\/deadline, cancellation boundaries, muted start, nonfatal end and gated PCM passed without hardware/);
     assert.match(output, /Independent startup deadline, route\/drain error once-only disposition and production asset decoding passed without hardware/);
     assert.match(output, /Production split-engine owner partial starts, input-only topology, muted allocation, output route disposition and bounded first diagnostics passed without hardware/);
     assert.match(output, /Production preaccept negotiation: fresh 48-to-24k converter\/tap, same UID, stale callbacks, cleanup\/cancel\/gate failures and one hardware 3s watchdog passed without hardware/);
-    assert.match(output, /Production phase deadline transfer: virtual 2.633s hardware plus cue\/tail, stale timers, blocked factory\/cue\/enable, muted handoff and cancellation\/epoch gates passed without hardware/);
-    assert.match(output, /Production post-output preaccept validation: benign notification, cue revalidation, UID\/formats\/running failures, atomic revision, cancellation\/timeout tombstones and strict runtime failure passed without hardware/);
+    assert.match(output, /Production phase deadline transfer: virtual 2.633s hardware with immediate capture, stale timers, blocked factory\/enable, muted handoff and cancellation\/epoch gates passed without hardware/);
+    assert.match(output, /Production input-only preaccept validation: benign notification, UID\/formats\/running failures, atomic revision, cancellation\/timeout tombstones and strict runtime failure passed without hardware/);
+    assert.match(output, /Capture-first deferred completion: no startup cue work\/tail, EOS before blocked output, cancel\/deadline retirement barriers and no-PCM\/missing-asset disposition passed without hardware/);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 

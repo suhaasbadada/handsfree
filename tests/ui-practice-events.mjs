@@ -43,8 +43,8 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   assert.equal(await evaluate(`!document.getElementById('practice-page').hidden && document.getElementById('overview').hidden && document.getElementById('nav-practice-page').getAttribute('aria-current')==='page'`),true,'Explicit Practice entry selects its page and grants context');
   const baseline = await evaluate(`JSON.stringify(window.fixture.stats)`);
   assert.equal(await evaluate(`document.getElementById('get-started').hidden`),true,'Returning ready users do not see a wizard');
-  await evaluate(`document.getElementById('practice-setup').click()`);
-  assert.equal(await evaluate(`!document.getElementById('settings').hidden && document.getElementById('practice-page').hidden && document.activeElement.id==='preferences-title' && document.getElementById('get-started').hidden && window.context===0`),true,'Practice Settings opens real Dictation settings, revoking context instead of expanding inline guidance');
+  await evaluate(`document.getElementById('nav-settings').click()`);
+  assert.equal(await evaluate(`!document.getElementById('settings').hidden && document.getElementById('practice-page').hidden && !document.getElementById('practice-setup') && document.getElementById('get-started').hidden && window.context===0`),true,'Sidebar Settings is the single settings entry and revokes Practice context');
   await evaluate(`document.getElementById('settings-started').click()`);
   assert.equal(await evaluate(`document.getElementById('settings').contains(document.getElementById('get-started')) && !document.getElementById('get-started').hidden && ['microphone','permissions','shortcut','model'].every(k=>document.getElementById('check-'+k).textContent.endsWith('Ready'))`),true,'Revisitable Settings checklist uses native proofs');
   assert.equal(await evaluate(`window.calls.some(c=>['request_microphone','request_permissions','download_model','practice_start'].includes(c.command))`),false,'Opening guidance never prompts, downloads or records');
@@ -211,9 +211,9 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   await until(`typeof window.pauseAck==='function'`);
   assert.equal(await evaluate(`document.getElementById('workflow-pause').disabled && document.getElementById('brand-pause').disabled`),true,'Both pause controls share pending owner');
   await evaluate(`window.pauseAck();window.delayPause=false`);
-  await until(`document.getElementById('workflow-pause').textContent==='Resume shortcuts'`);
+  await until(`document.getElementById('workflow-pause').getAttribute('aria-label')==='Resume shortcuts'`);
   await evaluate(`document.querySelector('.brand').click();document.getElementById('brand-pause').click()`);
-  await until(`document.getElementById('workflow-pause').textContent==='Pause shortcuts'`);
+  await until(`document.getElementById('workflow-pause').getAttribute('aria-label')==='Pause shortcuts'`);
   await evaluate(`window.workflow.paused=true`);
   await until(`document.getElementById('brand-pause').textContent==='Resume shortcuts'`);
   await evaluate(`document.getElementById('launch-at-login').click()`);
