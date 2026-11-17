@@ -2014,7 +2014,37 @@ fn handle_permission_args(app: &tauri::AppHandle, args: &[String]) {
     }
     refresh_status();
 }
+#[cfg(any(target_os = "macos", test))]
+fn release_smoke_invocation(args: &[String]) -> Result<bool, &'static str> {
+    if !args.iter().any(|arg| arg.starts_with("--release-smoke")) {
+        return Ok(false);
+    }
+    if args == ["--release-smoke"] {
+        Ok(true)
+    } else {
+        Err("Usage: handsfree --release-smoke")
+    }
+}
 fn main() {
+    // Explicit diagnostic dispatch precedes all normal app/plugin/model setup.
+    // Reject malformed smoke invocations, never fall through into normal launch.
+    #[cfg(target_os = "macos")]
+    {
+        let args: Vec<_> = std::env::args().skip(1).collect();
+        match release_smoke_invocation(&args) {
+            Err(usage) => {
+                eprintln!("{usage}");
+                std::process::exit(64);
+            }
+            Ok(true) => {
+                unsafe extern "C" {
+                    fn hf_release_smoke() -> i32;
+                }
+                std::process::exit(unsafe { hf_release_smoke() });
+            }
+            Ok(false) => {}
+        }
+    }
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
             show_settings(app);
@@ -2336,6 +2366,23 @@ fn main() {
 #[cfg(test)]
 mod audio_tests {
     use super::*;
+    #[test]
+    fn release_probe_is_explicit_and_strict_before_normal_setup() {
+        let parse = |args: &[&str]| {
+            release_smoke_invocation(&args.iter().map(|s| s.to_string()).collect::<Vec<_>>())
+        };
+        assert_eq!(parse(&[]), Ok(false));
+        assert_eq!(parse(&["--request-microphone"]), Ok(false));
+        assert_eq!(parse(&["--release-smoke"]), Ok(true));
+        for args in [
+            vec!["--release-smoke=1"],
+            vec!["--release-smoke", "--skip"],
+            vec!["--release-smoke", "--release-smoke"],
+            vec!["--request-microphone", "--release-smoke"],
+        ] {
+            assert!(parse(&args).is_err());
+        }
+    }
     #[test]
     fn resetting_without_confirmation_never_touches_state() {
         assert!(tauri::async_runtime::block_on(reset_stats(false)).is_err());

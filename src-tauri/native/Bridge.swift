@@ -5,6 +5,240 @@ import QuartzCore
 import Carbon
 import ServiceManagement
 
+// This is the sole production input/owner/deferred-output factory, used by both
+// record() and the explicit release probe. Trace is observation, never authority.
+final class ProductionAudioTrace {
+    private let lock = NSLock()
+    weak var capture: AudioCapture?
+    weak var engine: AnyObject?
+    private(set) var created = false
+    private var values: [String: Int] = [:]
+    private(set) var frozenUID: String?
+    func bind(_ input: AudioCapture) {
+        lock.lock(); defer { lock.unlock() }
+        capture = input; engine = input.observedEngine; frozenUID = input.frozenUID; created = true
+    }
+    func count(_ key: String) { lock.lock(); values[key, default: 0] += 1; lock.unlock() }
+    func snapshot() -> [String: Int] { lock.lock(); defer { lock.unlock() }; return values }
+}
+
+func productionAudioFactory(session: AudioSession, generation: UInt64, epoch: UInt64,
+    uid: String?, profile: String, volume: Float, sounds: Bool, outputUID: String?,
+    allowed: @escaping () -> Bool, authorized: @escaping () -> Bool,
+    sink: @escaping (UInt64, UInt64, UnsafePointer<Float>?, Int32) -> Void,
+    trace: ProductionAudioTrace? = nil) -> (@escaping () -> Void) throws -> AudioSession.Operations {
+    return { [weak session] routeFailure in
+        let capture = try audioStage("input_create") { try AudioCapture(generation: generation, epoch: epoch, microphoneUID: uid,
+            sink: { generation, epoch, data, count in
+                if count < 0 { routeFailure() } else if allowed() {
+                    if count > 0 { session?.acceptedPCM() }
+                    sink(generation, epoch, data, count)
+                }
+            }) }
+        trace?.bind(capture)
+        capture.routeFailed = { [weak session] in trace?.count("routeFailures"); session?.configurationFailure("input_configuration") }
+        capture.validationRequested = { [weak session] in trace?.count("notifications"); session?.inputConfigurationChanged() }
+        func certificate(_ final: Bool) throws -> () -> Bool {
+            let certify = try final ? capture.prepareDrainCertificate() : capture.prepareValidationCertificate()
+            return { let result = certify(); trace?.count(final ? (result ? "finalCertified" : "finalRejected") : (result ? "runtimeCertified" : "runtimeRejected")); return result }
+        }
+        let input = AudioSession.Operations(prepare: { try capture.prepareSession(allowed: authorized) }, enable: { try capture.enable() },
+            close: { capture.closeAcceptance() }, drain: { capture.closeAndDrain() },
+            play: { _, _ in }, stopCue: {}, stop: { let healthy = capture.stop(); trace?.count(healthy ? "cleanupPassed" : "cleanupFailed") },
+            level: { capture.level() }, outputRate: { 0 }, cancel: { capture.revoke() }, formats: { capture.formatMetadata() },
+            validatePrepared: { try capture.validatePrepared() }, prepareDrainCertificate: { try certificate(true) },
+            prepareValidationCertificate: { try certificate(false) })
+        var endPCM: AVAudioPCMBuffer?
+        let makeOutput: (() throws -> SessionAudioOwner.Output)? = sounds ? {
+            guard let outputUID, let data = EndCue.data(profile: profile) else { throw NSError(domain: "Completion cue unavailable", code: 1) }
+            let pcm = try SessionCuePCM.decode(data); endPCM = pcm
+            let output = try SessionCueOutput(format: pcm.format, volume: volume, frozenUID: outputUID)
+            trace?.count("outputCreated")
+            return output.operations(routeFailure: { [weak session] in session?.configurationFailure("output_configuration") },
+                cleanup: { healthy in trace?.count(healthy ? "outputCleanupPassed" : "outputCleanupFailed") })
+        } : nil
+        return SessionAudioOwner(input: input, makeOutput: makeOutput, cue: { ending in ending ? endPCM : nil }).operations()
+    }
+}
+
+// Same small controller is exercised by permission-free native tests. Finishing
+// waits for actual 16 kHz PCM, cancellation waits for its first actual packet.
+struct ReleaseSmokeController {
+    enum Action: Equatable { case wait, finish, cancel, timeout }
+    let cancelling: Bool
+    private(set) var commanded = false
+    mutating func next(frames: Int, elapsed: Double) -> Action {
+        guard !commanded else { return .wait }
+        if elapsed >= 12 { commanded = true; return .timeout }
+        if frames >= (cancelling ? 1 : 16000) {
+            commanded = true; return cancelling ? .cancel : .finish
+        }
+        return .wait
+    }
+    // Effects injected by production and by the permission-free native harness.
+    // There is no implicit start/retry and at most one finish/cancel dispatch.
+    mutating func drive(frames: Int, elapsed: Double, finish: () -> Void, cancel: () -> Void) -> Action {
+        let action = next(frames: frames, elapsed: elapsed)
+        switch action {
+        case .finish: finish()
+        case .cancel, .timeout: cancel()
+        case .wait: break
+        }
+        return action
+    }
+}
+
+private final class ReleaseSmokeAttempt {
+    let lock = NSLock()
+    var frames = 0, packets = 0, failures = 0, lateFrames = 0, nonzeroSamples = 0
+    var invalidPCM = false, ended = false, retired = false, revoked = false
+    let trace = ProductionAudioTrace()
+    func allowed() -> Bool { lock.lock(); defer { lock.unlock() }; return !revoked }
+    func revoke() { lock.lock(); revoked = true; ended = true; lock.unlock() }
+    func pcm(_ data: UnsafePointer<Float>?, _ count: Int32) {
+        lock.lock(); defer { lock.unlock() }
+        guard count > 0, let data else { failures += 1; return }
+        if ended { lateFrames += Int(count) }
+        // Inspect transient samples; never persist content or derive speech.
+        for index in 0..<Int(count) {
+            if !data[index].isFinite { invalidPCM = true }
+            else if data[index] != 0 { nonzeroSamples += 1 }
+        }
+        frames += Int(count); packets += 1
+    }
+}
+
+private func smokeRunning(_ id: AudioDeviceID) throws -> UInt32 {
+    var address = Microphones.property(kAudioDevicePropertyDeviceIsRunningSomewhere)
+    var value: UInt32 = 0, size = UInt32(MemoryLayout<UInt32>.size)
+    try Microphones.checked(AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value))
+    return value
+}
+
+// CLI only, before Rust/Tauri setup: no hook, model, paste, statistics, settings
+// transaction or permission prompt. All output is bounded metadata, never PCM.
+@_cdecl("hf_release_smoke") public func releaseSmoke() -> Int32 {
+    var result: [String: Any] = ["schemaVersion": 1, "probe": "production-audio-v1", "passed": false, "attempts": []]
+    func emit() { if let bytes = try? JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]), let text = String(data: bytes, encoding: .utf8) { print(text) } }
+    // Independent hard watchdog: OS audio calls cannot be forcibly unwound. Exit
+    // only this diagnostic process; OS releases its devices. No receipt on hang.
+    DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 80) { _exit(70) }
+    do {
+        guard Thread.isMainThread else { throw NSError(domain: "main_thread_required", code: 1) }
+        let app = NSApplication.shared
+        app.setActivationPolicy(.prohibited)
+        func isolated() -> Bool {
+            NSRunningApplication.runningApplications(withBundleIdentifier: "com.handsfree.local")
+                .allSatisfy { $0.processIdentifier == ProcessInfo.processInfo.processIdentifier }
+        }
+        // Conservative: even an idle installed copy may start capturing. Do not
+        // cancel it, message it, or mistake its state for this process's proof.
+        guard isolated() else { throw NSError(domain: "other_instance_running_quit_explicitly_before_probe", code: 1) }
+        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { throw NSError(domain: "microphone_permission_not_already_granted", code: 1) }
+        let settingsURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/com.handsfree.local/usage.json")
+        let settingsData = try Data(contentsOf: settingsURL)
+        guard let settings = try JSONSerialization.jsonObject(with: settingsData) as? [String: Any],
+              let sounds = settings["sounds"] as? Bool, let volume = settings["sound_volume"] as? NSNumber,
+              let profile = settings["sound_style"] as? String, ["clean", "warm"].contains(profile),
+              volume.floatValue.isFinite, (0...100).contains(volume.floatValue) else { throw NSError(domain: "saved_settings_unreadable", code: 1) }
+        let uid = settings["microphone_uid"] as? String
+        guard settings["microphone_uid"] == nil || settings["microphone_uid"] is NSNull ||
+                (uid != nil && !uid!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && uid!.utf8.count <= 1024 &&
+                 !uid!.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)) else {
+            throw NSError(domain: "saved_microphone_invalid_no_fallback", code: 1)
+        }
+        let inputID = try Microphones.resolve(uid), outputID = try SessionCueOutput.defaultDevice()
+        let selectedUID = try Microphones.string(inputID, kAudioDevicePropertyDeviceUID)
+        let defaultUID = try Microphones.defaultUID()
+        let outputUID = try Microphones.string(outputID, kAudioDevicePropertyDeviceUID)
+        let baseline = try [smokeRunning(inputID), smokeRunning(outputID)]
+        guard baseline == [0, 0] else { throw NSError(domain: "device_busy_baseline", code: 1) }
+        var transportAddress = Microphones.property(kAudioDevicePropertyTransportType)
+        var transport: UInt32 = 0, transportSize = UInt32(MemoryLayout<UInt32>.size)
+        try Microphones.checked(AudioObjectGetPropertyData(inputID, &transportAddress, 0, nil, &transportSize, &transport))
+        let coverage = transport == kAudioDeviceTransportTypeBuiltIn ? "built-in" : (transport == kAudioDeviceTransportTypeBluetooth || transport == kAudioDeviceTransportTypeBluetoothLE ? "bluetooth" : "other")
+        result["inputTransport"] = coverage
+        result["permission"] = "authorized"
+        result["savedSounds"] = sounds
+        result["soundProfile"] = profile
+        result["soundVolume"] = volume.floatValue / 100
+        result["completionEnabled"] = sounds && volume.floatValue > 0
+        result["baselineRunning"] = baseline
+        var attempts: [[String: Any]] = []
+        for index in 0..<4 {
+            let state = ReleaseSmokeAttempt(), start = Date()
+            var controller = ReleaseSmokeController(cancelling: index == 3)
+            let session = AudioSession(generation: UInt64(index + 1), epoch: 1, sounds: sounds && volume.floatValue > 0,
+                authorized: { state.allowed() }, epochAllowed: { state.allowed() }, failure: { state.lock.lock(); state.failures += 1; state.lock.unlock() },
+                retired: { _ in state.lock.lock(); state.retired = true; state.lock.unlock() })
+            session.start(factory: productionAudioFactory(session: session, generation: UInt64(index + 1), epoch: 1,
+                uid: uid, profile: profile, volume: volume.floatValue / 100, sounds: sounds && volume.floatValue > 0,
+                outputUID: outputUID, allowed: { state.allowed() }, authorized: { state.allowed() }, sink: { _, _, data, count in state.pcm(data, count) }, trace: state.trace))
+            // Not the hardware owner and not AppKit's queue. A blocked owner
+            // cannot defeat cancellation or the hard per-attempt deadline.
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 12) { [weak session] in
+                state.lock.lock(); let retired = state.retired; state.lock.unlock()
+                if !retired { state.revoke(); session?.cancel() }
+            }
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 18) {
+                state.lock.lock(); let retired = state.retired; state.lock.unlock()
+                if !retired { _exit(71) }
+            }
+            var timedOut = false, isolationFailed = false
+            while true {
+                state.lock.lock(); let frames = state.frames, retired = state.retired; state.lock.unlock()
+                if retired { break }
+                if !isolated() { isolationFailed = true; state.revoke(); session.cancel() }
+                let action = controller.drive(frames: frames, elapsed: Date().timeIntervalSince(start), finish: {
+                    // finish() synchronously drains accepted packets. Only after
+                    // its return is any subsequent PCM forbidden.
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        session.finish(); state.lock.lock(); state.ended = true; state.lock.unlock()
+                    }
+                }, cancel: {
+                    state.revoke(); session.cancel()
+                })
+                if action == .timeout { timedOut = true }
+                RunLoop.current.run(until: Date().addingTimeInterval(0.02))
+            }
+            // stop waits for actual retirement; no next attempt may overlap it.
+            session.stop()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+            let observation = session.snapshot(), trace = state.trace.snapshot()
+            let after = try [smokeRunning(inputID), smokeRunning(outputID)]
+            let unchanged = try Microphones.resolve(uid) == inputID && Microphones.defaultUID() == defaultUID &&
+                Microphones.string(inputID, kAudioDevicePropertyDeviceUID) == selectedUID &&
+                SessionCueOutput.defaultDevice() == outputID && Microphones.string(outputID, kAudioDevicePropertyDeviceUID) == outputUID &&
+                Data(contentsOf: settingsURL) == settingsData
+            state.lock.lock()
+            let passed = !timedOut && !isolationFailed && isolated() && controller.commanded && state.failures == 0 &&
+                !state.invalidPCM && state.nonzeroSamples > 0 && state.lateFrames == 0 && state.retired && state.trace.created && state.trace.capture == nil && state.trace.engine == nil &&
+                state.trace.frozenUID == selectedUID && after == baseline && unchanged && observation.failureStage == nil &&
+                trace["cleanupPassed"] == 1 && trace["cleanupFailed"] == nil && trace["outputCleanupFailed"] == nil &&
+                (trace["outputCreated"] == nil || trace["outputCleanupPassed"] == 1) && (trace["runtimeRejected"] ?? 0) == 0 &&
+                observation.formats["negotiationAttempts"] == 1 && state.frames >= (index == 3 ? 1 : 16000) &&
+                (index == 3 ? (observation.reason == "cancelled" && trace["outputCreated"] == nil) :
+                    (trace["finalCertified"] == 1 && observation.reason == "finished" &&
+                     (!(sounds && volume.floatValue > 0) || trace["outputCreated"] == 1)))
+            let observationObject = try JSONSerialization.jsonObject(with: JSONEncoder().encode(observation))
+            attempts.append(["kind": index == 3 ? "cancel" : "finish", "passed": passed, "frames": state.frames, "packets": state.packets,
+                "failures": state.failures, "lateFrames": state.lateFrames, "nonzeroSamples": state.nonzeroSamples, "invalidPCM": state.invalidPCM, "retired": state.retired,
+                "captureReleased": state.trace.capture == nil, "engineReleased": state.trace.engine == nil,
+                "frozenUIDMatches": state.trace.frozenUID == selectedUID, "unchanged": unchanged, "afterRunning": after,
+                "milliseconds": Date().timeIntervalSince(start) * 1000, "trace": trace, "observation": observationObject])
+            state.lock.unlock()
+            result["attempts"] = attempts
+            guard passed else { throw NSError(domain: "attempt_\(index + 1)_failed", code: 1) }
+        }
+        result["passed"] = true
+        emit(); return 0
+    } catch {
+        // Error domains are bounded stage labels, not file paths/UIDs/content.
+        result["error"] = (error as NSError).domain
+        emit(); return 1
+    }
+}
+
 // Main-thread-owned future-admission policy. Updating it never resets a physical
 // gesture, revokes an epoch, or touches an accepted recorder/cue.
 struct WorkflowPolicy {
@@ -925,37 +1159,9 @@ private func validateDelivery() -> PasteResult {
             }
             audioBusy = true
             lastAudioGeneration = generation; lastAudioEpoch = epoch; lastAudioObservation = nil
-            r.start { [weak r] routeFailure in
-                let capture = try audioStage("input_create") { try AudioCapture(generation: generation, epoch: epoch, microphoneUID: uid,
-                    sink: { generation, epoch, data, count in
-                        if count < 0 { routeFailure() } else if allowed(epoch) {
-                            if count > 0 { r?.acceptedPCM() }
-                            sink(generation, epoch, data, count)
-                        }
-                    }) }
-                capture.routeFailed = { [weak r] in r?.configurationFailure("input_configuration") }
-                capture.validationRequested = { [weak r] in r?.inputConfigurationChanged() }
-                let input = AudioSession.Operations(prepare: { try capture.prepareSession(allowed: { allowed(epoch) && (gate?(generation) ?? true) }) }, enable: { try capture.enable() },
-                    close: { capture.closeAcceptance() }, drain: { capture.closeAndDrain() },
-                    play: { _, _ in }, stopCue: {}, stop: { capture.stop() },
-                    level: { capture.level() }, outputRate: { 0 },
-                    cancel: { capture.revoke() }, formats: { capture.formatMetadata() },
-                    validatePrepared: { try capture.validatePrepared() },
-                    prepareDrainCertificate: { try capture.prepareDrainCertificate() },
-                    prepareValidationCertificate: { try capture.prepareValidationCertificate() })
-                var endPCM: AVAudioPCMBuffer?
-                let makeOutput: (() throws -> SessionAudioOwner.Output)? = sessionSounds ? {
-                    guard let outputUID, let data = EndCue.data(profile: profile) else {
-                        throw NSError(domain: "Completion cue unavailable", code: 1)
-                    }
-                    let pcm = try SessionCuePCM.decode(data)
-                    endPCM = pcm
-                    return try SessionCueOutput(format: pcm.format, volume: volume, frozenUID: outputUID).operations(routeFailure: { [weak r] in r?.configurationFailure("output_configuration") })
-                } : nil
-                return SessionAudioOwner(input: input, makeOutput: makeOutput, cue: { ending in
-                        ending ? endPCM : nil
-                }).operations()
-            }
+            r.start(factory: productionAudioFactory(session: r, generation: generation, epoch: epoch,
+                uid: uid, profile: profile, volume: volume, sounds: sessionSounds, outputUID: outputUID,
+                allowed: { allowed(epoch) }, authorized: { allowed(epoch) && (gate?(generation) ?? true) }, sink: sink))
             return true
         }
     }

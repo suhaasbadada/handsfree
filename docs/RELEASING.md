@@ -1,3 +1,94 @@
+## Beta 23 candidate preparation
+
+### Mandatory exact-candidate hardware gate (pending execution)
+
+Packaging may run without microphone evidence, but **every** local/draft/public
+`scripts/check-release.mjs` audit now rejects missing, failed, malformed, stale
+(older than 24 hours) or mismatched `release/release-smoke.json`. CI green is not
+microphone evidence. The previous scratch-app diagnostics below do **not** satisfy
+this gate. Commit/rebuild/package the exact candidate first, retaining the existing
+signer, then explicitly authorize and run:
+
+```sh
+node scripts/check-release-smoke.mjs --run release
+node scripts/check-release.mjs --local release
+node scripts/publish-release.mjs --check release
+# Only after separate owner publication approval:
+# node scripts/publish-release.mjs --publish release
+```
+
+The runner invokes **only** `release/updater/HandsFree.app/Contents/MacOS/handsfree
+--release-smoke`, before normal Tauri/plugin/hook/model setup. The direct CLI
+prints bounded JSON to stdout and returns nonzero on failure; only the runner
+writes a private ignored receipt. Existing microphone permission is required;
+there is no prompt/reset, new signer, device/rate/default write, installed app
+replacement, model initialization, transcript, paste, usage or settings write.
+Saved microphone, sounds/profile/volume are read-only. Audio content is discarded.
+
+The native path shares the **same single production factory**, AudioSession,
+SessionAudioOwner and AudioCapture, including both certification hooks, frozen UID
+and deferred completion. Three sequential real mono-16k captures require at least
+16,000 finite frames and nonzero samples each, final drain certification and full
+retirement; a fourth cancels only after actual first PCM. One preparation, no late
+accepted PCM, failure-free cleanup, weak capture/engine release, unchanged saved
+settings/default/selected/frozen/output identity and input/output running baseline
+are mandatory. Per-attempt and global watchdogs run independently of the owner;
+an uninterruptible OS call terminates only this probe process without a receipt.
+
+Conservatively **all other running HandsFree instances, including idle ones, are
+rejected**, rather than cancelling beta 22 or trusting its diagnostics. Quit an
+installed copy only with explicit authorization; the runner never does so. The
+probe rechecks isolation while running and fails on a newly observed instance.
+Older binaries do not participate in a shared admission lock: do not start another
+copy during testing. This observation guard is not an OS-wide exclusion guarantee.
+
+Before/after snapshots bind source commit/tree, distribution, executable and full
+bundle hash/seal, archive hash, original signing certificate/designated requirement,
+architecture, hardware model and macOS version/build. Archive executable bytes must
+match. Any source/artifact/OS change requires new evidence. No UID, hardware serial,
+audio or speech content is written into the receipt. Coverage reports the actual
+input transport, not imaginary Bluetooth or separate-Mac testing. Receipts are
+trusted local operator evidence, not an anti-forgery security boundary.
+
+The canonical publication script runs the full draft audit and requires the latest
+**exact-source** `.github/workflows/ci.yml` run to be completed/successful before
+`gh release edit --draft=false`. There is no skip flag or environment override.
+Direct `gh`/administrator publication bypasses repository policy and is unsupported;
+this script cannot revoke an administrator's GitHub authority. Publication is not
+installed semantic dictation, acoustic audibility or actual OTA/restart acceptance;
+those remain separate, explicitly authorized gates. **No new hardware run, signed
+candidate, valid receipt or publication is claimed by this source update.**
+
+Unpublished **v0.1.1-beta.23** retains embedded version **0.1.1**. Only candidate
+distribution, packaging/audit coordinates and disabled candidate metadata advance;
+active public downloads, README/install guidance and signed feed stay on beta 22.
+See [candidate contract and evidence](releases/v0.1.1-beta.23.md). The accepted
+configuration notification before first PCM is no longer inherently fatal:
+read-only actual identity/device UID, bound-device formats and running-state
+certificates fail closed, including mandatory final drain certification before EOS.
+Provisional PCM fails the whole capture if invalid. No added wait, retry, idle
+microphone or hardware setting change; owner/FIFO/epoch/generation and 3s watchdog
+boundaries remain. Joffrey's missing-final-hook finding was repaired with a guard
+and regression coverage.
+
+Three isolated signed native real-hardware diagnostics reproduced the notification
+and passed: 35,200 converted frames / 23 packets each, 44.1 kHz mono, one preparation,
+first PCM 249.866 / 250.033 / 251.661 ms (ascending, not attempt order), final-drain
+certificates and completion callbacks passed, zero failures, reason `finished`.
+Input/output running counts returned to baseline 0 and weak capture released.
+Audio was discarded. The 625-file installed/model/data hash baseline and installed
+beta 22 PID 48813 were preserved. Device names remain pending: neither both
+AirPods/built-in coverage nor semantic dictation, acoustic audibility or OTA
+acceptance is claimed. Receipt directory and test limitations are in the notes.
+
+The primary reported repair-source Node 325 passed / 1 skipped, Rust 90 passed /
+3 ignored, frontend build, formatting and strict Clippy. Final candidate checks,
+independent review, clean artifact source SHA/tree, exact-source CI, packaging,
+signing, artifact audits, publication and downstream activation/readback remain
+separate pending gates. No candidate artifact SHA, CI or hashes are claimed.
+The complete pre-existing guide follows byte-for-byte, including historical active
+wording; all prior release notes, receipts and FEATURE-RELEASES remain unchanged.
+
 # Release packaging
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.

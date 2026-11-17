@@ -7,10 +7,11 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { verifyCompiledAssets } from './check-macos-assets.mjs';
 import { updaterFeed } from './package-updater.mjs';
+import { verifyHardwareEvidence } from './check-release-smoke.mjs';
 
-export const candidate = 'HandsFree-0.1.1-beta.22-macos-arm64.dmg';
-export const tag = 'v0.1.1-beta.22';
-export const archiveName = 'HandsFree-0.1.1-beta.22-macos-arm64.app.tar.gz';
+export const candidate = 'HandsFree-0.1.1-beta.23-macos-arm64.dmg';
+export const tag = 'v0.1.1-beta.23';
+export const archiveName = 'HandsFree-0.1.1-beta.23-macos-arm64.app.tar.gz';
 export const payloadNames = [candidate, 'PROVENANCE.txt', archiveName, `${archiveName}.sig`, 'UPDATER-PROVENANCE.txt', 'macos-arm64.json'];
 export const names = [...payloadNames, 'SHA256SUMS'];
 const repo = 'suhaasbadada/handsfree';
@@ -141,6 +142,9 @@ export async function main(args = process.argv.slice(2), { onInterrupt } = {}) {
   requireThat(process.platform === 'darwin' && process.arch === 'arm64', 'Apple Silicon macOS required for signature/payload audit');
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const directory = resolve(inputDirectory ?? join(root, 'release'));
+  // Mandatory for local, draft AND public audits. Packaging itself deliberately
+  // does not require a receipt: the exact signed payload must exist first.
+  verifyHardwareEvidence(directory);
   validateAvailability((await import(pathToFileURL(join(root, 'site/release.js')).href)).candidateRelease, publicMode);
   const git = (...args) => run('git', args, { cwd: root });
   const commit = git('rev-parse', 'HEAD');
@@ -226,6 +230,7 @@ export async function main(args = process.argv.slice(2), { onInterrupt } = {}) {
       validateRelease(api(`releases/${draft.id}`), commit, sizes);
     }
     scope.assertActive();
+    verifyHardwareEvidence(directory);
     requireThat(git('rev-parse', 'HEAD') === commit && !git('status', '--short', '--untracked-files=normal'), 'Source changed during release audit');
     console.log(`PASS: ${commit} — checksums, clean provenance, stable signatures, arm64/macOS 14 bundle and DMG contents.${local ? '\nLOCAL ONLY: release target/tag/assets were NOT checked.' : publicMode ? '\nPublic prerelease target/tag and anonymous GET asset bytes match exactly.' : '\nDraft target/tag and downloaded asset bytes match exactly.'}\nArtifact audit only: no legal certification, Apple approval, or separate-Mac QA is implied.`);
   } finally {

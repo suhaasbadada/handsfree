@@ -224,3 +224,32 @@ Suggested shared inventory updates (owned by the coordinating agent):
   new phase or authorization; native meter access does not wait on hardware.
 - `stream-slot`/`audio-queue`: EOS follows drain; slot release/idle follows native
   retirement, including cancellation; capture errors defeat partial success.
+# Explicit signed-candidate release probe
+
+`handsfree --release-smoke` is an explicit, macOS-only early dispatch before normal
+application setup. No normal launch/idle capture behavior changes. Bridge's
+`productionAudioFactory` is shared by normal recording and the probe: actual
+AudioCapture, AudioSession and SessionAudioOwner, both live/final certificate
+hooks and deferred completion remain one implementation. Optional trace observes
+certificate results, notifications, cleanup and weak input/engine lifetime; it
+does not authorize or alter capture. Converted format metadata comes from the
+actual pipeline's output format.
+
+`ReleaseSmokeController.drive` is the common injected-effect control flow used
+by the probe and permission-free native tests. Actual PCM controls finish/cancel,
+not elapsed time or readiness. Three finishes need >=16000 mono-16k frames and
+nonzero samples; cancellation needs its first actual PCM. Every attempt needs one
+preparation, no failure/late accepted PCM, full retirement and baseline device
+running state/identity restored. Saved input and sound preferences are read-only;
+no permission prompt, audio file, model, paste, usage or settings transaction exists.
+Independent 12s cancellation / 18s hard per-attempt / 80s global bounds cannot be
+blocked by the serial hardware owner. Hard exit closes only this diagnostic process
+and cannot yield success evidence. No other app instance is terminated; even idle
+instances are conservatively rejected and isolation is rechecked during capture.
+Older instances do not share a lock; external concurrent launches remain an
+operator exclusion requirement, not a claimed OS-wide guarantee.
+
+The Node runner snapshots the exact source/signature/bundle/archive/OS identity
+before and after, writes only a private ignored metadata receipt, and all release
+audit modes require that evidence within 24h. Permission-free tests and earlier
+scratch-app diagnostics do not prove hardware operation or installed dictation/OTA.

@@ -30,6 +30,17 @@ prove discovery completeness or runtime correctness on an untested OS.
 
 ## The important boundaries
 
+The explicit release-smoke controller is separate from normal application startup:
+only the exact `--release-smoke` CLI may enter it, before hooks/plugins/models.
+Its injected effects drive the same production audio factory through three
+PCM-backed finishes and a first-PCM cancellation, independent watchdogs and full
+retirement. It grants no paste, inference, settings or permission authority.
+Publication evidence is a different fail-closed policy: every release audit mode
+requires a fresh exact-source/artifact/signature/OS receipt; packaging can precede
+evidence, but publication cannot. CI, hardware smoke, installed dictation and OTA
+remain separate gates. See RELEASING for the conservative instance guard and its
+older-binary concurrent-launch limitation.
+
 The top-right product-status dialog is an observation/recovery surface, not a new
 native lifecycle. Opening it uses the existing modal Practice-context revocation;
 closing can re-establish eligibility but never starts capture. Permission/download/

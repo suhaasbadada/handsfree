@@ -88,6 +88,7 @@ final class CapturePipeline {
     private let converter: AVAudioConverter
     private let inputFormat: AVAudioFormat
     private let output: AVAudioFormat
+    var convertedFormat: AVAudioFormat { output }
     private let sink: (UnsafePointer<Float>?, Int32) -> Void
     // A dedicated producer gate, never held across conversion/inference/AppKit calls.
     // Closing it makes the enqueue -> EOS barrier valid even for an in-flight tap.
@@ -387,6 +388,7 @@ final class CaptureStartup {
     }
     func level() -> Float { pipeline?.level() ?? -60 }
     var inputFormat: AVAudioFormat? { negotiatedFormat }
+    var convertedFormat: AVAudioFormat? { pipeline?.convertedFormat }
 }
 
 // One preparation transaction, not a recording retry. The engine/binding stay
@@ -486,6 +488,9 @@ func audioStage<T>(_ stage: String, _ action: () throws -> T) throws -> T {
 final class AudioCapture {
     let generation: UInt64
     let epoch: UInt64
+    let frozenUID: String
+    // Weak lifetime observations only; never exposes control of the engine.
+    var observedEngine: AnyObject { engine }
     private let engine: AVAudioEngine
     private let preparation: CapturePreparation
     private var startup: CaptureStartup { preparation.current }
@@ -500,6 +505,7 @@ final class AudioCapture {
             try captureChecked(HFCaptureBindInput(engine, id, &boundInput))
         }, format: { () })
         let frozenUID = try Microphones.string(device, kAudioDevicePropertyDeviceUID)
+        self.frozenUID = frozenUID
         guard let input = boundInput else { throw NSError(domain: "Microphone input unavailable", code: 1) }
         preparation = CapturePreparation { CaptureStartup(operations: .init(observe: { changed in
             let observer = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil) { _ in changed() }
@@ -558,6 +564,10 @@ final class AudioCapture {
     func formatMetadata() -> [String: Double] {
         var result: [String: Double] = [:]
         result["negotiationAttempts"] = Double(preparation.attempts)
+        if let format = startup.convertedFormat {
+            result["convertedRate"] = format.sampleRate
+            result["convertedChannels"] = Double(format.channelCount)
+        }
         if preparation.initialConfigChange {
             result["initial_config_change"] = 1
             result["initialInputRate"] = preparation.initialRate
@@ -627,7 +637,7 @@ final class SessionCueOutput {
         }
         outputFormat = current
     }
-    func operations(routeFailure: @escaping () -> Void) -> SessionAudioOwner.Output {
+    func operations(routeFailure: @escaping () -> Void, cleanup: ((Bool) -> Void)? = nil) -> SessionAudioOwner.Output {
         .init(prepare: {
             self.observer = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: self.engine, queue: nil) { _ in routeFailure() }
             try audioStage("output_prepare") {
@@ -639,10 +649,11 @@ final class SessionCueOutput {
             try Self.playIfAllowed(validate: { try self.validate() }, allowed: allowed) {
                 try captureChecked(HFCuePlay(self.player, buffer, completion))
             }
-        }, stopCue: { _ = HFCueStop(self.player) }, stop: {
+        }, stopCue: { if HFCueStop(self.player) != nil { cleanup?(false) } }, stop: {
             if let observer = self.observer { NotificationCenter.default.removeObserver(observer); self.observer = nil }
-            _ = HFCueStop(self.player)
-            _ = HFCaptureStop(self.engine)
+            let cueError = HFCueStop(self.player)
+            let engineError = HFCaptureStop(self.engine)
+            cleanup?(cueError == nil && engineError == nil)
         }, formats: {
             guard let output = self.outputFormat else { return [:] }
             return ["outputRate": output.sampleRate, "outputChannels": Double(output.channelCount), "cueRate": self.format.sampleRate]

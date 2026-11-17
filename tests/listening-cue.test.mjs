@@ -16,12 +16,12 @@ test('native roles freeze completion identity without startup cue work; preview 
   const source = readFileSync(new URL('../src-tauri/native/Bridge.swift', import.meta.url), 'utf8');
   assert.match(source, /let profile = cueProfile, volume = cueVolume/);
   assert.match(source, /let sessionSounds = soundsEnabled && volume > 0/);
-  const admission = source.slice(source.indexOf('let profile = cueProfile'), source.indexOf('r.start {'));
+  const admission = source.slice(source.indexOf('let profile = cueProfile'), source.indexOf('r.start(factory: productionAudioFactory'));
   assert.match(admission, /let outputUID = sessionSounds \? \(try\? Microphones.string/);
   assert.doesNotMatch(admission, /Cue.data|SessionCuePCM.decode|SessionCueOutput\(format/);
   assert.doesNotMatch(source, /StartCue.data\(profile: profile\)/);
   assert.match(source, /SessionCueOutput\(format: pcm\.format, volume: volume, frozenUID: outputUID\)/);
-  assert.match(source, /let makeOutput:[\s\S]*sessionSounds \? \{[\s\S]*EndCue.data\(profile: profile\)/);
+  assert.match(source, /let makeOutput:[\s\S]*sounds \? \{[\s\S]*EndCue.data\(profile: profile\)/);
   const preview = source.slice(source.indexOf('@_cdecl("hf_preview_sound")'), source.indexOf('@_cdecl("hf_sounds")'));
   assert.match(preview, /CuePolicy.canPreview/);
   assert.match(preview, /EndCue.data\(profile: cueProfile\)/);
@@ -71,9 +71,10 @@ test('native teardown snapshots on AppKit but waits on the FIFO; retirement prec
 test('production input notifications wire actual fact certification through final drain, not timing or first PCM', () => {
   const source = readFileSync(new URL('../src-tauri/native/AudioCapture.swift', import.meta.url), 'utf8');
   const bridge = readFileSync(new URL('../src-tauri/native/Bridge.swift', import.meta.url), 'utf8');
-  assert.match(bridge, /capture\.validationRequested = \{ \[weak r\] in r\?\.inputConfigurationChanged\(\) \}/);
-  assert.match(bridge, /prepareDrainCertificate: \{ try capture\.prepareDrainCertificate\(\) \}/);
-  assert.match(bridge, /prepareValidationCertificate: \{ try capture\.prepareValidationCertificate\(\) \}/);
+  assert.match(bridge, /capture\.validationRequested = \{ \[weak session\] in trace\?\.count\("notifications"\); session\?\.inputConfigurationChanged\(\) \}/);
+  assert.match(bridge, /prepareDrainCertificate: \{ try certificate\(true\) \}/);
+  assert.match(bridge, /prepareValidationCertificate: \{ try certificate\(false\) \}/);
+  assert.match(bridge, /let certify = try final \? capture\.prepareDrainCertificate\(\) : capture\.prepareValidationCertificate\(\)/);
   const notification = source.slice(source.indexOf('private func invalidate()'), source.indexOf('private func check()'));
   assert.match(notification, /configurationRevision &\+= 1/);
   assert.ok(notification.indexOf('routeLock.unlock()') < notification.indexOf('request?()'));

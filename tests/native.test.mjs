@@ -59,6 +59,8 @@ test('compact capsule, native shortcuts and Clean cue signals with idle-only pre
     assert.match(output, /Native capsule geometry, state layout, nonactivation, shortcut matching and Clean cues passed without capture/);
     assert.match(output, /Workflow receipt\/admission\/finish and fake login registration policy passed without capture or registration/);
     assert.match(output, /Production hold event routing: own tray\/menu and cue-wait retained; external clicks, repeats, release and focus watch passed without UI/);
+    assert.match(output, /Release smoke production controller: repeated finish, first-PCM cancel, no-PCM timeout and terminal tombstones passed without hardware/);
+    assert.match(output, /Release smoke injected backend drives real AudioSession finish\/cancel\/no-PCM\/final-certificate-failure retirement without hardware/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

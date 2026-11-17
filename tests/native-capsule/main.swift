@@ -467,3 +467,69 @@ precondition(!app.windows.first { $0 is NSPanel }!.isKeyWindow)
 overlay(0)
 app.setActivationPolicy(.prohibited)
 print("Native capsule geometry, state layout, nonactivation, shortcut matching and Clean cues passed without capture")
+
+// Exercise the production probe controller without creating an engine, querying
+// permission, or executing its CLI. Backends receive exactly one terminal action.
+for cancelling in [false, true] {
+    var controller = ReleaseSmokeController(cancelling: cancelling)
+    var finished = 0, cancelled = 0
+    let frameSequence = cancelling ? [0, 0, 1, 500] : [0, 8000, 15999, 16000, 18000]
+    for (index, frames) in frameSequence.enumerated() {
+        let action = controller.drive(frames: frames, elapsed: Double(index), finish: { finished += 1 }, cancel: { cancelled += 1 })
+        precondition(action != .timeout, "Early probe timeout")
+    }
+    precondition(finished == (cancelling ? 0 : 1) && cancelled == (cancelling ? 1 : 0))
+    precondition(controller.next(frames: 32000, elapsed: 50) == .wait, "No repeat or late timeout may restart hardware")
+}
+for frames in [0, 8000, 15999] {
+    var controller = ReleaseSmokeController(cancelling: false)
+    var cancellations = 0
+    precondition(controller.drive(frames: frames, elapsed: 12, finish: { preconditionFailure("No finish on timeout") }, cancel: { cancellations += 1 }) == .timeout)
+    precondition(controller.drive(frames: 32000, elapsed: 13, finish: { preconditionFailure("Late PCM revived timeout") }, cancel: { cancellations += 1 }) == .wait)
+    precondition(cancellations == 1)
+}
+var cancelledWithoutPCM = ReleaseSmokeController(cancelling: true)
+precondition(cancelledWithoutPCM.next(frames: 0, elapsed: 11.99) == .wait)
+precondition(cancelledWithoutPCM.next(frames: 0, elapsed: 12) == .timeout, "Cancellation success requires actual first PCM")
+print("Release smoke production controller: repeated finish, first-PCM cancel, no-PCM timeout and terminal tombstones passed without hardware")
+
+// The probe controller drives the actual AudioSession owner/retirement flow with
+// an injected operations backend. This is not proof that any device works.
+for scenario in ["finish", "cancel", "final-certificate-fails", "no-pcm"] {
+    let enabled = DispatchSemaphore(value: 0), retired = DispatchSemaphore(value: 0)
+    let effectsLock = NSLock()
+    var stops = 0, failures = 0, finalCertificates = 0
+    let session = AudioSession(generation: 1, epoch: 1, sounds: false, authorized: { true },
+        failure: { effectsLock.lock(); failures += 1; effectsLock.unlock() }, retired: { _ in retired.signal() },
+        scheduler: { _, _ in }) // Deadlines controlled by the injected controller.
+    session.start { _ in
+        AudioSession.Operations(prepare: {}, enable: { enabled.signal() }, close: {}, drain: { true },
+            play: { _, _ in preconditionFailure("Muted probe must not play") }, stopCue: {},
+            stop: { effectsLock.lock(); stops += 1; effectsLock.unlock() }, level: { -60 }, outputRate: { 0 },
+            validatePrepared: {}, prepareDrainCertificate: {
+                return { effectsLock.lock(); finalCertificates += 1; effectsLock.unlock(); return scenario != "final-certificate-fails" }
+            }, prepareValidationCertificate: { { true } })
+    }
+    precondition(enabled.wait(timeout: .now() + 2) == .success)
+    // Wait for the ready mark after the injected enable returns.
+    let readyDeadline = Date().addingTimeInterval(2)
+    while !session.isRecording && Date() < readyDeadline { Thread.sleep(forTimeInterval: 0.001) }
+    precondition(session.isRecording)
+    var controller = ReleaseSmokeController(cancelling: scenario == "cancel")
+    precondition(controller.drive(frames: 0, elapsed: 0, finish: { preconditionFailure() }, cancel: { preconditionFailure() }) == .wait)
+    if scenario != "no-pcm" { session.acceptedPCM() }
+    _ = controller.drive(frames: scenario == "no-pcm" ? 0 : 16000, elapsed: scenario == "no-pcm" ? 12 : 1,
+        finish: { session.finish() }, cancel: { session.cancel() })
+    precondition(retired.wait(timeout: .now() + 2) == .success)
+    session.stop()
+    effectsLock.lock()
+    precondition(stops == 1, "Actual session teardown is exactly once")
+    precondition(failures == (scenario == "final-certificate-fails" ? 1 : 0))
+    precondition(finalCertificates == (["finish", "final-certificate-fails"].contains(scenario) ? 1 : 0))
+    effectsLock.unlock()
+    let snapshot = session.snapshot()
+    if scenario == "finish" { precondition(snapshot.reason == "finished") }
+    if scenario == "cancel" || scenario == "no-pcm" { precondition(snapshot.reason == "cancelled") }
+    if scenario == "final-certificate-fails" { precondition(snapshot.failureStage == "input_configuration") }
+}
+print("Release smoke injected backend drives real AudioSession finish/cancel/no-PCM/final-certificate-failure retirement without hardware")
