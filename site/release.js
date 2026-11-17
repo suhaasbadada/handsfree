@@ -1,5 +1,4 @@
 // Flip publicAvailable only AFTER publishing and verifying the public DMG asset.
-// The embedded app version and distribution label are both 0.1.2.
 export const release = Object.freeze({
   schemaVersion: 1,
   version: '0.1.2',
@@ -12,10 +11,10 @@ export const release = Object.freeze({
 // Disabled even after publication; not a second availability switch.
 export const candidateRelease = Object.freeze({
   schemaVersion: 1,
-  version: '0.1.2',
+  version: '0.1.3',
   publicAvailable: false,
-  status: 'Stable v0.1.2 signed candidate accepted and published; public bytes verified. Installed in-app update/restart acceptance pending. Self-signed, not notarized; not an availability switch.',
-  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.2/HandsFree-0.1.2-macos-arm64.dmg',
+  status: 'Stable v0.1.3 candidate preparation; signed candidate acceptance and publication pending. Self-signed, not notarized; not an availability switch.',
+  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.3/HandsFree-0.1.3-macos-arm64.dmg',
 });
 
 // Historical coordinates only. Windows development and public promotion are paused.
