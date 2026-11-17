@@ -1,3 +1,47 @@
+## Beta 23 publication — exact signed candidate
+
+Published [v0.1.1-beta.23](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.23)
+through `node scripts/publish-release.mjs --publish release` after the mandatory
+hardware gate, full draft audit and successful exact-source CI
+[44020869412](https://github.com/suhaasbadada/handsfree/actions/runs/44020869412)
+for source `c1922f013777fe5dde66d173d3ec640d69696a79`.
+Local and anonymous-public seven-asset audits passed. Published artifacts are
+immutable; this metadata activation does not rebuild or replace them.
+
+- Exact candidate executable SHA-256: `ad7d9b0ecb65a0bef371aee85bbcd2ee28772775fca0a6be2ed22fda18df95ac`.
+- DMG SHA-256: `9673e1cd9905d054ae6740b286e94c8c710c94b5b72ab5fe99660a05c5cf52b0`.
+- Updater archive SHA-256: `1b0db63d0ebb15661c5613bc26677d6a66f7fce63cd2ddfd6c9db4c1aa530f55`.
+- Signed feed SHA-256: `ebb23392111c75095d1881c05a6d6e6287ac6460413619e5f92de35f0f3614ae`.
+
+`release/release-smoke.json` records three real normal captures of 17,600 mono
+16-kHz frames / 12 packets each from 44.1-kHz mono input. First PCM from session
+start: 232.888 / 189.926 / 188.204 ms. Runtime and final certification, completion
+cleanup and weak capture/engine release passed, with zero failures/late PCM and
+input/output baseline restored to zero. A fourth run cancelled after 1,480 samples
+(first PCM 193.399 ms), without output/end cue, restoring baseline zero.
+Only built-in MacBook Air Microphone/Speakers were connected; no Bluetooth,
+separate-Mac or acoustic measurement coverage is claimed.
+
+`release/candidate-dictation-acceptance.json` records the same signed candidate's
+real private Practice acceptance: known speaker fixture transcribed as
+“Hansberry verification. The microphone is working correctly.” First PCM was
+208.38 ms; finished without capture error; private text cleared and exact
+usage/settings bytes plus clipboard change count preserved. This recognizes the
+fixture core, not a 100% accuracy claim. The first UI harness attempt failed before
+audio admission while the button was not ready; its receipt remains preserved.
+The harness then waited for enabled native context; no app retry was needed.
+Missing-receipt and installed-other-instance negative controls failed closed.
+
+Final source checks: 384 Node passed / 1 skipped, 91 Rust passed / 3 ignored,
+frontend build, formatting, strict Clippy and independent review passed.
+Website/feed activation selects beta 23; Pages readback, Homebrew metadata/CI,
+actual installed in-app OTA/restart, representative dictation and final preservation
+checks remain **pending**, owned by the primary. Publication is not installed
+acceptance. No manual installed-app replacement is authorized by this metadata.
+
+The complete preparation and historical guide below are preserved verbatim as
+dated evidence; their pending/unpublished wording describes that earlier stage.
+
 ## Beta 23 candidate preparation
 
 ### Mandatory exact-candidate hardware gate (pending execution)
