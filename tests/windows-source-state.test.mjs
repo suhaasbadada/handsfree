@@ -77,7 +77,7 @@ for (const dirty of ['tracked', 'staged', 'untracked']) {
 for (const [name, mutate] of [
   ['common private API addition', text => text.replace('"tray-icon", "image-png"', '"tray-icon", "image-png", "macos-private-api"')],
   ['Windows dependency version', text => text.replace('cpal = "0.16"', 'cpal = "0.17"')],
-  ['package version', text => text.replace('version = "0.1.1"', 'version = "9.9.9"')],
+  ['package version', text => text.replace(/^(\[package\]\nname = "handsfree"\n)version = "[^"]+"/m, '$1version = "9.9.9"')],
   ['other Mac dependency change', text => text.replace('features = ["metal"]', 'features = []')],
   ['unrecognized Mac features', text => text.replace('tauri = { version = "2", features = [] }', 'tauri = { version = "2", features = ["tray-icon"] }')],
   ['invalid TOML', text => `${text}\n[invalid`],

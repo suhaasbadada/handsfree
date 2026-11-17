@@ -8,14 +8,14 @@ export const release = Object.freeze({
   dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1/HandsFree-0.1.1-macos-arm64.dmg',
 });
 
-// Historical stable candidate audit coordinates; the active release above is authoritative.
+// Candidate audit coordinates; the active release above is authoritative.
 // Disabled even after publication; not a second availability switch.
 export const candidateRelease = Object.freeze({
   schemaVersion: 1,
-  version: '0.1.1',
+  version: '0.1.2',
   publicAvailable: false,
-  status: 'Historical Stable v0.1.1 candidate preparation coordinates, now published through the active release above. Exact signed-candidate hardware and private Practice checks passed on the built-in Mac microphone; installed OTA/restart acceptance and separate Homebrew publication remain pending; self-signed, not notarized, no Apple approval; not an availability switch.',
-  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1/HandsFree-0.1.1-macos-arm64.dmg',
+  status: 'Stable v0.1.2 candidate preparation; signed candidate acceptance and publication pending. Self-signed, not notarized; not an availability switch.',
+  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.2/HandsFree-0.1.2-macos-arm64.dmg',
 });
 
 // Historical coordinates only. Windows development and public promotion are paused.

@@ -10,9 +10,9 @@ import { updaterFeed } from './package-updater.mjs';
 import { verifyHardwareEvidence } from './check-release-smoke.mjs';
 import { releaseVersion } from './release-version.mjs';
 
-export const candidate = 'HandsFree-0.1.1-macos-arm64.dmg';
-export const tag = 'v0.1.1';
-export const archiveName = 'HandsFree-0.1.1-macos-arm64.app.tar.gz';
+export const candidate = 'HandsFree-0.1.2-macos-arm64.dmg';
+export const tag = 'v0.1.2';
+export const archiveName = 'HandsFree-0.1.2-macos-arm64.app.tar.gz';
 export const payloadNames = [candidate, 'PROVENANCE.txt', archiveName, `${archiveName}.sig`, 'UPDATER-PROVENANCE.txt', 'macos-arm64.json'];
 export const names = [...payloadNames, 'SHA256SUMS'];
 const repo = 'suhaasbadada/handsfree';
@@ -82,7 +82,7 @@ async function hash(path) {
 }
 const run = (command, args, options = {}) => execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...options }).trim();
 
-function verifyApp(app, fingerprint, expectedVersion = '0.1.1') {
+function verifyApp(app, fingerprint, expectedVersion = tag.slice(1)) {
   run('/usr/bin/codesign', ['--verify', '--deep', '--strict', `-R=identifier "com.handsfree.local" and certificate leaf = H"${fingerprint}"`, app]);
   const plist = key => run('/usr/libexec/PlistBuddy', ['-c', `Print :${key}`, join(app, 'Contents/Info.plist')]);
   requireThat(plist('CFBundleIdentifier') === 'com.handsfree.local' && (!expectedVersion || plist('CFBundleShortVersionString') === expectedVersion) && plist('LSMinimumSystemVersion') === '14.0', 'Unexpected bundle ID/version/minimum macOS');

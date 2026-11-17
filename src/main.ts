@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getVersion } from '@tauri-apps/api/app';
+import { version as packagedVersion } from '../package.json';
 import { listen } from '@tauri-apps/api/event';
 import './style.css';
 import './typography.css';
@@ -821,6 +822,7 @@ async function refreshStatus() {
   } catch (e) { current = undefined; clearPractice(); renderPractice(); renderWorkflow(); el('phase').textContent = 'Disconnected'; el('dot').className = 'error'; connectionError = `Couldn’t connect to HandsFree: ${String(e)}`; renderHealth(); renderMicrophones(); feedback(connectionError); }
 }
 void refresh();
+el('app-version').textContent = packagedVersion;
 void getVersion().then(version => { el('app-version').textContent = version; }).catch(() => { /* Packaged version fallback for browser previews. */ });
 setInterval(() => { if (!document.hidden) void refresh(); }, 800);
 // Only sample the existing, owned private recording; never start capture on a timer.

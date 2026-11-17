@@ -22,24 +22,24 @@ test('active docs disclose stable while historical beta notes and app identity r
   assert.equal(config.identifier, 'com.handsfree.local');
 });
 
-test('published active Mac stable and disabled historical candidate keep embedded version unchanged', async () => {
+test('published Mac stable stays live while the next embedded version is prepared', async () => {
   const { release, candidateRelease } = await import('../site/release.js');
   const { candidate, tag } = await import('../scripts/check-release.mjs');
   const version = JSON.parse(read('package.json')).version;
-  assert.equal(version, '0.1.1');
+  assert.equal(version, '0.1.2');
   assert.equal(JSON.parse(read('package-lock.json')).version, version);
   assert.equal(JSON.parse(read('package-lock.json')).packages[''].version, version);
   assert.equal(JSON.parse(read('src-tauri/tauri.conf.json')).version, version);
-  assert.equal(release.version, version);
+  assert.equal(release.version, '0.1.1');
   assert.equal(release.publicAvailable, true, 'Activation follows publication and public asset verification');
   assert.equal(candidateRelease.version, version);
   assert.equal(candidateRelease.publicAvailable, false, 'Candidate must not activate public downloads');
   assert.ok(release.dmgUrl.endsWith(`/releases/download/v${release.version}/HandsFree-${release.version}-macos-arm64.dmg`));
-  assert.equal(release.dmgUrl, candidateRelease.dmgUrl, 'Historical coordinates now match the active stable release, but stay disabled');
+  assert.notEqual(release.dmgUrl, candidateRelease.dmgUrl, 'Candidate must not replace the active stable download');
   assert.equal(candidateRelease.schemaVersion, 1);
-  assert.match(candidateRelease.status, /Stable v0\.1\.1 candidate preparation/);
+  assert.match(candidateRelease.status, /Stable v0\.1\.2 candidate preparation/);
   assert.match(candidateRelease.status, /pending/);
-  assert.match(candidateRelease.status, /self-signed, not notarized/);
+  assert.match(candidateRelease.status, /self-signed, not notarized/i);
   assert.equal(JSON.parse(read('src-tauri/distribution.json')).version, candidateRelease.version);
   assert.equal(tag, `v${candidateRelease.version}`);
   assert.equal(candidate, `HandsFree-${candidateRelease.version}-macos-arm64.dmg`);
@@ -304,7 +304,6 @@ test('beta 17 publication records exact receipts without claiming deployment or 
     'candidateRelease.publicAvailable']) {
     assert.ok(notes.includes(evidence), evidence);
   }
-  assert.equal(JSON.parse(read('src-tauri/distribution.json')).version, '0.1.1');
   const guide = read('docs/RELEASING.md');
   assert.ok(guide.indexOf('## Beta 17 publication') < guide.indexOf('## Beta 16 publication'));
   for (const source of [notes, guide]) {
