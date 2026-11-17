@@ -1,6 +1,6 @@
 # Signed in-app updates (Mac beta 7 onward)
 
-Published beta 24 keeps updates entirely inline in the footer. Click **Updates**
+Published v0.1.1 keeps updates entirely inline in the footer. Click **Updates**
 to check; the refresh icon spins while checking. A verified offer changes the same
 action to **Download & update** with its version. Clicking that offer authorizes
 only that displayed version, freshly rechecked before download. Progress and retry
@@ -24,8 +24,9 @@ are separate gates.
 
 [Beta 9](releases/v0.1.1-beta.9.md) is the published correction. The authorized
 manual bootstrap completed with unchanged model/settings/usage hashes and signing
-requirement, and fresh native readiness was verified. The signed beta 9 feed is
-live; HTTP 200 and exact audited bytes were checked independently of installation.
+requirement, and fresh native readiness was verified. At that historical checkpoint,
+the signed beta 9 feed returned HTTP 200 and matched audited bytes independently
+of installation; this is not a claim about the current live feed.
 
 The actual beta 7 → beta 8 attempt reported “The update operation stopped
 unexpectedly.” The installed executable remained beta 7. A fresh-process Rust
@@ -83,8 +84,8 @@ The model, preferences and usage file are outside the app and are not rewritten
 by the updater. Unsaved in-memory last-transcript text does not survive restart;
 copy anything important first. Offline/404/malformed-feed/signature/installation
 failures are shown explicitly, not reported as “up to date.” An install failure
-requires another explicit check before retrying. The exact anonymously verified
-beta 9 feed is live on Pages with HTTP 200 and exact audited bytes verified.
+requires another explicit check before retrying. For current feed activation and
+live-byte verification status, see the [stable release record](releases/v0.1.1.md).
 A 404 is an explicit failure, not an up-to-date result. Do not
 invent beta 6 updater metadata or point the feed at the DMG.
 
@@ -162,7 +163,7 @@ requires a separately authorized bootstrap/key-rotation plan for installed users
    model/settings/usage, restart/readiness, and representative dictation. Unit
    tests or a generated signature alone do not establish this acceptance gate.
 
-Beta 7 publication, artifact verification and authorized manual bootstrap
-installation are recorded in the release notes. Forward OTA installation/restart,
-live audio acceptance and separate-Mac QA have not been performed. Windows work
+Historical beta publication and bootstrap evidence remain in their release notes.
+The [stable release record](releases/v0.1.1.md) owns current hardware evidence and
+remaining installed OTA/restart and separate-Mac acceptance limits. Windows work
 remains paused.
