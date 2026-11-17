@@ -1,0 +1,10 @@
+{
+  "version": "0.1.1",
+  "notes": "",
+  "platforms": {
+    "darwin-aarch64": {
+      "url": "https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1/HandsFree-0.1.1-macos-arm64.app.tar.gz",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUZElJbWEvYXFOcUI3WUlvcTlnSFl3a2dicS9kNzdFOHRGZlNpSWowQ0YzRE5lc0YxN2hjZmJGM2JoenFRVUhwWHArZmJZZmZIUFJNL215RnlrVXFPZUNQaTlDWVgzUVFjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0OTMzMDA3CWZpbGU6SGFuZHNGcmVlLTAuMS4xLW1hY29zLWFybTY0LmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuMQpHRkFJR2lKejFZSUsvTUFyc1Z5cW14dGdnYlA5MVQrY3NSYlVGT29pMUtjVWcxT0RTUml6cHUzKzBGRXVaTEk2UWVnOEdqYVBpN0VNbTNVM08zT3NBUT09Cg=="
+    }
+  }
+}

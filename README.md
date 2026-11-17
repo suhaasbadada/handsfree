@@ -7,9 +7,9 @@
 Local-first dictation for your Mac. Tap a shortcut, speak, and put text in the field you started in.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-706b68.svg)](LICENSE)
-[![Mac stable: v0.1.1](https://img.shields.io/badge/Mac_stable-v0.1.1-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1)
+[![Mac stable: v0.1.2](https://img.shields.io/badge/Mac_stable-v0.1.2-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.2)
 
-[Website](https://suhaasbadada.github.io/handsfree/) · [Release notes](docs/releases/v0.1.1.md) · [Report a bug](https://github.com/suhaasbadada/handsfree/issues)
+[Website](https://suhaasbadada.github.io/handsfree/) · [Release notes](docs/releases/v0.1.2.md) · [Report a bug](https://github.com/suhaasbadada/handsfree/issues)
 
 ## Download & install
 
@@ -21,11 +21,11 @@ Local-first dictation for your Mac. Tap a shortcut, speak, and put text in the f
 brew install --cask suhaasbadada/handsfree/handsfree
 ```
 
-Or [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1/HandsFree-0.1.1-macos-arm64.dmg), then drag HandsFree to Applications before opening.
+Homebrew currently offers **v0.1.1**; its v0.1.2 update is pending. For **v0.1.2**, [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.2/HandsFree-0.1.2-macos-arm64.dmg), then drag HandsFree to Applications before opening. Installed v0.1.2 in-app update/restart and preservation acceptance are pending.
 
 **Self-signed, not Apple notarized.** macOS security prompts still apply. If Homebrew requests cask trust, review the [tap repository](https://github.com/suhaasbadada/homebrew-handsfree#readme) first; cask trust is not Apple approval. Follow the [installation guide](docs/INSTALL.md) for security prompts, permissions, existing-app conflicts and older-beta upgrades. Never disable system security to install.
 
-Open **Applications → HandsFree**, allow Microphone, Accessibility and Input Monitoring, then choose **Settings → Setup → English model → Download** (~148 MB). Quit and reopen after permission changes if needed.
+Open **Applications → HandsFree**, allow Microphone, Accessibility and Input Monitoring, then choose **Settings → Setup → Speech model → Download** (~148 MB, still English-only). In v0.1.1 this section is labeled **English model**. Quit and reopen after permission changes if needed.
 
 ## Use it
 
@@ -41,7 +41,7 @@ On **Home**, see local usage totals or try the **Private** editor: **Record → 
 - **Your shortcut:** Fn or a custom combination; toggle by default, optional [push to talk](docs/PUSH-TO-TALK.md).
 - **Quiet controls:** a compact recording capsule, mic meter, optional completion sound and a configurable 2–5 minute limit. No idle microphone stays open.
 - **Careful delivery:** verifies the original app and field, with manual-paste fallback. Optional [Compatibility paste](docs/COMPATIBILITY-PASTE.md) relaxes field verification, stays off by default and cannot guarantee insertion.
-- **Explicit updates:** click footer **Updates**, then **Download & update** for the displayed version. No automatic checks or downloads. [Update privacy, restart and older-beta guidance](docs/UPDATES.md).
+- **Explicit updates:** click the footer **update icon** (labeled **Updates** in v0.1.1), then **Download & update** for the displayed version. No automatic checks or downloads. [Update privacy, restart and older-beta guidance](docs/UPDATES.md).
 
 Audio and transcript history are not saved; settings and usage totals stay local. Clipboard managers may retain copied text. Model downloads contact Hugging Face; explicit update checks/downloads contact GitHub with ordinary connection metadata, never your speech or transcripts. [Privacy & diagnostics](docs/DEVELOPMENT.md).
 

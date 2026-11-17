@@ -1,11 +1,14 @@
 # Signed in-app updates (Mac beta 7 onward)
 
-Published v0.1.1 keeps updates entirely inline in the footer. Click **Updates**
+Published v0.1.2 keeps updates entirely inline in the footer. Click the **update icon**
 to check; the refresh icon spins while checking. A verified offer changes the same
 action to **Download & update** with its version. Clicking that offer authorizes
 only that displayed version, freshly rechecked before download. Progress and retry
 errors stay inline; there are no update or confirmation modals. Local status reads
 never contact the feed, and there is no unsolicited background download.
+
+In v0.1.1 the footer check is labeled **Updates**. Installed v0.1.2 OTA/restart and
+preservation acceptance are pending; Homebrew still offers v0.1.1.
 
 Published older betas still use their **Check for updates** dialog and **Download & restart**
 action until upgraded. Stable v0.1.1 installed-app replacement/restart and private
@@ -59,9 +62,9 @@ published beta 8 does not repair the defect.
 
 ## User flow
 
-On Apple Silicon macOS, click **Updates** in the footer to check. The installed
+On Apple Silicon macOS, click the **update icon** in the footer to check (**Updates** in v0.1.1). The installed
 release is read from metadata embedded in the executable, not the latest release
-feed or the shared internal app version `0.1.1`. The explicit check contacts
+feed or older betas' shared internal app version `0.1.1`. The explicit check contacts
 `https://suhaasbadada.github.io/handsfree/updates/macos-arm64.json`.
 Starting the app and ordinary status polling do not check online.
 These requests disclose ordinary connection metadata to GitHub, never audio,
