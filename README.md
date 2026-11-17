@@ -7,7 +7,7 @@
 Say it while it’s clear. HandsFree turns your thoughts into text, without making typing the bottleneck.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-706b68.svg)](LICENSE)
-[![Mac beta: v0.1.1-beta.23](https://img.shields.io/badge/Mac_beta-v0.1.1--beta.23-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.23)
+[![Mac beta: v0.1.1-beta.24](https://img.shields.io/badge/Mac_beta-v0.1.1--beta.24-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.24)
 [![Platform: Apple Silicon Mac](https://img.shields.io/badge/Platform-Apple_Silicon_Mac-706b68.svg)](#platforms)
 
 ## Download & install
@@ -24,7 +24,7 @@ Homebrew simplifies installation; macOS security prompts may still appear. This 
 
 Open **Applications → HandsFree**, allow Microphone, Accessibility, and Input Monitoring, then download the English model (~148 MB) in Settings → Overview. [Complete Mac setup, security prompts & existing-app guidance](docs/INSTALL.md).
 
-### [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.23/HandsFree-0.1.1-beta.23-macos-arm64.dmg)
+### [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.24/HandsFree-0.1.1-beta.24-macos-arm64.dmg)
 
 **DMG alternative:** drag HandsFree to Applications before opening it or granting permissions. Intel Macs are unsupported. See [Open Anyway and installation guidance](docs/INSTALL.md). No developer tools needed.
 
@@ -36,13 +36,14 @@ Current product and development focus is **Mac-only: Apple Silicon, macOS 14+**.
 ## Features
 
 - **Private by design:** Whisper runs locally with Apple Silicon Metal. Download the model once; dictate offline afterward.
-- **Stay in flow:** a compact recording capsule, live mic meter, and Escape to cancel.
-- **Try your voice:** explicit-button [practice in Overview](docs/practice.md), with a temporary editable result and no paste, clipboard changes or usage tracking. This tests capture and transcription, not shortcuts or external insertion.
+- **Stay in flow:** a compact recording capsule, quiet preparation indicator, live mic meter after readiness, and Escape to cancel. No idle microphone is kept open.
+- **Home:** local usage totals and a private editor together, with one Settings gear. Settings puts shortcut, recording limit, sound, microphone, mode and appearance before General.
+- **Try your voice:** explicit-button [private practice](docs/practice.md) on Home, with a temporary editable result and no paste, clipboard changes or usage tracking. This tests capture and transcription, not shortcuts or external insertion.
 - **Your shortcut:** Fn / 🌐 or a custom key combination. Toggle is the default; opt into **Settings → Recording mode → Push to talk** to hold and release. Existing saved shortcuts are preserved.
 - **Practical controls:** optional listening sounds and local usage totals. Dictation text stays out of the app window.
 - **Safer insertion:** checks the original app and field before submitting Paste; otherwise copies for manual paste.
   Mac users can opt into **Settings → Compatibility paste** for apps that hide their text field. It requires the same verified active app/window, but cannot verify the exact field. It is off by default, including upgrades; missing window proof or focus monitoring still requires manual paste. A submitted shortcut does not confirm insertion; no automatic retry or Enter is sent. See [delivery safeguards and limits](docs/COMPATIBILITY-PASTE.md).
-- **Explicit signed updates:** beta 23 uses footer **Updates** to check, then **Download & update** for the displayed exact version, entirely inline. Older betas use **Check for updates → Download & restart…** until upgraded. No startup checks or automatic downloads. [Privacy, safeguards and acceptance limits](docs/UPDATES.md).
+- **Explicit signed updates:** beta 24 uses footer **Updates** to check, then **Download & update** for the displayed exact version, entirely inline. Older betas use **Check for updates → Download & restart…** until upgraded. No startup checks or automatic downloads. [Privacy, safeguards and acceptance limits](docs/UPDATES.md).
 
 ## Use cases
 
@@ -57,7 +58,7 @@ No special integration is required: insertion depends on the focused field, with
 
 | Platform | Status |
 | --- | --- |
-| macOS 14+, Apple Silicon | [Mac beta 23 available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.23) · self-signed, not notarized |
+| macOS 14+, Apple Silicon | [Mac beta 24 available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.24) · self-signed, not notarized |
 | Intel Macs | Unsupported |
 | Windows | Paused; historical experimental implementation, not currently supported |
 | Linux | Not supported; no build or download available |
@@ -77,14 +78,14 @@ Focus a text field, briefly tap **Fn / 🌐**, speak, and tap again to finish. *
 
 **Optional push to talk:** choose **Settings → Recording mode → Push to talk**. Hold Fn or your custom combination; release to finish (the first required component released finishes a combination). Other keys, mouse actions during a hold, or observed focus changes cancel without paste. Toggle remains the default; updates preserve your preferences, model and statistics. See [behavior, focus limits and test notes](docs/PUSH-TO-TALK.md).
 
-[Full installation and troubleshooting guide](docs/INSTALL.md) · [Beta release notes](docs/releases/v0.1.1-beta.23.md)
+[Full installation and troubleshooting guide](docs/INSTALL.md) · [Beta release notes](docs/releases/v0.1.1-beta.24.md)
 
-**Updates:** in beta 23 click footer **Updates** to check, then **Download & update**
+**Updates:** in beta 24 click footer **Updates** to check, then **Download & update**
 for the displayed exact version. Progress/errors stay inline, without update modals;
 a changed offer requires another click. Older betas retain their dialog until
 upgraded. Local status reads are local; explicit checks share ordinary connection metadata with GitHub,
 never audio, transcripts, settings or usage. Forward OTA replacement/restart has
-not yet been verified. Beta 11 publication does not establish that acceptance;
+not yet been verified. Beta 24 publication does not establish that acceptance;
 the owner upgrades through the app, not a manual replacement. See the release
 notes and the historical [beta 9 repair/bootstrap evidence](docs/releases/v0.1.1-beta.9.md).
 

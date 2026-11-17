@@ -1,3 +1,60 @@
+## Beta 24 publication — exact signed candidate
+
+Published [v0.1.1-beta.24](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.24)
+on 2026-11-16 through `node scripts/publish-release.mjs --publish release`.
+The successful canonical publication followed exact signed-candidate hardware and
+private Practice acceptance, local/draft audits and successful exact-source CI
+[44046181154](https://github.com/suhaasbadada/handsfree/actions/runs/44046181154)
+for source `b20bb12f4c5281e7632b43c97c32cf3b81968029`.
+`node scripts/check-release.mjs --public release` passed anonymous-public
+seven-asset and exact-byte verification. The earlier user-conversation-interrupted
+publisher attempt remains retained as failed evidence, not a successful run.
+Published artifact bytes and their source receipts are immutable; activation
+changes only distribution metadata/docs/tests, not packaging or signed source.
+
+- Exact executable SHA-256: `51af2dec59d43510061e8199626bbf05f38392e33fa36c482f779df396d4a2ff`.
+- DMG SHA-256: `48b4043be67abba130176b9404c8ea864fc9d149e2bd530b542975e8935fc357`.
+- Updater archive SHA-256: `8d69bbd5e5c23679c97c27712a8ff46b6a823038f8a861aebd131e892e371388`.
+- Signed feed SHA-256: `e205e12e5f9dedb20e8146813184ad2dd3306d6c06456c1df2eaecbec20ffdb3`.
+
+`release/release-smoke.json` records built-in microphone hardware acceptance:
+three finishes and first-PCM cancellation, all passing final certification and
+cleanup with baseline zero. Route-ready times were 145.2 / 108.3 / 105.3 / 93.0 ms;
+first PCM 246.9 / 209.2 / 206.2 / 194.5 ms. These are built-in transport measurements,
+not fresh Bluetooth evidence or an absolute-instant latency claim. Earlier failed
+Bluetooth/preparation and helper attempts remain retained, not reclassified.
+
+`release/candidate-dictation-acceptance.json` records actual normal AX Record and
+private synthetic-Fn fixture transcription, first PCM and completion, with private
+text cleared and unchanged usage/settings bytes and clipboard count. Home/Settings
+order, header and status were checked with actual coordinate mouse clicks after
+AX popup actions failed to open the control; only the helper was corrected.
+Physical Fn and external insertion are unverified. Output volume was restored to
+its original value. No model/settings changes, permission reset or installed app
+replacement was performed for this acceptance.
+
+Final source checks: 454 Node tests passed / 1 skipped; 91 Rust tests passed / 3
+ignored; frontend build, formatting, strict Clippy, full Chromium/eight DOM suites
+and 48 actual offscreen WebKit cases with overflow negative control passed.
+
+Current activation selects beta 24 in the authoritative active release, static
+downloads and exact signed-feed bytes. The disabled candidate block below remains
+historical coordinates, never a second availability switch. Windows stays paused.
+Activation CI, live Pages/download/feed readback and Homebrew publication/readback
+and tap CI are separate pending distribution gates.
+
+**User-operated installed acceptance is pending.** The user explicitly wants to
+click the update buttons themselves. Installed beta 23 has not been replaced;
+running the scratch candidate is not installed acceptance. Do not click, download,
+install, restart or quit on the user's behalf. Completion still requires the
+installed app's in-app OTA/restart, representative dictation and signing identity,
+models/settings/usage/clipboard preservation checks. No separate-Mac QA, fresh
+Bluetooth pass or stable-release approval is claimed.
+
+The complete preparation and older guide below is preserved verbatim as dated
+historical evidence. Its pending wording and earlier native-unchanged statement
+describe that checkpoint, not the current published build.
+
 ## Beta 24 candidate preparation
 
 The disabled `candidateRelease` and distribution/package/audit coordinates now
