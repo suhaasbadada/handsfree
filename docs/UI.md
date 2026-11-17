@@ -12,14 +12,20 @@
   screen, fitting default 980×820 and minimum 560×650 normal ready states.
   There is no sidebar, brand menu or Overview/Practice tab bar. A static brand
   anchors the header; compact status and one accessible Settings gear sit right.
-  Settings replaces Home; a header back arrow returns Home without recording.
+  Settings replaces Home; a header back arrow returns focus to the accessible Home
+  heading, not the editor, without recording. Explicit Private test and tray Practice
+  actions may focus the editor; keyboard focus remains visible. The Settings gear
+  is transparent at rest, with a temporary hover fill rather than a selected fill.
   Settings has one content scroller; the header and
-  compact footer stay in place. Small/zoomed viewports use normal reachable
+  compact footer stay in place. The stable candidate footer shows app version and
+  English/on-device metadata without a BETA badge. Small/zoomed viewports use normal reachable
   document scrolling rather than clipping controls. Long transcripts and errors
   remain keyboard-readable; fitting a normal page never hides actual content.
 - Practice has one editor and primary action. Record, Finish and Record again
-  reuse their action slot. Meter, timer and status transitions do not move the
-  editor. Settings has one header entry; navigating there retires private
+  reuse their action slot. Actions size intrinsically with bounded wrapping, not
+  fixed-width grid cells; completed/empty Record again labels and icons must fit
+  inside button padding, including larger text. Meter, timer and status transitions
+  do not move the editor. Settings has one header entry; navigating there retires private
   context/text. Error-specific recovery opens product status, never another
   Settings button. No onboarding panel is inserted into Practice.
 - Practice's compact waveform projects only the existing identity/readiness-checked
@@ -77,4 +83,6 @@
 - The cream/graphite/muted-red palette and saved Light/Dark/System preference
   remain shared across destinations. Browser regressions cover both palettes,
   normal/minimum/tiny viewports, actual keyboard focus, update states and private
-  context teardown. These checks are not native VoiceOver or microphone acceptance.
+  context teardown. `tests/ui-stable-bugs.mjs` covers action-content geometry and
+  navigation focus; `tests/ui-webkit-layout.jxa` also measures completed/empty
+  labels in WebKit. These checks are not native VoiceOver or microphone acceptance.

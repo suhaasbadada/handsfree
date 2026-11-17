@@ -57,9 +57,12 @@ anything. The required check name must continue to match the live workflow job.
    route coverage and limitations. Green hosted CI is not hardware evidence.
 5. Create the versioned draft with exactly the audited assets and exact source
    target. Run local/full draft audits and the latest exact-source Checks gate.
+   Every audit mode retains the source/artifact/signature/OS/date receipt checks;
+   failed, missing, stale or mismatched evidence blocks release.
 6. Publish only through `node scripts/publish-release.mjs --publish release`, with
    owner authorization. No skip flags, permission resets or substituted receipts.
-   Then run the anonymous-public byte/signature audit before activation.
+   Then run `node scripts/check-release.mjs --public release` for the anonymous-public
+   byte/signature audit before activation.
 
 ## Distribution and installed acceptance
 

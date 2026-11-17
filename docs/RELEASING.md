@@ -14,21 +14,11 @@ ignored beta 24 artifacts/evidence; do not overwrite them when preparing fresh
 stable artifacts from clean, reviewed source. No prior release receipt, historical
 waiver, synthetic test or CI pass substitutes for exact stable candidate evidence.
 
-Required sequence: complete fixes and review; exact-source tests/CI; fresh signed
-packaging; exact signed-candidate real-hardware capture/cancellation and private
-Practice acceptance; local and draft audits; canonical publication through
-`node scripts/publish-release.mjs --publish release`; anonymous-public audit through
-`node scripts/check-release.mjs --public release`; then separately activate feed,
-website and static links. Stable GitHub metadata requires `prerelease: false` in
-both draft and public modes. All source/artifact/signature/OS/date receipt checks
-remain mandatory in every audit mode; failed or missing evidence blocks release.
-
-Homebrew requires a separate matching cask PR/checks/deployed metadata gate. Final
-acceptance requires the installed app's in-app OTA/restart, representative dictation,
-audio calibration and preservation checks for identity, models, settings, usage and
-clipboard. Do not claim completion from publication or manual app replacement.
-No stable artifact source SHA, hashes, test counts or successful acceptance results
-are asserted by this preparation section.
+Follow the authoritative [release process](RELEASE-PROCESS.md) for review,
+exact-candidate acceptance, publication, activation, Homebrew and installed-app
+gates. Stable GitHub metadata requires `prerelease: false` in both draft and public
+modes. Candidate-specific local results and pending acceptance are recorded only
+in the [stable candidate notes](releases/v0.1.1.md).
 
 ## Dated history — guide preserved through 2026-11-16
 
