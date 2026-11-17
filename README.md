@@ -1,13 +1,13 @@
 <p align="center"><a href="https://suhaasbadada.github.io/handsfree/"><img src="site/assets/handsfree.png" width="96" height="96" alt="HandsFree logo"></a></p>
 
-# HandsFree · BETA
+# HandsFree
 
 **Don’t lose your train of thought.**
 
 Say it while it’s clear. HandsFree turns your thoughts into text, without making typing the bottleneck.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-706b68.svg)](LICENSE)
-[![Mac beta: v0.1.1-beta.24](https://img.shields.io/badge/Mac_beta-v0.1.1--beta.24-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.24)
+[![Mac stable: v0.1.1](https://img.shields.io/badge/Mac_stable-v0.1.1-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1)
 [![Platform: Apple Silicon Mac](https://img.shields.io/badge/Platform-Apple_Silicon_Mac-706b68.svg)](#platforms)
 
 ## Download & install
@@ -20,11 +20,11 @@ Say it while it’s clear. HandsFree turns your thoughts into text, without maki
 brew install --cask suhaasbadada/handsfree/handsfree
 ```
 
-Homebrew simplifies installation; macOS security prompts may still appear. This beta is self-signed, not notarized. If Homebrew 7 reports an untrusted cask, review the [tap repository](https://github.com/suhaasbadada/homebrew-handsfree#readme). Only if you trust its code, run `brew trust --cask suhaasbadada/handsfree/handsfree`, then retry the install. Cask trust is not Apple approval.
+Stable v0.1.1 is available by DMG below; the separate Homebrew update is pending and may still offer the prior beta. Homebrew simplifies installation; macOS security prompts may still appear. This release is self-signed, not notarized. If Homebrew 7 reports an untrusted cask, review the [tap repository](https://github.com/suhaasbadada/homebrew-handsfree#readme). Only if you trust its code, run `brew trust --cask suhaasbadada/handsfree/handsfree`, then retry the install. Cask trust is not Apple approval.
 
 Open **Applications → HandsFree**, allow Microphone, Accessibility, and Input Monitoring, then download the English model (~148 MB) in Settings → Overview. [Complete Mac setup, security prompts & existing-app guidance](docs/INSTALL.md).
 
-### [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.24/HandsFree-0.1.1-beta.24-macos-arm64.dmg)
+### [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1/HandsFree-0.1.1-macos-arm64.dmg)
 
 **DMG alternative:** drag HandsFree to Applications before opening it or granting permissions. Intel Macs are unsupported. See [Open Anyway and installation guidance](docs/INSTALL.md). No developer tools needed.
 
@@ -43,7 +43,7 @@ Current product and development focus is **Mac-only: Apple Silicon, macOS 14+**.
 - **Practical controls:** optional listening sounds and local usage totals. Dictation text stays out of the app window.
 - **Safer insertion:** checks the original app and field before submitting Paste; otherwise copies for manual paste.
   Mac users can opt into **Settings → Compatibility paste** for apps that hide their text field. It requires the same verified active app/window, but cannot verify the exact field. It is off by default, including upgrades; missing window proof or focus monitoring still requires manual paste. A submitted shortcut does not confirm insertion; no automatic retry or Enter is sent. See [delivery safeguards and limits](docs/COMPATIBILITY-PASTE.md).
-- **Explicit signed updates:** beta 24 uses footer **Updates** to check, then **Download & update** for the displayed exact version, entirely inline. Older betas use **Check for updates → Download & restart…** until upgraded. No startup checks or automatic downloads. [Privacy, safeguards and acceptance limits](docs/UPDATES.md).
+- **Explicit signed updates:** v0.1.1 uses footer **Updates** to check, then **Download & update** for the displayed exact version, entirely inline. Older betas use **Check for updates → Download & restart…** until upgraded. No startup checks or automatic downloads. [Privacy, safeguards and acceptance limits](docs/UPDATES.md).
 
 ## Use cases
 
@@ -58,7 +58,7 @@ No special integration is required: insertion depends on the focused field, with
 
 | Platform | Status |
 | --- | --- |
-| macOS 14+, Apple Silicon | [Mac beta 24 available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.24) · self-signed, not notarized |
+| macOS 14+, Apple Silicon | [Mac stable v0.1.1 available](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1) · self-signed, not notarized |
 | Intel Macs | Unsupported |
 | Windows | Paused; historical experimental implementation, not currently supported |
 | Linux | Not supported; no build or download available |
@@ -70,7 +70,7 @@ The Tauri 2, Rust, TypeScript and Swift stack retains shared application code an
 ### Mac
 
 1. Install using the recommended Homebrew command above. Alternatively, open the DMG and drag **HandsFree.app to Applications**, then eject the disk image. Launch the Applications copy before granting permissions.
-2. If macOS blocks this unnotarized beta, only if you trust the download, use **System Settings → Privacy & Security → Open Anyway**. Respect your organization’s policies; a local signature is not Apple approval.
+2. If macOS blocks this unnotarized release, only if you trust the download, use **System Settings → Privacy & Security → Open Anyway**. Respect your organization’s policies; a local signature is not Apple approval.
 3. In HandsFree Settings, allow **Microphone**, then enable **Accessibility** and **Input Monitoring** in System Settings. Quit and reopen after changing permissions.
 4. Click **Download** for the English Whisper model (~148 MB from Hugging Face, checksum verified). This explicit, one-time setup needs internet; dictation works offline afterward.
 
@@ -78,15 +78,15 @@ Focus a text field, briefly tap **Fn / 🌐**, speak, and tap again to finish. *
 
 **Optional push to talk:** choose **Settings → Recording mode → Push to talk**. Hold Fn or your custom combination; release to finish (the first required component released finishes a combination). Other keys, mouse actions during a hold, or observed focus changes cancel without paste. Toggle remains the default; updates preserve your preferences, model and statistics. See [behavior, focus limits and test notes](docs/PUSH-TO-TALK.md).
 
-[Full installation and troubleshooting guide](docs/INSTALL.md) · [Beta release notes](docs/releases/v0.1.1-beta.24.md)
+[Full installation and troubleshooting guide](docs/INSTALL.md) · [Stable release notes](docs/releases/v0.1.1.md)
 
-**Updates:** in beta 24 click footer **Updates** to check, then **Download & update**
+**Updates:** in v0.1.1 click footer **Updates** to check, then **Download & update**
 for the displayed exact version. Progress/errors stay inline, without update modals;
 a changed offer requires another click. Older betas retain their dialog until
 upgraded. Local status reads are local; explicit checks share ordinary connection metadata with GitHub,
 never audio, transcripts, settings or usage. Forward OTA replacement/restart has
-not yet been verified. Beta 24 publication does not establish that acceptance;
-the owner upgrades through the app, not a manual replacement. See the release
+not yet been verified for stable v0.1.1. Publication does not establish that acceptance;
+the installed-app acceptance upgrade must use the app, not a manual replacement. See the release
 notes and the historical [beta 9 repair/bootstrap evidence](docs/releases/v0.1.1-beta.9.md).
 
 **Optional manual Homebrew updates, or beta 6-and-earlier bootstrap:** quit HandsFree, run the following in Terminal, then reopen from Applications:

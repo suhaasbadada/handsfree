@@ -1,3 +1,15 @@
+## Stable v0.1.1 publication and distribution activation — 2026-11-17
+
+The [stable release record](releases/v0.1.1.md) owns publication provenance,
+asset hashes, candidate acceptance evidence, limitations and outstanding
+distribution/installed-app gates. Follow [the release process](RELEASE-PROCESS.md)
+for publication and activation; publication is not installed-app acceptance.
+
+## Historical stable preparation checkpoint
+
+Everything below is retained unchanged from before stable publication; pending
+statements there describe that earlier checkpoint, not the current release.
+
 ## Stable v0.1.1 PREPARATION — 2026-11-17
 
 The next candidate is **v0.1.1**, the first non-beta stable release, not beta 25.
