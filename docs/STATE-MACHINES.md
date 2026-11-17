@@ -107,7 +107,12 @@ cannot paint green Ready or enable the Record action; metadata never proves capt
   own-app fallback refusal, FIFO, epoch and generation guards remain independent.
   There is no sidebar, brand menu, tab navigation or setup guide. The top-right
   product-status dialog owns explicit recovery; observation never prompts,
-  downloads or records. Browser context/race contracts exercise this new boundary.
+   downloads or records. Browser context/race contracts exercise this new boundary.
+
+   Back navigation focuses the accessible Home heading, not its editor. Explicit
+   Private test/tray Practice actions may focus the editor intentionally. Pointer
+   navigation never implies capture or an editor activation; keyboard focus stays
+   visible. Completed/empty actions size to their real label, preserving bounds.
 
 - Appearance is presentation, not readiness or capture authorization. One saved
   `system`/`light`/`dark` preference defaults only its own absent/malformed field.

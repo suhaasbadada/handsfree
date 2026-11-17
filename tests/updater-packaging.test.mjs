@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, symlinkSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { releaseVersion } from '../scripts/release-version.mjs';
 
 test('Mac updater archives omit AppleDouble metadata while retaining bundle file bytes', { skip: process.platform !== 'darwin' }, () => {
   const temporary = mkdtempSync(join(tmpdir(), 'handsfree-archive-metadata-'));
@@ -47,11 +48,23 @@ test('generated updater metadata selects exactly the canonical Apple Silicon rel
     },
   });
   assert.equal(updaterFeed('1.2.3', 'signature', 'x'.repeat(5000)).notes.length, 4000);
-  for (const invalid of ['../escape', 'v0.1.1-beta.8', '0.1.1-windows-beta.3', '0.1.1-beta.01', '0.1.1-beta.8?query', '0.1.1+build']) {
+  for (const invalid of ['../escape', 'v0.1.1-beta.8', '0.1.1-windows-beta.3', '0.1.1-beta.01', '0.1.1-beta.8?query', '0.1.1+build', '01.1.1', '0.01.1', '0.1.01', '0.1.1-beta.0', '0.1.1 ', '0.1.1\n']) {
     assert.throws(() => updaterFeed(invalid, 'signature'));
   }
   assert.throws(() => updaterFeed('0.1.1-beta.8', ''));
   assert.throws(() => updaterFeed('0.1.1-beta.8', 'signature\nextra'));
+});
+test('stable and historical beta version policy controls prerelease metadata without permitting noncanonical semver', () => {
+  for (const version of ['0.1.1', '1.2.3']) {
+    assert.deepEqual(releaseVersion(version), { version, prerelease: false });
+    assert.equal(updaterFeed(version, 'signature').version, version);
+  }
+  for (const version of ['0.1.1-beta.6', '0.1.1-beta.24']) {
+    assert.deepEqual(releaseVersion(version), { version, prerelease: true });
+  }
+  for (const version of [undefined, null, 1, '0.1.1-rc.1', '0.1.1+build', '01.1.1', '0.1.1-beta.01']) {
+    assert.throws(() => releaseVersion(version));
+  }
 });
 test('updater provenance requires a fresh build inside a clean unchanged source boundary', () => {
   const events = [];

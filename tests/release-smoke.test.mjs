@@ -43,6 +43,19 @@ test('public receipt policy accepts normalized complete production evidence, not
   }
   assert.doesNotThrow(() => validateReceipt(f, identity, now), 'Actual deferred completion is required only when saved preferences enable it');
 });
+test('stable receipt policy retains exact identity binding and legacy beta coverage', () => {
+  for (const distribution of ['0.1.1', '0.1.1-beta.24', '0.1.1-beta.6']) {
+    const f = fixture(), exact = { ...identity, distribution };
+    f.before = structuredClone(exact); f.after = structuredClone(exact);
+    assert.doesNotThrow(() => validateReceipt(f, exact, now));
+    assert.throws(() => validateReceipt(f, { ...exact, distribution: '0.1.2' }, now), /identity changed/);
+  }
+  for (const distribution of ['v0.1.1', '01.1.1', '0.01.1', '0.1.01', '0.1.1+build', '0.1.1-beta.01', '0.1.1-beta.0', '0.1.1\n']) {
+    const f = fixture(), invalid = { ...identity, distribution };
+    f.before = structuredClone(invalid); f.after = structuredClone(invalid);
+    assert.throws(() => validateReceipt(f, invalid, now));
+  }
+});
 const reconciliation = { negotiationAttempts: 2, initial_config_change: 1, initialInputRate: 48000,
   firstPreparationRetiredHealthy: 1, sameEnginePreacceptTransaction: 1, secondPreparationSucceeded: 1 };
 test('validateProbe accepts certified bounded Bluetooth reconciliation, including first-PCM cancellation', () => {

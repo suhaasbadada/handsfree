@@ -2,7 +2,7 @@
 // BROWSER_BINARY='/path/to/Chromium' node tests/ui-smoke.mjs
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -14,16 +14,17 @@ import { checkRequestedFixes } from './ui-requested-fixes.mjs';
 import { checkProductStatus } from './ui-product-status.mjs';
 import { checkCompactControls } from './ui-compact-controls.mjs';
 import { checkRefinement } from './ui-refinement.mjs';
+import { checkStableBugs } from './ui-stable-bugs.mjs';
 
 const binary = process.env.BROWSER_BINARY;
 const port = process.env.UI_PORT ?? '5187';
 // Optional focused reruns; the default still executes every base and DOM check.
 const selected = process.env.UI_CHECKS?.split(',');
-const checks = {appearance:checkAppearance,practice:checkPracticeEvents,refinement:checkRefinement,keyboard:checkKeyboardRecovery,requested:checkRequestedFixes,status:checkProductStatus,compact:checkCompactControls,updates:checkUpdateIndicator};
+const checks = {appearance:checkAppearance,practice:checkPracticeEvents,refinement:checkRefinement,keyboard:checkKeyboardRecovery,requested:checkRequestedFixes,status:checkProductStatus,compact:checkCompactControls,updates:checkUpdateIndicator,bugs:checkStableBugs};
 if (selected?.some(name=>!Object.hasOwn(checks,name))) throw new Error('UI_CHECKS must name actual DOM suites: '+Object.keys(checks).join(','));
 if (!binary) throw new Error('Set BROWSER_BINARY to a Chromium-compatible browser. Start npm run dev -- --port 5187 first.');
 const profile = mkdtempSync(join(tmpdir(), 'handsfree-ui-'));
-const browser = spawn(binary, ['--headless', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=9237', `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore','ignore','pipe'] });
+const browser = spawn(binary, ['--headless', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore','ignore','pipe'] });
 let browserErrors = '';
 browser.stderr.on('data', chunk => { browserErrors = (browserErrors + chunk.toString()).slice(-4000); });
 let socket;
@@ -49,7 +50,11 @@ async function until(expression) {
 try {
   let page;
   for (let attempt = 0; attempt < 100; attempt++) {
-    try { page = await (await fetch('http://127.0.0.1:9237/json/new?about:blank', { method: 'PUT' })).json(); break; }
+    try {
+      const debugPort=Number(readFileSync(join(profile,'DevToolsActivePort'),'utf8').split('\n')[0]);
+      assert.ok(Number.isInteger(debugPort) && debugPort>0 && debugPort<65536);
+      page = await (await fetch(`http://127.0.0.1:${debugPort}/json/new?about:blank`, { method: 'PUT' })).json(); break;
+    }
     catch { await delay(50); }
   }
   assert.ok(page?.webSocketDebuggerUrl, `Headless browser started: ${browserErrors}`);
@@ -69,7 +74,7 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: 980, height: 820, deviceScaleFactor: 1, mobile: false });
   await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-color-scheme',value:'light'},{name:'prefers-reduced-motion',value:'no-preference'}]});
   await until(`Boolean(document.getElementById('nav-settings'))`);
-  assert.equal(await evaluate(`document.querySelector('footer .beta-badge').textContent==='BETA' && document.querySelector('footer .beta-badge').getBoundingClientRect().width>0 && !document.querySelector('.brand .beta-badge') && !document.querySelector('main footer') && document.getElementById('app-version').textContent==='0.1.1'`), true, 'Version, beta and language metadata live in the actual footer');
+  assert.equal(await evaluate(`!document.querySelector('.beta-badge') && !document.querySelector('main footer') && document.getElementById('app-version').textContent==='0.1.1' && document.querySelector('footer .footer-privacy').textContent.includes('English')`), true, 'Stable version and language metadata live in the actual footer without a beta badge');
    assert.equal(await evaluate(`['change-shortcut','mic','permissions','download','reset','sounds','sound-volume'].every(id=>document.getElementById(id).disabled)`), true, 'Native controls are unavailable before the backend connects');
    assert.equal(await evaluate(`document.getElementById('permissions-row').hidden && document.getElementById('saved-shortcut').textContent==='…' && !document.body.textContent.includes('this Mac')`), true, 'Unknown native platform has neutral, disabled setup');
   await evaluate(`window.calls = []; window.fixture = {phase:'idle',message:'Select a text field and press Fn.', progress:0,model_ready:true,microphone:true,accessibility:true,input_monitoring:true,hotkey:true,transcript:'',sounds:true,sound_volume:50,sound_style:'clean',shortcut:{code:'Fn',modifiers:0},shortcut_label:'Fn',stats:{words:0,transcriptions:0,speech_seconds:0,saved_seconds:0},persistence_error:''}; window.__TAURI_INTERNALS__ = { invoke: async (command,args) => { window.calls.push({command,args}); if(command==='status') return structuredClone(window.fixture); if(command==='set_sounds') window.fixture.sounds=args.enabled; if(command==='set_sound_style') window.fixture.sound_style=args.style; if(command==='set_shortcut'){if(window.rejectShortcut) throw 'Could not save shortcut'; window.fixture.shortcut=args.shortcut;window.fixture.shortcut_label=args.shortcut.code==='Fn'?'Fn':args.shortcut.code==='Space'?'Option + Space':'Control + Shift + J';} if(command==='reset_stats') window.fixture.stats={words:0,transcriptions:0,speech_seconds:0,saved_seconds:0}; } }; document.getElementById('feedback').hidden=true;`);
@@ -301,7 +306,7 @@ try {
   assert.equal(await evaluate(`document.body.textContent.includes(window.fixture.transcript)`), false);
   // Practice uses its own IPC result, never the ordinary transcript fixture.
   await evaluate(`window.dispatchEvent(new Event('focus'))`);
-  await evaluate(`window.fixture.platform='macos';window.practiceGeneration=0;window.practiceResult={phase:'recording',text:''};const beforePractice=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='practice_start'){window.calls.push({command,args});if(window.practiceReject)throw 'Practice busy';if(window.practiceDelay)await new Promise(r=>window.practiceAck=r);return ++window.practiceGeneration;}if(command==='practice_finish'){window.calls.push({command,args});window.practiceResult.phase='processing';return;}if(command==='practice_status'){return {...window.practiceResult,generation:window.practiceGeneration};}if(command==='practice_cancel'){window.calls.push({command,args});return;}return beforePractice(command,args);};document.getElementById('home-back').click()`);
+  await evaluate(`window.fixture.platform='macos';window.practiceGeneration=0;window.practiceResult={phase:'recording',text:''};const beforePractice=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='practice_start'){window.calls.push({command,args});if(window.practiceReject)throw 'Practice busy';if(window.practiceDelay)await new Promise(r=>window.practiceAck=r);window.practiceResult={phase:'recording',text:''};return ++window.practiceGeneration;}if(command==='practice_finish'){window.calls.push({command,args});window.practiceResult.phase='processing';return;}if(command==='practice_status'){return {...window.practiceResult,generation:window.practiceGeneration};}if(command==='practice_cancel'){window.calls.push({command,args});return;}return beforePractice(command,args);};document.getElementById('home-back').click()`);
   await until(`!document.getElementById('practice').hidden && !document.getElementById('practice-start').disabled`);
   assert.ok((await send('Accessibility.getFullAXTree')).nodes.some(n=>n.role?.value==='textbox' && n.name?.value==='Practice dictation'));
   await evaluate(`document.getElementById('practice-start').click();document.getElementById('practice-start').click()`);
@@ -339,7 +344,7 @@ try {
       const luminance = value => rgb(value).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
       const contrast = (a,b) => {const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05)};
       const background = el => {for(;el;el=el.parentElement){const bg=getComputedStyle(el).backgroundColor;if(bg!=='rgba(0, 0, 0, 0)')return bg;}return getComputedStyle(document.documentElement).backgroundColor;};
-      return ['.primary','textarea','select','#shortcut-evidence','.beta-badge','#feedback','footer','.subtle','.danger'].map(selector=>{
+      return ['.primary','textarea','select','#shortcut-evidence','#feedback','footer','.subtle','.danger'].map(selector=>{
         const el=document.querySelector(selector),s=getComputedStyle(el);
         return {selector,ratio:contrast(s.color,background(el))};
       });

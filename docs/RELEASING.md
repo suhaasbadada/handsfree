@@ -1,3 +1,40 @@
+## Stable v0.1.1 PREPARATION — 2026-11-17
+
+The next candidate is **v0.1.1**, the first non-beta stable release, not beta 25.
+This is preparation only: bugs 1 and 2 have local rendered regressions and fixes;
+independent review, exact-source CI and candidate acceptance remain pending here.
+See [stable candidate notes](releases/v0.1.1.md). The embedded app version stays
+0.1.1 and the bundle identity stays `com.handsfree.local`; reuse existing signing
+and updater keys. Stable remains **self-signed and not notarized**, not Developer ID
+signed, with no Apple approval implied. Mac-only scope remains unchanged.
+
+Keep the active website manifest, static downloads and signed feed on beta 24.
+`candidateRelease` selects 0.1.1 for auditing only and stays unavailable. Retain
+ignored beta 24 artifacts/evidence; do not overwrite them when preparing fresh
+stable artifacts from clean, reviewed source. No prior release receipt, historical
+waiver, synthetic test or CI pass substitutes for exact stable candidate evidence.
+
+Required sequence: complete fixes and review; exact-source tests/CI; fresh signed
+packaging; exact signed-candidate real-hardware capture/cancellation and private
+Practice acceptance; local and draft audits; canonical publication through
+`node scripts/publish-release.mjs --publish release`; anonymous-public audit through
+`node scripts/check-release.mjs --public release`; then separately activate feed,
+website and static links. Stable GitHub metadata requires `prerelease: false` in
+both draft and public modes. All source/artifact/signature/OS/date receipt checks
+remain mandatory in every audit mode; failed or missing evidence blocks release.
+
+Homebrew requires a separate matching cask PR/checks/deployed metadata gate. Final
+acceptance requires the installed app's in-app OTA/restart, representative dictation,
+audio calibration and preservation checks for identity, models, settings, usage and
+clipboard. Do not claim completion from publication or manual app replacement.
+No stable artifact source SHA, hashes, test counts or successful acceptance results
+are asserted by this preparation section.
+
+## Dated history — guide preserved through 2026-11-16
+
+Everything below is the prior guide, retained byte-for-byte as historical evidence.
+Historical channel labels, instructions and waivers do not override the stable gates.
+
 ## Beta 24 publication — exact signed candidate
 
 Published [v0.1.1-beta.24](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.24)
