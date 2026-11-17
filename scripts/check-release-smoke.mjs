@@ -121,7 +121,7 @@ export function candidateIdentity(directory) {
     bundleIdentifier: plist('CFBundleIdentifier'), signatureAnchor, designatedRequirement,
     arch: run('/usr/bin/lipo', ['-archs', executable]), os: { platform: process.platform, version: run('/usr/bin/sw_vers', ['-productVersion']), build: run('/usr/bin/sw_vers', ['-buildVersion']) },
     hardwareModel: run('/usr/sbin/sysctl', ['-n', 'hw.model']) };
-  requireThat(plist('CFBundleExecutable') === 'handsfree' && plist('CFBundleShortVersionString') === '0.1.1' && plist('LSMinimumSystemVersion') === '14.0', 'unexpected app version/executable/minimum OS');
+  requireThat(plist('CFBundleExecutable') === 'handsfree' && plist('CFBundleShortVersionString') === distribution && plist('LSMinimumSystemVersion') === '14.0', 'unexpected app version/executable/minimum OS');
   requireThat(readFileSync(join(directory, 'UPDATER-PROVENANCE.txt'), 'utf8').startsWith(`Distribution: ${distribution}\nSource commit: ${sourceCommit}\nApp executable SHA-256: ${identity.executableHash}\n`), 'updater provenance mismatch');
   requireThat(readFileSync(join(directory, 'PROVENANCE.txt'), 'utf8').startsWith(`Candidate: HandsFree-${distribution}-macos-arm64.dmg\nSource commit: ${sourceCommit}\nSource tree: ${sourceTree}\n`), 'packaging provenance mismatch');
   // Confirm the executable's embedded distribution is exactly the source's.
