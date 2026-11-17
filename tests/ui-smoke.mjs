@@ -1,7 +1,7 @@
 // Optional local browser smoke check. Does not launch HandsFree or use the mic.
 // BROWSER_BINARY='/path/to/Chromium' node tests/ui-smoke.mjs
 import assert from 'node:assert/strict';
-import { version as packagedVersion } from '../package.json' with { type: 'json' };
+import packageMetadata from '../package.json' with { type: 'json' };
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,6 +18,7 @@ import { checkRefinement } from './ui-refinement.mjs';
 import { checkStableBugs } from './ui-stable-bugs.mjs';
 
 const binary = process.env.BROWSER_BINARY;
+const packagedVersion = packageMetadata.version;
 const port = process.env.UI_PORT ?? '5187';
 // Optional focused reruns; the default still executes every base and DOM check.
 const selected = process.env.UI_CHECKS?.split(',');
