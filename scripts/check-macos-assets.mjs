@@ -11,14 +11,14 @@ export function verifyEmbeddedFrontend(executable, assets, cached) {
   requireThat(assets.some(asset => asset.name.endsWith('.js')), 'Missing built frontend JavaScript');
   requireThat(assets.some(asset => asset.name.endsWith('.css')), 'Missing built frontend CSS');
   const javascript = assets.filter(asset => asset.name.endsWith('.js')).map(asset => asset.bytes.toString()).join('\n');
-  requireThat(javascript.includes('All-time activity') && !/Last transcript|<details\b|<summary\b/i.test(javascript), 'Stale dashboard: expected stats-first UI without transcript/disclosures');
+  requireThat(['Usage totals', 'id="home"', 'id="nav-settings"', 'id="home-back"'].every(marker => javascript.includes(marker)) && !/Last transcript|<details\b|<summary\b|nav-practice-page|practice-page-title|setup-guide/i.test(javascript), 'Stale dashboard: expected combined Home without sidebar, separate Practice navigation or setup guide');
   for (const marker of ['Recording mode', 'value="toggle"', 'value="push_to_talk"', 'Push to talk', 'set_recording_mode']) {
     requireThat(javascript.includes(marker), `Missing compiled push-to-talk UI: ${marker}`);
   }
   for (const marker of ['Compatibility paste', 'compatibility-paste', 'set_compatibility_paste', 'compatibility_paste', 'the exact field cannot be verified']) {
     requireThat(javascript.includes(marker), `Missing compiled Compatibility paste UI: ${marker}`);
   }
-  for (const marker of ['Try your voice', 'nav-practice-page', 'practice-page-title', 'Start test', 'Practice dictation', 'No clipboard or usage counted.', 'practice-input', 'practice_context', 'practice_start', 'practice_finish', 'practice_cancel', 'practice_status']) {
+  for (const marker of ['Try your voice', 'practice-toolbar', 'practice-badge', 'practice-start', 'Practice dictation', 'No clipboard or usage counted.', 'practice-input', 'practice_context', 'practice_start', 'practice_finish', 'practice_cancel', 'practice_status']) {
     requireThat(javascript.includes(marker), `Missing compiled practice UI: ${marker}`);
   }
   for (const asset of assets) {
