@@ -1,9 +1,9 @@
 // Explicit hardware execution (--run) or read-only fail-closed evidence audit.
 // No signing, prompts, installation, application data writes or publication.
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync, lstatSync, readlinkSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
+import { readFileSync, readdirSync, lstatSync, readlinkSync, writeFileSync, existsSync, unlinkSync, mkdtempSync, rmSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -124,6 +124,23 @@ export function verifyHardwareEvidence(directory) {
   return validateReceipt(JSON.parse(readFileSync(path, 'utf8')), candidateIdentity(directory));
 }
 
+// Launch Services preserves the signed application's TCC identity. Directly
+// spawning its executable attributes permission to the invoking terminal instead.
+// open -W reports launcher status, not the child's exit code: the fresh, complete
+// native passed/probe document below remains mandatory evidence of child success.
+export function runNativeProbe(app, { launch = spawnSync } = {}) {
+  const temporary = mkdtempSync(join(tmpdir(), 'handsfree-candidate-probe-'));
+  const output = join(temporary, 'probe.json'), errors = join(temporary, 'native.log');
+  try {
+    const result = launch('/usr/bin/open', ['-n', '-W', '--stdout', output, '--stderr', errors, app, '--args', '--release-smoke'], {
+      encoding: 'utf8', timeout: 85000, maxBuffer: 128 * 1024, stdio: ['ignore', 'pipe', 'pipe'], killSignal: 'SIGKILL',
+    });
+    requireThat(!existsSync(output) || lstatSync(output).isFile() && lstatSync(output).size <= 128 * 1024, 'oversized/non-file native probe output');
+    return { status: result.status, signal: result.signal, error: result.error,
+      stdout: existsSync(output) ? readFileSync(output, 'utf8') : '' };
+  } finally { rmSync(temporary, { recursive: true, force: true }); }
+}
+
 export async function main(args = process.argv.slice(2)) {
   const execute = args[0] === '--run';
   if (execute) args = args.slice(1);
@@ -135,9 +152,7 @@ export async function main(args = process.argv.slice(2)) {
   const receiptPath = join(directory, 'release-smoke.json');
   if (existsSync(receiptPath)) unlinkSync(receiptPath);
   const before = candidateIdentity(directory), startedAt = new Date().toISOString();
-  const result = spawnSync(join(directory, 'updater/HandsFree.app/Contents/MacOS/handsfree'), ['--release-smoke'], {
-    encoding: 'utf8', timeout: 85000, maxBuffer: 128 * 1024, stdio: ['ignore', 'pipe', 'pipe'], killSignal: 'SIGKILL',
-  });
+  const result = runNativeProbe(join(directory, 'updater/HandsFree.app'));
   let probe;
   try { probe = JSON.parse(result.stdout?.trim()); } catch { /* Failure/timeout may have no stdout. Never print native stderr/device IDs. */ }
   if (probe?.schemaVersion === 1 && probe.probe === 'production-audio-v1') console.log(JSON.stringify(probe));

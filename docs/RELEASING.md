@@ -17,9 +17,12 @@ node scripts/publish-release.mjs --check release
 # node scripts/publish-release.mjs --publish release
 ```
 
-The runner invokes **only** `release/updater/HandsFree.app/Contents/MacOS/handsfree
---release-smoke`, before normal Tauri/plugin/hook/model setup. The direct CLI
-prints bounded JSON to stdout and returns nonzero on failure; only the runner
+The runner opens **only** `release/updater/HandsFree.app` through macOS Launch
+Services with `--release-smoke`, before normal Tauri/plugin/hook/model setup. This
+preserves the signed application's TCC identity; directly spawning the executable
+can attribute microphone access to the terminal and must not be used as the
+release runner. The diagnostic prints bounded JSON and returns nonzero on failure;
+Launch Services success alone is insufficient without fresh complete passing JSON. Only the runner
 writes a private ignored receipt. Existing microphone permission is required;
 there is no prompt/reset, new signer, device/rate/default write, installed app
 replacement, model initialization, transcript, paste, usage or settings write.

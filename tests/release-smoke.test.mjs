@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { validateProbe, validateReceipt, bundleHash } from '../scripts/check-release-smoke.mjs';
+import { validateProbe, validateReceipt, bundleHash, runNativeProbe } from '../scripts/check-release-smoke.mjs';
 import { validateSourceCI } from '../scripts/publish-release.mjs';
 
 // Normalized production Observation/trace shape. These are policy fixtures, NOT
@@ -119,4 +119,29 @@ test('publication requires latest exact-source canonical Checks workflow, not an
   }
   assert.throws(() => validateSourceCI([run, { ...run, id: run.id + 1, status: 'in_progress', conclusion: null }], identity.sourceCommit));
   assert.throws(() => validateSourceCI([], identity.sourceCommit));
+});
+
+test('native probe uses Launch Services with exact bundle/arguments and fresh bounded output', () => {
+  const bundle = '/candidate with spaces/HandsFree.app';
+  const document = JSON.stringify(fixture().probe);
+  let lastOutput;
+  const launch = (command, args, options) => {
+    assert.equal(command, '/usr/bin/open');
+    assert.deepEqual(args.slice(0, 3), ['-n', '-W', '--stdout']);
+    assert.equal(args[4], '--stderr');
+    assert.deepEqual(args.slice(6), [bundle, '--args', '--release-smoke']);
+    assert.equal(options.timeout, 85000);
+    assert.notEqual(args[3], lastOutput, 'A previous success cannot be reused');
+    lastOutput = args[3];
+    writeFileSync(args[3], document, { flag: 'wx' });
+    return { status: 0, signal: null };
+  };
+  assert.equal(runNativeProbe(bundle, { launch }).stdout, document);
+  assert.equal(runNativeProbe(bundle, { launch }).stdout, document);
+  const absent = runNativeProbe(bundle, { launch: () => ({ status: 0, signal: null }) });
+  assert.equal(absent.stdout, '', 'Launcher success alone is not native success');
+  assert.throws(() => validateProbe(JSON.parse(absent.stdout)));
+  assert.throws(() => runNativeProbe(bundle, { launch: (_, args) => {
+    writeFileSync(args[3], 'x'.repeat(128 * 1024 + 1)); return { status: 0 };
+  } }), /oversized/);
 });
