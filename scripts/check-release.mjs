@@ -8,10 +8,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { verifyCompiledAssets } from './check-macos-assets.mjs';
 import { updaterFeed } from './package-updater.mjs';
 import { verifyHardwareEvidence } from './check-release-smoke.mjs';
+import { releaseVersion } from './release-version.mjs';
 
-export const candidate = 'HandsFree-0.1.1-beta.24-macos-arm64.dmg';
-export const tag = 'v0.1.1-beta.24';
-export const archiveName = 'HandsFree-0.1.1-beta.24-macos-arm64.app.tar.gz';
+export const candidate = 'HandsFree-0.1.1-macos-arm64.dmg';
+export const tag = 'v0.1.1';
+export const archiveName = 'HandsFree-0.1.1-macos-arm64.app.tar.gz';
 export const payloadNames = [candidate, 'PROVENANCE.txt', archiveName, `${archiveName}.sig`, 'UPDATER-PROVENANCE.txt', 'macos-arm64.json'];
 export const names = [...payloadNames, 'SHA256SUMS'];
 const repo = 'suhaasbadada/handsfree';
@@ -43,12 +44,12 @@ export function validateUpdaterMetadata(feed, signature, provenance, commit, exe
 }
 
 export function validateDraft(draft, commit, sizes) {
-  requireThat(draft.draft === true && draft.prerelease === true && draft.tag_name === tag, 'Expected the versioned draft prerelease, not a public release');
+  requireThat(draft.draft === true && draft.prerelease === releaseVersion(tag.slice(1)).prerelease && draft.tag_name === tag, 'Expected the versioned draft with matching prerelease policy, not a public release');
   validateAssets(draft, commit, sizes);
 }
 
 export function validatePublic(release, commit, sizes) {
-  requireThat(release.draft === false && release.prerelease === true && release.tag_name === tag, 'Expected the versioned public prerelease');
+  requireThat(release.draft === false && release.prerelease === releaseVersion(tag.slice(1)).prerelease && release.tag_name === tag, 'Expected the versioned public release with matching prerelease policy');
   validateAssets(release, commit, sizes);
 }
 
@@ -199,7 +200,8 @@ export async function main(args = process.argv.slice(2), { onInterrupt } = {}) {
     for (const name of ['LICENSE', 'PUBLICATION-NOTES.txt', 'THIRD_PARTY_NOTICES/inventory.json', 'THIRD_PARTY_SOURCES.tar.gz', 'Documentation/README.md', 'Documentation/RELEASING.md', 'Documentation/release-readiness.md', 'Documentation/practice.md', 'Documentation/COMPATIBILITY-PASTE.md', `Documentation/releases/${tag}.md`]) {
       requireThat(statSync(join(mount, 'Licenses', name)).size > 0, `Missing license/documentation: ${name}`);
     }
-    requireThat(readFileSync(join(mount, 'Install HandsFree.txt'), 'utf8').includes('Experimental beta — self-signed and not notarized'), 'Install guide must disclose experimental signing status');
+    const installGuide = readFileSync(join(mount, 'Install HandsFree.txt'), 'utf8');
+    requireThat(/self-signed/i.test(installGuide) && /not notarized/i.test(installGuide), 'Install guide must disclose self-signed, not notarized signing status');
     scope.detach();
     if (!local) {
       const api = path => JSON.parse(run('gh', ['api', `repos/${repo}/${path}`]));
@@ -232,7 +234,7 @@ export async function main(args = process.argv.slice(2), { onInterrupt } = {}) {
     scope.assertActive();
     verifyHardwareEvidence(directory);
     requireThat(git('rev-parse', 'HEAD') === commit && !git('status', '--short', '--untracked-files=normal'), 'Source changed during release audit');
-    console.log(`PASS: ${commit} — checksums, clean provenance, stable signatures, arm64/macOS 14 bundle and DMG contents.${local ? '\nLOCAL ONLY: release target/tag/assets were NOT checked.' : publicMode ? '\nPublic prerelease target/tag and anonymous GET asset bytes match exactly.' : '\nDraft target/tag and downloaded asset bytes match exactly.'}\nArtifact audit only: no legal certification, Apple approval, or separate-Mac QA is implied.`);
+    console.log(`PASS: ${commit} — checksums, clean provenance, stable signatures, arm64/macOS 14 bundle and DMG contents.${local ? '\nLOCAL ONLY: release target/tag/assets were NOT checked.' : publicMode ? '\nPublic release target/tag and anonymous GET asset bytes match exactly.' : '\nDraft target/tag and downloaded asset bytes match exactly.'}\nArtifact audit only: no legal certification, Apple approval, or separate-Mac QA is implied.`);
   } finally {
     scope.cleanup();
   }

@@ -25,7 +25,7 @@ export async function checkKeyboardRecovery({send,evaluate,until,port}) {
       assert.equal(await evaluate(`(()=>{const e=document.getElementById('${id}'),s=getComputedStyle(e.parentElement.querySelector('svg'));return e.tagName==='SELECT' && s.display!=='none' && parseFloat(s.width)>=12 && s.pointerEvents==='none' && s.color===getComputedStyle(document.body).color;})()`),true,'Theme-safe visible chevron does not intercept native control');
     }
     await evaluate(`document.getElementById('home-back').focus()`); await key(opener);
-    assert.equal(await focused(),'practice-text');
+    assert.equal(await focused(),'home-title','Back announces Home without unsolicited editor focus');
     assert.equal(await evaluate(`document.getElementById('practice-text').tabIndex`),0,'Home return must not remove the editor from sequential keyboard navigation');
     await until(`window.context>0`);
     assert.equal(await evaluate(`!window.calls.some(c=>c.command==='practice_start')`),true,'Home return only restores eligibility, never capture');

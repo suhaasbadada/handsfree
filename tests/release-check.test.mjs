@@ -14,7 +14,7 @@ function fixture() {
   return { provenance, hashes, checksums: Object.entries(hashes).map(([name, hash]) => `${hash}  ${name}\n`).join(''), commit, tree, status: '' };
 }
 test('clean candidate has exact source commit/tree and six verified payload checksums', () => {
-  assert.deepEqual(payloadNames, ['HandsFree-0.1.1-beta.24-macos-arm64.dmg', 'PROVENANCE.txt', 'HandsFree-0.1.1-beta.24-macos-arm64.app.tar.gz', 'HandsFree-0.1.1-beta.24-macos-arm64.app.tar.gz.sig', 'UPDATER-PROVENANCE.txt', 'macos-arm64.json']);
+  assert.deepEqual(payloadNames, ['HandsFree-0.1.1-macos-arm64.dmg', 'PROVENANCE.txt', 'HandsFree-0.1.1-macos-arm64.app.tar.gz', 'HandsFree-0.1.1-macos-arm64.app.tar.gz.sig', 'UPDATER-PROVENANCE.txt', 'macos-arm64.json']);
   assert.equal(validateMetadata(fixture()), commit);
 });
 for (const name of payloadNames) test(`manifest rejects altered ${name} bytes`, () => {
@@ -23,12 +23,12 @@ for (const name of payloadNames) test(`manifest rejects altered ${name} bytes`, 
   assert.throws(() => validateMetadata(f), /SHA-256 mismatch/);
 });
 test('updater feed and provenance bind exact target, source, signature and executable', () => {
-  assert.equal(archiveName, 'HandsFree-0.1.1-beta.24-macos-arm64.app.tar.gz');
+  assert.equal(archiveName, 'HandsFree-0.1.1-macos-arm64.app.tar.gz');
   const signature = 'uploaded-signature';
   const executableHash = digest('sealed executable');
-  const provenance = `Distribution: 0.1.1-beta.24\nSource commit: ${commit}\nApp executable SHA-256: ${executableHash}\n`;
+  const provenance = `Distribution: ${tag.slice(1)}\nSource commit: ${commit}\nApp executable SHA-256: ${executableHash}\n`;
   const verify = feed => validateUpdaterMetadata(feed, signature, provenance, commit, executableHash);
-  const fresh = () => updaterFeed('0.1.1-beta.24', signature);
+  const fresh = () => updaterFeed(tag.slice(1), signature);
   assert.doesNotThrow(() => verify(fresh()));
   for (const mutate of [
     f => { f.version = '0.1.1-beta.6'; },
@@ -58,13 +58,13 @@ for (const [label, mutate, message] of [
 
 const sizes = Object.fromEntries(names.map((name, index) => [name, 123 + index]));
 test('draft audit requires the matching website manifest to remain unavailable', () => {
-  assert.equal(tag, 'v0.1.1-beta.24');
-  assert.equal(candidate, 'HandsFree-0.1.1-beta.24-macos-arm64.dmg');
+  assert.equal(tag, 'v0.1.1');
+  assert.equal(candidate, 'HandsFree-0.1.1-macos-arm64.dmg');
   assert.equal(release.publicAvailable, false);
   assert.throws(() => validateAvailability(publishedRelease), /manifest disabled/);
-  assert.doesNotThrow(() => validateAvailability(release, true), 'Public audit mode accepts beta 24 candidate coordinates without activating downloads');
+  assert.doesNotThrow(() => validateAvailability(release, true), 'Public audit mode accepts stable candidate coordinates without activating downloads');
   assert.equal(publishedRelease.version, '0.1.1-beta.24');
-  assert.doesNotThrow(() => validateAvailability(publishedRelease, true), 'The activated public beta 24 matches the audited candidate');
+  assert.throws(() => validateAvailability(publishedRelease, true), 'Active beta 24 cannot substitute for the stable candidate');
   for (const version of ['beta.5', 'beta.6', 'beta.7', 'beta.8', 'beta.9', 'beta.10', 'beta.11', 'beta.12', 'beta.13', 'beta.14', 'beta.15', 'beta.16', 'beta.17', 'beta.18', 'beta.19', 'beta.20', 'beta.21', 'beta.22', 'beta.23']) {
     const historical = { ...release, version: `0.1.1-${version}`, dmgUrl: release.dmgUrl.replaceAll('beta.24', version) };
     for (const publicMode of [false, true]) {
@@ -76,7 +76,13 @@ test('draft audit requires the matching website manifest to remain unavailable',
     assert.throws(() => validateAvailability({ ...release, ...change }), /manifest disabled/);
   }
 });
-function draft() { return { draft: true, prerelease: true, tag_name: tag, target_commitish: commit, assets: Object.entries(sizes).map(([name, size]) => ({ name, size, state: 'uploaded' })) }; }
+function draft() { return { draft: true, prerelease: false, tag_name: tag, target_commitish: commit, assets: Object.entries(sizes).map(([name, size]) => ({ name, size, state: 'uploaded' })) }; }
+test('stable draft/public audits reject beta flags and accept only exact stable assets', () => {
+  assert.doesNotThrow(() => validateDraft(draft(), commit, sizes));
+  assert.doesNotThrow(() => validatePublic({ ...draft(), draft: false }, commit, sizes));
+  assert.throws(() => validateDraft({ ...draft(), prerelease: true }, commit, sizes), /prerelease policy/);
+  assert.throws(() => validatePublic({ ...draft(), draft: false, prerelease: true }, commit, sizes), /prerelease policy/);
+});
 test('public mode is explicit, mutually exclusive and keeps identity checks', () => {
   assert.deepEqual(auditOptions([]), { local: false, publicMode: false, directory: undefined });
   assert.deepEqual(auditOptions(['--public', 'release']), { local: false, publicMode: true, directory: 'release' });
@@ -86,8 +92,8 @@ test('public mode is explicit, mutually exclusive and keeps identity checks', ()
   assert.throws(() => validateAvailability({ ...release, version: '0.2.0' }, true));
   const published = { ...draft(), draft: false };
   assert.doesNotThrow(() => validatePublic(published, commit, sizes));
-  assert.throws(() => validatePublic(draft(), commit, sizes), /public prerelease/);
-  for (const change of [{ prerelease: false }, { tag_name: 'other' }, { target_commitish: 'main' }, { assets: [] }]) assert.throws(() => validatePublic({ ...published, ...change }, commit, sizes));
+  assert.throws(() => validatePublic(draft(), commit, sizes), /public release/);
+  for (const change of [{ prerelease: true }, { tag_name: 'other' }, { target_commitish: 'main' }, { assets: [] }]) assert.throws(() => validatePublic({ ...published, ...change }, commit, sizes));
 });
 test('draft is versioned, unpublished, exact full-SHA target and uploaded asset set', () => {
   assert.doesNotThrow(() => validateDraft(draft(), commit, sizes));
@@ -95,9 +101,9 @@ test('draft is versioned, unpublished, exact full-SHA target and uploaded asset 
 for (const [label, mutate, message] of [
   ['older draft target', d => { d.target_commitish = 'c'.repeat(40); }, /exact full provenance commit/],
   ['branch draft target', d => { d.target_commitish = 'main'; }, /exact full provenance commit/],
-  ['public release', d => { d.draft = false; }, /draft prerelease/],
-  ['stable release', d => { d.prerelease = false; }, /draft prerelease/],
-  ['different tag', d => { d.tag_name = 'v0.1.0'; }, /draft prerelease/],
+  ['public release', d => { d.draft = false; }, /draft with matching prerelease policy/],
+  ['beta prerelease flag', d => { d.prerelease = true; }, /draft with matching prerelease policy/],
+  ['different tag', d => { d.tag_name = 'v0.1.0'; }, /draft with matching prerelease policy/],
   ['missing asset', d => { d.assets.pop(); }, /Missing/],
   ['incomplete upload', d => { d.assets[0].state = 'starter'; }, /incomplete/],
   ['wrong asset size', d => { d.assets[0].size++; }, /wrong-size/],

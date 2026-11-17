@@ -35,7 +35,8 @@ document.querySelector('#app')!.innerHTML = `
 <div class="shell">
  <header class="product-header"><div class="home-brand"><button id="home-back" class="icon-action" aria-label="Back to Home" title="Back to Home" hidden>${icon('back')}</button><img src="${logo}" alt="" width="36" height="36"><span>HandsFree</span></div><div class="header-actions"><section class="status" aria-label="App status"><button id="product-status" aria-haspopup="dialog" aria-controls="health-dialog" title="View product status and resolve problems"><span id="dot" aria-hidden="true"></span><strong id="phase" aria-live="polite">Connecting…</strong>${icon('chevron')}</button><button id="cancel" hidden aria-label="Cancel dictation" title="Cancel dictation">×</button></section><button id="nav-settings" class="icon-action" aria-label="Settings" title="Settings">${icon('settings')}</button></div></header>
  <main>
- <section id="home" aria-label="Home">
+  <section id="home" aria-label="Home">
+     <h1 id="home-title" class="sr-only" tabindex="-1">Home</h1>
       <section class="activity" aria-labelledby="activity-title"><h2 id="activity-title" class="sr-only">Usage totals</h2><div class="metrics" aria-label="Real dictation only; practice tests excluded"><article><span>${icon('words')}Words</span><strong id="words">0</strong></article><article><span tabindex="0" title="Estimate per dictation: typing at 40 words/minute, minus recording time, never below zero. Not a productivity measurement.">${icon('clock')}Time saved<small>Estimated</small></span><strong id="saved">0 sec</strong></article><article><span>${icon('wave')}Dictations</span><strong id="count">0</strong></article></div></section>
     <section id="practice" class="card practice" aria-labelledby="practice-title" hidden>
       <h2 id="practice-title" class="sr-only">Try your voice</h2>
@@ -81,7 +82,7 @@ document.querySelector('#app')!.innerHTML = `
   <div class="general-status-slot"><p id="message" class="status-detail" role="status" aria-label="Dictation status" aria-live="polite" hidden></p><button id="message-recovery" class="text-action" hidden>View problem</button></div>
  <p id="feedback" class="feedback" role="status" hidden></p><p id="storage-error" class="feedback" role="status" hidden></p>
   </main>
-   <footer><span class="footer-privacy">${icon('shield')}On-device · English</span><div class="footer-meta"><span class="footer-brand"><span class="sr-only">HandsFree</span><span id="app-version">0.1.1</span><span class="beta-badge">BETA</span></span><button id="updates-open" class="text-action" aria-describedby="updates-feedback" hidden>${icon('update')}<span class="update-summary"><strong id="updates-indicator-label">Updates</strong><span id="updates-indicator-detail">Not checked</span></span><span id="updates-announcement" class="sr-only" role="status" aria-live="polite"></span></button></div><p id="updates-feedback" role="status" aria-live="polite" hidden></p></footer>
+   <footer><span class="footer-privacy">${icon('shield')}On-device · English</span><div class="footer-meta"><span class="footer-brand"><span class="sr-only">HandsFree</span><span id="app-version">0.1.1</span></span><button id="updates-open" class="text-action" aria-describedby="updates-feedback" hidden>${icon('update')}<span class="update-summary"><strong id="updates-indicator-label">Updates</strong><span id="updates-indicator-detail">Not checked</span></span><span id="updates-announcement" class="sr-only" role="status" aria-live="polite"></span></button></div><p id="updates-feedback" role="status" aria-live="polite" hidden></p></footer>
 </div>
  <dialog id="reset-dialog" aria-labelledby="reset-title"><h2 id="reset-title">Reset usage totals?</h2><p>Totals will return to zero. Your preferences and language model won’t change.</p><div class="dialog-actions"><button id="keep-stats" autofocus>Keep totals</button><button id="confirm-reset" class="danger">Reset totals</button></div></dialog>
  <dialog id="health-dialog" aria-labelledby="health-title" aria-describedby="health-summary">
@@ -184,8 +185,8 @@ function statusText(id: string, text: string) {
 }
 type Page = 'home' | 'settings';
 function focusHeading(tab: Page) {
-  const heading = tab === 'home' ? el('practice-text') : el('settings-title');
-  if (tab === 'settings') heading.tabIndex = -1;
+  const heading = tab === 'home' ? el('home-title') : el('settings-title');
+  heading.tabIndex = -1;
   heading.focus({preventScroll:true});
 }
 function navigate(tab: Page) {
@@ -273,7 +274,7 @@ button('health-model').onclick = () => { if (!button('health-model').disabled) b
 button('health-practice').onclick = () => {
   if (button('health-practice').disabled) return;
   healthReturnsHome = true;
-  healthDialog.close(); navigate('home'); focusHeading('home');
+  healthDialog.close(); navigate('home'); practiceField.focus({preventScroll:true});
 };
 const practiceField = el('practice-text') as HTMLTextAreaElement;
 let windowActive = document.hasFocus();

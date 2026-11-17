@@ -653,7 +653,20 @@ mod tests {
     }
     #[test]
     fn distribution_and_prerelease_ordering() {
-        assert_eq!(installed_version(), "0.1.1-beta.24");
+        assert_eq!(installed_version(), "0.1.1");
+        assert!(validate_feed(&feed("0.1.1"), "0.1.1-beta.24").unwrap().1);
+        assert!(!validate_feed(&feed("0.1.1"), "0.1.1").unwrap().1);
+        assert!(validate_feed(&feed("0.1.1-beta.24"), "0.1.1").is_err());
+        for invalid in [
+            "01.1.1",
+            "0.01.1",
+            "0.1.01",
+            "0.1.1+build",
+            "0.1.1-beta.01",
+            "v0.1.1",
+        ] {
+            assert!(validate_feed(&feed(invalid), "0.1.1-beta.24").is_err());
+        }
         assert!(
             validate_feed(&feed("0.1.1-beta.8"), "0.1.1-beta.7")
                 .unwrap()

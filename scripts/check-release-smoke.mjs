@@ -6,6 +6,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { releaseVersion } from './release-version.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const run = (cmd, args, options = {}) => execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...options }).trim();
@@ -85,7 +86,8 @@ export function validateReceipt(receipt, identity, now = Date.now()) {
   requireThat(receipt?.schemaVersion === 1 && receipt.type === 'signed-candidate-hardware-smoke', 'receipt missing/malformed');
   requireThat(identity && hex(identity.sourceCommit, 40) && hex(identity.sourceTree, 40) && hex(identity.executableHash, 64) &&
     hex(identity.archiveHash, 64) && hex(identity.bundleHash, 64) && hex(identity.signatureAnchor, 40), 'invalid exact-candidate identity');
-  requireThat(identity.bundleIdentifier === 'com.handsfree.local' && identity.arch === 'arm64' && /^0\.1\.1-beta\.\d+$/.test(identity.distribution) &&
+  releaseVersion(identity.distribution);
+  requireThat(identity.bundleIdentifier === 'com.handsfree.local' && identity.arch === 'arm64' &&
     identity.os?.platform === 'darwin' && Number(identity.os.version?.split('.')[0]) >= 14 && typeof identity.os.build === 'string' && identity.os.build.length > 0 &&
     typeof identity.hardwareModel === 'string' && identity.hardwareModel.length > 0 && typeof identity.designatedRequirement === 'string' && identity.designatedRequirement.length > 0, 'unsupported/missing version/OS/signature identity');
   requireThat(same(receipt.before, identity) && same(receipt.after, identity), 'source/version/executable/archive/bundle/signature/OS identity changed');
@@ -102,7 +104,10 @@ export function candidateIdentity(directory) {
   const git = (...args) => run('git', args, { cwd: root });
   requireThat(!git('status', '--short', '--untracked-files=normal'), 'source dirty; commit and rebuild before hardware execution');
   const sourceCommit = git('rev-parse', 'HEAD'), sourceTree = git('rev-parse', 'HEAD^{tree}');
-  const distribution = JSON.parse(readFileSync(join(root, 'src-tauri/distribution.json'), 'utf8')).version;
+  const distributionMetadata = readFileSync(join(root, 'src-tauri/distribution.json'), 'utf8').trim();
+  const metadata = JSON.parse(distributionMetadata);
+  requireThat(metadata.schemaVersion === 1, 'unsupported distribution schema');
+  const distribution = releaseVersion(metadata.version).version;
   const app = join(directory, 'updater/HandsFree.app'), executable = join(app, 'Contents/MacOS/handsfree');
   const archive = join(directory, `HandsFree-${distribution}-macos-arm64.app.tar.gz`);
   const signatureAnchor = run('/usr/bin/openssl', ['x509', '-in', join(homedir(), 'Library/Application Support/HandsFree Local Signing/certificate.pem'), '-noout', '-fingerprint', '-sha1']).split('=').at(-1).replaceAll(':', '').toLowerCase();
@@ -120,7 +125,7 @@ export function candidateIdentity(directory) {
   requireThat(readFileSync(join(directory, 'UPDATER-PROVENANCE.txt'), 'utf8').startsWith(`Distribution: ${distribution}\nSource commit: ${sourceCommit}\nApp executable SHA-256: ${identity.executableHash}\n`), 'updater provenance mismatch');
   requireThat(readFileSync(join(directory, 'PROVENANCE.txt'), 'utf8').startsWith(`Candidate: HandsFree-${distribution}-macos-arm64.dmg\nSource commit: ${sourceCommit}\nSource tree: ${sourceTree}\n`), 'packaging provenance mismatch');
   // Confirm the executable's embedded distribution is exactly the source's.
-  requireThat(readFileSync(executable).includes(Buffer.from(distribution)), 'distribution not embedded in executable');
+  requireThat(readFileSync(executable).includes(Buffer.from(distributionMetadata)), 'exact distribution metadata not embedded in executable');
   const archivedExecutable = execFileSync('/usr/bin/tar', ['-xOf', archive, 'HandsFree.app/Contents/MacOS/handsfree'], { maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
   requireThat(sha(archivedExecutable) === identity.executableHash, 'prepared executable differs from exact updater archive');
   return identity;

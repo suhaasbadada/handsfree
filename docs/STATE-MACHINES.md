@@ -108,6 +108,7 @@ cannot paint green Ready or enable the Record action; metadata never proves capt
   There is no sidebar, brand menu, tab navigation or setup guide. The top-right
   product-status dialog owns explicit recovery; observation never prompts,
   downloads or records. Browser context/race contracts exercise this new boundary.
+  See [desktop interface contracts](UI.md) for navigation focus and action layout.
 
 - Appearance is presentation, not readiness or capture authorization. One saved
   `system`/`light`/`dark` preference defaults only its own absent/malformed field.

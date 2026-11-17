@@ -88,11 +88,9 @@ acceptance is implied by these tests.
 
 ## Keyboard and recovery (group 4, partial)
 
-The brand menu is a button: Enter, Space or Down opens it at the first enabled
-item; arrows/Home/End skip disabled items, Escape returns to the brand, and Tab
-leaves the menu rather than leaving practice disabled. Focusout closes without
-stealing focus. Menu navigation focuses the visible view heading. Returning
-eligibility never replays a stale held shortcut.
+The current Home/Settings navigation and its keyboard-focus behavior are specified
+in [desktop interface contracts](UI.md). The former brand menu is removed.
+Returning eligibility never replays a stale held shortcut.
 
 Populated practice and dictation status regions are named keyboard stops. Use
 Down/Page Down to read long messages in their fixed slots; unchanged polls keep

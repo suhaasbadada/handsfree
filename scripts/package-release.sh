@@ -7,7 +7,7 @@ cd "$ROOT"
 fail() { printf '%s\n' "$*" >&2; exit 1; }
 [[ $# == 0 ]] || fail 'Usage: bash scripts/package-release.sh (no arguments)'
 [[ $(uname -s) == Darwin && $(uname -m) == arm64 ]] || fail 'Apple Silicon macOS required.'
-NAME=HandsFree-0.1.1-beta.24-macos-arm64
+NAME=HandsFree-0.1.1-macos-arm64
 OUT="$ROOT/release"
 mkdir -p "$OUT"
 [[ ! -L "$OUT" && $(cd "$OUT" && pwd -P) == "$OUT" ]] || fail 'Refusing symlinked output directory.'
@@ -61,9 +61,9 @@ cp LICENSE "$PAYLOAD/Licenses/LICENSE"
 cp README.md CONTRIBUTING.md SECURITY.md "$PAYLOAD/Licenses/Documentation/"
 cp docs/DEVELOPMENT.md docs/RELEASING.md docs/WEBSITE.md docs/INSTALL.md docs/release-readiness.md "$PAYLOAD/Licenses/Documentation/"
 cp docs/PUSH-TO-TALK.md docs/practice.md docs/COMPATIBILITY-PASTE.md "$PAYLOAD/Licenses/Documentation/"
-cp docs/releases/v0.1.1-beta.24.md "$PAYLOAD/Licenses/Documentation/releases/"
+cp docs/releases/v0.1.1.md "$PAYLOAD/Licenses/Documentation/releases/"
 python3 scripts/release-notices.py "$PAYLOAD/Licenses"
-printf '%s\n' 'Experimental Mac beta — self-signed, not Developer ID signed or notarized.' 'No Apple approval or legal certification. Separate-Mac QA remains unverified.' 'Upstream notices, license texts and historical SDK caveat are preserved.' 'See THIRD_PARTY_NOTICES/README.txt and Documentation/release-readiness.md.' > "$PAYLOAD/Licenses/PUBLICATION-NOTES.txt"
+printf '%s\n' 'Stable Mac release — self-signed, not Developer ID signed or notarized.' 'No Apple approval or legal certification. Separate-Mac QA remains unverified.' 'Upstream notices, license texts and historical SDK caveat are preserved.' 'See THIRD_PARTY_NOTICES/README.txt and Documentation/release-readiness.md.' > "$PAYLOAD/Licenses/PUBLICATION-NOTES.txt"
 # No Finder/AppleScript automation or new dependencies. The named volume and
 # Applications shortcut provide drag-to-install without Automation permission.
 python3 - "$PAYLOAD" "$ROOT" <<'PY'
@@ -89,7 +89,7 @@ for file in root.rglob('*'):
         if file.stat().st_size < 5_000_000 and b'-----BEGIN PRIVATE KEY-----' in file.read_bytes():
             raise SystemExit(f'Private key content: {file}')
 PY
-/usr/bin/hdiutil create -quiet -volname 'HandsFree Beta — drag to Applications' -srcfolder "$PAYLOAD" \
+/usr/bin/hdiutil create -quiet -volname 'HandsFree — drag to Applications' -srcfolder "$PAYLOAD" \
   -format UDZO -fs HFS+ "$STAGE/$NAME.dmg"
 bash scripts/local-signing.sh --sign-dmg "$STAGE/$NAME.dmg"
 /usr/bin/hdiutil verify "$STAGE/$NAME.dmg"
@@ -100,7 +100,7 @@ MOUNTED=true
 verify_app "$MOUNT/HandsFree.app"
 node scripts/check-macos-assets.mjs "$MOUNT/HandsFree.app"
 [[ -L "$MOUNT/Applications" && $(readlink "$MOUNT/Applications") == /Applications ]]
-for required in 'Install HandsFree.txt' Licenses/LICENSE Licenses/Documentation/README.md Licenses/Documentation/RELEASING.md Licenses/Documentation/practice.md Licenses/Documentation/COMPATIBILITY-PASTE.md Licenses/Documentation/releases/v0.1.1-beta.24.md Licenses/THIRD_PARTY_NOTICES/inventory.json Licenses/THIRD_PARTY_SOURCES.tar.gz Licenses/PUBLICATION-NOTES.txt; do
+for required in 'Install HandsFree.txt' Licenses/LICENSE Licenses/Documentation/README.md Licenses/Documentation/RELEASING.md Licenses/Documentation/practice.md Licenses/Documentation/COMPATIBILITY-PASTE.md Licenses/Documentation/releases/v0.1.1.md Licenses/THIRD_PARTY_NOTICES/inventory.json Licenses/THIRD_PARTY_SOURCES.tar.gz Licenses/PUBLICATION-NOTES.txt; do
   [[ -s "$MOUNT/$required" ]] || fail "Missing disk-image payload: $required"
 done
 /usr/bin/hdiutil detach "$MOUNT"
@@ -117,12 +117,12 @@ MOUNTED=false
   printf 'Architecture: '; uname -m
   printf 'Rust: '; rustc --version
   printf 'Node: '; node --version
-  printf '\nExperimental beta candidate. Self-signed; not Developer ID or notarized.\n'
+  printf '\nStable candidate. Self-signed; not Developer ID or notarized. No Apple approval.\n'
 } > "$STAGE/PROVENANCE.txt"
 python3 - "$OUT/updater" "$STAGE" <<'PY'
 import pathlib, shutil, sys
 source, destination = map(pathlib.Path, sys.argv[1:])
-for name in ('HandsFree-0.1.1-beta.24-macos-arm64.app.tar.gz', 'HandsFree-0.1.1-beta.24-macos-arm64.app.tar.gz.sig', 'macos-arm64.json', 'PROVENANCE.txt'):
+for name in ('HandsFree-0.1.1-macos-arm64.app.tar.gz', 'HandsFree-0.1.1-macos-arm64.app.tar.gz.sig', 'macos-arm64.json', 'PROVENANCE.txt'):
     target = 'UPDATER-PROVENANCE.txt' if name == 'PROVENANCE.txt' else name
     with (source / name).open('rb') as src, (destination / target).open('xb') as dst:
         shutil.copyfileobj(src, dst)
@@ -137,4 +137,4 @@ for file in (name + '.dmg', 'PROVENANCE.txt', 'SHA256SUMS', name + '.app.tar.gz'
         shutil.copyfileobj(src, dst)
 PY
 printf '\nCandidate: %s/%s.dmg\n' "$OUT" "$NAME"
-echo 'Beta candidate packaged; no upload or installation performed. See included publication notes.'
+echo 'Stable candidate packaged; no upload or installation performed. See included publication notes.'

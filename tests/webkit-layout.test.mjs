@@ -17,4 +17,7 @@ test('macOS WebKit contains native select text without hiding main overflow', {s
   assert.ok(rows.every(row=>row.ok && row.chevrons && row.refreshFits && row.mainOverflow!=='hidden'),output);
   assert.ok(rows.filter(row=>row.mode==='forced-css-scrollbars').every(row=>row.main.gutter===16&&row.dialog.gutter===16),output);
   assert.ok(output.includes('NEGATIVE_CONTROL='),output);
+  const home=output.split('\n').filter(line=>line.startsWith('HOME=')).map(line=>JSON.parse(line.slice(5)));
+  assert.equal(home.length,24,output);
+  assert.ok(home.every(row=>row.ok&&row.fits&&row.contained),output);
 });

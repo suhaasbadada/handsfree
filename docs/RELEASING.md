@@ -1,3 +1,30 @@
+## Stable v0.1.1 PREPARATION — 2026-11-17
+
+The next candidate is **v0.1.1**, the first non-beta stable release, not beta 25.
+This is preparation only: bugs 1 and 2 have local rendered regressions and fixes;
+independent review, exact-source CI and candidate acceptance remain pending here.
+See [stable candidate notes](releases/v0.1.1.md). The embedded app version stays
+0.1.1 and the bundle identity stays `com.handsfree.local`; reuse existing signing
+and updater keys. Stable remains **self-signed and not notarized**, not Developer ID
+signed, with no Apple approval implied. Mac-only scope remains unchanged.
+
+Keep the active website manifest, static downloads and signed feed on beta 24.
+`candidateRelease` selects 0.1.1 for auditing only and stays unavailable. Retain
+ignored beta 24 artifacts/evidence; do not overwrite them when preparing fresh
+stable artifacts from clean, reviewed source. No prior release receipt, historical
+waiver, synthetic test or CI pass substitutes for exact stable candidate evidence.
+
+Follow the authoritative [release process](RELEASE-PROCESS.md) for review,
+exact-candidate acceptance, publication, activation, Homebrew and installed-app
+gates. Stable GitHub metadata requires `prerelease: false` in both draft and public
+modes. Candidate-specific local results and pending acceptance are recorded only
+in the [stable candidate notes](releases/v0.1.1.md).
+
+## Dated history — guide preserved through 2026-11-16
+
+Everything below is the prior guide, retained byte-for-byte as historical evidence.
+Historical channel labels, instructions and waivers do not override the stable gates.
+
 ## Beta 24 publication — exact signed candidate
 
 Published [v0.1.1-beta.24](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.24)

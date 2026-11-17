@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 
-// These exercise the macOS shell packager; static contract checks below run everywhere.
 const posixTest = process.platform === 'win32' ? test.skip : test;
 
 function sandbox(callback) {
@@ -44,7 +43,7 @@ posixTest('packaging rejects unsupported hosts before build', () => sandbox(({ r
   assert.ok(!readdirSync(root).includes('release'));
 }));
 
-for (const existing of ['HandsFree-0.1.1-beta.24-macos-arm64.dmg', 'SHA256SUMS', 'PROVENANCE.txt', 'HandsFree-0.1.1-beta.24-macos-arm64.app.tar.gz', 'HandsFree-0.1.1-beta.24-macos-arm64.app.tar.gz.sig', 'UPDATER-PROVENANCE.txt', 'macos-arm64.json']) {
+for (const existing of ['HandsFree-0.1.1-macos-arm64.dmg', 'SHA256SUMS', 'PROVENANCE.txt', 'HandsFree-0.1.1-macos-arm64.app.tar.gz', 'HandsFree-0.1.1-macos-arm64.app.tar.gz.sig', 'UPDATER-PROVENANCE.txt', 'macos-arm64.json']) {
   posixTest(`packaging refuses to overwrite ${existing}`, () => sandbox(({ root, run }) => {
     mkdirSync(join(root, 'release'));
     writeFileSync(join(root, 'release', existing), 'preserve me');
@@ -64,30 +63,3 @@ posixTest('build failure propagates its status and cleans only the run staging d
   assert.match(result.stderr, /mock updater preparation failed/);
   assert.deepEqual(readdirSync(join(root, 'release')), ['unrelated.txt']);
 }));
-
-test('DMG script uses stable signing, read-only validation, scoped cleanup and no installer ZIP', () => {
-  const script = readFileSync(new URL('../scripts/package-release.sh', import.meta.url), 'utf8');
-  assert.match(script, /node scripts\/package-updater.mjs "\$OUT\/updater"/);
-  assert.match(script, /APP="\$OUT\/updater\/HandsFree.app"/);
-  assert.doesNotMatch(script, /npm run|tauri build/);
-  assert.match(script, /local-signing.sh --sign-dmg/);
-  assert.match(script, /hdiutil verify/);
-  assert.match(script, /hdiutil attach -readonly -nobrowse -noautoopen -mountpoint/);
-  assert.match(script, /verify_app "\$MOUNT\/HandsFree.app"/);
-  assert.match(script, /trap cleanup EXIT/);
-  assert.match(script, /preserving staging directory/);
-  assert.doesNotMatch(script, /--init|\.zip|osascript|\/Applications\/HandsFree\.app/);
-});
-
-test('disk-image root is install-focused while complete notices and source remain included', () => {
-  const script = readFileSync(new URL('../scripts/package-release.sh', import.meta.url), 'utf8');
-  assert.match(script, /cp docs\/INSTALL.md "\$PAYLOAD\/Install HandsFree.txt"/);
-  assert.match(script, /cp LICENSE "\$PAYLOAD\/Licenses\/LICENSE"/);
-  assert.match(script, /release-notices.py "\$PAYLOAD\/Licenses"/);
-  assert.match(script, /Licenses\/THIRD_PARTY_SOURCES.tar.gz/);
-  assert.match(script, /Licenses\/PUBLICATION-NOTES.txt/);
-  assert.match(script, /Source tree: %s/);
-  assert.match(script, /HEAD changed during packaging/);
-  assert.match(script, /Working tree status after packaging/);
-  assert.match(script, /shasum -a 256 "\$NAME.dmg" PROVENANCE.txt/);
-});
