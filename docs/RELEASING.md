@@ -1,3 +1,46 @@
+## Stable v0.1.1 publication and distribution activation — 2026-11-17
+
+Published [v0.1.1](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1)
+as a non-prerelease through `node scripts/publish-release.mjs --publish release`.
+The subsequent `node scripts/check-release.mjs --public release` passed anonymous
+public-byte verification. Packaging source is
+`83d255b05baaa81b19ddaae8d7d27c915daba893` (tree
+`f816779ba3c0dd987ec3014f94ede8e0d169004b`), with successful exact-source Checks
+[44074406923](https://github.com/suhaasbadada/handsfree/actions/runs/44074406923).
+PR #9 squash merge `32914c1de83639be76d639e46c165573c7c2c5a7` also passed
+[44075717071](https://github.com/suhaasbadada/handsfree/actions/runs/44075717071).
+
+- Exact executable SHA-256: `f0de75abd79d38fc9de43cf1b589e97217797d1b087df966e57bbac0f1830c71`.
+- DMG SHA-256: `a84f328e880fa58c0055f605ae9bda19ebb6ad9f0a22d819804202684c0bab91`.
+- Updater archive SHA-256: `032885467f7ba02368ff9020744102f88ccbf28352935453c86650108280456a`.
+- Signed feed SHA-256: `783a4c1ac21a69e5da782b06e59e29a3716d051bd92973182da434d30ca52fa7`.
+
+Fresh exact signed-candidate evidence passed three native captures/finishes and
+first-PCM cancellation with cleanup on the **built-in Mac microphone**. Private
+Practice passed button and synthetic Fn known-speech recognition, with cleared
+private text and unchanged clipboard/settings/usage. Synthetic Fn is not physical
+key evidence. No all-route, separate-Mac, or installed-app dictation claim is made.
+The release remains **self-signed, not notarized**, not Apple approved.
+
+Evidence directory: `handsfree-stable-acceptance-59iunw4b` under the authorized
+local OpenCode temporary directory; receipts: `publish.log`, `public-audit.log`,
+`hardware-smoke-resumed.log`, `private-button-resumed.json`, `private-fn-resumed.json`.
+Published `release/` bytes are immutable. This activation copies the exact signed
+feed and updates active site/download documentation only; the disabled
+`candidateRelease` is historical audit provenance, not an availability switch.
+Live Pages/feed deployment and readback remain separate from checked-in activation.
+
+**Still pending:** separate Homebrew PR/publication, pinned stable checksum/URL
+readback and tap CI; installed in-app OTA/restart, representative dictation and
+preservation of signing identity, model, settings, usage and clipboard. Do not
+manually replace the installed app to satisfy OTA acceptance or reset permissions.
+Publication and CI do not establish these gates. See [stable release evidence](releases/v0.1.1.md).
+
+## Historical stable preparation checkpoint
+
+Everything below is retained unchanged from before stable publication; pending
+statements there describe that earlier checkpoint, not the current release.
+
 ## Stable v0.1.1 PREPARATION — 2026-11-17
 
 The next candidate is **v0.1.1**, the first non-beta stable release, not beta 25.

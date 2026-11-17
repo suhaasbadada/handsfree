@@ -97,14 +97,30 @@ test('rendering transitions remove stale links and disabled state without click 
   assert.match(document.getElementById('download-platform-note').textContent, /Windows is not supported; Windows development is paused/);
 });
 
+test('visible release status identifies the active stable channel and preserves acceptance limits', () => {
+  const document = fixtureDocument();
+  renderDownload(document, { os: 'mac', arch: 'arm64' }, release);
+  const status = document.getElementById('release-status');
+  assert.ok(status.textContent.startsWith('Mac stable v0.1.1 · DMG · Self-signed, not notarized.'));
+  assert.ok(status.textContent.includes(release.status));
+  assert.match(status.textContent, /built-in Mac microphone/);
+  assert.match(status.textContent, /installed OTA\/restart acceptance and separate Homebrew publication remain pending/);
+  const beta = { ...release, version: '0.1.1-beta.24',
+    dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.24/HandsFree-0.1.1-beta.24-macos-arm64.dmg', status: 'Historical beta fixture.' };
+  renderDownload(document, { os: 'mac', arch: 'arm64' }, beta);
+  assert.ok(status.textContent.startsWith('Mac beta v0.1.1-beta.24 · DMG'));
+  renderDownload(document, { os: 'mac', arch: 'arm64' }, { ...release, publicAvailable: false });
+  assert.equal(status.textContent, 'No public Mac download yet. Release assets are awaiting public verification.');
+});
+
 test('historical Windows coordinates are retained but public availability is paused', () => {
   assert.equal(windowsRelease.publicAvailable, false);
   assert.equal(windowsRelease.version, '0.1.1-windows-beta.3');
   assert.equal(windowsRelease.appVersion, '0.1.1');
   assert.equal(publishedWindowsUrl(windowsRelease), null);
   assert.equal(publishedWindowsUrl(windowsDisabled), null);
-  assert.equal(release.publicAvailable, true, 'Mac beta 24 is available');
-  assert.equal(release.dmgUrl, 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.24/HandsFree-0.1.1-beta.24-macos-arm64.dmg');
+  assert.equal(release.publicAvailable, true, 'Mac stable v0.1.1 is available');
+  assert.equal(release.dmgUrl, 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1/HandsFree-0.1.1-macos-arm64.dmg');
   for (const arch of ['unknown', 'intel', 'arm64']) {
     const state = downloadState({ os: 'windows', arch }, enabled, windowsDisabled);
     assert.equal(state.url, enabled.dmgUrl);

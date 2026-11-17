@@ -94,7 +94,7 @@ try {
     await send('Page.navigate', { url });
     let ready = false;
     for (let i = 0; i < 100; i++) {
-      ready = await evaluate(`location.href === ${JSON.stringify(url)} && document.readyState === 'complete' && !!document.getElementById('primary-download') && document.getElementById('release-status').textContent.startsWith('Mac beta v')`);
+      ready = await evaluate(`location.href === ${JSON.stringify(url)} && document.readyState === 'complete' && !!document.getElementById('primary-download') && document.getElementById('release-status').textContent.startsWith('Mac stable v0.1.1')`);
       if (ready) break;
       await delay(30);
     }
@@ -103,6 +103,12 @@ try {
   const visible = id => `getComputedStyle(document.getElementById(${JSON.stringify(id)})).display !== 'none'`;
   assert.equal(windowsRelease.publicAvailable, false);
   await navigate('/stale-windows/');
+  assert.equal(await evaluate(`document.querySelector('.site-header .beta-badge').textContent`), 'STABLE');
+  assert.equal(await evaluate(`document.querySelector('.brand').getAttribute('aria-label')`), 'HandsFree home');
+  assert.equal(await evaluate(`document.querySelector('.platform-card.available .pill').textContent`), 'Mac stable');
+  assert.match(await evaluate(`document.querySelector('meta[name="description"]').content`), /Mac stable v0\.1\.1/);
+  assert.match(await evaluate(`document.getElementById('hero-homebrew').textContent`), /Stable cask update pending; use the DMG for v0\.1\.1/);
+  assert.match(await evaluate(`document.getElementById('release-status').textContent`), /installed OTA\/restart acceptance and separate Homebrew publication remain pending/);
   assert.equal(await evaluate(`document.getElementById('primary-download').getAttribute('href')`), release.dmgUrl);
   assert.equal(await evaluate(`document.querySelectorAll('a[href*=".exe"]').length`), 0);
   assert.equal(await evaluate(visible('primary-windows-icon')), false);
@@ -152,6 +158,9 @@ try {
     await delay(30);
   }
   assert.equal(await evaluate(`document.getElementById('primary-download').getAttribute('href')`), release.dmgUrl, 'Static Mac download works without JS');
+  assert.equal(await evaluate(`document.querySelector('.site-header .beta-badge').textContent`), 'STABLE', 'Stable identity without JS');
+  assert.match(await evaluate(`document.getElementById('release-status').textContent`), /Stable Mac v0\.1\.1 published and public bytes verified/);
+  assert.match(await evaluate(`document.getElementById('release-status').textContent`), /installed OTA\/restart acceptance and separate Homebrew publication remain pending/);
   assert.equal(await evaluate(visible('hero-homebrew')), true, 'No-JS recommendation stays available and explicitly Mac-labeled');
   assert.equal(await evaluate(`document.querySelector('[data-copy-brew]').hidden`), true, 'No-JS never shows a nonfunctional copy button');
   assert.equal(await evaluate(`document.querySelectorAll('a[href*=".exe"], #windows-card-download').length`), 0, 'No Windows CTA without JS');

@@ -63,12 +63,12 @@ test('draft audit requires the matching website manifest to remain unavailable',
   assert.equal(release.publicAvailable, false);
   assert.throws(() => validateAvailability(publishedRelease), /manifest disabled/);
   assert.doesNotThrow(() => validateAvailability(release, true), 'Public audit mode accepts stable candidate coordinates without activating downloads');
-  assert.equal(publishedRelease.version, '0.1.1-beta.24');
-  assert.throws(() => validateAvailability(publishedRelease, true), 'Active beta 24 cannot substitute for the stable candidate');
-  for (const version of ['beta.5', 'beta.6', 'beta.7', 'beta.8', 'beta.9', 'beta.10', 'beta.11', 'beta.12', 'beta.13', 'beta.14', 'beta.15', 'beta.16', 'beta.17', 'beta.18', 'beta.19', 'beta.20', 'beta.21', 'beta.22', 'beta.23']) {
-    const historical = { ...release, version: `0.1.1-${version}`, dmgUrl: release.dmgUrl.replaceAll('beta.24', version) };
+  assert.equal(publishedRelease.version, '0.1.1');
+  assert.doesNotThrow(() => validateAvailability(publishedRelease, true), 'Active stable coordinates are valid only in public audit mode');
+  for (const version of ['beta.5', 'beta.6', 'beta.7', 'beta.8', 'beta.9', 'beta.10', 'beta.11', 'beta.12', 'beta.13', 'beta.14', 'beta.15', 'beta.16', 'beta.17', 'beta.18', 'beta.19', 'beta.20', 'beta.21', 'beta.22', 'beta.23', 'beta.24']) {
+    const historical = { ...release, version: `0.1.1-${version}`, dmgUrl: `https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-${version}/HandsFree-0.1.1-${version}-macos-arm64.dmg` };
     for (const publicMode of [false, true]) {
-      assert.throws(() => validateAvailability(historical, publicMode), /manifest disabled/, 'Earlier versions cannot substitute for the beta 24 artifact');
+      assert.throws(() => validateAvailability(historical, publicMode), /manifest disabled/, 'Earlier versions cannot substitute for the stable artifact');
     }
   }
   assert.doesNotThrow(() => validateAvailability({ ...release, publicAvailable: false }));

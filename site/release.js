@@ -2,19 +2,19 @@
 // The embedded app version is 0.1.1; this is the distribution label.
 export const release = Object.freeze({
   schemaVersion: 1,
-  version: '0.1.1-beta.24',
+  version: '0.1.1',
   publicAvailable: true,
-  status: 'Experimental Mac beta 24 available. Exact signed-candidate hardware and private Practice checks passed; user-operated installed OTA/restart acceptance pending. Built-in Mac microphone only; self-signed, not notarized.',
-  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.24/HandsFree-0.1.1-beta.24-macos-arm64.dmg',
+  status: 'Stable Mac v0.1.1 published and public bytes verified. Exact signed-candidate hardware and private Practice checks passed on the built-in Mac microphone; installed OTA/restart acceptance and separate Homebrew publication remain pending. Self-signed, not notarized; separate-Mac installation unverified.',
+  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1/HandsFree-0.1.1-macos-arm64.dmg',
 });
 
-// Stable candidate audit coordinates; the active beta 24 above is authoritative.
+// Historical stable candidate audit coordinates; the active release above is authoritative.
 // Disabled even after publication; not a second availability switch.
 export const candidateRelease = Object.freeze({
   schemaVersion: 1,
   version: '0.1.1',
   publicAvailable: false,
-  status: 'Stable v0.1.1 candidate preparation: bugs 1 and 2 implementation and acceptance pending. Exact signed-candidate hardware, private Practice, packaging, publication and installed OTA/restart acceptance remain pending; self-signed, not notarized, no Apple approval; not an availability switch.',
+  status: 'Historical Stable v0.1.1 candidate preparation coordinates, now published through the active release above. Exact signed-candidate hardware and private Practice checks passed on the built-in Mac microphone; installed OTA/restart acceptance and separate Homebrew publication remain pending; self-signed, not notarized, no Apple approval; not an availability switch.',
   dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1/HandsFree-0.1.1-macos-arm64.dmg',
 });
 

@@ -1,12 +1,14 @@
-# Install HandsFree (Mac beta)
+# Install HandsFree (Mac stable)
 
 Requires **Apple Silicon (M-series), macOS 14+, English**. This is the only current product and development target. In Apple menu → About This Mac, check that **Chip** names an Apple M-series chip. Intel Macs, Windows, Linux, and mobile are not currently supported. Windows work is paused; no Windows or Linux port or release date is promised.
 
-**Experimental beta — self-signed and not notarized.** Separate-Mac installation testing is not yet verified. See `Licenses/PUBLICATION-NOTES.txt` and `Licenses/Documentation/release-readiness.md` for the distribution decision, upstream caveat and testing limitations. No paid account, Apple Developer membership, payment, or certificate installation is required.
+**Stable v0.1.1 — self-signed and not notarized.** Exact signed-candidate hardware and private Practice checks passed on the built-in Mac microphone. Installed OTA/restart acceptance and separate Homebrew publication remain pending; separate-Mac installation testing is not yet verified. See `Licenses/PUBLICATION-NOTES.txt` and `Licenses/Documentation/release-readiness.md` for the distribution decision, upstream caveat and testing limitations. No paid account, Apple Developer membership, payment, or certificate installation is required.
 
 <a id="homebrew-option"></a>
 
 ## Homebrew option — recommended
+
+The separate stable v0.1.1 Homebrew update is pending. Until its publication/readback and tap CI pass, the cask may still install the prior beta; use the stable DMG below for a new stable installation. Do not manually replace the app being used for installed OTA acceptance.
 
 1. If needed, [install Homebrew from its official website](https://brew.sh/).
 2. Open **Terminal** (Applications → Utilities) and paste this command for the [HandsFree tap](https://github.com/suhaasbadada/homebrew-handsfree#readme):
@@ -22,35 +24,35 @@ brew trust --cask suhaasbadada/handsfree/handsfree
 brew install --cask suhaasbadada/handsfree/handsfree
 ```
 
-Homebrew simplifies installation; macOS security prompts may still appear. Trust approves the cask’s Homebrew code, **not the app’s Apple identity or notarization**. This beta remains self-signed and not notarized. Homebrew verifies the pinned download checksum; Gatekeeper, quarantine, and the permissions below still apply. Continue with **First launch** below; Homebrew does not download the speech model for you.
+Homebrew simplifies installation; macOS security prompts may still appear. Trust approves the cask’s Homebrew code, **not the app’s Apple identity or notarization**. This release remains self-signed and not notarized. Homebrew verifies the pinned download checksum; Gatekeeper, quarantine, and the permissions below still apply. Continue with **First launch** below; Homebrew does not download the speech model for you.
 
 ### Existing manual installation
 
 Already have a manually installed `/Applications/HandsFree.app`? Homebrew may report that the app already exists. You can keep using your current manual installation. If you choose to switch and Homebrew asks you to resolve that conflict, quit HandsFree and move the existing app copy to a safe backup location before retrying the install. Keep the backup until the new copy works; do not delete your models, settings, statistics, or other user data. Permissions may need reauthorization.
 
 For optional manual Homebrew-managed updates, or the required beta 6-and-earlier
-bootstrap to the current beta, quit HandsFree, then run:
+bootstrap to a current release, quit HandsFree, then run:
 
 ```sh
 brew update
 brew upgrade --cask suhaasbadada/handsfree/handsfree
 ```
 
-Reopen the Applications copy afterward. The current Mac distribution is `0.1.1-beta.24` (the embedded app version remains `0.1.1`); Homebrew selects upgrades using the cask's distribution version. Beta updates are reviewed manually, not promised on a schedule. Its documented online-audit prerelease policy finding is intentional, not a claim that the beta meets Homebrew’s stable-release policy. Matching Homebrew publication/readback and tap CI are separate verification gates.
+Reopen the Applications copy afterward. The current Mac distribution is `0.1.1` (the embedded app version remains `0.1.1`); Homebrew selects upgrades using the cask's distribution version. Updates are reviewed manually, not promised on a schedule. Prior beta online-audit prerelease policy findings are historical, not stable acceptance. Matching stable Homebrew publication/readback and tap CI are separate pending verification gates.
 
 Normal updates preserve your existing model, settings, and usage totals; they do not restart onboarding or reset permissions. Do not use `--zap`, delete HandsFree's data folders, or reset totals to update. Existing permissions may still need reauthorization if macOS requests it. No installed-app upgrade or clean-machine onboarding test is implied by the release's artifact checks.
 
 ## DMG alternative
 
-Download the [Mac DMG](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.24/HandsFree-0.1.1-beta.24-macos-arm64.dmg). Open it and drag **HandsFree.app** onto **Applications**. Keep the disk image: its `Licenses` folder (project license, dependency notices and corresponding sources) accompanies redistributions. No ZIP extraction or developer tools are needed. Eject the image after copying. Do not launch the copy inside the disk image.
+Download the [Mac DMG](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1/HandsFree-0.1.1-macos-arm64.dmg). Open it and drag **HandsFree.app** onto **Applications**. Keep the disk image: its `Licenses` folder (project license, dependency notices and corresponding sources) accompanies redistributions. No ZIP extraction or developer tools are needed. Eject the image after copying. Do not launch the copy inside the disk image.
 
 For optional manual DMG updates, quit HandsFree, replace the Applications copy,
 then reopen. Beta 6 and earlier need this or Homebrew as a one-time bootstrap.
-Permissions may need reauthorization.
+Permissions may need reauthorization. For the pending installed OTA acceptance, use the existing app's signed updater instead; a manual replacement cannot satisfy that gate.
 
 ## Signed in-app updates — beta 7 onward
 
-In beta 24 choose footer **Updates** to check, then **Download & update** for the
+In v0.1.1 choose footer **Updates** to check, then **Download & update** for the
 displayed exact version. Checks, progress and errors stay inline; no update modals
 remain. A freshly rechecked different offer requires another click. Older betas
 use **Check for updates → Download & restart…** in their dialog until upgraded.
@@ -68,7 +70,7 @@ See [trust and safeguards](UPDATES.md) and [beta 9 evidence](releases/v0.1.1-bet
 ## First launch — both install methods
 
 1. Open **Applications → HandsFree** before granting permissions.
-2. This beta is **self-signed, not Apple Developer ID signed or notarized**. macOS cannot verify its publisher and may block it. Only if you trust the download, attempt to open it, then use System Settings → Privacy & Security → **Open Anyway** if offered. Do not disable Gatekeeper or bypass organizational policies. Signing is not Apple approval or malware screening. If Open Anyway is not offered or your Mac is managed, contact your administrator; do not weaken system security.
+2. This release is **self-signed, not Apple Developer ID signed or notarized**. macOS cannot verify its publisher and may block it. Only if you trust the download, attempt to open it, then use System Settings → Privacy & Security → **Open Anyway** if offered. Do not disable Gatekeeper or bypass organizational policies. Signing is not Apple approval or malware screening. If Open Anyway is not offered or your Mac is managed, contact your administrator; do not weaken system security.
 3. In HandsFree Settings, explicitly allow **Microphone**, **Accessibility**, and **Input Monitoring**. Quit and reopen after permission changes if needed. HandsFree cannot grant access for you.
 4. Open **Product status** from Home or Settings and choose **Download** for the English Whisper model (~148 MB, from Hugging Face) if it is not already present. It is checksum-verified and downloaded only on request. Dictation then works offline.
 
@@ -78,7 +80,7 @@ Focus a text field, tap your shortcut to speak, and tap again to transcribe. Esc
 speak, then **Finish**. The temporary editable result does not paste, change the
 clipboard or count toward usage. This is not a shortcut or external-insertion
 test. See [practice safeguards](practice.md) and the
-[release evidence and remaining acceptance checks](releases/v0.1.1-beta.24.md).
+[release evidence and remaining acceptance checks](releases/v0.1.1.md).
 
 **Toggle remains the default.** For optional hold-to-record behavior, select
 **Settings → Recording mode → Push to talk**: hold Fn / Globe or your saved
