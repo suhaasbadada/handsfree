@@ -349,6 +349,10 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 #updates-open { display: inline-flex; align-items: center; gap: 5px; min-width: 0; min-height: 24px; height: auto; padding: 0; background: transparent; color: var(--muted); }
 #updates-open svg { width: 14px; height: 14px; }
 #updates-open { position: relative; width: 32px; height: 32px; min-height: 32px; justify-content: center; }
+#updates-open:has(.update-summary) { width: auto; max-width: min(220px, 66vw); height: auto; padding: 4px 8px; }
+#updates-open > svg { flex: none; }
+.update-summary { display: grid; min-width: 0; text-align: left; overflow-wrap: anywhere; font-size: 11px; }
+#updates-open[data-reopens="true"] .update-summary::after { content: 'Installs and reopens'; }
 #updates-open:hover:not(:disabled), #repository-link:hover { background: var(--button); }
 #updates-open[data-attention="available"]::after { content: ''; position: absolute; inset: 5px 4px auto auto; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 #repository-link { color: inherit; border-radius: 8px; }

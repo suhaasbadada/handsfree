@@ -219,7 +219,11 @@ async function action(command: string, args?: Record<string, unknown>): Promise<
 }
 el('home-back').onclick = () => { navigate('home'); focusHeading('home'); };
 el('nav-settings').onclick = () => { navigate('settings'); focusHeading('settings'); };
-el('repository-link').onclick = event => { event.preventDefault(); void action('open_project_repository'); };
+el('repository-link').onclick = async event => {
+  event.preventDefault();
+  try { await invoke('open_project_repository'); }
+  catch (error) { feedback(String(error)); }
+};
 const healthDialog = el('health-dialog') as HTMLDialogElement;
 function renderHealth() {
   const s = current;
@@ -245,7 +249,7 @@ function renderHealth() {
   el('health-permissions-row').hidden = !mac;
   el('health-permissions-state').textContent = !s ? 'Unknown' : s.accessibility && s.input_monitoring ? 'Allowed' : [!s.accessibility && 'Accessibility needed', !s.input_monitoring && 'Input Monitoring needed'].filter(Boolean).join(' · ');
   el('health-hook-state').textContent = !s ? 'Unknown' : s.hotkey ? 'Connected' : mac ? 'Disconnected. Quit and reopen HandsFree after granting access.' : 'Unavailable. Choose another shortcut in Settings.';
-  el('health-model-state').textContent = !s ? 'Unknown' : s.model_ready ? 'Installed · English' : s.phase === 'downloading' ? `Downloading… ${Math.round(s.progress)}%` : 'Download needed · ~148 MB';
+  el('health-model-state').textContent = !s ? 'Unknown' : s.model_ready ? 'Installed · English' : s.phase === 'downloading' ? `Downloading English · ${Math.round(s.progress)}%` : 'Download needed · English · ~148 MB';
   button('health-mic').hidden = !s || s.microphone;
   button('health-mic').disabled = !s || installingUpdate() || !phasePolicy(s.phase).editConfiguration;
   button('health-permissions').hidden = !mac || Boolean(s?.accessibility && s.input_monitoring);
@@ -255,13 +259,16 @@ function renderHealth() {
   el('health-input').hidden = !mac;
 }
 button('product-status').onclick = () => {
+  button('product-status').focus({preventScroll:true});
   renderHealth(); healthDialog.showModal(); renderPractice();
   void refresh(); void refreshMicrophones();
 };
 button('health-close').onclick = () => healthDialog.close();
 healthDialog.addEventListener('close', () => {
   renderPractice();
-  button('product-status').focus({preventScroll:true});
+  if (!document.querySelector('dialog[open]') && document.activeElement === document.body) {
+    button('product-status').focus({preventScroll:true});
+  }
 });
 button('health-refresh').onclick = async () => {
   button('health-refresh').disabled = true; busyIcon('health-refresh', true);
@@ -443,8 +450,13 @@ function renderUpdates() {
     if (el(id).textContent !== text) el(id).textContent = text;
   }
   button('updates-open').dataset.attention = indicator.attention;
+  const summary = el('updates-indicator-label').parentElement!;
+  const expanded = view.phase === 'available' || updateBusy(view);
+  summary.classList.toggle('update-summary', expanded);
+  summary.classList.toggle('sr-only', !expanded);
+  button('updates-open').dataset.reopens = String(view.phase === 'available' && canInstallUpdate());
   const canDownload = canInstallUpdate();
-  const instruction = view.phase === 'available' ? canDownload ? 'Click to download, verify, install and reopen HandsFree. Models, settings and usage totals are kept.' : 'Finish dictation, clear the private test and stop shortcut recording before updating.' : 'Click to check for updates';
+  const instruction = view.phase === 'available' ? canDownload ? 'Click to download, verify, install and reopen HandsFree. Models, settings and usage totals are kept.' : 'Finish dictation, clear the private test and stop shortcut recording before updating.' : updateBusy(view) ? 'Update in progress' : 'Click to check for updates';
   button('updates-open').title = `${indicator.label}. ${indicator.detail}. ${instruction}`;
   button('updates-open').setAttribute('aria-label', button('updates-open').title);
   button('updates-open').disabled = current?.platform !== 'macos' || updateBusy(view) || (view.phase === 'available' && !canDownload);

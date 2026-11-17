@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 
 // Native bridge must exist BEFORE the production module registers listeners.
-export async function checkPracticeEvents({send,evaluate,until,port}) {
+export async function installPracticeFixture({send,evaluate}) {
   await send('Page.enable');
   const fixture = await evaluate(`({...window.fixture,platform:'macos',phase:'idle',message:'',model_ready:true,microphone:true,accessibility:true,input_monitoring:true,hotkey:true})`);
-  await send('Page.addScriptToEvaluateOnNewDocument', {source:`
+  return send('Page.addScriptToEvaluateOnNewDocument', {source:`
     window.fixture=${JSON.stringify(fixture)};
     window.calls=[];window.callbacks=new Map();window.listeners=new Map();window.callbackId=0;
     window.practiceGeneration=0;window.practiceResult={phase:'recording',text:''};
@@ -35,6 +35,9 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
       }
     };
   `});
+}
+export async function checkPracticeEvents({send,evaluate,until,port}) {
+  await installPracticeFixture({send,evaluate});
   await send('Page.navigate', {url:`http://127.0.0.1:${port}`});
   await until(`window.listeners.has('practice-input') && document.getElementById('phase').textContent==='Ready'`);
   assert.equal(await evaluate(`!document.getElementById('home').hidden && !document.querySelector('aside,nav,#brand-menu,#get-started')`),true,'Home replaces sidebar, tabs and setup guide');
@@ -169,7 +172,7 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
     assert.equal(await evaluate(`document.getElementById('practice-timer').textContent`),'1:01 / 2:00','Current timer keeps frozen native limit');
     await evaluate(`document.getElementById('practice-finish').focus({preventScroll:true});document.getElementById('practice-finish').click()`);
     await until(`document.getElementById('practice-message').textContent.includes('Transcribing')`);
-    await until(`document.getElementById('phase').textContent==='Processing'`);
+    await until(`document.getElementById('phase')?.textContent==='Processing'`);
     await stable('processing');
     await evaluate(`window.practiceResult={phase:'complete',text:'Completed privately.'}`);
     await until(`document.getElementById('practice-text').value==='Completed privately.'`);

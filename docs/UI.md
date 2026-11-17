@@ -69,8 +69,8 @@
   and meter. Returning only restores eligibility, never starts recording.
 - Updates stay inline in the footer, with no update or install-confirmation modal.
   Clicking the refresh action checks the feed and shows a busy SVG spinner. A verified offer
-  changes that same control to a marked download icon with Download & update and the
-  exact version in its label/tooltip; another
+  changes that same control to a marked download icon with a visible action,
+  exact version, and notice that the app will reopen; another
   explicit click rechecks and installs only that version, then the native updater
   reopens HandsFree. A changed offer needs another click, never silent consent.
   Busy states disable repeats, byte progress and failures stay inline, and ordinary

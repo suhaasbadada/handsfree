@@ -27,12 +27,12 @@ export async function checkKeyboardRecovery({send,evaluate,until,port}) {
     await evaluate(`document.getElementById('product-status').click()`);
     await until(`document.getElementById('health-dialog').open`);
     await key('Escape');
-    await until(`!document.getElementById('health-dialog').open`);
+    await until(`!document.getElementById('health-dialog').open && document.activeElement.id==='product-status'`);
     assert.equal(await evaluate(`document.getElementById('home').hidden`), true, 'Closing Product status must not leave Settings');
     await evaluate(`document.getElementById('change-shortcut').click()`);
     await until(`document.getElementById('change-shortcut').getAttribute('aria-pressed')==='true'`);
     await key('Escape');
-    await until(`document.getElementById('change-shortcut').getAttribute('aria-pressed')==='false'`);
+    await until(`document.getElementById('change-shortcut').getAttribute('aria-pressed')==='false' && !document.getElementById('change-shortcut').disabled`);
     assert.equal(await evaluate(`document.getElementById('home').hidden`), true, 'Escape cancels recording a shortcut before navigating');
     await evaluate(`document.getElementById('home-back').focus()`); await key(opener === 'Enter' ? 'Escape' : opener);
     assert.equal(await focused(),'home-title','Back announces Home without unsolicited editor focus');

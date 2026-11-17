@@ -64,10 +64,11 @@ export async function checkAppearance({send,evaluate,until,port}) {
     for (const saved of ['dark','system']) {
       // The mock backend survives reload, just as persisted native Store does.
       await send('Page.removeScriptToEvaluateOnNewDocument',{identifier:script.identifier});
+      script=undefined;
       script=await send('Page.addScriptToEvaluateOnNewDocument',{source:source(saved)});
       await send('Page.reload');
       await until(`document.documentElement.dataset.appearance===${JSON.stringify(saved)} && document.querySelector('#appearance-choice input:checked').value===${JSON.stringify(saved)} && !document.getElementById('appearance-choice').disabled`);
     }
-  } finally { await send('Page.removeScriptToEvaluateOnNewDocument',{identifier:script.identifier}); }
+  } finally { if (script) await send('Page.removeScriptToEvaluateOnNewDocument',{identifier:script.identifier}); }
   console.log('Appearance DOM: six mode/OS combinations, live changes, landing CSS, geometry, pending/failure and saved reload passed');
 }
