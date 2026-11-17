@@ -39,6 +39,10 @@ export class Updates {
   view: UpdateView = { installed_version: '', phase: 'idle', notes: '', downloaded_bytes: 0, message: 'Choose Check for updates to contact the release server.' };
   private revision = 0;
   private pending = false;
+  private installationPending = false;
+  // Native installation starts with metadata validation, still rendered as
+  // `checking`. That invoke already excludes private capture, unlike a feed check.
+  get installing() { return this.installationPending; }
   private polling = false;
   private preparation = 0;
   private prepared?: { version: string; revision: number };
@@ -102,11 +106,11 @@ export class Updates {
   async install(version: string) {
     if (this.pending || this.view.phase !== 'available' || this.view.available_version !== version || this.prepared?.version !== version || this.prepared.revision !== this.revision || !this.canInstall()) return;
     this.prepared = undefined;
-    this.pending = true; ++this.revision;
+    this.pending = true; this.installationPending = true; ++this.revision;
     this.view = { ...this.view, phase: 'checking', downloaded_bytes: 0, message: 'Validating the confirmed release before downloading…' }; this.render(this.view);
     try { this.accept(await this.invoke<UpdateView>('install_update', { version })); }
     catch (error) { this.error(error); }
-    finally { this.pending = false; }
+    finally { this.pending = false; this.installationPending = false; this.render(this.view); }
   }
   // Only local status IPC is polled during an owned operation, never the feed.
   async progress() {

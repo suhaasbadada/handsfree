@@ -28,12 +28,13 @@ export async function checkUpdateIndicator({send,evaluate,until,port}) {
   await until(`document.querySelector('.setup-card').hidden`);
   await evaluate(`window.waitUpdateCheck=new Promise(resolve=>window.finishUpdateCheck=resolve);document.getElementById('updates-open').focus();document.getElementById('updates-open').click();document.getElementById('updates-open').click()`);
   await until(`document.getElementById('updates-open').dataset.phase==='checking'`);
-  assert.equal(await evaluate(`document.getElementById('updates-open').disabled && getComputedStyle(document.querySelector('#updates-open > svg')).animationName==='update-spin' && !document.querySelector('dialog[open]')`),true,'Checking animates the refresh icon inline, without opening a modal');
+  assert.equal(await evaluate(`document.getElementById('updates-open').disabled && document.getElementById('updates-open').getAttribute('aria-busy')==='true' && document.querySelector('#updates-open > svg').dataset.glyph==='spinner' && getComputedStyle(document.querySelector('#updates-open > svg')).animationName==='update-spin' && !document.querySelector('dialog[open]')`),true,'Checking animates the accessible busy spinner inline, without opening a modal');
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='check_for_updates').length`),1,'Repeated check clicks are suppressed');
   await evaluate(`window.finishUpdateCheck();window.waitUpdateCheck=undefined`);
   await until(`document.getElementById('updates-indicator-label').textContent==='Download & update' && !document.getElementById('updates-open').disabled`);
   assert.equal(await evaluate(`document.activeElement.id`),'updates-open','Keyboard focus stays on the inline action after the check, without a modal');
   assert.equal(await evaluate(`document.getElementById('updates-indicator-detail').textContent`),'0.1.1-beta.21','The action exposes its exact version');
+  assert.equal(await evaluate(`document.getElementById('updates-open').getAttribute('aria-busy')==='false' && document.querySelector('#updates-open > svg').dataset.glyph==='download' && getComputedStyle(document.querySelector('#updates-open > svg')).animationName==='none'`),true,'Available offer has a static download icon, never an idle loader');
   await screenshot('available');
   assert.equal(await evaluate(`!window.updateInjected && !document.querySelector('#updates-dialog,#update-confirm-dialog') && !window.calls.some(c=>c.command==='install_update')`),true,'The check result is not consent and cannot inject notes or open update modals');
   // A changed feed must not silently turn a click for beta21 into beta22 consent.
@@ -45,11 +46,12 @@ export async function checkUpdateIndicator({send,evaluate,until,port}) {
   await evaluate(`window.fixture.phase='idle'`);
   await until(`!document.getElementById('updates-open').disabled`);
   // Navigation revokes a pending download intent before archive bytes.
-  await evaluate(`window.waitUpdateCheck=new Promise(resolve=>window.finishUpdateCheck=resolve);document.getElementById('updates-open').click();document.getElementById('nav-overview').click();window.finishUpdateCheck();window.waitUpdateCheck=undefined`);
+  await evaluate(`window.waitUpdateCheck=new Promise(resolve=>window.finishUpdateCheck=resolve);document.getElementById('updates-open').click();document.getElementById('home-back').click();window.finishUpdateCheck();window.waitUpdateCheck=undefined`);
   await until(`!document.getElementById('updates-open').disabled`);
   assert.equal(await evaluate(`window.calls.some(c=>c.command==='install_update')`),false,'Navigating during preparation revokes the click, not the fresh offer');
-  await evaluate(`window.waitInstall=new Promise(resolve=>window.finishInstall=resolve);document.getElementById('updates-open').click();document.getElementById('updates-open').click()`);
+  await evaluate(`document.getElementById('practice-text').value='Private draft before update';document.getElementById('practice-text').dispatchEvent(new Event('input'));window.waitInstall=new Promise(resolve=>window.finishInstall=resolve);document.getElementById('updates-open').click();document.getElementById('updates-open').click()`);
   await until(`window.calls.filter(c=>c.command==='install_update').length===1`);
+  assert.equal(await evaluate(`window.context===0 && document.getElementById('practice-text').value==='' && document.getElementById('input-level').value===0`),true,'Installation revokes Home eligibility and clears private draft and meter');
   assert.deepEqual(await evaluate(`window.calls.filter(c=>c.command==='install_update').map(c=>c.args)`),[{version:'0.1.1-beta.22'}],'One explicit click dispatches only the freshly revalidated displayed version');
   await evaluate(`window.visibleUpdateState={...window.visibleUpdateState,phase:'downloading',downloaded_bytes:50,total_bytes:100}`);
   await until(`document.getElementById('updates-indicator-detail').textContent.includes('50%')`);

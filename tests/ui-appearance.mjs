@@ -23,7 +23,7 @@ export async function checkAppearance({send,evaluate,until,port}) {
   try {
     await send('Page.navigate',{url:`http://127.0.0.1:${port}`});
     await until(`document.documentElement.dataset.appearance==='system' && !document.getElementById('appearance-choice').disabled`);
-    await evaluate(`document.getElementById('nav-practice-page').click()`);
+    await evaluate(`document.getElementById('home-back').click()`);
     const before = await evaluate(`JSON.stringify(window.fixture)`);
     const bounds = await evaluate(`(()=>{const r=document.getElementById('practice-title').closest('section').getBoundingClientRect();return [r.x,r.y,r.width,r.height];})()`);
     const choose = async mode => {
@@ -34,6 +34,7 @@ export async function checkAppearance({send,evaluate,until,port}) {
       await choose(mode);
       for (const os of ['light','dark','light']) {
         await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:os}]});
+        await evaluate(`Promise.allSettled(document.getAnimations().filter(a=>a.effect?.getTiming().iterations!==Infinity).map(a=>a.finished))`);
         const dark = mode==='dark' || (mode==='system' && os==='dark');
         assert.deepEqual(await evaluate(`(()=>{const s=getComputedStyle(document.documentElement);return [s.backgroundColor,s.color];})()`),dark?['rgb(32, 31, 30)','rgb(243, 239, 234)']:['rgb(247, 246, 243)','rgb(48, 46, 45)'],`${mode}/${os}: explicit override or future system change`);
         assert.deepEqual(await evaluate(`(()=>{const r=document.getElementById('practice-title').closest('section').getBoundingClientRect();return [r.x,r.y,r.width,r.height];})()`),bounds,'Appearance does not alter practice geometry');

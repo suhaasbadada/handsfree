@@ -5,13 +5,13 @@ export async function checkCompactControls({send,evaluate,until,port}) {
   await send('Page.bringToFront');
   await until(`document.getElementById('phase')?.textContent==='Ready'`);
   await evaluate(`window.fixture.shortcut_label='Fn';window.fixture.shortcut={code:'Fn',modifiers:0}`);
-  await until(`document.getElementById('overview-shortcut').textContent==='Fn'`);
+  await until(`document.getElementById('practice-shortcut').textContent==='Fn'`);
   await until(`document.getElementById('microphone-choice').options.length>=3`);
   await evaluate(`window.compactRealOptions=document.getElementById('microphone-choice').innerHTML`);
   for (const theme of ['light','dark']) {
     await evaluate(`window.fixture.appearance='${theme}'`);
     await until(`document.documentElement.dataset.appearance==='${theme}'`);
-    assert.equal(await evaluate(`(()=>{const p=document.createElement('span');p.style.color='var(--accent)';document.body.append(p);const c=getComputedStyle(p).color;p.remove();return getComputedStyle(document.getElementById('overview-shortcut')).color===c && getComputedStyle(document.getElementById('saved-shortcut')).color===c;})()`),true,'Configured shortcut is red without replacing its key box');
+    assert.equal(await evaluate(`(()=>{const p=document.createElement('span');p.style.color='var(--accent)';document.body.append(p);const c=getComputedStyle(p).color;p.remove();return getComputedStyle(document.getElementById('practice-shortcut')).color===c && getComputedStyle(document.getElementById('saved-shortcut')).color===c;})()`),true,'Configured shortcut is red without replacing its key box');
     for (const [width,height] of [[980,820],[980,600],[560,650],[320,650]]) {
       await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
       await evaluate(`document.getElementById('nav-settings').click()`);
@@ -27,13 +27,13 @@ export async function checkCompactControls({send,evaluate,until,port}) {
     }
   }
   await send('Emulation.setDeviceMetricsOverride',{width:980,height:820,deviceScaleFactor:1,mobile:false});
-  await evaluate(`document.getElementById('nav-practice-page').click()`);
+  await evaluate(`document.getElementById('home-back').click()`);
   await until(`window.context>0`);
   assert.equal(await evaluate(`!document.getElementById('practice-setup') && document.getElementById('nav-settings').getClientRects().length>0`),true,'Practice has no redundant Settings button');
-  assert.equal(await evaluate(`getComputedStyle(document.getElementById('practice-shortcut')).color===getComputedStyle(document.getElementById('overview-shortcut')).color`),true,'Practice uses the same red configured shortcut key');
+  assert.equal(await evaluate(`getComputedStyle(document.getElementById('practice-shortcut')).color===getComputedStyle(document.getElementById('saved-shortcut')).color`),true,'Home and Settings share the red configured shortcut key');
   await evaluate(`window.fixture.shortcut_label='Control + Shift + J'`);
   await until(`document.getElementById('practice-shortcut').textContent==='Control + Shift + J'`);
-  assert.equal(await evaluate(`getComputedStyle(document.getElementById('practice-shortcut')).color===getComputedStyle(document.getElementById('overview-shortcut')).color`),true,'Red shortcut styling follows custom combinations, not hardcoded Fn');
+  assert.equal(await evaluate(`getComputedStyle(document.getElementById('practice-shortcut')).color===getComputedStyle(document.getElementById('saved-shortcut')).color`),true,'Red shortcut styling follows custom combinations, not hardcoded Fn');
   await evaluate(`window.fixture.microphone_uid=null;document.getElementById('microphone-choice').innerHTML=window.compactRealOptions;document.getElementById('nav-settings').click();document.getElementById('microphone-refresh').click()`);
   await until(`document.getElementById('microphone-choice').options.length>=3 && !document.getElementById('microphone-choice').disabled`);
   await evaluate(`window.compactKeys=[];window.compactKeyWrites=window.calls.filter(c=>c.command==='set_microphone').length;document.getElementById('microphone-choice').value='';document.getElementById('microphone-choice').focus();document.getElementById('microphone-choice').addEventListener('keydown',e=>window.compactKeys.push([e.key,e.isTrusted,e.defaultPrevented,document.hasFocus()]));`);

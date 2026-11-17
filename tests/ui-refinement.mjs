@@ -17,10 +17,10 @@ export async function checkRefinement({send,evaluate,until,port}) {
     for (const theme of ['light','dark']) {
       await evaluate(`window.fixture.appearance='${theme}'`);
       await until(`document.documentElement.dataset.appearance==='${theme}'`);
-      for (const tab of ['overview','practice-page','settings']) {
-        await evaluate(`document.getElementById('nav-${tab}').click()`);
+      for (const tab of ['home','settings']) {
+        await evaluate(`document.getElementById('${tab==='home'?'home-back':'nav-settings'}').click()`);
         assert.equal(await evaluate(`Array.from(document.querySelectorAll('.hero,.metrics,.card')).every(e=>{const s=getComputedStyle(e);return s.backgroundColor==='rgba(0, 0, 0, 0)' && s.borderLeftWidth==='0px' && s.borderRightWidth==='0px' && s.boxShadow==='none';})`),true,'Page sections use typography and spacing, not filled rectangular containers');
-        if (tab==='practice-page') await until(`window.context>0 && !document.getElementById('practice-start').disabled`);
+        if (tab==='home') await until(`window.context>0 && !document.getElementById('practice-start').disabled`);
         await screenshot(`${width}-${theme}-${tab}`);
         const fit = await evaluate(`(()=>{const main=document.querySelector('main'),footer=document.querySelector('footer').getBoundingClientRect();return {body:document.documentElement.scrollHeight<=innerHeight+1,main:main.scrollHeight<=main.clientHeight+1,footer:footer.bottom<=innerHeight+1,horizontal:document.documentElement.scrollWidth<=innerWidth,heights:[main.scrollHeight,main.clientHeight]};})()`);
         assert.equal(fit.body && fit.footer && fit.horizontal,true,`${width} ${theme} ${tab}: viewport-bound shell`);
@@ -33,13 +33,13 @@ export async function checkRefinement({send,evaluate,until,port}) {
         }
         await screenshot(`${width}-${theme}-${tab}`);
       }
-      await evaluate(`document.querySelector('main').scrollTop=document.querySelector('main').scrollHeight;document.getElementById('nav-practice-page').click()`);
+      await evaluate(`document.querySelector('main').scrollTop=document.querySelector('main').scrollHeight;document.getElementById('home-back').click()`);
       await until(`window.context>0 && !document.getElementById('practice-start').disabled`);
       assert.equal(await evaluate(`document.querySelector('main').scrollTop===0 && document.querySelector('main').scrollHeight<=document.querySelector('main').clientHeight+1`),true,'Switch from long Settings leaves Practice at its natural, unscrolled start');
        await evaluate(`window.savedContext=window.context;document.getElementById('practice-text').value='Private draft';document.getElementById('practice-text').dispatchEvent(new Event('input'));document.getElementById('nav-settings').click()`);
       await until(`window.context===0 && document.getElementById('practice-text').value===''`);
-       assert.equal(await evaluate(`!document.getElementById('settings').hidden && !document.getElementById('practice-setup')`),true,'Sidebar Settings clears the private draft and grant without a redundant Practice button');
-      await evaluate(`document.getElementById('nav-practice-page').click()`);
+       assert.equal(await evaluate(`!document.getElementById('settings').hidden && !document.getElementById('practice-setup')`),true,'Settings clears the private draft and grant without a redundant Practice button');
+      await evaluate(`document.getElementById('home-back').click()`);
       await until(`window.context>window.savedContext && !document.getElementById('practice-start').disabled`);
       if (width===980) {
         for (const [name,phase] of [['recording','recording'],['processing','processing'],['complete','complete']]) {
@@ -58,5 +58,5 @@ export async function checkRefinement({send,evaluate,until,port}) {
   await evaluate(`document.getElementById('nav-settings').click();document.querySelector('.local-data button').focus()`);
   assert.equal(await evaluate(`document.documentElement.scrollHeight>innerHeight && document.activeElement.id==='reset' && document.activeElement.getBoundingClientRect().bottom<=innerHeight && document.documentElement.scrollWidth<=innerWidth`),true,'Tiny viewport keyboard navigation reaches lower content through normal scrolling');
   await send('Emulation.setDeviceMetricsOverride',{width:980,height:820,deviceScaleFactor:1,mobile:false});
-  await evaluate(`delete window.fixture.appearance;document.getElementById('nav-overview').click()`);
+  await evaluate(`delete window.fixture.appearance;document.getElementById('home-back').click()`);
 }

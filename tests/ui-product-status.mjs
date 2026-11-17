@@ -6,11 +6,36 @@ export async function checkProductStatus({send,evaluate,until,port}) {
   await send('Page.navigate',{url:`http://127.0.0.1:${port}`});
   await send('Page.bringToFront');
   await until(`window.fixture && document.getElementById('phase')?.textContent==='Ready'`);
+  for (const theme of ['light','dark','system']) {
+    await evaluate(`window.fixture.appearance='${theme}'`);
+    await until(`document.documentElement.dataset.appearance==='${theme}'`);
+    assert.equal(await evaluate(`getComputedStyle(document.getElementById('dot')).backgroundColor`),'rgb(38, 133, 68)',`${theme}: true Ready is green`);
+    await evaluate(`window.fixture.microphone=false`);
+    await until(`document.getElementById('dot').className==='error'`);
+    assert.equal(await evaluate(`(()=>{const p=document.createElement('span');p.style.color='var(--danger)';document.body.append(p);const red=getComputedStyle(p).color;p.remove();return getComputedStyle(document.getElementById('dot')).backgroundColor===red;})()`),true,`${theme}: missing native requirements are red`);
+    await evaluate(`window.fixture.microphone=true;window.fixture.phase='error';window.fixture.message='Capture failed.'`);
+    await until(`document.getElementById('phase').textContent==='Needs attention'`);
+    assert.equal(await evaluate(`document.getElementById('dot').className==='error'`),true,'Permission-ready capture errors are not relabeled green');
+    await evaluate(`window.fixture.phase='idle';window.fixture.message=''`);
+    await until(`document.getElementById('phase').textContent==='Ready'`);
+  }
+  await evaluate(`window.fixture.persistence_error='Could not save local changes.'`);
+  await until(`document.getElementById('phase').textContent==='Needs attention' && document.getElementById('dot').className==='error'`);
+  await evaluate(`document.getElementById('product-status').click()`);
+  assert.match(await evaluate(`document.getElementById('health-summary').textContent`),/Settings or usage couldn’t be saved/,'A storage failure is broken health even when capture prerequisites are ready');
+  await evaluate(`document.getElementById('health-close').click();window.fixture.persistence_error=''`);
+  await until(`document.getElementById('phase').textContent==='Ready'`);
+  await evaluate(`window.healthInputInvoke=window.__TAURI_INTERNALS__.invoke;window.noDefaultInput=true;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{const result=await window.healthInputInvoke(command,args);return command==='list_microphones' && window.noDefaultInput?{devices:[],default_uid:null}:result;};window.fixture.microphone_uid=null;document.getElementById('product-status').click()`);
+  await until(`document.getElementById('phase').textContent==='Needs attention' && document.getElementById('health-practice').disabled`);
+  assert.match(await evaluate(`document.getElementById('health-summary').textContent`),/Microphone unavailable/,'No actual system-default input is not green Ready or authorization to record');
+  await evaluate(`window.noDefaultInput=false;document.getElementById('health-microphone-refresh').click()`);
+  await until(`document.getElementById('phase').textContent==='Ready' && !document.getElementById('health-practice').disabled`);
+  await evaluate(`document.getElementById('health-close').click();window.__TAURI_INTERNALS__.invoke=window.healthInputInvoke`);
   await evaluate(`window.fixture.phase='error';window.fixture.message='Microphone capture failed. Please check your input device.'`);
   await until(`document.getElementById('phase').textContent==='Needs attention'`);
   for (const [width,height] of [[980,820],[560,650],[320,650]]) {
     await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
-    const geometry = await evaluate(`(()=>{const s=document.getElementById('product-status').getBoundingClientRect(),b=document.querySelector('.brand').getBoundingClientRect();return {top:s.top,right:s.right,left:s.left,brandRight:b.right};})()`);
+    const geometry = await evaluate(`(()=>{const s=document.getElementById('product-status').getBoundingClientRect(),b=document.querySelector('.home-brand').getBoundingClientRect();return {top:s.top,right:s.right,left:s.left,brandRight:b.right};})()`);
     assert.ok(geometry.top<60 && geometry.right<=width && geometry.right>width/2 && geometry.left>geometry.brandRight,'Status is top-right, separate from branding');
     await evaluate(`document.getElementById('product-status').focus()`);
     await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r'});
@@ -55,7 +80,7 @@ export async function checkProductStatus({send,evaluate,until,port}) {
   await until(`document.getElementById('phase').textContent==='Ready' && !document.getElementById('health-practice').disabled`);
   assert.equal(await evaluate(`document.getElementById('health-error').hidden`),true,'Successful reconnect retires the obsolete connection failure');
   await evaluate(`document.getElementById('health-practice').click()`);
-  await until(`!document.getElementById('practice-page').hidden && window.context>0`);
+  await until(`!document.getElementById('home').hidden && window.context>0`);
   assert.equal(await evaluate(`window.calls.some(c=>c.command==='practice_start')`),false,'Opening the private test still requires explicit Start');
   await evaluate(`document.getElementById('product-status').click()`);
   await until(`window.context===0 && document.getElementById('practice-waveform').dataset.active==='false'`);

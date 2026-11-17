@@ -37,30 +37,28 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   `});
   await send('Page.navigate', {url:`http://127.0.0.1:${port}`});
   await until(`window.listeners.has('practice-input') && document.getElementById('phase').textContent==='Ready'`);
-  assert.equal(await evaluate(`!document.getElementById('overview').hidden && document.getElementById('practice-page').hidden && !window.context && !window.calls.some(c=>c.command==='practice_context' && c.args.active)`),true,'Initial Overview never grants a practice context');
-  await evaluate(`document.getElementById('nav-practice-page').click()`);
+  assert.equal(await evaluate(`!document.getElementById('home').hidden && !document.querySelector('aside,nav,#brand-menu,#get-started')`),true,'Home replaces sidebar, tabs and setup guide');
   await until(`window.context>0 && window.listeners.has('practice-input') && !document.getElementById('practice-start').disabled`);
-  assert.equal(await evaluate(`!document.getElementById('practice-page').hidden && document.getElementById('overview').hidden && document.getElementById('nav-practice-page').getAttribute('aria-current')==='page'`),true,'Explicit Practice entry selects its page and grants context');
+  assert.equal(await evaluate(`['words','saved','count','practice-text'].every(id=>document.getElementById(id).getClientRects().length) && window.context>0`),true,'Visible focused Home combines totals and private editor and grants context');
   const baseline = await evaluate(`JSON.stringify(window.fixture.stats)`);
-  assert.equal(await evaluate(`document.getElementById('get-started').hidden`),true,'Returning ready users do not see a wizard');
+  assert.equal(await evaluate(`!document.getElementById('get-started')`),true,'No setup guide DOM');
   await evaluate(`document.getElementById('nav-settings').click()`);
-  assert.equal(await evaluate(`!document.getElementById('settings').hidden && document.getElementById('practice-page').hidden && !document.getElementById('practice-setup') && document.getElementById('get-started').hidden && window.context===0`),true,'Sidebar Settings is the single settings entry and revokes Practice context');
-  await evaluate(`document.getElementById('settings-started').click()`);
-  assert.equal(await evaluate(`document.getElementById('settings').contains(document.getElementById('get-started')) && !document.getElementById('get-started').hidden && ['microphone','permissions','shortcut','model'].every(k=>document.getElementById('check-'+k).textContent.endsWith('Ready'))`),true,'Revisitable Settings checklist uses native proofs');
+  assert.equal(await evaluate(`!document.getElementById('settings').hidden && document.getElementById('home').hidden && window.context===0`),true,'Settings replaces Home and revokes Practice context');
+  await evaluate(`document.getElementById('product-status').click()`);
+  assert.equal(await evaluate(`document.getElementById('health-dialog').open && document.getElementById('health-model-state').textContent==='Ready offline'`),true,'Product status uses native proofs');
   assert.equal(await evaluate(`window.calls.some(c=>['request_microphone','request_permissions','download_model','practice_start'].includes(c.command))`),false,'Opening guidance never prompts, downloads or records');
   await evaluate(`Object.assign(window.fixture,{microphone:false,input_monitoring:false,model_ready:false,hotkey:false})`);
-  await until(`['microphone','permissions','shortcut','model'].every(k=>document.getElementById('check-'+k).textContent.endsWith('Needs attention')) && !document.getElementById('started-model').disabled`);
+  await until(`!document.getElementById('health-model').disabled && !document.getElementById('health-model').hidden`);
   assert.equal(await evaluate(`document.getElementById('practice-start').disabled`),true,'Partial native setup cannot authorize practice');
-  await evaluate(`document.getElementById('started-mic').click();document.getElementById('started-permissions').click();document.getElementById('started-model').click()`);
+  await evaluate(`document.getElementById('health-mic').click();document.getElementById('health-permissions').click();document.getElementById('health-model').click()`);
   await until(`['request_microphone','request_permissions','download_model'].every(command=>window.calls.filter(c=>c.command===command).length===1)`);
   await evaluate(`Object.assign(window.fixture,{microphone:true,input_monitoring:true,model_ready:true,hotkey:true})`);
-  await until(`document.getElementById('check-model').textContent.endsWith('Ready')`);
-   assert.equal(await evaluate(`window.fixture.permission_requests===3 && !document.getElementById('settings').hidden && !document.getElementById('get-started').hidden && window.context===0`),true,'Permission-request bits preserve the Settings guide without granting Practice');
-   await evaluate(`document.getElementById('started-close').click()`);
-   assert.equal(await evaluate(`document.activeElement.id==='settings-title' && document.activeElement.getClientRects().length>0`),true,'Guide close focuses a visible Settings recovery heading');
-  await evaluate(`document.getElementById('started-close').click();document.querySelector('.brand').click();document.getElementById('brand-started').click()`);
-  assert.equal(await evaluate(`!document.getElementById('get-started').hidden && document.activeElement.id==='get-started-title'`),true,'Menu revisits guidance without a new navigation surface');
-    await evaluate(`document.getElementById('started-close').click();document.getElementById('nav-practice-page').click()`);
+  await until(`document.getElementById('health-model-state').textContent==='Ready offline'`);
+   assert.equal(await evaluate(`window.fixture.permission_requests===3 && document.getElementById('health-dialog').open && window.context===0`),true,'Explicit recovery preserves modal revocation');
+   await evaluate(`document.getElementById('health-close').click()`);
+   await until(`document.activeElement.id==='product-status'`);
+   assert.equal(await evaluate(`document.activeElement.id==='product-status' && document.activeElement.getClientRects().length>0`),true,'Status close restores visible recovery trigger');
+    await evaluate(`document.getElementById('home-back').click()`);
     await until(`window.context>0 && !document.getElementById('practice-start').disabled`);
     await evaluate(`document.getElementById('practice-start').click()`);
    await until(`!document.getElementById('practice-finish').hidden`);
@@ -85,18 +83,18 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   await until(`document.getElementById('practice-text').value==='A little more thinking.'`);
   assert.equal(await evaluate(`JSON.stringify(window.fixture.stats)`),baseline,'Native practice leaves totals unchanged');
   assert.equal(await evaluate(`window.calls.every(c=>!['toggle','copy_transcript','reset_stats'].includes(c.command))`),true,'Practice uses no normal dictation, clipboard or stats reset IPC');
-   await evaluate(`window.oldContext=window.context;document.getElementById('nav-overview').click()`);
+   await evaluate(`window.oldContext=window.context;document.getElementById('nav-settings').click()`);
    await until(`window.context===0 && document.getElementById('practice-text').value===''`);
-   assert.equal(await evaluate(`!document.getElementById('overview').hidden && document.getElementById('practice-page').hidden`),true,'Overview navigation revokes and clears Practice');
+   assert.equal(await evaluate(`!document.getElementById('settings').hidden && document.getElementById('home').hidden`),true,'Settings navigation revokes and clears Practice');
    const overviewStarts = await evaluate(`window.calls.filter(c=>c.command==='practice_start').length`);
    await evaluate(`window.sendPractice('toggle',1,window.oldContext)`);
-   assert.equal(await evaluate(`window.context===0 && document.getElementById('practice-text').value==='' && window.calls.filter(c=>c.command==='practice_start').length===${overviewStarts}`),true,'Stale native input cannot revive Practice on Overview');
+   assert.equal(await evaluate(`window.context===0 && document.getElementById('practice-text').value==='' && window.calls.filter(c=>c.command==='practice_start').length===${overviewStarts}`),true,'Stale native input cannot revive Practice in Settings');
    await evaluate(`window.emitNative('dashboard-navigate','settings')`);
    await until(`!document.getElementById('settings').hidden && window.context===0`);
   assert.equal(await evaluate(`document.getElementById('input-level').value===0 && document.getElementById('shortcut-evidence').textContent.startsWith('Shortcut not tested')`),true,'Navigation retires meter and evidence');
   await evaluate(`window.emitNative('dashboard-navigate','practice')`);
    await until(`window.context>window.oldContext && document.activeElement.id==='practice-text' && !document.getElementById('practice-start').disabled`);
-   assert.equal(await evaluate(`!document.getElementById('practice-page').hidden && document.getElementById('nav-practice-page').getAttribute('aria-current')==='page'`),true,'Tray Practice navigation selects the dedicated page');
+   assert.equal(await evaluate(`!document.getElementById('home').hidden`),true,'Legacy tray Practice navigation selects Home');
   const starts = await evaluate(`window.calls.filter(c=>c.command==='practice_start').length`);
   await evaluate(`window.sendPractice('toggle',1,window.oldContext)`);
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='practice_start').length`),starts,'Old context is rejected');
@@ -107,11 +105,9 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   await until(`window.calls.filter(c=>c.command==='practice_finish').length===2`);
   await evaluate(`document.getElementById('practice-cancel').click()`);
   await until(`!document.getElementById('practice-start').disabled`);
-  await evaluate(`document.querySelector('.brand').click()`);
-  await until(`window.context===0 && !document.getElementById('brand-menu').hidden`);
-   await evaluate(`document.getElementById('brand-overview').click()`);
-   await until(`window.context===0 && !document.getElementById('overview').hidden`);
-   await evaluate(`document.getElementById('nav-practice-page').click()`);
+  await evaluate(`document.getElementById('nav-settings').click()`);
+  await until(`window.context===0 && !document.getElementById('settings').hidden`);
+   await evaluate(`window.emitNative('dashboard-navigate','overview')`);
   await until(`window.context>0`);
   await evaluate(`window.oldContext=window.context;window.dispatchEvent(new Event('blur'))`);
   await until(`window.context===0`);
@@ -119,19 +115,28 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   await until(`window.context>window.oldContext`);
   await evaluate(`window.oldContext=window.context;window.emitNative('practice-cleared')`);
   await until(`window.context>window.oldContext && !document.getElementById('practice-start').disabled`);
-  for (const opener of [`document.querySelector('.brand').click()`,`document.getElementById('product-status').click()`]) {
+  for (const opener of [`document.getElementById('nav-settings').click()`,`document.getElementById('product-status').click()`]) {
+    const pendingStarts = await evaluate(`window.calls.filter(c=>c.command==='practice_start').length`);
     await evaluate(`window.delayStart=true;window.startAck=undefined;window.sendPractice('press',3)`);
     await until(`typeof window.startAck==='function'`);
     await evaluate(opener);
     await until(`window.context===0`);
     await evaluate(`window.startAck();window.delayStart=false`);
     await until(`document.getElementById('practice-cancel').hidden`);
-     await evaluate(`document.getElementById('health-dialog').close();document.getElementById('brand-overview').click();document.getElementById('nav-practice-page').click()`);
-    await until(`window.context>0 && !document.getElementById('practice-start').disabled`);
+     await evaluate(`document.getElementById('health-dialog').close();document.getElementById('home-back').click()`);
+     await until(`window.context>0 && !document.getElementById('practice-start').disabled`);
+     assert.equal(await evaluate(`window.calls.filter(c=>c.command==='practice_start').length`),pendingStarts+1,'Returning Home does not revive the revoked pending start');
+     assert.equal(await evaluate(`document.getElementById('practice-text').value==='' && document.getElementById('input-level').value===0`),true,'Pending teardown leaves no private text or meter');
   }
   await evaluate(`window.updateChecks=window.calls.filter(c=>c.command==='check_for_updates').length;window.emitNative('dashboard-navigate','updates')`);
   await until(`window.calls.filter(c=>c.command==='check_for_updates').length>window.updateChecks`);
   assert.equal(await evaluate(`window.context>0 && !document.querySelector('dialog[open]') && !window.calls.some(c=>c.command==='install_update')`),true,'Tray Updates checks inline without a modal, capture teardown or implicit install');
+  await evaluate(`window.trayUpdatesInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{const result=await window.trayUpdatesInvoke(command,args);return ['update_status','check_for_updates'].includes(command)?{...result,phase:'available',available_version:'0.1.1-beta.24',message:'Update available'}:result;};document.getElementById('updates-open').click()`);
+  await until(`document.getElementById('updates-open').dataset.phase==='available'`);
+  await evaluate(`window.availableTrayChecks=window.calls.filter(c=>c.command==='check_for_updates').length;window.emitNative('dashboard-navigate','updates')`);
+  await until(`window.calls.filter(c=>c.command==='check_for_updates').length>window.availableTrayChecks && document.getElementById('updates-open').dataset.phase==='available'`);
+  assert.equal(await evaluate(`!window.calls.some(c=>c.command==='install_update') && window.context>0`),true,'Generic tray App updates remains check-only even with an available offer; only the exact-version Download & update action may install');
+  await evaluate(`window.__TAURI_INTERNALS__.invoke=window.trayUpdatesInvoke`);
 
   // Fresh production documents at each width: no direct controller calls or
   // screenshots masquerading as layout evidence. Compare document positions AND
@@ -139,8 +144,7 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   for (const width of [320,400,740,980]) {
     await send('Emulation.setDeviceMetricsOverride', {width,height:820,deviceScaleFactor:1,mobile:false});
      await send('Page.navigate', {url:`http://127.0.0.1:${port}`});
-     await until(`Boolean(document.getElementById('nav-practice-page'))`);
-     await evaluate(`document.getElementById('nav-practice-page').click()`);
+     await until(`Boolean(document.getElementById('home'))`);
     await until(`window.context>0 && !document.getElementById('practice-start').disabled`);
     await evaluate(`window.layoutLiveStatus=true;document.getElementById('practice-start').focus({preventScroll:true});window.scrollTo(0,Math.max(0,document.getElementById('practice').getBoundingClientRect().top+scrollY-80));window.layoutSnapshot=()=>({scroll:scrollY,rects:['practice','practice-text','practice-message'].map(id=>document.getElementById(id)).concat([document.querySelector('.practice-actions'),document.querySelector('.activity'),document.querySelector('footer')]).map(e=>{const r=e.getBoundingClientRect();return [r.x,r.y+scrollY,r.width,r.height]})});`);
     const pristine = await evaluate(`window.layoutSnapshot()`);
@@ -194,6 +198,7 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
 
   await evaluate(`document.getElementById('nav-settings').click();window.fixture.microphone_uid='disconnected-uid'`);
   await until(`document.getElementById('microphone-choice').value==='disconnected-uid'`);
+  assert.equal(await evaluate(`document.getElementById('dot').className==='error' && document.getElementById('phase').textContent==='Needs attention' && document.getElementById('practice-start').disabled`),true,'Unavailable saved microphone is broken, not green Ready');
   assert.equal(await evaluate(`document.getElementById('microphone-choice').selectedOptions[0].textContent`),'Saved microphone · Unavailable','Disconnected saved UID remains visible, never replaced by default');
   await evaluate(`{window.rejectMicrophone=true;const s=document.getElementById('microphone-choice');s.value='usb-input';s.dispatchEvent(new Event('change'));}`);
   await until(`!document.getElementById('microphone-choice').disabled && document.getElementById('feedback').textContent.includes('Could not save microphone')`);
@@ -209,13 +214,13 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='running_apps').length`),appReads,'Status polling does not enumerate apps');
   await evaluate(`window.delayPause=true;document.getElementById('workflow-pause').click();document.getElementById('workflow-pause').click()`);
   await until(`typeof window.pauseAck==='function'`);
-  assert.equal(await evaluate(`document.getElementById('workflow-pause').disabled && document.getElementById('brand-pause').disabled`),true,'Both pause controls share pending owner');
+  assert.equal(await evaluate(`document.getElementById('workflow-pause').disabled`),true,'Pause control preserves pending owner');
   await evaluate(`window.pauseAck();window.delayPause=false`);
   await until(`document.getElementById('workflow-pause').getAttribute('aria-label')==='Resume shortcuts'`);
-  await evaluate(`document.querySelector('.brand').click();document.getElementById('brand-pause').click()`);
+  await evaluate(`document.getElementById('workflow-pause').click()`);
   await until(`document.getElementById('workflow-pause').getAttribute('aria-label')==='Pause shortcuts'`);
   await evaluate(`window.workflow.paused=true`);
-  await until(`document.getElementById('brand-pause').textContent==='Resume shortcuts'`);
+  await until(`document.getElementById('workflow-pause').getAttribute('aria-label')==='Resume shortcuts'`);
   await evaluate(`document.getElementById('launch-at-login').click()`);
   await until(`!document.getElementById('login-settings').hidden`);
   assert.equal(await evaluate(`document.getElementById('launch-at-login').checked`),false,'Approval is not enabled');
@@ -236,7 +241,7 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   assert.equal(await evaluate(`!document.getElementById('excluded-apps').querySelector('b') && document.getElementById('excluded-apps').textContent.includes('<b>Running app</b>')`),true,'Names rendered as text only');
   await evaluate(`document.querySelector('[aria-label="Remove com.absent.app"]').click()`);
   await until(`!window.workflow.excluded_bundle_ids.includes('com.absent.app')`);
-   await evaluate(`document.getElementById('nav-practice-page').click();document.getElementById('practice-start').click()`);
+   await evaluate(`document.getElementById('home-back').click();document.getElementById('practice-start').click()`);
   await until(`!document.getElementById('practice-finish').hidden`);
   assert.equal(await evaluate(`'shortcutReceipt' in window.calls.filter(c=>c.command==='practice_start').at(-1).args`),false,'Explicit Start test works while paused and omits receipt');
   await evaluate(`document.getElementById('practice-cancel').click()`);

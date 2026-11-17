@@ -1,3 +1,47 @@
+## Beta 24 candidate preparation
+
+The disabled `candidateRelease` and distribution/package/audit coordinates now
+select **0.1.1-beta.24**; embedded app version remains **0.1.1**. The active beta
+23 release object, Windows history, signed feed and static download links are
+unchanged. This is preparation, not publication or installed acceptance.
+
+Scope is the requested sidebar/Home/Practice merge, one Settings gear, prioritized
+compact settings, select chevrons and utility icons, honest green Ready/red broken
+health, Setup guide removal and minimal copy. Home private-context eligibility and
+`Updates.installing` pending-check revocation are intentional UI changes; native
+authorization/privacy and owner/FIFO/epoch/generation boundaries remain intact.
+There is no native capture implementation change. See the implemented/verified/
+pending checkpoints in [beta 24 notes](releases/v0.1.1-beta.24.md).
+
+Preparation verification: 78 focused metadata tests passed (zero failures/skips)
+and `npm run build` passed on the shared uncommitted candidate. Historical guide,
+beta 6–23 notes and active Mac/Windows object byte-preservation assertions passed.
+These are not final full-suite, exact-source CI or signed-hardware receipts.
+
+Before publication, the primary must record final-source checks/review, commit and
+package the exact signed candidate, then obtain **new beta 24** real-hardware
+capture/cancellation and private Practice acceptance receipts. Beta 23 hardware,
+private/installed Practice and preservation evidence are historical only. Green
+CI or UI-only scope never waives the gate. Keep failed attempts; never reset
+permissions, replace the signing identity or substitute another build's evidence.
+The hardware gate and publisher logic are unchanged except version coordinates.
+
+Release checklist (all pending for this candidate):
+
+- [ ] Final-source tests/build, browser/WebKit review and exact commit/tree.
+- [ ] Exact signed packaging using the existing signing identity and preservation
+  baselines; new hardware and private Practice receipts for that source/binary.
+- [ ] Local/draft audits, exact-source CI and mandatory acceptance gates.
+- [ ] Publish only via `node scripts/publish-release.mjs --publish release`;
+  verify public assets before separately activating downloads/feed.
+- [ ] Installed in-app OTA/restart, representative dictation and signing identity,
+  models/settings/usage/clipboard preservation. Publication is not completion.
+- [ ] Stable/beta exit deferred until later explicit user satisfaction/approval.
+
+The entire prior guide below, including beta 23 preparation/publication and every
+historical ledger, is preserved verbatim. Its dated pending wording is not a beta
+24 acceptance receipt and must not be rewritten to manufacture one.
+
 ## Beta 23 publication — exact signed candidate
 
 Published [v0.1.1-beta.23](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.23)

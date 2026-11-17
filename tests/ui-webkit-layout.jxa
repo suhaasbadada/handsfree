@@ -42,11 +42,14 @@ while (!ready && Date.now() < deadline) {
 }
 if (!ready) throw Error('WKWebView fixture did not load');
 evaluate(`
-  document.getElementById('overview').hidden = true;
+  document.getElementById('home').hidden = true;
   for (const id of ['settings','workflow','microphone-choice-row','health-input']) document.getElementById(id).hidden = false;
   document.querySelector('.setup-card').hidden = true;
   document.getElementById('saved-shortcut').textContent = 'Fn';
-  document.getElementById('settings').insertBefore(document.getElementById('get-started'), document.getElementById('workflow'));
+  for(const select of document.querySelectorAll('select')) {
+    const wrapper=document.createElement('span');wrapper.className='select-wrap';
+    select.before(wrapper);wrapper.append(select);wrapper.innerHTML+='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg>';
+  }
   document.head.appendChild(Object.assign(document.createElement('style'), {id:'probe-mode'}));
   window.measure = () => {
     const metric = element => {
@@ -58,7 +61,15 @@ evaluate(`
     return {viewport:[innerWidth,innerHeight],doc:metric(document.documentElement),main:metric(main),
       dialog:metric(document.getElementById('health-dialog')),healthInput:metric(document.getElementById('health-input')),
       controls:metric(document.querySelector('.microphone-controls')),mainOverflow:getComputedStyle(main).overflowX,
-      selectOverflow:getComputedStyle(document.getElementById('microphone-choice')).overflow};
+      selectOverflow:getComputedStyle(document.getElementById('microphone-choice')).overflow,
+      chevrons:['recording-mode','appearance-choice','sound-style'].every(id=>{
+        const e=document.getElementById(id),c=e.parentElement.querySelector('svg'),s=getComputedStyle(c);
+        return e.tagName==='SELECT' && c.getBoundingClientRect().width>=12 && s.display!=='none' && s.pointerEvents==='none' && s.color===getComputedStyle(document.body).color;
+      }),
+      refreshFits:[['microphone-choice','microphone-refresh'],['health-microphone','health-microphone-refresh']].every(pair=>{
+        const s=document.getElementById(pair[0]).getBoundingClientRect(),b=document.getElementById(pair[1]).getBoundingClientRect();
+        return b.width===32 && s.right<=b.left && b.right<=innerWidth && b.left>=0;
+      })};
   }; true
 `);
 const sizes = [[980,820],[980,600],[560,650],[320,650]];
@@ -78,7 +89,7 @@ function configure(size, theme, mode, label) {
   `);
 }
 function fits(result) {
-  return ['doc','main','dialog','healthInput'].every(key=>result[key].scroll<=result[key].client);
+  return result.chevrons && result.refreshFits && ['doc','main','dialog','healthInput'].every(key=>result[key].scroll<=result[key].client);
 }
 let failures = 0, cases = 0;
 for (const size of sizes)

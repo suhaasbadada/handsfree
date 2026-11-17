@@ -17,6 +17,10 @@ import { checkRefinement } from './ui-refinement.mjs';
 
 const binary = process.env.BROWSER_BINARY;
 const port = process.env.UI_PORT ?? '5187';
+// Optional focused reruns; the default still executes every base and DOM check.
+const selected = process.env.UI_CHECKS?.split(',');
+const checks = {appearance:checkAppearance,practice:checkPracticeEvents,refinement:checkRefinement,keyboard:checkKeyboardRecovery,requested:checkRequestedFixes,status:checkProductStatus,compact:checkCompactControls,updates:checkUpdateIndicator};
+if (selected?.some(name=>!Object.hasOwn(checks,name))) throw new Error('UI_CHECKS must name actual DOM suites: '+Object.keys(checks).join(','));
 if (!binary) throw new Error('Set BROWSER_BINARY to a Chromium-compatible browser. Start npm run dev -- --port 5187 first.');
 const profile = mkdtempSync(join(tmpdir(), 'handsfree-ui-'));
 const browser = spawn(binary, ['--headless', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=9237', `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore','ignore','pipe'] });
@@ -62,37 +66,41 @@ try {
   await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-color-scheme',value:'light'},{name:'prefers-reduced-motion',value:'no-preference'}]});
   await until(`Boolean(document.getElementById('nav-settings'))`);
   assert.equal(await evaluate(`document.querySelector('footer .beta-badge').textContent==='BETA' && document.querySelector('footer .beta-badge').getBoundingClientRect().width>0 && !document.querySelector('.brand .beta-badge') && !document.querySelector('main footer') && document.getElementById('app-version').textContent==='0.1.1'`), true, 'Version, beta and language metadata live in the actual footer');
-   assert.equal(await evaluate(`['setup','change-shortcut','mic','permissions','download','reset','sounds','sound-volume'].every(id=>document.getElementById(id).disabled)`), true, 'Native controls are unavailable before the backend connects');
+   assert.equal(await evaluate(`['change-shortcut','mic','permissions','download','reset','sounds','sound-volume'].every(id=>document.getElementById(id).disabled)`), true, 'Native controls are unavailable before the backend connects');
    assert.equal(await evaluate(`document.getElementById('permissions-row').hidden && document.getElementById('saved-shortcut').textContent==='…' && !document.body.textContent.includes('this Mac')`), true, 'Unknown native platform has neutral, disabled setup');
   await evaluate(`window.calls = []; window.fixture = {phase:'idle',message:'Select a text field and press Fn.', progress:0,model_ready:true,microphone:true,accessibility:true,input_monitoring:true,hotkey:true,transcript:'',sounds:true,sound_volume:50,sound_style:'clean',shortcut:{code:'Fn',modifiers:0},shortcut_label:'Fn',stats:{words:0,transcriptions:0,speech_seconds:0,saved_seconds:0},persistence_error:''}; window.__TAURI_INTERNALS__ = { invoke: async (command,args) => { window.calls.push({command,args}); if(command==='status') return structuredClone(window.fixture); if(command==='set_sounds') window.fixture.sounds=args.enabled; if(command==='set_sound_style') window.fixture.sound_style=args.style; if(command==='set_shortcut'){if(window.rejectShortcut) throw 'Could not save shortcut'; window.fixture.shortcut=args.shortcut;window.fixture.shortcut_label=args.shortcut.code==='Fn'?'Fn':args.shortcut.code==='Space'?'Option + Space':'Control + Shift + J';} if(command==='reset_stats') window.fixture.stats={words:0,transcriptions:0,speech_seconds:0,saved_seconds:0}; } }; document.getElementById('feedback').hidden=true;`);
-  await until(`document.getElementById('ready-title').textContent==='Ready'`);
+  if (!selected) {
+  await until(`document.getElementById('phase').textContent==='Ready'`);
   assert.deepEqual(await evaluate(`['words','saved','count'].map(id=>document.getElementById(id).textContent)`), ['0','0 sec','0'], 'First-launch totals are real zeros');
   assert.equal(await evaluate(`document.querySelectorAll('details').length`), 0, 'No disclosure maze in the app or its dialogs');
-  assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('nav button'),b=>({name:b.getAttribute('aria-label'),title:b.title,text:b.textContent.trim(),icon:!!b.querySelector('svg')}))`), ['Overview','Practice','Settings'].map(name=>({name,title:name,text:name,icon:true})), 'Three labeled navigation buttons retain accessible names and tooltips');
+  assert.equal(await evaluate(`!document.querySelector('aside,nav,#brand-menu,#get-started') && document.getElementById('nav-settings').getAttribute('aria-label')==='Settings' && !!document.getElementById('nav-settings').querySelector('svg')`),true,'No sidebar, tabs or brand menu; one accessible Settings icon');
   const accessibility = await send('Accessibility.getFullAXTree');
-  for (const name of ['Overview','Practice','Settings']) assert.ok(accessibility.nodes.some(node=>node.role?.value==='button' && node.name?.value===name), `${name} is an accessible button`);
-  assert.equal(await evaluate(`document.getElementById('overview-model').hidden`), true, 'Existing users do not see another download CTA');
+  assert.ok(accessibility.nodes.some(node=>node.role?.value==='button' && node.name?.value==='Settings'),'Settings is an accessible button');
+  assert.equal(await evaluate(`document.getElementById('download').hidden`), true, 'Existing users do not see another download CTA');
   // Clean first launch: download remains discoverable for every permissions /
   // hook combination, without a poll initiating any network operation.
   for (let mask = 0; mask < 16; mask++) {
     await evaluate(`Object.assign(window.fixture,{model_ready:false,microphone:${!!(mask & 1)},accessibility:${!!(mask & 2)},input_monitoring:${!!(mask & 4)},hotkey:${!!(mask & 8)}})`);
-    await until(`!document.getElementById('overview-model').hidden && !document.getElementById('overview-download').disabled`);
+    await until(`!document.getElementById('download').hidden && !document.getElementById('download').disabled`);
     await until(`document.getElementById('mic-row').hidden===${!!(mask&1)} && document.getElementById('permissions-row').hidden===${!!((mask&2)&&(mask&4))} && document.getElementById('hotkey-row').hidden===${!!(mask&8)}`);
-    assert.equal(await evaluate(`document.getElementById('overview-download').getBoundingClientRect().width>0 && document.getElementById('overview-download').textContent.includes('Download English model')`), true);
+    await evaluate(`document.getElementById('product-status').click()`);
+    assert.equal(await evaluate(`document.getElementById('health-model').getBoundingClientRect().width>0 && !document.getElementById('health-model').disabled`),true,'Missing model remains directly actionable from Home health');
+    await evaluate(`document.getElementById('health-close').click()`);
     await evaluate(`document.getElementById('nav-settings').click()`);
     assert.equal(await evaluate(`['mic','permissions','download'].every(id=>{const b=document.getElementById(id);return !b.getClientRects().length || b.getBoundingClientRect().height===32})`), true, `Compact setup action heights in readiness combination ${mask}`);
-    await evaluate(`document.getElementById('nav-overview').click()`);
+    await evaluate(`document.getElementById('home-back').click()`);
   }
   assert.equal(await evaluate(`window.calls.some(c=>c.command==='download_model')`), false, 'Never downloads automatically');
-  await evaluate(`document.getElementById('setup').click()`);
-  assert.equal(await evaluate(`!document.getElementById('settings').hidden && document.activeElement.id==='model-row'`), true, 'Setup points directly to missing model');
+  await evaluate(`document.getElementById('product-status').click()`);
+  assert.equal(await evaluate(`document.getElementById('health-dialog').open && !document.getElementById('health-model').disabled`), true, 'Health points directly to missing model');
   await evaluate(`window.downloadAttempts=0;const downloadInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='download_model'){window.downloadAttempts++;if(window.failDownload)throw 'Download failed. You can retry.';window.fixture.phase='downloading';window.fixture.progress=42;await new Promise(resolve=>window.finishDownload=resolve);window.fixture.model_ready=true;window.fixture.phase='idle';}return downloadInvoke(command,args);};window.failDownload=true;document.getElementById('download').click()`);
   await until(`document.getElementById('feedback').textContent.includes('Download failed') && !document.getElementById('download').disabled`);
-  await evaluate(`window.failDownload=false;document.getElementById('nav-overview').click();document.getElementById('overview-download').click();document.getElementById('overview-download').click()`);
-  await until(`document.getElementById('overview-download').textContent.includes('42%') && document.getElementById('overview-download').disabled`);
+  await evaluate(`window.failDownload=false;document.getElementById('health-model').click();document.getElementById('health-model').click()`);
+  await until(`document.getElementById('health-model-state').textContent.includes('42%') && document.getElementById('health-model').disabled`);
   assert.equal(await evaluate(`window.downloadAttempts`), 2, 'Failed request plus one retry; duplicate click does not dispatch twice');
   await evaluate(`window.finishDownload()`);
-  await until(`document.getElementById('overview-model').hidden && document.getElementById('model-ready').textContent.includes('Ready')`);
+  await until(`document.getElementById('health-model').hidden && document.getElementById('model-ready').textContent.includes('Ready')`);
+  await evaluate(`document.getElementById('health-close').click()`);
   await evaluate(`Object.assign(window.fixture,{microphone:true,accessibility:true,input_monitoring:true,hotkey:true});document.getElementById('feedback').hidden=true`);
   await until(`document.getElementById('setup-state').textContent==='Ready'`);
   // Duration saves independently of sound/shortcut, rolls back failed writes,
@@ -100,8 +108,8 @@ try {
   await evaluate(`window.fixture.recording_limit=120; const limitInvoke=window.__TAURI_INTERNALS__.invoke; window.__TAURI_INTERNALS__.invoke=async(command,args)=>{ if(command==='set_recording_limit'){if(window.rejectLimit)throw 'Could not save recording limit';window.fixture.recording_limit=args.seconds;} return limitInvoke(command,args); };`);
   assert.equal(await evaluate(`!document.getElementById('copy') && !document.getElementById('transcript') && !document.querySelector('.transcript-section')`), true, 'No transcript or manual copy surface');
   await evaluate(`document.getElementById('nav-settings').click()`);
-  assert.equal(await evaluate(`document.getElementById('overview').hidden && !document.getElementById('settings').hidden`), true);
-  assert.equal(await evaluate(`document.querySelector('.readiness').hidden`), true, 'No readiness card when ready');
+  assert.equal(await evaluate(`document.getElementById('home').hidden && !document.getElementById('settings').hidden`), true);
+  assert.equal(await evaluate(`!document.querySelector('.readiness')`), true, 'No duplicate readiness card');
   await until(`!document.getElementById('recording-limit').disabled`);
   assert.equal(await evaluate(`document.getElementById('recording-mode').value`), 'toggle', 'Old status defaults to Toggle');
   await evaluate(`const modeInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='set_recording_mode'){if(window.rejectMode)throw 'Could not save recording mode';if(window.delayMode)await new Promise(resolve=>window.releaseMode=resolve);window.fixture.recording_mode=args.mode;}return modeInvoke(command,args);};window.delayMode=true;document.getElementById('recording-mode').value='push_to_talk';document.getElementById('recording-mode').dispatchEvent(new Event('change'))`);
@@ -109,13 +117,13 @@ try {
   await delay(1000);
   assert.equal(await evaluate(`document.getElementById('recording-mode').value==='push_to_talk' && document.getElementById('change-shortcut').disabled`), true, 'Pending choice survives polls and blocks shortcut editing');
   await evaluate(`window.releaseMode();window.delayMode=false`);
-  await until(`!document.getElementById('recording-mode').disabled && document.getElementById('recording-action').textContent==='Hold'`);
-  assert.equal(await evaluate(`!document.getElementById('recording-mode-help').hidden && document.getElementById('recording-instruction').textContent.includes('Release')`), true);
+  await until(`!document.getElementById('recording-mode').disabled && document.getElementById('practice-gesture').textContent==='Hold'`);
+  assert.equal(await evaluate(`!document.getElementById('recording-mode-help').hidden && document.getElementById('practice-instruction').textContent.includes('release')`), true);
   await evaluate(`window.rejectMode=true;document.getElementById('recording-mode').value='toggle';document.getElementById('recording-mode').dispatchEvent(new Event('change'))`);
   await until(`!document.getElementById('recording-mode').disabled && document.getElementById('recording-mode').value==='push_to_talk'`);
   assert.equal(await evaluate(`document.getElementById('feedback').textContent.includes('Could not save recording mode')`), true);
   await evaluate(`window.rejectMode=false;document.getElementById('recording-mode').value='toggle';document.getElementById('recording-mode').dispatchEvent(new Event('change'))`);
-  await until(`!document.getElementById('recording-mode').disabled && document.getElementById('recording-action').textContent==='Press'`);
+  await until(`!document.getElementById('recording-mode').disabled && document.getElementById('practice-gesture').textContent==='Press'`);
   assert.deepEqual(await evaluate(`Array.from(document.getElementById('recording-limit').options,o=>o.value)`), ['120','180','240','300']);
   await evaluate(`document.getElementById('recording-limit').value='300'; document.getElementById('recording-limit').dispatchEvent(new Event('change'))`);
   await until(`window.fixture.recording_limit===300 && !document.getElementById('recording-limit').disabled`);
@@ -152,7 +160,7 @@ try {
     if (cancel==='escape') await key('Escape');
     if (cancel==='tab') await key('Tab');
     if (cancel==='blur') await evaluate(`window.dispatchEvent(new Event('blur'))`);
-    if (cancel==='navigation') await evaluate(`document.getElementById('nav-overview').click()`);
+    if (cancel==='navigation') await evaluate(`document.getElementById('home-back').click()`);
     if (cancel==='cancel') await evaluate(`document.getElementById('stop-shortcut').click()`);
     await until(stopped);
     assert.equal(await evaluate(`window.calls.filter(c=>c.command==='capture_shortcut').at(-1).args.active`), false, `${cancel} releases native capture`);
@@ -242,7 +250,7 @@ try {
     await evaluate(`window.fixture[${JSON.stringify(field)}]=false`);
     await until(`document.getElementById('setup-state').textContent==='Needs attention'`);
     const row = {microphone:'mic-row',accessibility:'permissions-row',input_monitoring:'permissions-row',hotkey:'hotkey-row',model_ready:'model-row'}[field];
-    assert.equal(await evaluate(`!document.getElementById('setup-missing').hidden && !document.getElementById('${row}').hidden && !document.querySelector('.readiness').hidden`), true, `Missing ${field} is actionable, never concealed by Ready`);
+    assert.equal(await evaluate(`!document.getElementById('setup-missing').hidden && !document.getElementById('${row}').hidden && document.getElementById('dot').className==='error'`), true, `Missing ${field} is actionable, never concealed by Ready`);
     await evaluate(`window.fixture[${JSON.stringify(field)}]=true`);
     await until(`document.getElementById('setup-state').textContent==='Ready'`);
   }
@@ -267,7 +275,7 @@ try {
   await evaluate(`document.getElementById('reset').click(); document.getElementById('confirm-reset').click()`);
   await until(`!document.getElementById('reset-dialog').open`);
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='reset_stats' && c.args.confirmed).length`), 1);
-  await evaluate(`document.getElementById('nav-overview').click(); window.fixture.transcript='<script>unsafe</script> & a thought'; window.fixture.stats={words:100,transcriptions:4,speech_seconds:45,saved_seconds:105};`);
+  await evaluate(`document.getElementById('home-back').click(); window.fixture.transcript='<script>unsafe</script> & a thought'; window.fixture.stats={words:100,transcriptions:4,speech_seconds:45,saved_seconds:105};`);
   await until(`document.getElementById('words').textContent==='100'`);
   assert.equal(await evaluate(`document.body.textContent.includes(window.fixture.transcript)`), false, 'Confidential payload is never rendered, even as escaped text');
   assert.ok(!(await send('Accessibility.getFullAXTree')).nodes.some(node=>node.name?.value?.includes('<script>unsafe</script>')), 'Payload absent from accessibility tree');
@@ -289,7 +297,7 @@ try {
   assert.equal(await evaluate(`document.body.textContent.includes(window.fixture.transcript)`), false);
   // Practice uses its own IPC result, never the ordinary transcript fixture.
   await evaluate(`window.dispatchEvent(new Event('focus'))`);
-  await evaluate(`window.fixture.platform='macos';window.practiceGeneration=0;window.practiceResult={phase:'recording',text:''};const beforePractice=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='practice_start'){window.calls.push({command,args});if(window.practiceReject)throw 'Practice busy';if(window.practiceDelay)await new Promise(r=>window.practiceAck=r);return ++window.practiceGeneration;}if(command==='practice_finish'){window.calls.push({command,args});window.practiceResult.phase='processing';return;}if(command==='practice_status'){return {...window.practiceResult,generation:window.practiceGeneration};}if(command==='practice_cancel'){window.calls.push({command,args});return;}return beforePractice(command,args);};document.getElementById('nav-practice-page').click()`);
+  await evaluate(`window.fixture.platform='macos';window.practiceGeneration=0;window.practiceResult={phase:'recording',text:''};const beforePractice=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='practice_start'){window.calls.push({command,args});if(window.practiceReject)throw 'Practice busy';if(window.practiceDelay)await new Promise(r=>window.practiceAck=r);return ++window.practiceGeneration;}if(command==='practice_finish'){window.calls.push({command,args});window.practiceResult.phase='processing';return;}if(command==='practice_status'){return {...window.practiceResult,generation:window.practiceGeneration};}if(command==='practice_cancel'){window.calls.push({command,args});return;}return beforePractice(command,args);};document.getElementById('home-back').click()`);
   await until(`!document.getElementById('practice').hidden && !document.getElementById('practice-start').disabled`);
   assert.ok((await send('Accessibility.getFullAXTree')).nodes.some(n=>n.role?.value==='textbox' && n.name?.value==='Practice dictation'));
   await evaluate(`document.getElementById('practice-start').click();document.getElementById('practice-start').click()`);
@@ -306,7 +314,7 @@ try {
   await evaluate(`window.practiceDelay=true;document.getElementById('practice-start').click();document.getElementById('nav-settings').click();window.practiceAck()`);
   await delay(950);
   assert.equal(await evaluate(`document.getElementById('practice-text').value==='' && document.getElementById('practice-finish').disabled`),true,'Late acknowledgement after navigation stays cancelled');
-  await evaluate(`window.practiceDelay=false;window.practiceReject=true;document.getElementById('nav-practice-page').click();document.getElementById('practice-start').click()`);
+  await evaluate(`window.practiceDelay=false;window.practiceReject=true;document.getElementById('home-back').click();document.getElementById('practice-start').click()`);
   await until(`document.getElementById('practice-message').textContent.includes('Practice busy')`);
   await evaluate(`window.practiceReject=false;document.getElementById('practice-clear').click()`);
   await until(`!document.getElementById('practice-start').disabled`);
@@ -319,6 +327,7 @@ try {
   // by checkUpdateIndicator below. Real signatures/relaunch remain native gates.
   for (const theme of ['light','dark']) {
     await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-color-scheme',value:theme}]});
+    await evaluate(`Promise.allSettled(document.getAnimations().filter(a=>a.effect?.getTiming().iterations!==Infinity).map(a=>a.finished))`);
     assert.deepEqual(await evaluate(`({scheme:getComputedStyle(document.documentElement).colorScheme,bg:getComputedStyle(document.documentElement).backgroundColor,text:getComputedStyle(document.documentElement).color})`), {scheme:'light dark',bg:theme==='dark'?'rgb(32, 31, 30)':'rgb(247, 246, 243)',text:theme==='dark'?'rgb(243, 239, 234)':'rgb(48, 46, 45)'}, 'The app follows system appearance without a saved theme preference');
     await evaluate(`document.getElementById('feedback').hidden=false;document.getElementById('feedback').textContent='Could not save. Try again.'`);
     const readability = await evaluate(`(() => {
@@ -349,15 +358,14 @@ try {
     await evaluate(`document.getElementById('feedback').hidden=true`);
     for (const width of [320, 390, 400, 560, 740, 980, 1280]) {
       await send('Emulation.setDeviceMetricsOverride', { width, height: 820, deviceScaleFactor: 1, mobile: false });
-      for (const tab of ['overview','practice-page','settings']) {
-        await evaluate(`document.getElementById('nav-${tab}').click()`);
-        const nav = await evaluate(`(() => { const rs=[...document.querySelectorAll('nav button')].map(e=>e.getBoundingClientRect());return {same:rs.every(r=>Math.abs(r.width-rs[0].width)<1&&r.height===40),aligned:rs.every(r=>innerWidth<=760?r.y===rs[0].y:r.x===rs[0].x),active:document.querySelector('nav [aria-current="page"]').id};})()`);
-        assert.deepEqual(nav, {same:true,aligned:true,active:`nav-${tab}`}, `Labeled navigation aligned at ${width}px`);
+      for (const tab of ['home','settings']) {
+        await evaluate(`document.getElementById('${tab==='home'?'home-back':'nav-settings'}').click()`);
+        assert.equal(await evaluate(`!document.getElementById('${tab}').hidden && !document.querySelector('aside,nav')`),true,'Only Home or Settings replaces main content');
         assert.equal(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth`), true, `No horizontal overflow at ${width}px, ${theme}, ${tab}`);
         assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('button, select, input')).filter(e=>e.getClientRects().length && (e.getBoundingClientRect().right>innerWidth || e.getBoundingClientRect().left<0)).map(e=>e.id)`), [], 'All controls fit');
         if (tab==='settings') assert.equal(await evaluate(`(() => {const label=document.querySelector('.shortcut-row h3').getBoundingClientRect(),value=document.querySelector('.shortcut-value').getBoundingClientRect();return value.top>=label.bottom || value.left>=label.right;})()`), true, 'Shortcut value never overlaps its label');
         assert.equal(await evaluate(`['words','saved','count'].every(id=>{const s=getComputedStyle(document.getElementById(id));return s.color==='${theme==='dark'?'rgb(243, 239, 234)':'rgb(48, 46, 45)'}' && s.opacity==='1'})`), true, 'Readable appearance-specific activity numbers, not faded opacity');
-        assert.equal(await evaluate(`(() => {const status=document.querySelector('.status').getBoundingClientRect(),nav=document.querySelector('nav').getBoundingClientRect();return status.top<60 && status.right>innerWidth/2 && (innerWidth>760 || status.bottom<=nav.top) && !document.querySelector('aside .status') && !document.querySelector('main .status');})()`), true, 'Interactive status remains at the top right without navigation overlap');
+        assert.equal(await evaluate(`(() => {const status=document.querySelector('.status').getBoundingClientRect(),brand=document.querySelector('.home-brand').getBoundingClientRect();return status.top<60 && status.right>innerWidth/2 && status.left>=brand.right && !document.querySelector('main .status');})()`), true, 'Interactive status remains at the top right without branding overlap');
       }
       await evaluate(`document.getElementById('change-shortcut').click()`);
       await until(recording);
@@ -365,10 +373,10 @@ try {
       await key('Escape'); await until(stopped);
       await evaluate(`Object.assign(window.fixture,{microphone:false,accessibility:false,input_monitoring:false,hotkey:false,model_ready:false})`);
       await until(`document.getElementById('setup-state').textContent==='Needs attention'`);
-      for (const tab of ['settings','overview']) {
-        await evaluate(`document.getElementById('nav-${tab}').click()`);
+      for (const tab of ['settings','home']) {
+        await evaluate(`document.getElementById('${tab==='home'?'home-back':'nav-settings'}').click()`);
         assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth`), true, `First-run ${tab} fits ${width}px`);
-        assert.equal(await evaluate(`['mic','permissions','download','overview-download'].every(id=>{const b=document.getElementById(id),r=b.getBoundingClientRect();return !r.width || (r.left>=0&&r.right<=innerWidth&&r.height>=32)})`), true, 'First-run actions fit without clipping');
+        assert.equal(await evaluate(`['mic','permissions','download'].every(id=>{const b=document.getElementById(id),r=b.getBoundingClientRect();return !r.width || (r.left>=0&&r.right<=innerWidth&&r.height>=32)})`), true, 'First-run actions fit without clipping');
       }
       await evaluate(`Object.assign(window.fixture,{microphone:true,accessibility:true,input_monitoring:true,hotkey:true,model_ready:true})`);
       await until(`document.getElementById('setup-state').textContent==='Ready'`);
@@ -402,31 +410,31 @@ try {
      await until(`document.getElementById('phase').textContent==='Ready'`);
      for (const width of [980,740,400,320]) {
        await send('Emulation.setDeviceMetricsOverride', {width,height:820,deviceScaleFactor:1,mobile:false});
-       for (const tab of ['overview','practice-page','settings']) {
-         await evaluate(`document.getElementById('nav-${tab}').click()`);
+       for (const tab of ['home','settings']) {
+         await evaluate(`document.getElementById('${tab==='home'?'home-back':'nav-settings'}').click()`);
          const shot = await send('Page.captureScreenshot', {format:'png',captureBeyondViewport:true});
          writeFileSync(join(process.env.UI_SCREENSHOT_DIR, `${tab}-${width}.png`), Buffer.from(shot.data,'base64'));
        }
      }
      await evaluate(`Object.assign(window.fixture,{model_ready:false,microphone:false,accessibility:false,input_monitoring:false,hotkey:false})`);
      await until(`document.getElementById('setup-state').textContent==='Needs attention'`);
-     for (const tab of ['overview','practice-page','settings']) {
-       await evaluate(`document.getElementById('nav-${tab}').click()`);
+     for (const tab of ['home','settings']) {
+       await evaluate(`document.getElementById('${tab==='home'?'home-back':'nav-settings'}').click()`);
        const shot = await send('Page.captureScreenshot', {format:'png',captureBeyondViewport:true});
        writeFileSync(join(process.env.UI_SCREENSHOT_DIR, `${tab}-first-run-320.png`), Buffer.from(shot.data,'base64'));
      }
    }
    // Native platform, not browser UA: this Windows fixture runs in a Mac browser.
    await evaluate(`Object.assign(window.fixture,{platform:'windows',phase:'idle',message:'',model_ready:true,microphone:true,accessibility:false,input_monitoring:false,hotkey:true,shortcut:{code:'Space',modifiers:5},shortcut_label:'Control + Shift + Space'});document.getElementById('feedback').hidden=true`);
-   await until(`document.getElementById('overview-shortcut').textContent==='Ctrl + Shift + Space' && document.getElementById('setup-state').textContent==='Ready'`);
+   await until(`document.getElementById('practice-shortcut').textContent==='Ctrl + Shift + Space' && document.getElementById('setup-state').textContent==='Ready'`);
    assert.equal(await evaluate(`!document.getElementById('shortcut-fn').hidden && document.getElementById('shortcut-fn').textContent==='Use default' && document.getElementById('permissions-row').hidden && document.getElementById('permissions').disabled && !document.body.innerText.includes('this Mac') && !document.body.innerText.includes('Fn')`), true, 'Legacy Windows preference is retained with an explicit default reset, not silently migrated');
    const windowsCallsStart = await evaluate(`window.calls.length`);
    for (let mask = 0; mask < 32; mask++) {
      const model = !!(mask & 1), mic = !!(mask & 2), ax = !!(mask & 4), input = !!(mask & 8), hook = !!(mask & 16);
      await evaluate(`Object.assign(window.fixture,{model_ready:${model},microphone:${mic},accessibility:${ax},input_monitoring:${input},hotkey:${hook}})`);
-     await until(`document.getElementById('setup-state').textContent===${JSON.stringify(model && mic && hook ? 'Ready' : 'Needs attention')} && document.getElementById('mic-row').hidden===${mic} && document.getElementById('hotkey-row').hidden===${hook} && document.getElementById('overview-model').hidden===${model}`);
+     await until(`document.getElementById('setup-state').textContent===${JSON.stringify(model && mic && hook ? 'Ready' : 'Needs attention')} && document.getElementById('mic-row').hidden===${mic} && document.getElementById('hotkey-row').hidden===${hook} && document.getElementById('download').hidden===${model}`);
      assert.equal(await evaluate(`document.getElementById('permissions-row').hidden && document.getElementById('permissions').disabled`), true, `No fake AX/Input Monitoring grants for Windows combination ${mask}`);
-     if (!model) assert.equal(await evaluate(`!document.getElementById('overview-download').disabled`), true, 'Model CTA survives every Windows capability combination');
+     if (!model) assert.equal(await evaluate(`!document.getElementById('download').disabled`), true, 'Model CTA survives every Windows capability combination');
    }
    await evaluate(`Object.assign(window.fixture,{model_ready:true,microphone:false,hotkey:false,accessibility:false,input_monitoring:false});document.getElementById('nav-settings').click()`);
    await until(`!document.getElementById('mic').disabled && !document.getElementById('mic-row').hidden`);
@@ -435,9 +443,9 @@ try {
    await until(`window.calls.slice(${windowsCallsStart}).some(c=>c.command==='request_microphone')`);
    assert.equal(await evaluate(`window.calls.slice(${windowsCallsStart}).some(c=>c.command==='request_permissions')`), false, 'Windows never requests Accessibility/Input Monitoring');
    await evaluate(`window.fixture.microphone=true`);
-   await until(`document.getElementById('ready-detail').textContent.includes('Shortcut unavailable')`);
-   await evaluate(`document.getElementById('setup').click()`);
-   assert.equal(await evaluate(`document.activeElement.id`), 'change-shortcut', 'Unavailable registration points to changing the binding');
+   await until(`document.getElementById('hotkey-detail').textContent.includes('Choose another')`);
+   await evaluate(`document.getElementById('change-shortcut').focus()`);
+   assert.equal(await evaluate(`document.activeElement.id`), 'change-shortcut', 'Unavailable registration has reachable binding control');
    assert.match(await evaluate(`document.getElementById('hotkey-detail').textContent`), /Choose another.*Another app/);
    await evaluate(`window.fixture.hotkey=true;document.getElementById('change-shortcut').click()`);
    await until(recording);
@@ -454,17 +462,17 @@ try {
    await evaluate(`window.rejectShortcut=false;document.getElementById('shortcut-fn').click()`);
     await until(`${stopped} && document.getElementById('saved-shortcut').textContent==='Right Ctrl'`);
     await evaluate(`document.getElementById('recording-mode').value='push_to_talk';document.getElementById('recording-mode').dispatchEvent(new Event('change'))`);
-    await until(`!document.getElementById('recording-mode').disabled && document.getElementById('recording-action').textContent==='Hold'`);
-    assert.equal(await evaluate(`document.getElementById('overview-shortcut').textContent==='Right Ctrl' && window.fixture.recording_mode==='push_to_talk'`), true, 'Windows hold instructions use the actual native shortcut');
+    await until(`!document.getElementById('recording-mode').disabled && document.getElementById('practice-gesture').textContent==='Hold'`);
+    assert.equal(await evaluate(`document.getElementById('practice-shortcut').textContent==='Right Ctrl' && window.fixture.recording_mode==='push_to_talk'`), true, 'Windows hold instructions use the actual native shortcut');
     for (const width of [320,390,400,560,740,980,1280]) {
       await send('Emulation.setDeviceMetricsOverride', {width,height:820,deviceScaleFactor:1,mobile:false});
-      for (const tab of ['overview','settings']) {
-        await evaluate(`document.getElementById('nav-${tab}').click()`);
+      for (const tab of ['home','settings']) {
+        await evaluate(`document.getElementById('${tab==='home'?'home-back':'nav-settings'}').click()`);
         assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth`), true, `Push to talk fits ${width}px ${tab}`);
       }
     }
     await evaluate(`document.getElementById('recording-mode').value='toggle';document.getElementById('recording-mode').dispatchEvent(new Event('change'))`);
-    await until(`!document.getElementById('recording-mode').disabled && document.getElementById('recording-action').textContent==='Press'`);
+    await until(`!document.getElementById('recording-mode').disabled && document.getElementById('practice-gesture').textContent==='Press'`);
    assert.deepEqual(await evaluate(`window.calls.filter(c=>c.command==='set_shortcut').at(-1).args.shortcut`), {code:'ControlRight',modifiers:0}, 'Use default persists Right Ctrl, never Fn');
    // Actual modifier-first sequences: never finalize a modifier keydown.
    await evaluate(`document.getElementById('change-shortcut').click()`);
@@ -497,26 +505,22 @@ try {
      for (const ready of [true,false]) {
        await evaluate(`Object.assign(window.fixture,{model_ready:${ready},microphone:${ready},hotkey:${ready}});document.getElementById('shortcut-feedback').hidden=true`);
        await until(`document.getElementById('setup-state').textContent==='${ready ? 'Ready' : 'Needs attention'}'`);
-       for (const tab of ['overview','settings']) {
-         await evaluate(`document.getElementById('nav-${tab}').click()`);
+       for (const tab of ['home','settings']) {
+         await evaluate(`document.getElementById('${tab==='home'?'home-back':'nav-settings'}').click()`);
          assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth`), true, `Windows ${ready ? 'ready' : 'setup'} ${tab} fits ${width}px`);
          assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('button,select,input')).filter(e=>e.getClientRects().length && (e.getBoundingClientRect().right>innerWidth || e.getBoundingClientRect().left<0)).map(e=>e.id)`), [], 'Windows controls fit');
          assert.equal(await evaluate(`document.getElementById('permissions-row').hidden && !document.body.innerText.includes('Use Fn') && !document.body.innerText.includes('Accessibility') && !document.body.innerText.includes('Input Monitoring')`), true);
        }
      }
    }
-   assert.equal(await evaluate(`window.calls.slice(${windowsCallsStart}).some(c=>['request_permissions','start_recording','download_model','preview_sound'].includes(c.command))`), false, 'Windows setup never requests AX, starts recording, downloads or plays sound automatically');
-   console.log('UI smoke: base/theme checks passed; checking practice events');
-   await checkAppearance({send,evaluate,until,port});
-    await checkPracticeEvents({send,evaluate,until,port});
-    await checkRefinement({send,evaluate,until,port});
-   console.log('UI smoke: practice checks passed; checking keyboard/recovery');
-     await checkKeyboardRecovery({send,evaluate,until,port});
-     await checkRequestedFixes({send,evaluate,until,port});
-     await checkProductStatus({send,evaluate,until,port});
-     await checkCompactControls({send,evaluate,until,port});
-    await checkUpdateIndicator({send,evaluate,until,port});
-   console.log('UI smoke passed: native practice event wiring, context races, Mac and Windows capabilities, shortcuts, privacy, preferences, downloads and responsive layout. No microphone capture.');
+    assert.equal(await evaluate(`window.calls.slice(${windowsCallsStart}).some(c=>['request_permissions','start_recording','download_model','preview_sound'].includes(c.command))`), false, 'Windows setup never requests AX, starts recording, downloads or plays sound automatically');
+    console.log('UI smoke: base/theme checks passed');
+  }
+  for (const [name,check] of Object.entries(checks)) {
+    if (selected && !selected.includes(name)) continue;
+    await check({send,evaluate,until,port}); console.log(`UI DOM: ${name} passed`);
+  }
+  console.log(selected ? `Focused UI checks passed: ${selected.join(', ')}` : 'Full UI smoke passed: native practice event wiring, context races, Mac and Windows capabilities, shortcuts, privacy, preferences, downloads and responsive layout. No microphone capture.');
 } finally {
   socket?.close();
   const exited = new Promise(resolve => { if (browser.exitCode !== null || browser.signalCode !== null) resolve(); else browser.once('exit',resolve); });

@@ -17,7 +17,8 @@ export async function checkRequestedFixes({send,evaluate,until,port}) {
   for (const theme of ['light','dark']) {
     await evaluate(`window.fixture.appearance='${theme}';document.getElementById('nav-settings').click()`);
     await until(`document.documentElement.dataset.appearance==='${theme}'`);
-    assert.equal(await evaluate(`(()=>{const s=getComputedStyle(document.getElementById('settings-started'));return s.paddingLeft===s.paddingRight && s.alignItems==='center' && s.justifyContent==='center';})()`),true,'Setup-guide label is centered by equal padding and flex alignment');
+    assert.equal(await evaluate(`!document.querySelector('#settings-started,#get-started')`),true,'Setup guide is removed, not another expandable recovery surface');
+    assert.equal(await evaluate(`(()=>{const ids=['change-shortcut','recording-limit','sound-style','sound-volume','microphone-choice','recording-mode','appearance-choice','workflow-pause'];const rows=ids.map(id=>document.getElementById(id).getBoundingClientRect());return rows.every((r,i)=>!i||r.top>rows[i-1].top);})()`),true,'Settings priority is shortcut, time, sounds/volume, microphone, mode, appearance, general');
     assert.equal(await evaluate(`(()=>{const c=document.querySelector('.workflow-app-controls'),r=c.previousElementSibling;return c.querySelector('select').getBoundingClientRect().top-r.getBoundingClientRect().bottom>=12;})()`),true,'App picker does not sit on the row divider');
     for (const phase of ['error','not_pasted','setup_required']) {
       await evaluate(`window.fixture.phase='${phase}';window.fixture.message='Microphone capture failed. Please check your input device.'`);
@@ -31,7 +32,7 @@ export async function checkRequestedFixes({send,evaluate,until,port}) {
     await shot(`${theme}-settings`);
     await evaluate(`window.fixture.phase='idle';window.fixture.message=''`);
     await until(`document.getElementById('phase').textContent==='Ready'`);
-    await evaluate(`document.getElementById('nav-practice-page').focus();document.getElementById('nav-practice-page').click()`);
+    await evaluate(`document.getElementById('home-back').focus();document.getElementById('home-back').click()`);
     await until(`window.context>0 && !document.getElementById('practice-start').disabled`);
     const bounds = await evaluate(`(()=>{const r=document.getElementById('practice-text').getBoundingClientRect();return [r.x,r.y,r.width,r.height];})()`);
     const bars = () => evaluate(`Array.from(document.querySelectorAll('#practice-waveform span'),e=>parseFloat(e.style.height))`);
@@ -51,9 +52,9 @@ export async function checkRequestedFixes({send,evaluate,until,port}) {
     await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
     assert.equal(await evaluate(`getComputedStyle(document.querySelector('#practice-waveform span')).transitionDuration`),'0s','Reduced motion disables waveform transitions');
     await send('Emulation.setEmulatedMedia',{features:[]});
-    await evaluate(`document.getElementById('nav-overview').click();window.fixture.phase='error';window.fixture.message='Microphone capture failed. Please check your input device.'`);
+    await evaluate(`window.fixture.phase='error';window.fixture.message='Microphone capture failed. Please check your input device.'`);
     await until(`!document.getElementById('message-recovery').hidden`);
-    assert.equal(await evaluate(`(()=>{const c=document.getElementById('overview-practice'),r=document.getElementById('message-recovery'),m=document.getElementById('message'),s=getComputedStyle(c);return s.backgroundColor==='rgba(0, 0, 0, 0)' && s.borderTopWidth==='0px' && r.getBoundingClientRect().top>c.getBoundingClientRect().bottom && m.getBoundingClientRect().right<r.getBoundingClientRect().left;})()`),true,'Lightweight Practice link and recovery remain separate and aligned without boxed cards');
+    assert.equal(await evaluate(`(()=>{const c=document.getElementById('practice'),r=document.getElementById('message-recovery'),m=document.getElementById('message');return r.getBoundingClientRect().top>c.getBoundingClientRect().bottom && m.getBoundingClientRect().right<r.getBoundingClientRect().left;})()`),true,'Home editor and recovery remain separate and aligned');
     await shot(`${theme}-overview-error`);
     await evaluate(`window.fixture.phase='idle';window.fixture.message=''`);
     await until(`document.getElementById('phase').textContent==='Ready'`);

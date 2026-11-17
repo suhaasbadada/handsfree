@@ -46,6 +46,10 @@ native lifecycle. Opening it uses the existing modal Practice-context revocation
 closing can re-establish eligibility but never starts capture. Permission/download/
 device changes require explicit actions and retain their existing native guards.
 Failure details remain distinct from setup readiness; disconnected status is unknown.
+Dismissal restores the visible status trigger; the explicit Private test action
+instead returns to Home and focuses its editor, without removing it from Tab order.
+This focus-return intent owns no capture lease. An observed unavailable saved input
+cannot paint green Ready or enable the Record action; metadata never proves capture.
 
 1. **Observation is not authorization.** `src/state.ts` describes phase-level UI
    eligibility. Rust checks current ownership under its FIFO/locks before effects.
@@ -89,13 +93,16 @@ Failure details remain distinct from setup readiness; disconnected status is unk
 
 ## Executable contracts
 
-- The dashboard has three explicit destinations: Overview, Practice and Settings.
-  Only the visible, focused Practice page can grant a practice context. Navigation
-  away clears its ephemeral text/input owner and revokes the context; late native
-  receipts cannot revive it. Overview never grants capture or external-delivery
-  authority. Native dashboard own-app refusal remains the independent final guard.
-  The setup guide lives in Settings; tray Practice navigation selects Practice.
-  Browser context, blur, pending-start and stale-receipt contracts cover this split.
+- The dashboard has two content destinations: Home (totals plus private editor)
+  and Settings. Visible, focused Home intentionally grants Practice eligibility,
+  not recording authority. Settings, blur, modal entry, shortcut capture and update
+  installation revoke context and clear ephemeral text/meter/pending input. Late
+  receipts cannot revive it; returning Home never starts recording. Legacy tray
+  Overview/Practice select Home; Practice also focuses its editor. Native receipt,
+  own-app fallback refusal, FIFO, epoch and generation guards remain independent.
+  There is no sidebar, brand menu, tab navigation or setup guide. The top-right
+  product-status dialog owns explicit recovery; observation never prompts,
+  downloads or records. Browser context/race contracts exercise this new boundary.
 
 - Appearance is presentation, not readiness or capture authorization. One saved
   `system`/`light`/`dark` preference defaults only its own absent/malformed field.
@@ -127,7 +134,7 @@ Failure details remain distinct from setup readiness; disconnected status is unk
 - `src/workflow.ts` owns independent pause/login/exclusion/app-list pending flags
   and coalesced status reads. Any write invalidates older snapshots; write replies
   merge only their owned field, preserving concurrent independent edits. Settings
-  and brand-menu pause observe actual native state (including tray changes).
+  pause observe actual native state (including tray changes).
   Login approval is not enabled; failed requests restore observed selections.
   Running apps are metadata-only, loaded on Settings open or explicit Refresh,
   never by status polling. Saved absent bundle IDs remain removable. Installer
@@ -148,8 +155,8 @@ Failure details remain distinct from setup readiness; disconnected status is unk
   Existing external dictation retains its ordinary completion route. Own-app
   delivery refusal code 15 exits before clipboard fallback and usage publication.
 
-- Settings-owned Get started observes explicit native readiness only and reuses explicit
-  permission/download actions. Practice's input meter observes its existing
+- Product status observes explicit native readiness only and reuses explicit
+  permission/download/device actions. Practice's input meter observes its existing
   recorder by token/generation/epoch; no Rust lock crosses synchronous native
   dispatch. Native focus, permission and cancellation checks and a post-dispatch
   lease check fail closed. Shortcut receipt is separate from button-start and
@@ -241,7 +248,7 @@ Failure details remain distinct from setup readiness; disconnected status is unk
   waits happen outside AppKit. See [audio session ownership](AUDIO-SESSION.md).
 
 - Practice owns stable bounded status/copy/action slots, including the native
-  status header and overview diagnostic area. Contextual controls reuse grid
+  status header and Home diagnostic area. Contextual controls reuse grid
   positions; retiring focused controls transfers focus without scrolling. Real
   long errors scroll within their status slot instead of moving the card/activity.
   Fresh-document CDP assertions cover pending/recording/meter/timer/processing/
@@ -249,7 +256,7 @@ Failure details remain distinct from setup readiness; disconnected status is unk
   Populated practice/general status regions are named keyboard tab stops with
   bounded scrolling and stable text nodes; empty reserved slots are not tab stops.
   Recovery uses existing microphone/settings/setup destinations, never inferred
-  URLs or uncertain paste retries. Brand menu keyboard exit/focusout restores
+  URLs or uncertain paste retries. Settings back and modal dismissal restore
   only currently eligible practice context, not held input. Group 4 is partial:
   production-DOM CDP key/AX evidence is not macOS VoiceOver acceptance.
 
@@ -271,6 +278,11 @@ Failure details remain distinct from setup readiness; disconnected status is unk
   minutes; errors clear offer/version/notes, never the installed version. Expired
   confirmation refreshes within the owning RAII operation before the idle lease
   or any archive bytes; changed versions return a fresh offer requiring review.
+  The frontend separately observes an active `install_update` invoke: native
+  validation still displays `checking`, but must already revoke Home Practice
+  context/text/meter. Ordinary feed checks do not revoke it. This local intent
+  retires only with its invoke and re-renders eligibility; it grants no native
+  authority or automatic recording on retirement.
 - `tests/state-catalog.test.mjs`: unique IDs, resolvable owners/anchors/test paths
   and valid dependency references. Catalog cycles reflect coordination, not a
   scheduling order; do not topologically reorder runtime code from this graph.

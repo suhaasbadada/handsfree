@@ -67,6 +67,28 @@ test('installation requires the explicitly clicked version and idle work, and di
   const other = fixture(); other.responses.set('check_for_updates', available()); await other.updates.check(); other.busy();
   await other.updates.install('0.1.1-beta.8'); assert.equal(other.calls.some(c => c.command === 'install_update'), false);
 });
+test('install invoke revokes capture through checking and retirement, unlike a metadata check', async () => {
+  const feed = deferred(), install = deferred(), frames = [];
+  let u;
+  u = new Updates(async command => {
+    if (command === 'check_for_updates') return feed.promise;
+    if (command === 'install_update') {
+      assert.equal(u.installing, true, 'Capture is already excluded before native validation starts');
+      return install.promise;
+    }
+    return view('checking');
+  }, () => frames.push([u.view.phase, u.installing]), () => true);
+  const checking = u.check();
+  assert.equal(u.installing, false, 'An ordinary metadata check does not clear Home Practice');
+  feed.resolve(available()); await checking;
+  await u.prepareConfirmation();
+  const installing = u.install('0.1.1-beta.8');
+  assert.equal(u.view.phase, 'checking'); assert.equal(u.installing, true);
+  await u.progress(); assert.equal(u.installing, true, 'Checking progress cannot retire the invoke owner');
+  install.resolve(view('error', {message:'Signature rejected'})); await installing;
+  assert.equal(u.installing, false);
+  assert.deepEqual(frames.at(-1), ['error', false], 'Retirement re-renders actual eligibility without starting capture');
+});
 test('offline checks and installation failures stay visible and permit an explicit retry', async () => {
   const { updates: u, responses, calls } = fixture();
   responses.set('check_for_updates', new Error('Feed unavailable (HTTP 404)')); await u.check();

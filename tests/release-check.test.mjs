@@ -14,7 +14,7 @@ function fixture() {
   return { provenance, hashes, checksums: Object.entries(hashes).map(([name, hash]) => `${hash}  ${name}\n`).join(''), commit, tree, status: '' };
 }
 test('clean candidate has exact source commit/tree and six verified payload checksums', () => {
-  assert.deepEqual(payloadNames, ['HandsFree-0.1.1-beta.23-macos-arm64.dmg', 'PROVENANCE.txt', 'HandsFree-0.1.1-beta.23-macos-arm64.app.tar.gz', 'HandsFree-0.1.1-beta.23-macos-arm64.app.tar.gz.sig', 'UPDATER-PROVENANCE.txt', 'macos-arm64.json']);
+  assert.deepEqual(payloadNames, ['HandsFree-0.1.1-beta.24-macos-arm64.dmg', 'PROVENANCE.txt', 'HandsFree-0.1.1-beta.24-macos-arm64.app.tar.gz', 'HandsFree-0.1.1-beta.24-macos-arm64.app.tar.gz.sig', 'UPDATER-PROVENANCE.txt', 'macos-arm64.json']);
   assert.equal(validateMetadata(fixture()), commit);
 });
 for (const name of payloadNames) test(`manifest rejects altered ${name} bytes`, () => {
@@ -23,12 +23,12 @@ for (const name of payloadNames) test(`manifest rejects altered ${name} bytes`, 
   assert.throws(() => validateMetadata(f), /SHA-256 mismatch/);
 });
 test('updater feed and provenance bind exact target, source, signature and executable', () => {
-  assert.equal(archiveName, 'HandsFree-0.1.1-beta.23-macos-arm64.app.tar.gz');
+  assert.equal(archiveName, 'HandsFree-0.1.1-beta.24-macos-arm64.app.tar.gz');
   const signature = 'uploaded-signature';
   const executableHash = digest('sealed executable');
-  const provenance = `Distribution: 0.1.1-beta.23\nSource commit: ${commit}\nApp executable SHA-256: ${executableHash}\n`;
+  const provenance = `Distribution: 0.1.1-beta.24\nSource commit: ${commit}\nApp executable SHA-256: ${executableHash}\n`;
   const verify = feed => validateUpdaterMetadata(feed, signature, provenance, commit, executableHash);
-  const fresh = () => updaterFeed('0.1.1-beta.23', signature);
+  const fresh = () => updaterFeed('0.1.1-beta.24', signature);
   assert.doesNotThrow(() => verify(fresh()));
   for (const mutate of [
     f => { f.version = '0.1.1-beta.6'; },
@@ -58,17 +58,17 @@ for (const [label, mutate, message] of [
 
 const sizes = Object.fromEntries(names.map((name, index) => [name, 123 + index]));
 test('draft audit requires the matching website manifest to remain unavailable', () => {
-  assert.equal(tag, 'v0.1.1-beta.23');
-  assert.equal(candidate, 'HandsFree-0.1.1-beta.23-macos-arm64.dmg');
+  assert.equal(tag, 'v0.1.1-beta.24');
+  assert.equal(candidate, 'HandsFree-0.1.1-beta.24-macos-arm64.dmg');
   assert.equal(release.publicAvailable, false);
   assert.throws(() => validateAvailability(publishedRelease), /manifest disabled/);
-  assert.doesNotThrow(() => validateAvailability(release, true), 'Public audit mode accepts beta 23 candidate coordinates without activating downloads');
+  assert.doesNotThrow(() => validateAvailability(release, true), 'Public audit mode accepts beta 24 candidate coordinates without activating downloads');
   assert.equal(publishedRelease.version, '0.1.1-beta.23');
-  assert.doesNotThrow(() => validateAvailability(publishedRelease, true), 'Activated public metadata selects the audited beta 23 artifact');
-  for (const version of ['beta.5', 'beta.6', 'beta.7', 'beta.8', 'beta.9', 'beta.10', 'beta.11', 'beta.12', 'beta.13', 'beta.14', 'beta.15', 'beta.16', 'beta.17', 'beta.18', 'beta.19', 'beta.20', 'beta.21', 'beta.22']) {
-    const historical = { ...release, version: `0.1.1-${version}`, dmgUrl: release.dmgUrl.replaceAll('beta.23', version) };
+  assert.throws(() => validateAvailability(publishedRelease, true), /manifest disabled/, 'Published beta 23 cannot satisfy a beta 24 candidate audit');
+  for (const version of ['beta.5', 'beta.6', 'beta.7', 'beta.8', 'beta.9', 'beta.10', 'beta.11', 'beta.12', 'beta.13', 'beta.14', 'beta.15', 'beta.16', 'beta.17', 'beta.18', 'beta.19', 'beta.20', 'beta.21', 'beta.22', 'beta.23']) {
+    const historical = { ...release, version: `0.1.1-${version}`, dmgUrl: release.dmgUrl.replaceAll('beta.24', version) };
     for (const publicMode of [false, true]) {
-      assert.throws(() => validateAvailability(historical, publicMode), /manifest disabled/, 'Earlier versions cannot substitute for the beta 23 artifact');
+      assert.throws(() => validateAvailability(historical, publicMode), /manifest disabled/, 'Earlier versions cannot substitute for the beta 24 artifact');
     }
   }
   assert.doesNotThrow(() => validateAvailability({ ...release, publicAvailable: false }));
@@ -107,12 +107,7 @@ for (const [label, mutate, message] of [
   ['extra updater archive', d => { d.assets.push({ name: 'HandsFree-old.app.tar.gz' }); }, /exactly seven/],
 ]) test(`draft audit rejects ${label}`, () => { const d = draft(); mutate(d); assert.throws(() => validateDraft(d, commit, sizes), message); });
 
-test('first-install actions stay visible, offline-aware and explicitly initiated', () => {
-  const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
-  assert.doesNotMatch(source, /<details\b|<summary\b/);
-  assert.match(source, /Download English model \(~148 MB\)/);
-  assert.match(source, /Works offline afterward/);
-  assert.match(source, /title="Applies to the next recording"/);
-  assert.match(source, /el\('mic'\)\.onclick = \(\) => void action\('request_microphone'\)/);
-  assert.match(source, /el\('overview-download'\)\.onclick = \(\) => void downloadModel\(\)/);
-});
+// First-install recovery is exercised through real DOM actions in
+// ui-practice-events.mjs: no implicit consent/download/capture, explicit health
+// actions, pending guards and restored readiness. Release audits do not infer
+// that behavior from obsolete Overview markup or implementation source strings.

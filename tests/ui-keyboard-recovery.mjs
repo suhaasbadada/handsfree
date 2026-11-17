@@ -4,8 +4,7 @@ import assert from 'node:assert/strict';
 // macOS VoiceOver / WKWebView or ServiceManagement acceptance.
 export async function checkKeyboardRecovery({send,evaluate,until,port}) {
   await send('Page.navigate', {url:`http://127.0.0.1:${port}`});
-  await until(`Boolean(document.getElementById('nav-practice-page'))`);
-  await evaluate(`document.getElementById('nav-practice-page').click()`);
+  await until(`Boolean(document.getElementById('home'))`);
   await until(`window.context>0 && !document.getElementById('practice-start').disabled`);
   const key = async (key, modifiers=0) => {
     const codes = {Enter:13,' ':32,ArrowDown:40,ArrowUp:38,Home:36,End:35,Escape:27,Tab:9,PageDown:34};
@@ -14,33 +13,23 @@ export async function checkKeyboardRecovery({send,evaluate,until,port}) {
   };
   const focused = () => evaluate(`document.activeElement.id || document.activeElement.className`);
   const ax = await send('Accessibility.getFullAXTree');
-  assert.ok(ax.nodes.some(n=>n.role?.value==='button' && n.name?.value==='HandsFree menu'));
-  for (const opener of ['Enter',' ','ArrowDown']) {
-    await evaluate(`window.keyTrace=[];if(!window.traceInstalled){window.traceInstalled=true;for(const type of ['focusin','focusout','click','keydown','keyup'])document.addEventListener(type,e=>window.keyTrace.push([e.type,e.target.id||e.target.className,e.key,e.relatedTarget?.id]),true);}`);
-    await evaluate(`document.querySelector('.brand').focus()`); await key(opener);
-    assert.equal(await focused(),'brand-overview',`${opener} opens at first item: ${JSON.stringify(await evaluate(`window.keyTrace`))}`);
-    await evaluate(`document.getElementById('brand-started').disabled=true`);
-    await key('ArrowDown'); assert.equal(await focused(),'brand-settings','Disabled item skipped');
-    await key('End'); assert.equal(await focused(),'brand-updates');
-    await key('Home'); assert.equal(await focused(),'brand-overview');
-    await key('ArrowUp'); assert.equal(await focused(),'brand-updates');
-    await key('Escape'); assert.equal(await focused(),'brand');
+  assert.ok(ax.nodes.some(n=>n.role?.value==='button' && n.name?.value==='Settings'));
+  assert.ok(!ax.nodes.some(n=>n.name?.value==='HandsFree menu'));
+  for (const opener of ['Enter',' ']) {
+    await evaluate(`document.getElementById('nav-settings').focus()`); await key(opener);
+    assert.equal(await focused(),'settings-title');
+    assert.equal(await evaluate(`window.context===0 && document.getElementById('home').hidden`),true,'Keyboard Settings revokes private context');
+    for (const id of ['recording-mode','appearance-choice','sound-style']) {
+      await evaluate(`document.getElementById('${id}').focus()`);
+      assert.equal(await focused(),id,'Native select is keyboard focusable');
+      assert.equal(await evaluate(`(()=>{const e=document.getElementById('${id}'),s=getComputedStyle(e.parentElement.querySelector('svg'));return e.tagName==='SELECT' && s.display!=='none' && parseFloat(s.width)>=12 && s.pointerEvents==='none' && s.color===getComputedStyle(document.body).color;})()`),true,'Theme-safe visible chevron does not intercept native control');
+    }
+    await evaluate(`document.getElementById('home-back').focus()`); await key(opener);
+    assert.equal(await focused(),'practice-text');
+    assert.equal(await evaluate(`document.getElementById('practice-text').tabIndex`),0,'Home return must not remove the editor from sequential keyboard navigation');
+    await until(`window.context>0`);
+    assert.equal(await evaluate(`!window.calls.some(c=>c.command==='practice_start')`),true,'Home return only restores eligibility, never capture');
   }
-  await key('Enter'); await key('Tab');
-  assert.equal(await focused(),'nav-overview');
-  assert.equal(await evaluate(`document.getElementById('brand-menu').hidden && window.context>0`),true,'Tab closes and restores eligible practice context');
-  await evaluate(`document.querySelector('.brand').focus()`); await key('Enter'); await key('Tab',8);
-  assert.equal(await evaluate(`document.getElementById('brand-menu').hidden && !document.activeElement.closest('#brand-menu')`),true,'Shift Tab exits composite');
-  await evaluate(`document.querySelector('.brand').focus()`); await key('Enter');
-  await evaluate(`document.getElementById('nav-settings').focus()`);
-  assert.equal(await focused(),'nav-settings');
-  assert.equal(await evaluate(`document.getElementById('brand-menu').hidden`),true,'Focusout does not steal focus');
-  await evaluate(`document.querySelector('.brand').focus()`); await key('Enter'); await key('ArrowDown'); await key('Enter');
-  assert.equal(await focused(),'settings-title');
-  await evaluate(`document.querySelector('.brand').focus()`); await key('Enter'); await key('Enter');
-  assert.equal(await focused(),'overview-title');
-  assert.equal(await evaluate(`window.context===0`),true,'Overview menu selection does not restore Practice context');
-  await evaluate(`document.getElementById('nav-practice-page').click()`);
 
   await evaluate(`window.rejectStart='Selected microphone unavailable. Reconnect it or choose another microphone. '.repeat(80);document.getElementById('practice-start').click()`);
   await until(`!document.getElementById('practice-recovery').hidden`);
@@ -61,8 +50,9 @@ export async function checkKeyboardRecovery({send,evaluate,until,port}) {
   await evaluate(`document.getElementById('practice-recovery').click()`);
   assert.equal(await focused(),'health-title','Explicit recovery opens the direct product-status panel, not another Settings button');
   await evaluate(`document.getElementById('health-close').click()`);
-  await evaluate(`window.fixture.phase='idle';window.fixture.message='';window.rejectStart='';document.getElementById('nav-practice-page').click()`);
-  await until(`document.getElementById('practice-message').textContent.startsWith('No clipboard or usage counted.') && document.getElementById('message').hidden`);
+  await evaluate(`window.fixture.phase='idle';window.fixture.message='';window.rejectStart='';document.getElementById('home-back').click()`);
+  await until(`document.getElementById('practice-message').textContent==='' && document.getElementById('message').hidden`);
+  assert.equal(await evaluate(`document.querySelector('.practice-badge').textContent==='Private' && document.getElementById('practice-text').getAttribute('aria-describedby')==='practice-privacy' && getComputedStyle(document.getElementById('practice-privacy')).position==='absolute'`),true,'Idle Home keeps a compact privacy label and accessible description, not another explanatory paragraph');
   assert.equal(await evaluate(`['practice-message','message'].every(id=>!document.getElementById(id).hasAttribute('tabindex'))`),true,'Empty reserved status is not a tab stop');
 
   await evaluate(`document.getElementById('nav-settings').click()`);
@@ -84,9 +74,9 @@ export async function checkKeyboardRecovery({send,evaluate,until,port}) {
   assert.equal(await focused(),'launch-at-login');
   await evaluate(`window.loginAck=null;document.getElementById('launch-at-login').click()`);
   await until(`typeof window.loginAck==='function'`);
-  await evaluate(`document.getElementById('nav-overview').focus();document.getElementById('nav-overview').click();document.getElementById('nav-settings').click();window.loginAck()`);
+  await evaluate(`document.getElementById('home-back').click();document.getElementById('nav-settings').click();window.loginAck()`);
   await until(`!document.getElementById('launch-at-login').disabled`);
-  assert.equal(await focused(),'nav-overview','Navigating away and back revokes delayed focus ownership');
+  assert.equal(await focused(),'settings-title','Navigating away and back revokes delayed focus ownership');
 
   await evaluate(`window.workflow.excluded_bundle_ids=['com.first','com.middle','com.last']`);
   await until(`document.querySelector('[aria-label="Remove com.middle"]')`);

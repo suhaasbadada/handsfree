@@ -8,14 +8,18 @@
   clears stale readiness. Native guards remain authoritative; private testing still
   needs explicit Start. The dialog follows existing Practice-context revocation,
   restores focus on dismissal, and keeps recovery actions reachable in small windows.
-- Overview and Practice fit the default 980×820 and minimum 560×650 windows in
-  their normal ready states. Settings has one content scroller; the sidebar and
+- Home combines Words, Time saved and Dictations with the private editor in one
+  screen, fitting default 980×820 and minimum 560×650 normal ready states.
+  There is no sidebar, brand menu or Overview/Practice tab bar. A static brand
+  anchors the header; compact status and one accessible Settings gear sit right.
+  Settings replaces Home; a header back arrow returns Home without recording.
+  Settings has one content scroller; the header and
   compact footer stay in place. Small/zoomed viewports use normal reachable
   document scrolling rather than clipping controls. Long transcripts and errors
   remain keyboard-readable; fitting a normal page never hides actual content.
-- Practice has one editor and primary action. Start, Finish and Record again
+- Practice has one editor and primary action. Record, Finish and Record again
   reuse their action slot. Meter, timer and status transitions do not move the
-  editor. Settings lives in the sidebar only; navigating there retires private
+  editor. Settings has one header entry; navigating there retires private
   context/text. Error-specific recovery opens product status, never another
   Settings button. No onboarding panel is inserted into Practice.
 - Practice's compact waveform projects only the existing identity/readiness-checked
@@ -24,11 +28,16 @@
   remains available and reduced-motion disables bar transitions. Privacy is the
   idle status fallback, with a persistent editor description for screen readers.
 - Page hierarchy uses typography, whitespace and subtle dividers, not filled,
-  bordered cards around every section. Overview metrics are unboxed; the Practice
-  link is a lightweight row. Practice retains only its functional editor surface.
+  bordered cards around every section. Home metrics are unboxed and the private
+  editor retains only its functional surface.
   Settings sections have no enclosing rectangles. Buttons center labels with equal
   inline padding; controls use compact 32px targets and quiet native select values
-  instead of filled rectangles. Utility actions use labeled SVG icons. The app
+  instead of filled rectangles. Native selects have separate current-color SVG
+  chevrons (including mode, appearance and completion sound), preserving native
+  keyboard semantics, ellipsis and full-name tooltips. Microphone help is an
+  accessible description, not a paragraph competing with its refresh button.
+  Settings order is shortcut, recording limit, sound and adjacent volume, then
+  microphone, mode, appearance and General extras. Utility actions use labeled SVG icons. The app
   picker clears its divider; recovery remains separate
   and aligned. Long recovery text stays scrollable rather than overlapping actions.
 - Sound preview remains usable in quiescent idle/result/error/setup phases, without
@@ -43,12 +52,16 @@
   overflow hiding is not a fix. Offscreen WKWebView regressions exercise realistic,
   unavailable and long labels, both palettes, minimum/tiny widths and measured 16px
   scrollbar gutters, with a reversible negative control for the original overflow.
-- The revisitable setup guide belongs to Settings. It observes native proofs and
-  uses explicit permission/download actions. Closing it focuses the visible
-  Settings heading, never a hidden practice field.
+- Setup guidance is removed. Product status remains the single health/recovery
+  surface with explicit permission/model/device actions. Ready is green only
+  when native requirements are met; missing requirements, capture errors and
+  disconnection remain red, never relabeled healthy because permissions pass.
+  Home eligibility is intentional: native private shortcut receipts work there,
+  but Settings/modal/blur/install revoke all pending Practice work and clear text
+  and meter. Returning only restores eligibility, never starts recording.
 - Updates stay inline in the footer, with no update or install-confirmation modal.
-  Clicking the refresh action checks the feed and spins its icon. A verified offer
-  changes that same control to Download & update with its exact version; another
+  Clicking the refresh action checks the feed and shows a busy SVG spinner. A verified offer
+  changes that same control to a download icon and Download & update with its exact version; another
   explicit click rechecks and installs only that version, then the native updater
   reopens HandsFree. A changed offer needs another click, never silent consent.
   Busy states disable repeats, byte progress and failures stay inline, and ordinary

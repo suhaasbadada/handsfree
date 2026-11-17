@@ -38,14 +38,14 @@ test('README, release notes, installer guide and filename disclose beta without 
   assert.match(read('docs/releases/v0.1.1-beta.2.md'), /# HandsFree v0\.1\.1-beta\.2/);
   assert.match(read('docs/releases/v0.1.1-beta.2.md'), /Prerelease · Beta testing/);
   assert.match(read('docs/INSTALL.md'), /# Install HandsFree \(Mac beta\)/);
-  assert.match(read('scripts/package-release.sh'), /NAME=HandsFree-0\.1\.1-beta\.23-macos-arm64/);
+  assert.match(read('scripts/package-release.sh'), /NAME=HandsFree-0\.1\.1-beta\.24-macos-arm64/);
   assert.match(read('scripts/package-release.sh'), /-volname 'HandsFree Beta — drag to Applications'/);
   const config = JSON.parse(read('src-tauri/tauri.conf.json'));
   assert.equal(config.productName, 'HandsFree');
   assert.equal(config.identifier, 'com.handsfree.local');
 });
 
-test('published active Mac beta 23 and disabled beta 23 audit coordinates keep embedded version unchanged', async () => {
+test('published active Mac beta 23 and disabled beta 24 candidate keep embedded version unchanged', async () => {
   const { release, candidateRelease } = await import('../site/release.js');
   const { candidate, tag } = await import('../scripts/check-release.mjs');
   const version = JSON.parse(read('package.json')).version;
@@ -57,16 +57,16 @@ test('published active Mac beta 23 and disabled beta 23 audit coordinates keep e
   assert.ok(read('src-tauri/Cargo.lock').includes(`name = "handsfree"\nversion = "${version}"`));
   assert.equal(release.version, `${version}-beta.23`);
   assert.equal(release.publicAvailable, true, 'Activation follows publication and public asset verification');
-  assert.equal(candidateRelease.version, `${version}-beta.23`);
+  assert.equal(candidateRelease.version, `${version}-beta.24`);
   assert.equal(candidateRelease.publicAvailable, false, 'Candidate must not activate public downloads');
   assert.ok(release.dmgUrl.endsWith(`/releases/download/v${release.version}/HandsFree-${release.version}-macos-arm64.dmg`));
-  assert.equal(release.dmgUrl, candidateRelease.dmgUrl, 'Active release selects the audited beta 23 artifact');
+  assert.notEqual(release.dmgUrl, candidateRelease.dmgUrl, 'Beta 24 preparation must not activate downloads');
   assert.deepEqual(candidateRelease, {
     schemaVersion: 1,
-    version: '0.1.1-beta.23',
+    version: '0.1.1-beta.24',
     publicAvailable: false,
-    status: 'Mac beta 23 candidate: certify actual input identity, formats and running state across configuration notifications and final drain. Three isolated hardware diagnostics passed; installed dictation, acoustic audibility, OTA, packaging, publication and public audit remain unverified; not an availability switch.',
-    dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.23/HandsFree-0.1.1-beta.23-macos-arm64.dmg',
+    status: 'Mac beta 24 candidate: simplified Home, Settings and product health UI. Exact signed-candidate hardware, private Practice, packaging, publication and installed OTA/restart acceptance remain pending; not an availability switch.',
+    dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.24/HandsFree-0.1.1-beta.24-macos-arm64.dmg',
   }, 'Candidate coordinates remain isolated from the active public release');
   assert.equal(JSON.parse(read('src-tauri/distribution.json')).version, candidateRelease.version);
   assert.equal(tag, `v${candidateRelease.version}`);
@@ -77,6 +77,38 @@ test('published active Mac beta 23 and disabled beta 23 audit coordinates keep e
   assert.ok(read('src/main.ts').includes(`<span id="app-version">${version}</span>`));
   assert.match(read('src/main.ts'), /getVersion\(\)\.then/);
   assert.ok(read(`docs/releases/${tag}.md`).includes(`Internal app version: **${version}**`));
+});
+
+test('beta 24 preparation preserves all prior guide, notes and active release bytes', () => {
+  const guide = read('docs/RELEASING.md');
+  assert.ok(guide.startsWith('## Beta 24 candidate preparation\n'));
+  const prior = guide.slice(guide.indexOf('## Beta 23 publication — exact signed candidate\n'));
+  assert.equal(createHash('sha256').update(prior).digest('hex'),
+    '3df627c0d5e669278ef3c860882d96b0bfe17d42e594eba4d012f6cac59a9e3d',
+    'Entire beta 23 publication/preparation and older guide remain byte-identical');
+  const historical = createHash('sha256');
+  for (let beta = 6; beta <= 23; beta++) historical.update(read(`docs/releases/v0.1.1-beta.${beta}.md`));
+  assert.equal(historical.digest('hex'), '645882b57b4510e20b97d8d3e0d2954f933499701147c88ed91b6a387d035ef6');
+  for (const [name, hash] of [
+    ['release', '9ff976730de65177715a48d8ae5307e6bbe7979ca971d79f3dc5a48ec06e4bf7'],
+    ['windowsRelease', 'ad8b3df4266efb3b3ea9d037cc8a03ee71cf8db3556cd6491896d7629954dd62'],
+  ]) {
+    const object = read('site/release.js').match(new RegExp(`export const ${name} = Object.freeze\\(\\{[\\s\\S]*?\\n\\}\\);`))?.[0];
+    assert.ok(object, name);
+    assert.equal(createHash('sha256').update(object).digest('hex'), hash, `${name} stays byte-identical during preparation`);
+  }
+});
+
+test('beta 24 checkpoints distinguish implementation, earlier verification and pending exact-candidate gates', () => {
+  const notes = read('docs/releases/v0.1.1-beta.24.md').replace(/\s+/g, ' ');
+  for (const checkpoint of ['Unpublished experimental Mac candidate', 'Internal app version: **0.1.1**',
+    'Remove sidebar', 'Settings entry', 'Prioritize Settings', 'select affordances',
+    'microphone help', 'Honest health colors', 'Remove Setup guide', 'Minimal copy',
+    'Home context merge is intentional', 'eligibility is **not** native authorization',
+    'Updates.installing', 'pending-check revocation', 'No native capture implementation changes',
+    'beta 24 checkpoints', 'Beta 23 receipts cannot substitute',
+    'node scripts/publish-release.mjs --publish release', "installed app's in-app OTA/restart",
+    'Exit beta only after user satisfaction', '943c87c']) assert.ok(notes.includes(checkpoint), checkpoint);
 });
 
 test('beta 22 publication documents audited source and capture-first scope without manufacturing hardware receipts', () => {
@@ -271,7 +303,7 @@ test('beta 17 publication records exact receipts without claiming deployment or 
     'candidateRelease.publicAvailable']) {
     assert.ok(notes.includes(evidence), evidence);
   }
-  assert.ok(read('src-tauri/src/updater.rs').includes('assert_eq!(installed_version(), "0.1.1-beta.23")'));
+  assert.ok(read('src-tauri/src/updater.rs').includes('assert_eq!(installed_version(), "0.1.1-beta.24")'));
   const guide = read('docs/RELEASING.md');
   assert.ok(guide.indexOf('## Beta 17 publication') < guide.indexOf('## Beta 16 publication'));
   for (const source of [notes, guide]) {
@@ -502,7 +534,7 @@ test('beta 12 historical notes and completed group 2 parity ledger do not claim 
   }
 });
 
-test('beta 23 packaging retains practice guidance; beta 6 publication evidence remains historical', () => {
+test('beta 24 packaging retains practice guidance; beta 6 publication evidence remains historical', () => {
   const packager = read('scripts/package-release.sh');
   const audit = read('scripts/check-release.mjs');
   for (const name of ['practice.md', 'COMPATIBILITY-PASTE.md']) {
@@ -510,7 +542,7 @@ test('beta 23 packaging retains practice guidance; beta 6 publication evidence r
     assert.ok(packager.includes(`Licenses/Documentation/${name}`));
     assert.ok(audit.includes(`Documentation/${name}`));
   }
-  assert.ok(packager.includes('docs/releases/v0.1.1-beta.23.md'));
+  assert.ok(packager.includes('docs/releases/v0.1.1-beta.24.md'));
   assert.match(audit, /validateAvailability\([^\n]*\.candidateRelease, publicMode\)/);
   const notes = read('docs/releases/v0.1.1-beta.6.md');
   assert.match(notes, /Published experimental Mac beta/);
