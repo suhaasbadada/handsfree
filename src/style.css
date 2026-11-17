@@ -139,16 +139,20 @@ h2, h3 { margin: 0; }
 .hero p { color: var(--muted); margin: 0; line-height: 1.8; }
 .hero .hint { margin-top: 4px; font-size: 12px; }
 kbd { display: inline-block; max-width: 100%; color: var(--accent); background: var(--button); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; padding: 1px 7px; overflow-wrap: anywhere; }
-.activity { margin-top: 24px; }
-.activity + .practice { margin-top: 28px; }
+.activity { margin-top: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.activity .metrics strong { font-size: clamp(28px, 4vw, 40px); font-weight: 600; letter-spacing: -1.5px; line-height: 1.15; margin-top: 12px; font-variant-numeric: tabular-nums; }
+.activity .metrics article:first-child strong { color: var(--accent); }
+.activity .metrics article + article { padding-left: 24px; border-left: 1px solid var(--line); }
+.activity + .practice { margin-top: 20px; }
 .activity > h2 { margin-bottom: 10px; font-size: 12px; color: var(--muted); font-weight: 500; }
 .metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; padding: 0; margin: 0; border: 0; background: transparent; }
-.metrics article { min-width: 0; background: transparent; padding: 8px 0; }
+.metrics article { display: grid; grid-template-rows: 40px auto; min-width: 0; background: transparent; padding: 8px 0; }
 .metrics strong { color: var(--text); overflow-wrap: anywhere; margin-top: 8px; }
 .metrics small { font-size: 9px; font-weight: 400; color: var(--muted); }
 .metrics strong, .metrics article > span { display: block; }
-.metrics article > span { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 0; color: var(--muted); }
+.metrics article > span { display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; min-height: 34px; gap: 5px; margin: 0; color: var(--muted); }
 .metrics svg { width: 14px; height: 14px; }
+.metrics article > span > svg { width: 16px; height: 16px; margin-right: 2px; color: var(--accent); }
 .card { background: transparent; border: 0; border-radius: 0; padding: 0; margin-bottom: 28px; }
 .card > h2 { padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .card-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -314,7 +318,12 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .test-badge svg { width: 12px; height: 12px; }
 .practice-bottom { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 .practice-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.practice-badge { color: var(--muted); font-size: 12px; }
+.practice-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--text); }
+.practice-badge svg { width: 15px; height: 15px; color: var(--accent); }
+#nav-settings { width: 36px; height: 36px; border-radius: 10px; background: var(--button); }
+#nav-settings svg { width: 21px; height: 21px; stroke-width: 1.8; }
+.practice textarea { font-size: 16px; line-height: 1.65; padding: 16px; border-radius: 12px; }
+.practice-actions .primary { min-height: 38px; padding-inline: 14px; border-radius: 9px; }
 .practice-bottom .subtle { text-align: right; font-size: 10px; line-height: 1.6; }
 .icon-action { display: inline-flex; align-items: center; justify-content: center; width: 32px; min-width: 32px; height: 32px; padding: 0; background: transparent; }
 .icon-action svg { width: 17px; height: 17px; }

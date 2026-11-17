@@ -5,6 +5,8 @@ import { join } from 'node:path';
 export async function checkRefinement({send,evaluate,until,port}) {
   await send('Page.navigate',{url:`http://127.0.0.1:${port}`});
   await until(`document.getElementById('phase')?.textContent==='Ready'`);
+  assert.equal(await evaluate(`(()=>{const button=document.getElementById('nav-settings'),svg=button.querySelector('svg'),r=svg.getBoundingClientRect(),b=button.getBoundingClientRect(),ink=svg.getBBox();return r.width>=20 && Math.abs(r.width-r.height)<1 && Math.abs(ink.width-ink.height)<.1 && Math.abs(r.left+r.width/2-b.left-b.width/2)<1 && Math.abs(r.top+r.height/2-b.top-b.height/2)<1;})()`),true,'Settings gear has balanced square geometry and is centered in its hit target');
+  assert.equal(await evaluate(`Array.from(document.querySelectorAll('.metrics article')).every(a=>a.querySelector('span > svg')?.getAttribute('aria-hidden')==='true') && parseFloat(getComputedStyle(document.getElementById('words')).fontSize)>=28 && getComputedStyle(document.getElementById('words')).fontVariantNumeric.includes('tabular-nums')`),true,'Home presents real totals with a readable numeric hierarchy and decorative metric icons, not fake history charts');
   const screenshot = async name => {
     if (!process.env.UI_SCREENSHOTS) return;
     await evaluate(`Promise.allSettled(document.getAnimations().filter(a=>a.effect?.getTiming().iterations!==Infinity).map(a=>a.finished))`);
@@ -20,7 +22,10 @@ export async function checkRefinement({send,evaluate,until,port}) {
       for (const tab of ['home','settings']) {
         await evaluate(`document.getElementById('${tab==='home'?'home-back':'nav-settings'}').click()`);
         assert.equal(await evaluate(`Array.from(document.querySelectorAll('.hero,.metrics,.card')).every(e=>{const s=getComputedStyle(e);return s.backgroundColor==='rgba(0, 0, 0, 0)' && s.borderLeftWidth==='0px' && s.borderRightWidth==='0px' && s.boxShadow==='none';})`),true,'Page sections use typography and spacing, not filled rectangular containers');
-        if (tab==='home') await until(`window.context>0 && !document.getElementById('practice-start').disabled`);
+         if (tab==='home') {
+           await until(`window.context>0 && !document.getElementById('practice-start').disabled`);
+           assert.equal(await evaluate(`(()=>{const tops=['words','saved','count'].map(id=>document.getElementById(id).getBoundingClientRect().top);return Math.max(...tops)-Math.min(...tops)<1;})()`),true,'Stat values share a baseline even when Estimated wraps at narrow widths');
+         }
         await screenshot(`${width}-${theme}-${tab}`);
         const fit = await evaluate(`(()=>{const main=document.querySelector('main'),footer=document.querySelector('footer').getBoundingClientRect();return {body:document.documentElement.scrollHeight<=innerHeight+1,main:main.scrollHeight<=main.clientHeight+1,footer:footer.bottom<=innerHeight+1,horizontal:document.documentElement.scrollWidth<=innerWidth,heights:[main.scrollHeight,main.clientHeight]};})()`);
         assert.equal(fit.body && fit.footer && fit.horizontal,true,`${width} ${theme} ${tab}: viewport-bound shell`);

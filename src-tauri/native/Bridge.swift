@@ -703,6 +703,7 @@ class PillView: NSView {
         }
     }
     var showsStartupIndicator: Bool { phase == 1 && !audioReady }
+    var startupIndicatorCenter: NSPoint { NSPoint(x: capsuleRect.midX, y: capsuleRect.midY) }
     var showsCaptureMeter: Bool { phase == 1 && audioReady }
     var captureTimerText: String? { showsCaptureMeter ? Self.timerText(elapsed: elapsed, limit: limit) : nil }
     static func timerText(elapsed: Double, limit: UInt32) -> String {
@@ -773,7 +774,7 @@ class PillView: NSView {
                 palette.text.withAlphaComponent(0.65).setStroke()
                 let arc = NSBezierPath()
                 let angle: CGFloat = reduceMotion ? 0 : -tick * 12
-                arc.appendArc(withCenter: NSPoint(x: 75, y: 28), radius: 5, startAngle: angle, endAngle: angle + 260)
+                arc.appendArc(withCenter: startupIndicatorCenter, radius: 5, startAngle: angle, endAngle: angle + 260)
                 arc.lineWidth = 1.5; arc.lineCapStyle = .round; arc.stroke()
             }
         } else if phase == 2 {

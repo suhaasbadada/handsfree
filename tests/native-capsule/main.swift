@@ -330,6 +330,8 @@ axPill.setPhase(1)
 precondition(axPill.accessibilityRole() == .group)
 precondition(axPill.accessibilityLabel() == "HandsFree starting")
 precondition(axPill.showsStartupIndicator && !axPill.showsCaptureMeter && axPill.captureTimerText == nil)
+precondition(axPill.startupIndicatorCenter == NSPoint(x: axPill.capsuleRect.midX, y: axPill.capsuleRect.midY))
+precondition(axPill.startupIndicatorCenter == NSPoint(x: 75, y: 22))
 axPill.audioReady = true
 precondition(!axPill.showsStartupIndicator && axPill.showsCaptureMeter && axPill.captureTimerText != nil)
 precondition(axPill.accessibilityLabel() == "HandsFree listening")
