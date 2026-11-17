@@ -39,8 +39,9 @@ test('memory capture converter drains hardware-rate stereo and bounds producer b
     assert.match(output, /Production split-engine owner partial starts, input-only topology, muted allocation, output route disposition and bounded first diagnostics passed without hardware/);
     assert.match(output, /Production preaccept negotiation: fresh 48-to-24k converter\/tap, same UID, stale callbacks, cleanup\/cancel\/gate failures and one hardware 3s watchdog passed without hardware/);
     assert.match(output, /Production phase deadline transfer: virtual 2.633s hardware with immediate capture, stale timers, blocked factory\/enable, muted handoff and cancellation\/epoch gates passed without hardware/);
-    assert.match(output, /Production input-only preaccept validation: benign notification, UID\/formats\/running failures, atomic revision, cancellation\/timeout tombstones and strict runtime failure passed without hardware/);
+    assert.match(output, /Production input-only preaccept validation: benign notification, UID\/formats\/running failures, atomic revision, cancellation\/timeout tombstones and certified runtime failure passed without hardware/);
     assert.match(output, /Capture-first deferred completion: no startup cue work\/tail, EOS before blocked output, cancel\/deadline retirement barriers and no-PCM\/missing-asset disposition passed without hardware/);
+    assert.match(output, /Production accepted-input certification: 25 route\/format\/running, provisional PCM, cancellation\/watchdog and final drain revision scenarios passed without hardware/);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 

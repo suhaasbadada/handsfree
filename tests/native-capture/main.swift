@@ -329,7 +329,8 @@ final class SessionHarness {
             self.event(ending ? "end" : "start")
             if self.failurePoint == (ending ? "end" : "start") { throw NSError(domain: "synthetic", code: 1) }
         }, stopCue: { self.event("stopCue") }, stop: { self.event("stop") },
-        level: { -30 }, outputRate: { 24000 }, cancel: { self.event("revoke") })
+        level: { -30 }, outputRate: { 24000 }, cancel: { self.event("revoke") },
+        prepareDrainCertificate: { { true } }) // Explicit synthetic route proof.
     }
     func session(sounds: Bool = true, authorized: @escaping () -> Bool = { true }, epochAllowed: @escaping () -> Bool = { true }) -> AudioSession {
         let s = AudioSession(generation: 77, epoch: 8, sounds: sounds, authorized: authorized,
@@ -356,6 +357,19 @@ do {
     precondition(stopped.wait(timeout: .now() + 2) == .success)
     h.complete(); h.complete(); h.fire(3)
     precondition(h.count("stop") == 1 && h.count("failure") == 0)
+}
+// An omitted production seam must not silently authorize successful EOS.
+do {
+    let h = SessionHarness(), s = h.session()
+    s.start { changed in
+        var operations = try h.operations(changed)
+        operations.prepareDrainCertificate = nil
+        return operations
+    }
+    awaitReady(s); s.finish(); h.wait("retired"); s.stop()
+    precondition(h.count("failure") == 1 && h.count("end") == 0)
+    precondition(s.snapshot().failureStage == "input_configuration")
+    precondition(s.snapshot().failureDomain == "Input drain validator unavailable")
 }
 for point in ["factory", "prepare", "enable"] {
     let h = SessionHarness(); h.failurePoint = point
@@ -790,7 +804,8 @@ final class NegotiationHarness {
                  "initial_config_change": self.preparation.initialConfigChange ? 1 : 0,
                  "initialInputRate": self.preparation.initialRate,
                   "negotiationAttempts": Double(self.preparation.attempts)]
-            }, validatePrepared: { try self.preparation.current.validatePrepared() })
+            }, validatePrepared: { try self.preparation.current.validatePrepared() },
+            prepareDrainCertificate: { try self.preparation.current.prepareDrainCertificate() })
         return SessionAudioOwner(input: input, makeOutput: {
             precondition(self.preparation.current.started)
             self.session.event("output")
@@ -884,6 +899,7 @@ for mode in ["benign", "cue-notice", "cue-format", "format", "node-format", "uid
         if count < 0 { pipelineFailure?() }
     }
     startup.routeFailed = { s.configurationFailure("input_configuration") }
+    startup.validationRequested = { s.inputConfigurationChanged() }
     s.start { failed in
         pipelineFailure = failed
         let input = AudioSession.Operations(prepare: { try startup.start(acceptAudio: false, negotiate: true) }, enable: {
@@ -898,7 +914,8 @@ for mode in ["benign", "cue-notice", "cue-format", "format", "node-format", "uid
             if mode == "uid" { uid = 43 }
             if mode == "stopped" { running = false }
             validating = true; defer { validating = false }; try startup.validatePrepared()
-        })
+        }, prepareDrainCertificate: { try startup.prepareDrainCertificate() },
+        prepareValidationCertificate: { try startup.prepareValidationCertificate() })
         return SessionAudioOwner(input: input, makeOutput: {
             .init(prepare: {
                 precondition(startup.started && samples > 0)
@@ -914,7 +931,7 @@ for mode in ["benign", "cue-notice", "cue-format", "format", "node-format", "uid
     if ["benign", "cue-notice", "cue-format", "output", "runtime", "pipeline"].contains(mode) {
         h.wait("enabled"); awaitReady(s)
         precondition(h.count("cue") == 0)
-        if mode == "runtime" { changed(); h.wait("retired") }
+        if mode == "runtime" { hardware = changedFormat; changed(); h.wait("retired") }
         else if mode == "pipeline" {
             let bad = AVAudioPCMBuffer(pcmFormat: changedFormat, frameCapacity: 1)!
             bad.frameLength = 1; pipeline.enqueue(bad); h.wait("retired")
@@ -939,7 +956,215 @@ for mode in ["benign", "cue-notice", "cue-format", "format", "node-format", "uid
     }
     let failures = h.count("failure"); stale(); precondition(h.count("failure") == failures && starts == 1)
 }
-print("Production input-only preaccept validation: benign notification, UID/formats/running failures, atomic revision, cancellation/timeout tombstones and strict runtime failure passed without hardware")
+print("Production input-only preaccept validation: benign notification, UID/formats/running failures, atomic revision, cancellation/timeout tombstones and certified runtime failure passed without hardware")
+
+// The production chain, with no AVAudioEngine construction: Session -> split
+// owner -> bounded preparation -> startup -> real in-memory converter. Facts
+// stand in for the exact selected/default, UID, AU binding and fresh OS reads.
+final class CertifiedInputHarness {
+    let h = SessionHarness()
+    let mode: String
+    let facts = NSLock()
+    let release = DispatchSemaphore(value: 0)
+    let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1)!
+    let other = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 1)!
+    var selected = AudioDeviceID(42), bound = AudioDeviceID(42), frozenUID = "frozen"
+    var hardware: AVAudioFormat!, node: AVAudioFormat!
+    var running = true, gate = true, phase = "startup"
+    var samples = 0
+    var changed: (() -> Void)!, stale: (() -> Void)!, pipeline: CapturePipeline!
+    var sinkNotice = false
+    lazy var s = h.session(authorized: { self.read { self.gate } })
+    lazy var preparation = CapturePreparation { self.makeStartup() }
+    init(_ mode: String) { self.mode = mode; hardware = format; node = format }
+    func read<T>(_ action: () -> T) -> T { facts.lock(); defer { facts.unlock() }; return action() }
+    func change(_ action: () -> Void) { facts.lock(); action(); facts.unlock() }
+    func packet() {
+        let pcm = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 44100)!
+        pcm.frameLength = 44100; memset(pcm.floatChannelData![0], 0, 44100 * 4)
+        pipeline.enqueue(pcm)
+    }
+    func makeStartup() -> CaptureStartup {
+        CaptureStartup(operations: .init(observe: { notice in
+            self.changed = notice; self.stale = notice; self.h.event("observe"); return {}
+        }, validate: {
+            let phase = self.read { self.phase }
+            if phase == "runtime" {
+                self.h.event("validating")
+                if ["cancel-blocked", "timeout-blocked", "released-blocked"].contains(self.mode) { self.release.wait() }
+                if self.mode == "inside-validation" { self.changed() }
+                if self.mode == "exception" { throw HFTestCaptureAdapter(2)! }
+            }
+            if phase == "final" && ["cancel-final", "timeout-final"].contains(self.mode) {
+                if self.mode == "timeout-final" { self.changed() }
+                self.h.event("finalblocked"); self.release.wait()
+            }
+            let (selected, bound, uid) = self.read { (self.selected, self.bound, self.frozenUID) }
+            try MicrophoneBinding.revalidate(expected: 42, resolve: { selected })
+            guard uid == "frozen" else { throw NSError(domain: "Frozen UID changed", code: 1) }
+            try MicrophoneBinding.revalidate(expected: 42, resolve: { bound })
+        }, format: { self.read { self.hardware } }, outputFormat: { self.read { self.node } },
+        install: { _, pipeline in self.pipeline = pipeline; self.h.event("install") }, prepare: {},
+        start: { self.h.event("start") }, stop: { self.h.event("stop") }, remove: {}, running: {
+            if self.read({ self.phase }) == "final" && self.mode == "final-notice" { self.changed() }
+            return self.read { self.running }
+        })) { _, count in
+            if count > 0 {
+                if self.mode == "converter-notice" && !self.sinkNotice {
+                    self.sinkNotice = true; self.h.event("sinkblocked"); self.release.wait()
+                    self.changed() // Converter is executing while Finish waits in drain.
+                }
+                self.change { self.samples += Int(count) }
+                self.s.acceptedPCM(); self.h.event("pcm")
+            } else if count < 0 { self.s.configurationFailure("capture_pipeline") }
+        }
+    }
+    func start() {
+        let session = s
+        preparation.routeFailed = { session.configurationFailure("input_configuration") }
+        preparation.validationRequested = {
+            self.h.event("validation_requested")
+            session.inputConfigurationChanged()
+        }
+        session.start { _ in
+            let input = AudioSession.Operations(prepare: { try self.preparation.prepare(allowed: { self.read { self.gate } }) }, enable: {
+                try self.preparation.current.enable()
+                self.h.event("enabled")
+                if self.mode == "enable-notice" { precondition(self.h.count("pcm") == 0); self.changed() }
+                if self.mode != "no-pcm" { self.packet() }
+            }, close: { self.preparation.current.closeAcceptance() }, drain: {
+                self.h.event("drain")
+                if self.mode.hasPrefix("queued-finish") && self.h.count("drain") == 1 { self.release.wait() }
+                if self.mode == "converter-notice" { self.release.signal() }
+                return self.preparation.current.closeAndDrain()
+            }, play: { _, _ in }, stopCue: {}, stop: { self.preparation.revoke(); self.preparation.current.stop() },
+            level: { -60 }, outputRate: { 0 }, cancel: { self.preparation.revoke() },
+            validatePrepared: { try self.preparation.current.validatePrepared() },
+            prepareDrainCertificate: {
+                self.change { self.phase = "final" }
+                self.h.event("final_validation")
+                let certify = try self.preparation.current.prepareDrainCertificate()
+                return {
+                    // Exercise the session-lock -> route-lock boundary. The
+                    // callback on another thread must wait for the session lock,
+                    // but the route revision is already advanced when signalled.
+                    func noticeAtBoundary() {
+                        let noticed = DispatchSemaphore(value: 0)
+                        let startup = self.preparation.current
+                        if self.mode == "after-certificate" {
+                            startup.routeFailed = { noticed.signal(); session.configurationFailure("input_configuration") }
+                        } else {
+                            startup.validationRequested = { noticed.signal(); session.inputConfigurationChanged() }
+                        }
+                        DispatchQueue.global().async { self.changed() }
+                        precondition(noticed.wait(timeout: .now() + 2) == .success)
+                    }
+                    if self.mode == "before-certificate" { noticeAtBoundary() }
+                    let good = certify()
+                    if good { self.h.event("certified") }
+                    if self.mode == "after-certificate" { noticeAtBoundary() }
+                    return good
+                }
+            }, prepareValidationCertificate: {
+                self.change { self.phase = "runtime" }
+                let certify = try self.preparation.current.prepareValidationCertificate()
+                return { let good = certify(); if good { self.h.event("validated") }; return good }
+            })
+            return SessionAudioOwner(input: input, makeOutput: {
+                precondition(self.h.count("certified") == 1, "No completion factory before final drain certificate")
+                self.h.event("output")
+                return .init(prepare: {}, play: { _, _, done in
+                    self.h.condition.lock(); self.h.completed.append(done); self.h.condition.unlock(); self.h.event("cue")
+                }, stopCue: {}, stop: {}, formats: { [:] })
+            }, cue: { _ in AVAudioPCMBuffer(pcmFormat: self.format, frameCapacity: 1)! }).operations()
+        }
+        h.wait("enabled"); awaitReady(session)
+        if mode == "converter-notice" { h.wait("sinkblocked") }
+        else if mode != "no-pcm" { h.wait("pcm") }
+    }
+    func finish() {
+        s.finish()
+        if h.count("output") == 0 && h.count("failure") == 0 && !["no-pcm", "after-certificate"].contains(mode) { h.wait("cue") }
+        if h.count("cue") > 0 { h.complete() }
+        h.wait("retired"); s.stop()
+    }
+    func assertRetired(failures: Int) {
+        h.wait("retired"); s.stop()
+        precondition(h.count("failure") == failures, mode)
+        precondition(h.count("start") == 1 && h.count("install") == 1 && preparation.attempts == 1, mode)
+        let before = h.count("failure"); stale()
+        h.condition.lock(); let hasTimers = !h.timers.isEmpty; h.condition.unlock()
+        if hasTimers { h.fire(3) }
+        precondition(h.count("failure") == before && !s.isRecording, mode)
+    }
+}
+let certifiedModes = ["enable-notice", "ongoing", "default", "saved", "uid", "binding", "hardware", "node", "stopped", "exception", "inside-validation", "cancel-blocked", "timeout-blocked", "released-blocked", "released-failure", "queued-finish-good", "queued-finish-bad", "converter-notice", "final-notice", "before-certificate", "after-certificate", "converter-failure", "no-pcm", "cancel-final", "timeout-final"]
+for mode in certifiedModes {
+    let t = CertifiedInputHarness(mode); t.start()
+    if ["enable-notice", "ongoing"].contains(mode) {
+        if mode == "ongoing" { t.changed() }
+        t.h.wait("validated")
+        let before = t.h.count("pcm"); t.packet()
+        // Finish is the real converter barrier; no packet loss or extra start.
+        t.finish(); precondition(t.h.count("pcm") > before && t.h.count("certified") == 1)
+        precondition(abs(t.read { t.samples } - 32000) <= 2, "No silent loss of provisional exact-format PCM")
+        t.assertRetired(failures: 0)
+    } else if ["cancel-final", "timeout-final"].contains(mode) {
+        let done = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async { t.s.finish(); done.signal() }
+        t.h.wait("finalblocked")
+        if mode == "cancel-final" { t.s.cancel() } else { t.h.fire(3) }
+        t.release.signal()
+        precondition(done.wait(timeout: .now() + 2) == .success)
+        t.assertRetired(failures: mode == "cancel-final" ? 0 : 1)
+        precondition(t.h.count("certified") == 0 && t.h.count("output") == 0)
+        precondition(t.s.snapshot().failureStage == (mode == "cancel-final" ? nil : "input_validation_timeout"))
+    } else if mode.hasPrefix("queued-finish") {
+        let done = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async { t.s.finish(); done.signal() }
+        t.h.wait("drain") // Validation request will be queued BEHIND Finish.
+        if mode == "queued-finish-bad" { t.change { t.bound = 99 } }
+        t.changed(); t.release.signal()
+        precondition(done.wait(timeout: .now() + 2) == .success)
+        if mode == "queued-finish-good" { t.h.wait("cue"); t.h.complete() }
+        t.assertRetired(failures: mode == "queued-finish-good" ? 0 : 1)
+        precondition(t.h.count("output") == (mode == "queued-finish-good" ? 1 : 0))
+    } else if ["converter-notice", "final-notice", "before-certificate", "after-certificate", "no-pcm"].contains(mode) {
+        t.finish()
+        let bad = ["final-notice", "before-certificate"].contains(mode)
+        t.assertRetired(failures: bad ? 1 : 0)
+        precondition(t.h.count("certified") == (bad ? 0 : 1))
+        if bad || mode == "no-pcm" { precondition(t.h.count("output") == 0) }
+    } else if mode == "converter-failure" {
+        let bad = AVAudioPCMBuffer(pcmFormat: t.other, frameCapacity: 1)!
+        bad.frameLength = 1; t.pipeline.enqueue(bad)
+        t.assertRetired(failures: 1)
+        precondition(t.h.count("certified") == 0 && t.h.count("output") == 0)
+    } else {
+        t.change {
+            if ["default", "saved"].contains(mode) { t.selected = 99 }
+            if mode == "uid" { t.frozenUID = "replacement" }
+            if mode == "binding" { t.bound = 99 }
+            if mode == "hardware" { t.hardware = t.other }
+            if mode == "node" { t.node = t.other }
+            if mode == "stopped" { t.running = false }
+            if mode == "released-failure" { t.gate = false; t.bound = 99 }
+        }
+        t.changed()
+        if mode.hasSuffix("blocked") {
+            t.h.wait("validating")
+            if mode == "cancel-blocked" { t.s.cancel() }
+            if mode == "timeout-blocked" { t.h.fire(3) }
+            if mode == "released-blocked" { t.change { t.gate = false; t.bound = 99 } }
+            t.release.signal()
+        }
+        t.assertRetired(failures: mode == "cancel-blocked" ? 0 : 1)
+        precondition(t.h.count("output") == 0 && t.h.count("certified") == 0)
+        if mode == "timeout-blocked" { precondition(t.s.snapshot().failureStage == "input_validation_timeout") }
+        if mode == "inside-validation" { precondition(t.h.count("validating") == 1, "No quiet loop or revalidation retry") }
+    }
+}
+print("Production accepted-input certification: \(certifiedModes.count) route/format/running, provisional PCM, cancellation/watchdog and final drain revision scenarios passed without hardware")
 
 // Deferred work cannot block EOS, manufacture retirement or revive cancelled
 // playback. Include the final production validation-to-play authorization boundary.

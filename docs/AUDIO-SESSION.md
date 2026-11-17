@@ -35,9 +35,21 @@ boundary). It repeats that validation immediately before enabling acceptance.
 Unchanged, running input can proceed without a retry; changed identity/format or
 a stopped engine fails recoverably. A notification racing the validation fails
 the atomic revision check rather than accepting an unvalidated snapshot.
-Revocation/deadline tombstones cannot be cleared by validation. Once acceptance
-commits, notifications still close the producer immediately and fail capture;
-this preaccept confirmation never weakens runtime route failure.
+Revocation/deadline tombstones cannot be cleared by validation. After acceptance,
+each live input notification also advances that revision and requests read-only
+certification on the existing serial owner, after releasing the route lock.
+Certification reuses the actual selected/default device, frozen UID, input AU
+binding, fresh hardware and node-output formats against the frozen tap/converter
+format, and actual engine-running operations. An unchanged, running input is
+benign regardless of elapsed time or whether first PCM has arrived. Frozen format
+diagnostics alone are not evidence. No notification/tap callback reads OS state.
+Exact-format PCM continues provisionally; certification never enables/reopens a
+producer. Failed reads, contained exceptions, changed identity/format/running or
+a notification during validation fail the whole transcription once, including
+partial PCM already delivered. There is no quiet loop, retry, restart or fallback.
+A separate independent three-second pending-certification watchdog closes/revokes
+and reports even if its owner is blocked. Cancellation, epoch revocation and final
+drain certification make stale work/deadlines inert; they cannot grant late acceptance.
 Acceptance follows immediately, subject to the original epoch/start gate and
 route/format checks. Startup has
 two phase-bounded, independent three-second budgets, not one global three-second
@@ -84,10 +96,10 @@ attempt identities cannot report failure against the new attempt. Lost UID,
 binding/format/stop/remove failure, expired gate/deadline or cancellation never
 authorize another preparation. The second failure is final. Configuration
 changes after input-start commit but before acceptance require the read-only
-confirmation above, not another preparation. Listening and end-cue periods
-retain their existing failure disposition. Output configuration notifications
+confirmation above, not another preparation. Listening uses read-only
+certification, not additional negotiation. After certified drain, input/output notifications
 retire completion nonfatally after drain. No output engine is created until
-Finish has closed and drained accepted PCM; neither input preparation accepts PCM.
+Finish has closed, drained and certified accepted PCM; neither input preparation accepts PCM.
 
 Bounded format diagnostics retain `negotiationAttempts`, `initial_config_change`
 and `initialInputRate` alongside the terminal failure metadata/current input rate;
@@ -129,19 +141,35 @@ cancellation epoch. An absent, stale or non-recording observation yields null.
 
 Diagnostic reason strings never decide whether a capture failure is fatal.
 Locked `captureAccepted` records that this session reached readiness;
-`producerDrained` records that normal producer drain completed. Before readiness,
+`producerDrained` records a successful, live, revision-certified normal producer
+drain (not merely entering drain or flushing the converter). Before readiness,
 startup failure requires the live startup gate. After readiness, capture/route/
 converter failure reports once using the epoch/cancellation guard, even if
 physical release already closed the startup gate and Finish has not yet run.
-Failure during drain also defeats partial transcription. Revoked epochs cannot
+Failure during drain/final certification also defeats partial transcription. Revoked epochs cannot
 publish errors. Once drain is complete, end-cue playback/route failure can retire
 the session but cannot corrupt already-final PCM or fail transcription.
 
 ## EOS and full retirement are separate barriers
 
 Normal `hf_finish` snapshots the exact session on AppKit, then closes and drains
-the producer on the calling FIFO worker, **outside AppKit**. Rust publishes EOS
-after this drain. Only after successful drain with actual accepted PCM does
+the producer on the calling FIFO worker, **outside AppKit**. It then performs fresh
+read-only input validation and certifies that snapshot's revision and the live
+session's `producerDrained` fact in one short atomic boundary, before returning
+to Rust for EOS. A missing final-validator hook fails capture; it cannot grant an
+uncertified successful drain. This final validation is required even if a notification's owner
+task was queued behind Finish, or arrived during converter drain. A notification
+during final reads/before certification fails closed; one after certification may
+retire completion but cannot invalidate final PCM. Converter failure can never
+produce a successful certificate or start completion work.
+
+Lock order is session -> preparation (revocation only) -> route -> producer.
+Certificate commits take session -> route; notification callbacks release route
+and preparation locks before calling the session. OS reads and converter drains
+occur outside all these locks. Runtime validation clears its pending ticket only
+inside the same session/revision boundary, so a concurrent notification cannot
+be lost. Startup's `drained` cleanup flag is deliberately separate from the final
+certificate. Only after successful certified drain with actual accepted PCM does
 optional completion read/decode/create/prepare run asynchronously on the same
 serial owner. Missing assets/output metadata, changed frozen output UID, output
 failure or its three-second deadline are nonfatal to final PCM. No current-default
@@ -169,6 +197,13 @@ Permission-free native harnesses cover release-before-Finish failure, revoked
 epochs, drain failure, nonfatal end-cue errors, blocked preparation with runnable
 main-loop work, independent hardware/handoff timeouts (including blocked
 factory/enable), virtual 2.633 s preparation with immediate acceptance,
+25 production-chain accepted-input certification scenarios (including notification
+after enable/before first PCM, ongoing lossless provisional PCM, actual route/
+format/running mismatches, contained errors, notification inside validation,
+blocked validation cancellation/timeout, physical release, Finish queued ahead
+of validation, notification during converter drain/final reads and on both sides
+of the certificate boundary, converter failure and stale callbacks),
+an omitted final-validator hook failing closed before EOS/completion,
 stale/duplicate deadlines, muted handoff, cancellation and
 withheld end-cue completion holding a queued restart until retirement. Capsule
 accessibility checks distinguish Starting from Listening. These are synthetic

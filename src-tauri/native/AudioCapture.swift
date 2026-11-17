@@ -175,7 +175,7 @@ final class CapturePipeline {
     func level() -> Float { queue.sync { db } }
 }
 
-// Main-thread lifecycle with an independently locked route-failure latch: engine
+// Serial-owner lifecycle with an independently locked route revision: engine
 // notifications can arrive on any thread, including during install/prepare/start.
 // Tests inject these same operations without constructing an AVAudioEngine.
 final class CaptureStartup {
@@ -209,7 +209,10 @@ final class CaptureStartup {
     private var negotiatedFormat: AVAudioFormat?
     private var configurationRevision: UInt64 = 0
     private var accepted = false
+    private var drainHealthy = false
+    private var drainCertified = false
     var routeFailed: (() -> Void)?
+    var validationRequested: (() -> Void)?
     private(set) var started = false
     init(operations: Operations, sink: @escaping (UnsafePointer<Float>?, Int32) -> Void) {
         self.operations = operations; self.sink = sink
@@ -217,12 +220,17 @@ final class CaptureStartup {
     private func invalidate() {
         routeLock.lock()
         guard !revoked else { routeLock.unlock(); return }
-        // Running is not acceptance. Preaccept negotiation can notify an
-        // unchanged input engine. Only the serial owner reads OS facts.
-        if started && !accepted && !revoked {
+        // A notification is not proof of changed hardware. Only the serial
+        // owner reads OS facts; all live notifications advance its revision.
+        if started && !drainCertified {
             configurationRevision &+= 1
-            routeLock.unlock()
-            return
+            let request = accepted ? validationRequested : nil
+            if !accepted || request != nil {
+                routeLock.unlock()
+                request?() // Never acquire the session lock while holding routeLock.
+                return
+            }
+            // Legacy standalone startup has no session validator: fail closed.
         }
         invalidated = true
         // Profile negotiation can notify anywhere from observer installation to
@@ -321,12 +329,34 @@ final class CaptureStartup {
         if acceptAudio { accepted = true; pipeline?.enable() }
     }
     func enable() throws { try validatePrepared(acceptAudio: true) }
+    // OS reads happen on the owner, outside locks. The returned short closure is
+    // invoked under the session lock: session -> route -> producer is the only
+    // lock order. It certifies the revision and session drain in one boundary.
+    func prepareValidationCertificate(draining: Bool = false) throws -> () -> Bool {
+        routeLock.lock()
+        let revision = configurationRevision
+        let live = started && accepted && (draining ? drained && drainHealthy : !drained) && !invalidated && !revoked && !drainCertified
+        routeLock.unlock()
+        guard live, let format = negotiatedFormat else { throw NSError(domain: "Capture not live for certification", code: 1) }
+        try operations.validate()
+        try checkFormats(format)
+        guard try operations.running() else { throw NSError(domain: "Input engine stopped during capture", code: 1) }
+        return { [self] in
+            routeLock.lock(); defer { routeLock.unlock() }
+            guard started && accepted && (draining ? drained && drainHealthy : !drained) && !invalidated && !revoked && !drainCertified,
+                  configurationRevision == revision else { return false }
+            if draining { drainCertified = true }
+            return true
+        }
+    }
+    func prepareDrainCertificate() throws -> () -> Bool { try prepareValidationCertificate(draining: true) }
     // Close the producer and drain transcription while keeping the established
     // input/output route alive for the end cue. No cue-period PCM is copied.
     func closeAndDrain() -> Bool {
         guard started && !drained else { return false }
         drained = true
-        return pipeline?.drain() ?? false
+        drainHealthy = pipeline?.drain() ?? false
+        return drainHealthy
     }
     func closeAcceptance() {
         routeLock.lock(); pipeline?.close(); routeLock.unlock()
@@ -373,12 +403,20 @@ final class CapturePreparation {
     var routeFailed: (() -> Void)? {
         didSet { wire(current) }
     }
+    var validationRequested: (() -> Void)? {
+        didSet { wire(current) }
+    }
     init(make: @escaping () -> CaptureStartup) { self.make = make; current = make(); wire(current) }
     private func wire(_ attempt: CaptureStartup) {
         attempt.routeFailed = { [weak self, weak attempt] in
             guard let self, let attempt else { return }
             self.lock.lock(); let active = !self.closed && self.current === attempt; self.lock.unlock()
             if active { self.routeFailed?() }
+        }
+        attempt.validationRequested = validationRequested == nil ? nil : { [weak self, weak attempt] in
+            guard let self, let attempt else { return }
+            self.lock.lock(); let active = !self.closed && self.current === attempt; self.lock.unlock()
+            if active { self.validationRequested?() }
         }
     }
     func revoke() {
@@ -505,11 +543,17 @@ final class AudioCapture {
     func enable() throws { try startup.enable() }
     func validatePrepared() throws { try startup.validatePrepared() }
     func closeAndDrain() -> Bool { startup.closeAndDrain() }
+    func prepareDrainCertificate() throws -> () -> Bool { try startup.prepareDrainCertificate() }
+    func prepareValidationCertificate() throws -> () -> Bool { try startup.prepareValidationCertificate() }
     func closeAcceptance() { startup.closeAcceptance() }
     func revoke() { preparation.revoke() }
     var routeFailed: (() -> Void)? {
         get { preparation.routeFailed }
         set { preparation.routeFailed = newValue }
+    }
+    var validationRequested: (() -> Void)? {
+        get { preparation.validationRequested }
+        set { preparation.validationRequested = newValue }
     }
     func formatMetadata() -> [String: Double] {
         var result: [String: Double] = [:]
@@ -655,7 +699,8 @@ final class SessionAudioOwner {
                 guard allowed() else { return }
                 try audioStage("output_prepare") { try self.output?.prepare() }
             }
-        })
+        }, prepareDrainCertificate: self.input.prepareDrainCertificate,
+        prepareValidationCertificate: self.input.prepareValidationCertificate)
     }
 }
 
@@ -711,6 +756,8 @@ final class AudioSession {
         var formats: () -> [String: Double] = { [:] }
         var validatePrepared: (() throws -> Void)? = nil
         var prepareCompletion: ((_ allowed: @escaping () -> Bool) throws -> Void)? = nil
+        var prepareDrainCertificate: (() throws -> (() -> Bool))? = nil
+        var prepareValidationCertificate: (() throws -> (() -> Bool))? = nil
     }
     struct Observation: Codable {
         var reason = "starting"
@@ -744,6 +791,8 @@ final class AudioSession {
     // report a failure of PCM already accepted by this generation.
     private var captureAccepted = false
     private var producerDrained = false
+    private var validationTicket: UInt64 = 0
+    private var validationPending = false
     private var completionExpired = false
     private var completionFailed = false
     private var cachedLevel: Float = -60
@@ -788,7 +837,7 @@ final class AudioSession {
         recordFailureLocked(first)
     }
     private func recordFailureLocked(_ first: AudioStageFailure) {
-        guard !released && observation.failureStage == nil else { return }
+        guard !cancelled && !released && observation.failureStage == nil else { return }
         observation.failureStage = first.stage
         observation.failureDomain = first.domain
         observation.failureCode = first.code
@@ -805,6 +854,48 @@ final class AudioSession {
     func configurationFailure(_ stage: String) {
         recordFailure(NSError(domain: "Audio configuration notification", code: 1), stage: stage)
         captureFailure()
+    }
+    // PCM remains provisional while read-only certification is pending. Failed
+    // certification rejects the entire transcription, including already queued PCM.
+    func inputConfigurationChanged() {
+        lock.lock()
+        guard !cancelled && !released && !captureFailed && !producerDrained && !validationPending else { lock.unlock(); return }
+        validationPending = true; validationTicket &+= 1
+        let ticket = validationTicket
+        lock.unlock()
+        let deadline = { [weak self] in
+            guard let self else { return }
+            self.lock.lock()
+            let expired = self.validationPending && self.validationTicket == ticket && !self.cancelled && !self.released && !self.captureFailed && !self.producerDrained
+            if expired {
+                self.recordFailureLocked(AudioStageFailure("input_validation_timeout", NSError(domain: "Input validation deadline", code: 1)))
+                self.validationPending = false; self.captureFailed = true; self.observation.audioReady = false
+                self.closeProducer?()
+            }
+            self.lock.unlock()
+            if expired { self.reportFailure(startGateRequired: false); self.queue.async { self.teardown("failed") } }
+        }
+        if let scheduler { scheduler(3, deadline) }
+        else { DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 3, execute: deadline) }
+        queue.async { [self] in
+            lock.lock()
+            let live = validationPending && validationTicket == ticket && !producerDrained && !cancelled && !captureFailed && !released
+            lock.unlock()
+            guard live else { return }
+            do {
+                guard let validate = operations?.prepareValidationCertificate else { throw NSError(domain: "Input validator unavailable", code: 1) }
+                let certify = try validate() // No enable, retry, restart, or producer reopening.
+                lock.lock()
+                let live = validationPending && validationTicket == ticket && !producerDrained && !cancelled && !captureFailed && !released
+                let certified = live && certify()
+                if certified { validationPending = false }
+                lock.unlock()
+                if live && !certified { throw NSError(domain: "Input configuration changed during validation", code: 1) }
+            } catch {
+                lock.lock(); let live = !producerDrained && !cancelled && !released && !captureFailed; lock.unlock()
+                if live { recordFailure(error, stage: "input_configuration"); captureFailure() }
+            }
+        }
     }
     private func valid() -> Bool {
         lock.lock(); let live = !cancelled && !captureFailed; lock.unlock()
@@ -980,9 +1071,28 @@ final class AudioSession {
             lock.lock(); let wasReady = captureAccepted && !captureFailed && !cancelled; lock.unlock()
             mark("draining")
             operations?.close()
-            let healthy = operations?.drain() ?? false
-            if wasReady && !healthy { reportFailure(startGateRequired: false) }
-            lock.lock(); producerDrained = true; let hasPCM = firstPCM; lock.unlock()
+            var healthy = operations?.drain() ?? false
+            var certificate: (() -> Bool)?
+            if wasReady && healthy {
+                do {
+                    guard let prepareCertificate = operations?.prepareDrainCertificate else {
+                        throw NSError(domain: "Input drain validator unavailable", code: 1)
+                    }
+                    certificate = try prepareCertificate()
+                }
+                catch { recordFailure(error, stage: "input_configuration"); healthy = false }
+            }
+            lock.lock()
+            // A notification can race the final OS reads. Its revision must be
+            // certified under this lock before EOS can become successful.
+            healthy = healthy && !captureFailed && !cancelled && (certificate?() ?? false)
+            if healthy { producerDrained = true; validationPending = false; validationTicket &+= 1 }
+            let hasPCM = firstPCM
+            lock.unlock()
+            if wasReady && !healthy {
+                recordFailure(NSError(domain: "Input drain certification failed", code: 1), stage: "input_configuration")
+                captureFailure()
+            }
             guard valid(), wasReady, healthy else { teardown("finished_without_cue"); return }
             guard hasPCM else { teardown("finished_without_cue"); return }
             if sounds { queue.async { self.play(ending: true) } } else { teardown("finished") }

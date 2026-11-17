@@ -934,12 +934,15 @@ private func validateDelivery() -> PasteResult {
                         }
                     }) }
                 capture.routeFailed = { [weak r] in r?.configurationFailure("input_configuration") }
+                capture.validationRequested = { [weak r] in r?.inputConfigurationChanged() }
                 let input = AudioSession.Operations(prepare: { try capture.prepareSession(allowed: { allowed(epoch) && (gate?(generation) ?? true) }) }, enable: { try capture.enable() },
                     close: { capture.closeAcceptance() }, drain: { capture.closeAndDrain() },
                     play: { _, _ in }, stopCue: {}, stop: { capture.stop() },
                     level: { capture.level() }, outputRate: { 0 },
                     cancel: { capture.revoke() }, formats: { capture.formatMetadata() },
-                    validatePrepared: { try capture.validatePrepared() })
+                    validatePrepared: { try capture.validatePrepared() },
+                    prepareDrainCertificate: { try capture.prepareDrainCertificate() },
+                    prepareValidationCertificate: { try capture.prepareValidationCertificate() })
                 var endPCM: AVAudioPCMBuffer?
                 let makeOutput: (() throws -> SessionAudioOwner.Output)? = sessionSounds ? {
                     guard let outputUID, let data = EndCue.data(profile: profile) else {

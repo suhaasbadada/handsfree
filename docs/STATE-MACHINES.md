@@ -174,8 +174,15 @@ Failure details remain distinct from setup readiness; disconnected status is unk
   hardware/node/converter format and actual engine running state. The final
   revision/tombstone check and acceptance commit are atomic. No OS reads occur
   in notification callbacks, no new preparation/retry is granted, and runtime
-  notification failure remains strict. Cancellation/deadline can never reopen
-   a producer through this validation. Deferred output failures cannot poison drained PCM.
+   accepted-input notifications also advance the revision and request read-only
+   certification on the existing owner after route-lock release. Actual selected/
+   default device, frozen UID/AU binding, fresh hardware/node versus frozen tap/
+   converter formats and actual running state must agree, regardless of first PCM
+   or elapsed time. Exact-format PCM remains provisional; failed certification
+   rejects all partial transcription. A notification during validation fails
+   closed without retry. An independent 3 s pending-certification watchdog bounds
+   blocked validation. Neither validation success nor cancellation/deadline can
+   reopen a producer. Deferred output failures cannot poison certified drained PCM.
   Startup deadlines are lock-protected phase facts, not reason strings: the
    independent 3 s hardware budget covers factory/input preparation and
    validation through successful `route_ready`, which atomically retires
@@ -204,7 +211,17 @@ Failure details remain distinct from setup readiness; disconnected status is unk
   transcription. Synthetic adapter tests exercise these production operations
   and real Objective-C throws without constructing an engine or opening hardware;
   macOS 14/Bluetooth installed-app acceptance is a separate gate.
-   Normal Finish closes/drains accepted PCM before deferred end-cue work; no PCM,
+   Normal Finish closes/drains accepted PCM, then performs fresh input validation
+   and commits the live session drain fact and unchanged route revision atomically
+   before EOS or deferred end-cue work. Notification tasks queued behind Finish
+   cannot escape this final certificate; a missing validator fails closed. Actual
+   route/format/running changes during converter drain fail final validation.
+   Notifications during final reads or before certificate commit fail the revision
+   check; after commit they may retire
+   completion but not poison final PCM. Cleanup's early drained flag is not the
+   successful certificate. Lock order is session -> preparation (revoke) -> route
+   -> producer; callbacks release route/preparation before session access. No OS
+   reads or converter waits occur under these locks. No PCM,
    cancellation and failed drain play no end cue. Completion output errors/timeouts
    are nonfatal; its independently armed deadline precedes deferred construction
    and prevents late playback. Blocked OS calls retain the real owner until cleanup.

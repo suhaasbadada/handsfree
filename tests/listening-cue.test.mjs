@@ -68,6 +68,38 @@ test('native teardown snapshots on AppKit but waits on the FIFO; retirement prec
   assert.match(practice, /audio_ready:[\s\S]*gate\.meter_identity\(token\) == identity/);
 });
 
+test('production input notifications wire actual fact certification through final drain, not timing or first PCM', () => {
+  const source = readFileSync(new URL('../src-tauri/native/AudioCapture.swift', import.meta.url), 'utf8');
+  const bridge = readFileSync(new URL('../src-tauri/native/Bridge.swift', import.meta.url), 'utf8');
+  assert.match(bridge, /capture\.validationRequested = \{ \[weak r\] in r\?\.inputConfigurationChanged\(\) \}/);
+  assert.match(bridge, /prepareDrainCertificate: \{ try capture\.prepareDrainCertificate\(\) \}/);
+  assert.match(bridge, /prepareValidationCertificate: \{ try capture\.prepareValidationCertificate\(\) \}/);
+  const notification = source.slice(source.indexOf('private func invalidate()'), source.indexOf('private func check()'));
+  assert.match(notification, /configurationRevision &\+= 1/);
+  assert.ok(notification.indexOf('routeLock.unlock()') < notification.indexOf('request?()'));
+  assert.doesNotMatch(notification, /operations\.(?:validate|format|outputFormat|running)|firstPCM|asyncAfter/);
+  const validation = source.slice(source.indexOf('func prepareValidationCertificate(draining:'), source.indexOf('func closeAndDrain()'));
+  for (const fact of ['operations.validate()', 'checkFormats(format)', 'operations.running()', 'configurationRevision == revision', '!revoked', '!invalidated']) {
+    assert.ok(validation.includes(fact), `missing actual fact: ${fact}`);
+  }
+  assert.doesNotMatch(validation, /\.enable\(|operations\.(?:start|install|prepare)\(|firstPCM|asyncAfter/);
+  const owner = source.slice(source.indexOf('final class SessionAudioOwner'), source.indexOf('enum CaptureEnd'));
+  assert.match(owner, /prepareDrainCertificate: self\.input\.prepareDrainCertificate/);
+  assert.match(owner, /prepareValidationCertificate: self\.input\.prepareValidationCertificate/);
+  const runtime = source.slice(source.indexOf('func inputConfigurationChanged()'), source.indexOf('private func valid()'));
+  assert.match(runtime, /input_validation_timeout/);
+  assert.match(runtime, /let certified = live && certify\(\)/);
+  assert.doesNotMatch(runtime, /\.enable\(|firstPCM|operations\?\.(?:start|prepare)\(/);
+  const finish = source.slice(source.lastIndexOf('func finish()'), source.indexOf('func cancel()'));
+  assert.ok(finish.includes('certificate = try prepareCertificate()'));
+  assert.ok(finish.indexOf('operations?.drain()') < finish.indexOf('certificate = try prepareCertificate()'));
+  assert.match(finish, /guard let prepareCertificate = operations\?\.prepareDrainCertificate else/);
+  assert.match(finish, /Input drain validator unavailable/);
+  assert.match(finish, /certificate\?\(\) \?\? false/);
+  assert.ok(finish.indexOf('certificate?()') < finish.indexOf('producerDrained = true'));
+  assert.ok(finish.indexOf('producerDrained = true') < finish.indexOf('self.play(ending: true)'));
+});
+
 for (const [profile, pairHash, singleHash] of [['clean', 'a1eb8aeadfc425a5a217e3d35732762571c16d7e03969a5f3b0bfe41dbde6856', 'd9164cb188a469059517b60817e5acca1dd5121278c01ebd8193cfc79411e6c8'], ['warm', '0e59d9fd1a43491f6193760ce55eb96807c6b6b08e7549f1e8d3b760eff416b8', 'a8947c7505db50c240aae0fb76cfcd2ce69a3cdaf4b8387dd5e444d675a098ed']]) test(`${profile}: approved double end and identical single start packaged without playback`, () => {
   const config = JSON.parse(readFileSync(new URL('../src-tauri/tauri.conf.json', import.meta.url)));
   const source = `native/assets/sounds/${profile}-end.wav`;
