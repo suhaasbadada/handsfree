@@ -1,6 +1,6 @@
 # Signed in-app updates (Mac beta 7 onward)
 
-Published beta 21 keeps updates entirely inline in the footer. Click **Updates**
+Published beta 22 keeps updates entirely inline in the footer. Click **Updates**
 to check; the refresh icon spins while checking. A verified offer changes the same
 action to **Download & update** with its version. Clicking that offer authorizes
 only that displayed version, freshly rechecked before download. Progress and retry

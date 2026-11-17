@@ -2,6 +2,45 @@
 
 **Current release/development scope is Mac-only: Apple Silicon, macOS 14+.** Windows work is paused and Linux is not supported; neither port has a promised scope or release date. Retain historical assets and provenance unchanged. The [Windows records](WINDOWS.md) are historical, not an active packaging or promotion track. This guide is a procedure, not authorization to publish or deploy; an explicit user hold takes precedence.
 
+## Beta 22 publication and metadata activation
+
+Published experimental Mac distribution **v0.1.1-beta.22** retains embedded
+version **0.1.1**. [Published release](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.1-beta.22)
+uses clean artifact source `b777c551d4e64110d500e8ecfebcf1488c855e5e`;
+[exact-source CI run 44004684790 passed](https://github.com/suhaasbadada/handsfree/actions/runs/44004684790).
+Local, draft and anonymous-public seven-asset audits passed. Receipts are
+`handsfree-beta22-{local,draft,public}-audit.log` under
+`/private/var/folders/2y/n6f_6bjj2q1_3byq_z4dk9640000gn/T/opencode/`.
+
+- DMG SHA-256: `81154c3c735018723870f98d9158bedd6274342997160f3c8f94f575dba1cf30`.
+- Updater archive SHA-256: `35d4bdbcfda979d28f124227e44f423c9479d0cf7157017dd59d41c5d45985eb`.
+- Exact generated signed feed SHA-256: `03f139757fd661b22d21e06e97e8f4e3be5c68d859bca3e04ecf8a9613325912`.
+
+Active downloads/docs select beta 22. The tracked feed copies generated
+`release/macos-arm64.json` byte-for-byte without reconstructing its signature;
+disabled candidate22 coordinates remain unchanged, not a second availability
+switch. [Scope and evidence](releases/v0.1.1-beta.22.md): native capture first,
+no start cue/tail, completion output deferred until capture close/drain; compact
+red shortcut controls without Practice Settings, aligned microphone/refresh row,
+SVG utilities and native WebKit overflow containment (48 actual layout cases).
+Final source validation passed Node 324 / 1 skipped, Rust 90 / 3 ignored,
+frontend build, formatting, Clippy and full browser checks. Independent reviews
+had no remaining findings. Self-signed, not notarized.
+
+The instrumented hardware attempt was blocked by permission timeout with zero
+capture admissions, not a pass. The user explicitly authorized experimental
+publication despite that limitation. No instant cold Bluetooth guarantee,
+measured beta 22 latency, actual dictation, acoustic audibility or OTA acceptance
+is claimed. Activation is metadata-only: no rebuild/sign/install, microphone
+use, app restart or settings writes. Activation commit/push and exact-head CI,
+Pages/live website/feed byte readback, Homebrew publication/readback and tap CI,
+and runtime preservation checks remain separate pending gates owned by the primary.
+No activation SHA or downstream gate success is claimed here. Beta 21 artifacts
+remain in `release/history/beta21-before-beta22-u4q3o7hg/`; all historical beta
+6–21 notes, candidate preparation, prior receipts and FEATURE-RELEASES ledger
+bytes remain unchanged. The preparation record below predates publication;
+its then-pending gates are historical, not the current publication status.
+
 ## Beta 22 candidate preparation
 
 The unpublished **v0.1.1-beta.22** candidate retains embedded version **0.1.1**.
