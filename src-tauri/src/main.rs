@@ -2025,6 +2025,20 @@ fn release_smoke_invocation(args: &[String]) -> Result<bool, &'static str> {
         Err("Usage: handsfree --release-smoke")
     }
 }
+#[cfg(target_os = "macos")]
+#[tauri::command]
+fn open_project_repository() -> Result<(), String> {
+    let status = std::process::Command::new("/usr/bin/open")
+        .arg("https://github.com/suhaasbadada/handsfree")
+        .status()
+        .map_err(|_| "Could not open the HandsFree repository.")?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err("Could not open the HandsFree repository.".into())
+    }
+}
+
 fn main() {
     // Explicit diagnostic dispatch precedes all normal app/plugin/model setup.
     // Reject malformed smoke invocations, never fall through into normal launch.
@@ -2051,6 +2065,8 @@ fn main() {
             handle_permission_args(app, &args);
         }))
         .invoke_handler(tauri::generate_handler![
+            #[cfg(target_os = "macos")]
+            open_project_repository,
             #[cfg(target_os = "macos")]
             workflow_status,
             #[cfg(target_os = "macos")]

@@ -39,11 +39,12 @@ function pixels(path) {
   return { width, height, data };
 }
 
-function assertRedLogo(path, size) {
+function assertRedLogo(path, size, padded = false) {
   const { width, height, data } = pixels(path);
   assert.equal(width, size);
   assert.equal(height, size);
   let red = 0, green = 0, neutral = 0;
+  let left = size, right = -1, top = size, bottom = -1;
   for (let i = 0; i < data.length; i += 4) {
     const [r, g, b, a] = data.subarray(i, i + 4);
     if (a === 0) continue;
@@ -52,16 +53,23 @@ function assertRedLogo(path, size) {
     assert.ok(g <= Math.max(r, b) + 1, `Green tint in logo shell: ${path} at pixel ${i / 4}`);
     const redEdge = r > g + 1 && r > b + 1;
     if (!redEdge) {
-      assert.ok(Math.max(r, g, b) - Math.min(r, g, b) <= 1, `Non-neutral logo shell: ${path} at pixel ${i / 4}`);
+      // Resampling the padded ICNS can round each channel independently.
+      assert.ok(Math.max(r, g, b) - Math.min(r, g, b) <= 2, `Non-neutral logo shell: ${path} at pixel ${i / 4}`);
       if (a === 255 && r >= 20 && r <= 45) neutral++;
     }
     if (a < 128) continue;
+    const x = (i / 4) % size, y = Math.floor(i / 4 / size);
+    left = Math.min(left, x); right = Math.max(right, x);
+    top = Math.min(top, y); bottom = Math.max(bottom, y);
     if (r > g + 30 && r > b + 30) red++;
     if (g > r + 20 && g > b + 20) green++;
   }
   assert.ok(red > size * size * 0.05, `Missing warm red waveform: ${path}`);
   assert.equal(green, 0, `Stale green waveform: ${path}`);
-  assert.ok(neutral > size * size * 0.4, `Missing neutral charcoal tile: ${path}`);
+  assert.ok(neutral > (right - left + 1) * (bottom - top + 1) * 0.4, `Missing neutral charcoal tile: ${path}`);
+  if (padded) for (const margin of [left, top, size - right - 1, size - bottom - 1]) {
+    assert.ok(Math.abs(margin - Math.round(size / 10)) <= 1, `Unexpected macOS artwork inset: ${path}`);
+  }
 }
 
 test('frontend and website share the canonical red waveform', () => {
@@ -78,7 +86,7 @@ test('every native ICNS representation contains the red logo at its proper resol
     const iconset = join(directory, 'icon.iconset');
     execFileSync('iconutil', ['-c', 'iconset', new URL('src-tauri/icons/icon.icns', root).pathname, '-o', iconset]);
     for (const size of [16, 32, 128, 256, 512]) {
-      for (const scale of [1, 2]) assertRedLogo(join(iconset, `icon_${size}x${size}${scale === 2 ? '@2x' : ''}.png`), size * scale);
+      for (const scale of [1, 2]) assertRedLogo(join(iconset, `icon_${size}x${size}${scale === 2 ? '@2x' : ''}.png`), size * scale, true);
     }
     const bridge = readFileSync(new URL('src-tauri/native/Bridge.swift', root), 'utf8');
     assert.match(bridge, /CFBundleIconFile/);

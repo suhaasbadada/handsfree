@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { installPracticeFixture } from './ui-practice-events.mjs';
 
 // Mock IPC only: never contacts the real feed, installs or relaunches the app.
 export async function checkUpdateIndicator({send,evaluate,until,port}) {
+  const fixture = await evaluate(`Boolean(window.listeners)`)
+    ? undefined : await installPracticeFixture({send,evaluate});
+  try {
   const screenshot = async name => {
     if (!process.env.UI_SCREENSHOTS) return;
     mkdirSync(process.env.UI_SCREENSHOTS,{recursive:true});
@@ -34,6 +38,7 @@ export async function checkUpdateIndicator({send,evaluate,until,port}) {
   await until(`document.getElementById('updates-indicator-label').textContent==='Download & update' && !document.getElementById('updates-open').disabled`);
   assert.equal(await evaluate(`document.activeElement.id`),'updates-open','Keyboard focus stays on the inline action after the check, without a modal');
   assert.equal(await evaluate(`document.getElementById('updates-indicator-detail').textContent`),'0.1.1-beta.21','The action exposes its exact version');
+  assert.equal(await evaluate(`(()=>{const b=document.getElementById('updates-open'),a=b.getBoundingClientRect();return ['updates-indicator-label','updates-indicator-detail'].every(id=>{const r=document.getElementById(id).getBoundingClientRect();return r.width>1 && r.height>1 && r.left>=a.left && r.right<=a.right && r.bottom<=a.bottom;});})()`),true,'The exact offer and action are visible before consent');
   assert.equal(await evaluate(`document.getElementById('updates-open').getAttribute('aria-busy')==='false' && document.querySelector('#updates-open > svg').dataset.glyph==='download' && getComputedStyle(document.querySelector('#updates-open > svg')).animationName==='none'`),true,'Available offer has a static download icon, never an idle loader');
   await screenshot('available');
   assert.equal(await evaluate(`!window.updateInjected && !document.querySelector('#updates-dialog,#update-confirm-dialog') && !window.calls.some(c=>c.command==='install_update')`),true,'The check result is not consent and cannot inject notes or open update modals');
@@ -80,4 +85,7 @@ export async function checkUpdateIndicator({send,evaluate,until,port}) {
   }
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='check_for_updates').length`),checks,'Progress/status reads never issue unsolicited feed checks');
   await send('Emulation.setDeviceMetricsOverride',{width:980,height:820,deviceScaleFactor:1,mobile:false});
+  } finally {
+    if (fixture) await send('Page.removeScriptToEvaluateOnNewDocument', {identifier:fixture.identifier});
+  }
 }

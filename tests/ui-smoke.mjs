@@ -108,7 +108,7 @@ try {
   await until(`document.getElementById('health-model-state').textContent.includes('42%') && document.getElementById('health-model').disabled`);
   assert.equal(await evaluate(`window.downloadAttempts`), 2, 'Failed request plus one retry; duplicate click does not dispatch twice');
   await evaluate(`window.finishDownload()`);
-  await until(`document.getElementById('health-model').hidden && document.getElementById('model-ready').textContent.includes('Ready')`);
+  await until(`document.getElementById('health-model').hidden && !document.getElementById('model-ready').hidden && document.getElementById('model-ready').textContent==='Installed'`);
   await evaluate(`document.getElementById('health-close').click()`);
   await evaluate(`Object.assign(window.fixture,{microphone:true,accessibility:true,input_monitoring:true,hotkey:true});document.getElementById('feedback').hidden=true`);
   await until(`document.getElementById('setup-state').textContent==='Ready'`);
@@ -264,7 +264,7 @@ try {
     await until(`document.getElementById('setup-state').textContent==='Ready'`);
   }
   await evaluate(`window.fixture.model_ready=false;window.fixture.phase='downloading';window.fixture.progress=42`);
-  await until(`document.getElementById('download').textContent==='42%'`);
+  await until(`document.getElementById('download').textContent==='Downloading 42%'`);
   assert.equal(await evaluate(`!document.getElementById('progress').hidden && document.getElementById('progress').value===42 && !document.getElementById('setup-missing').hidden`), true, 'Model download progress remains visible');
   await evaluate(`window.fixture.model_ready=true;window.fixture.phase='idle'`);
   await until(`document.getElementById('setup-state').textContent==='Ready'`);

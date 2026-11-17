@@ -1,5 +1,7 @@
 # HandsFree workflow
 
+- Use local tests, review and GitHub's required PR checks directly. Do not run No Mistakes for this repository.
+
 - For lifecycle, phase, pending-flag or concurrency changes, start at `docs/STATE-MACHINES.md` and `docs/state-machines.json`. Preserve owner/FIFO/epoch/generation boundaries, update the relevant contract tests, and distinguish UI eligibility from native authorization. Inventory anchors are navigation, not proof of runtime correctness.
 
 - After each completed, validated update, commit and push only the task branch and open/update a pull request targeting `main`. Never push directly to `main`, force-push a protected branch, or bypass its PR/CI requirements. Report the PR, full head SHA and actual check states.
