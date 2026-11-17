@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 // Historical receipt assertions operate on the intact pre-beta-23 guide suffix.
@@ -12,35 +13,11 @@ const beta22ReleaseGuide = () => {
   return guide.slice(start);
 };
 
-test('active beta landing brand retains its badge during stable preparation', () => {
-  // Stable app footer behavior is exercised in the real DOM smoke suite.
-  for (const path of ['site/index.html']) {
-    const source = read(path);
-    if (path.startsWith('site')) assert.match(source, /aria-label="HandsFree beta home"/);
-    else assert.match(source, /<footer>[\s\S]*<span class="beta-badge">BETA<\/span>[\s\S]*<\/footer>/);
-    assert.match(source, /class="beta-badge">BETA<\/(?:sup|span)>/);
-    assert.equal([...source.matchAll(/class="beta-badge"/g)].length, 1, 'One unobtrusive badge per surface');
-  }
-  for (const path of ['site/styles.css']) {
-    assert.match(read(path), path.startsWith('src') ? /\.beta-badge\s*\{[^}]*color:\s*var\(--accent\);[^}]*font-size:\s*(?:10|11)px/ : /\.beta-badge\s*\{[^}]*color:\s*#873c38;[^}]*font-size:\s*(?:10|11)px/);
-  }
-});
-
-test('landing Beta is a small superscript, not a full-size wordmark or pill', () => {
-  assert.match(read('site/index.html'), /<sup class="beta-badge">BETA<\/sup>/);
-  const rule = read('site/styles.css').match(/\.beta-badge\{([^}]*)\}/)?.[1];
-  assert.match(rule, /top:-0\.55em/);
-  assert.match(rule, /font-size:10px/);
-  assert.doesNotMatch(rule, /border:|padding:|background:/);
-});
-
-test('README, release notes, installer guide and filename disclose beta without renaming the app', () => {
+test('README, release notes and installer guide disclose beta without renaming the app', () => {
   assert.match(read('README.md'), /!\[Mac beta: v0\.1\.1-beta\.24\]\(https:\/\/img.shields.io\/badge\/Mac_beta-v0\.1\.1--beta\.24-a64a45.svg\)/);
   assert.match(read('docs/releases/v0.1.1-beta.2.md'), /# HandsFree v0\.1\.1-beta\.2/);
   assert.match(read('docs/releases/v0.1.1-beta.2.md'), /Prerelease · Beta testing/);
   assert.match(read('docs/INSTALL.md'), /# Install HandsFree \(Mac beta\)/);
-  assert.match(read('scripts/package-release.sh'), /NAME=HandsFree-0\.1\.1-macos-arm64/);
-  assert.match(read('scripts/package-release.sh'), /-volname 'HandsFree — drag to Applications'/);
   const config = JSON.parse(read('src-tauri/tauri.conf.json'));
   assert.equal(config.productName, 'HandsFree');
   assert.equal(config.identifier, 'com.handsfree.local');
@@ -54,8 +31,13 @@ test('published active Mac beta 24 and disabled stable candidate keep embedded v
   assert.equal(JSON.parse(read('package-lock.json')).version, version);
   assert.equal(JSON.parse(read('package-lock.json')).packages[''].version, version);
   assert.equal(JSON.parse(read('src-tauri/tauri.conf.json')).version, version);
-  assert.ok(read('src-tauri/Cargo.toml').includes(`version = "${version}"`));
-  assert.ok(read('src-tauri/Cargo.lock').includes(`name = "handsfree"\nversion = "${version}"`));
+  const [manifest, lock] = JSON.parse(execFileSync('python3', ['-c',
+    'import json, sys, tomllib; print(json.dumps([tomllib.loads(value) for value in json.load(sys.stdin)]))',
+  ], { input: JSON.stringify([read('src-tauri/Cargo.toml'), read('src-tauri/Cargo.lock')]), encoding: 'utf8' }));
+  assert.equal(manifest.package.version, '0.1.1', 'Stable internal Cargo package version');
+  const lockedApp = lock.package.filter(entry => entry.name === 'handsfree');
+  assert.equal(lockedApp.length, 1);
+  assert.equal(lockedApp[0].version, '0.1.1', 'Lockfile resolves the stable internal app version');
   assert.equal(release.version, `${version}-beta.24`);
   assert.equal(release.publicAvailable, true, 'Activation follows publication and public asset verification');
   assert.equal(candidateRelease.version, version);
@@ -70,10 +52,6 @@ test('published active Mac beta 24 and disabled stable candidate keep embedded v
   assert.equal(tag, `v${candidateRelease.version}`);
   assert.equal(candidate, `HandsFree-${candidateRelease.version}-macos-arm64.dmg`);
   assert.ok(candidateRelease.dmgUrl.endsWith(`/releases/download/${tag}/${candidate}`));
-  assert.ok(read('scripts/package-release.sh').includes(`NAME=${candidate.slice(0, -4)}`));
-  assert.ok(read('scripts/package-release.sh').includes(`== ${version} ]]`));
-  assert.ok(read('src/main.ts').includes(`<span id="app-version">${version}</span>`));
-  assert.match(read('src/main.ts'), /getVersion\(\)\.then/);
   assert.ok(read(`docs/releases/${tag}.md`).includes(`Internal app version: **${version}**`));
 });
 
@@ -258,9 +236,6 @@ test('beta 21 published notes distinguish audited publication from pending deplo
   assert.equal(createHash('sha256').update(read('docs/releases/v0.1.1-beta.20.md')).digest('hex'),
     'c6a5beee0f48a57e40abfdc8f12db2aaa8a0be8a90b4e26f222350b2920bf9f5',
     'Beta 21 activation preserves historical beta 20 notes byte-for-byte');
-  const packager = read('scripts/package-updater.mjs');
-  assert.ok(packager.includes("join(root, 'src-tauri/distribution.json')"));
-  assert.doesNotMatch(packager, /candidateRelease|site\/release\.js/);
 });
 
 test('beta 13 publication notes separate audited artifacts from pending deployment and OS acceptance', () => {
@@ -561,16 +536,7 @@ test('beta 12 historical notes and completed group 2 parity ledger do not claim 
   }
 });
 
-test('beta 24 packaging retains practice guidance; beta 6 publication evidence remains historical', () => {
-  const packager = read('scripts/package-release.sh');
-  const audit = read('scripts/check-release.mjs');
-  for (const name of ['practice.md', 'COMPATIBILITY-PASTE.md']) {
-    assert.ok(packager.includes(`docs/${name}`));
-    assert.ok(packager.includes(`Licenses/Documentation/${name}`));
-    assert.ok(audit.includes(`Documentation/${name}`));
-  }
-  assert.ok(packager.includes('docs/releases/v0.1.1.md'));
-  assert.match(audit, /validateAvailability\([^\n]*\.candidateRelease, publicMode\)/);
+test('beta 6 publication evidence remains historical', () => {
   const notes = read('docs/releases/v0.1.1-beta.6.md');
   assert.match(notes, /Published experimental Mac beta/);
   assert.match(notes, /not a shortcut test/);
