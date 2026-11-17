@@ -106,12 +106,23 @@ function busyIcon(id: string, busy: boolean) {
 }
 // Native selects retain their keyboard semantics; a separate SVG is visible in
 // WKWebView even when the system's native arrow is not painted.
+const selectLabels: {select: HTMLSelectElement; label: HTMLSpanElement}[] = [];
+function syncSelectLabels() {
+  for (const {select,label} of selectLabels) {
+    const text = select.selectedOptions[0]?.textContent ?? '';
+    if (label.textContent !== text) label.textContent = text;
+  }
+}
 for (const select of Array.from(document.querySelectorAll<HTMLSelectElement>('select'))) {
   const wrapper = document.createElement('span'); wrapper.className = 'select-wrap';
-  select.before(wrapper); wrapper.append(select); wrapper.insertAdjacentHTML('beforeend', icon('chevron'));
+  const label = document.createElement('span'); label.className = 'select-label'; label.setAttribute('aria-hidden','true');
+  selectLabels.push({select,label});
+  select.before(wrapper); wrapper.append(label,select); wrapper.insertAdjacentHTML('beforeend', icon('chevron'));
   if (!select.title) select.title = select.selectedOptions[0]?.textContent ?? '';
-  select.addEventListener('change', () => { select.title = select.selectedOptions[0]?.textContent ?? ''; });
+  select.addEventListener('change', () => { select.title = select.selectedOptions[0]?.textContent ?? ''; syncSelectLabels(); });
+  new MutationObserver(syncSelectLabels).observe(select, {childList:true,subtree:true,characterData:true});
 }
+syncSelectLabels();
 // Avoid presenting native actions as ready before the first backend response.
 for (const id of ['change-shortcut', 'mic', 'permissions', 'download', 'reset', 'sounds', 'sound-style', 'sound-volume', 'recording-limit', 'recording-mode']) {
   (el(id) as HTMLInputElement | HTMLButtonElement).disabled = true;
@@ -768,7 +779,7 @@ async function refreshStatus() {
       el('sound-state').textContent = current.sounds ? 'On' : 'Off';
     }
     if (capturing && !canEditShortcut() && !shortcutPending) void stopCapture();
-     renderShortcut();
+      renderShortcut();
     renderPractice();
     void practice.poll();
     if (!volumePending && !volumeEditing) { volume.value = String(current.sound_volume); showVolume(); }
@@ -785,7 +796,8 @@ async function refreshStatus() {
     el('storage-error').hidden = !current.persistence_error;
      el('storage-error').textContent = current.persistence_error;
      renderHealth();
-     renderUpdates();
+      renderUpdates();
+      syncSelectLabels();
   } catch (e) { current = undefined; clearPractice(); renderPractice(); renderWorkflow(); el('phase').textContent = 'Disconnected'; el('dot').className = 'error'; connectionError = `Couldn’t connect to HandsFree: ${String(e)}`; renderHealth(); renderMicrophones(); feedback(connectionError); }
 }
 void refresh();
