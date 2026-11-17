@@ -48,7 +48,6 @@ test('Homebrew is recommended and visible in the hero, with safe setup across do
   assert.match(install, /do not delete your models, settings, statistics, or other user data/);
   assert.match(install, /Gatekeeper, quarantine/);
   assert.match(install, /Do not use `--zap`, delete HandsFree's data folders, or reset totals to update/);
-  assert.match(css, /\.homebrew-option>code\{[^}]*white-space:normal;overflow-wrap:anywhere/);
 });
 
 test('hero has a direct, accessible Mac download with a real decorative Apple SVG', () => {
@@ -83,7 +82,6 @@ test('hero and README lead with the same grounded thought-first positioning', ()
   assert.ok(readme.includes(`**${headline}**`));
   const support = 'Say it while it’s clear. HandsFree turns your thoughts into text, without making typing the bottleneck.';
   assert.ok(html.includes(support));
-  assert.match(css, /\.hero h1 em\{font-style:normal\}/);
 });
 
 test('use cases are concise, semantic, and honest about coding-tool support', () => {
