@@ -219,6 +219,7 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); margin-top: 10
 .status #cancel { width: 32px; height: 36px; min-width: 32px; padding: 0; font-size: 22px; }
 .status-detail { color: var(--muted); line-height: 1.65; overflow-wrap: anywhere; margin: 0 0 12px; }
 .general-status-slot { position: relative; margin-top: 16px; }
+main:has(#settings:not([hidden])) .general-status-slot { display: none; }
 .general-status-slot:has(#message[hidden]):has(#message-recovery[hidden]) { margin-top: 0; }
 .general-status-slot:has(#message-recovery:not([hidden])) { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); background: transparent; }
 .general-status-slot > #message { max-block-size: 4.8em; overflow-y: auto; }
@@ -232,7 +233,10 @@ main:has(#practice-page:not([hidden])) #message[hidden] { display: block !import
 #dot.processing, #dot.downloading { animation: pulse 1.6s infinite; }
 #dot.error, #dot.not_pasted { background: var(--danger); }
 .feedback { background: var(--warning); color: var(--text); border-radius: 10px; padding: 12px; overflow-wrap: anywhere; line-height: 1.6; }
-footer { grid-column: 2; width: 100%; max-width: 760px; min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; color: var(--muted); margin: 0 auto; padding: 12px 0; border-top: 1px solid var(--line); }
+footer { grid-column: 2; width: 100%; max-width: 760px; min-height: 58px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; color: var(--muted); margin: 0 auto; padding: 12px 0; border-top: 1px solid var(--line); }
+#updates-feedback { flex-basis: 100%; margin: 0; max-height: 3.2em; overflow: auto; overflow-wrap: anywhere; color: var(--danger); font-size: 12px; line-height: 1.6; }
+#updates-open[data-phase="checking"] > svg, #updates-open[data-phase="downloading"] > svg { animation: update-spin 1s linear infinite; }
+@keyframes update-spin { to { transform: rotate(360deg); } }
 .footer-privacy, .footer-meta { display: flex; align-items: center; gap: 8px; }
 .footer-meta { gap: 16px; }
 .footer-privacy svg { width: 14px; height: 14px; }
@@ -330,28 +334,16 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .microphone-controls { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 55%; }
 .microphone-controls select { min-width: 0; max-width: 100%; }
 .practice-sample { color: var(--muted); font-size: 13px; line-height: 1.6; }
-.update-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
-.release-notes:has(#updates-notes[hidden]) { display: none; }
-.release-notes { padding-top: 12px; border-top: 1px solid var(--line); }
-.release-notes h3 { font-size: 12px; color: var(--muted); }
-.update-releases { margin-top: 16px; padding: 12px; border-radius: 8px; background: var(--input); }
-.update-releases p { margin: 0; overflow-wrap: anywhere; }
-.update-releases p + p { margin-top: 6px; color: var(--accent); font-weight: 500; }
-#updates-dialog .dialog-actions, #update-confirm-dialog .dialog-actions { display: flex; flex-wrap: wrap; gap: 10px; }
-#updates-dialog .dialog-actions button, #update-confirm-dialog .dialog-actions button { flex: 1 1 auto; }
-/* Start on the dialog heading, not an apparently selected Close action.
-   Interactive controls retain their keyboard focus-visible ring. */
-#updates-title:focus, #update-confirm-title:focus { outline: none; }
-#updates-dialog strong, #updates-version { overflow-wrap: anywhere; }
 #updates-open { display: inline-flex; align-items: center; gap: 5px; min-width: 0; min-height: 24px; height: auto; padding: 0; background: transparent; color: var(--muted); }
 #updates-open svg { width: 14px; height: 14px; }
 .update-summary { display: flex; align-items: center; gap: 5px; text-align: left; min-width: 0; }
 .update-summary strong { font-size: 11px; font-weight: 600; }
 .update-summary > span { font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#updates-open { width: 196px; height: 30px; min-height: 30px; padding: 4px 6px; border: 1px solid transparent; border-radius: 6px; justify-content: flex-start; }
-#updates-open[data-attention="available"] { color: var(--accent); background: var(--active); }
-#updates-open[data-attention="available"]:hover { border-color: var(--accent); }
+#updates-open { width: 220px; height: 30px; min-height: 30px; padding: 4px 6px; border: 1px solid transparent; justify-content: flex-start; }
+#updates-open[data-attention="available"] { color: var(--accent); }
+#updates-open[data-attention="available"]:hover { text-decoration: underline; text-underline-offset: 3px; }
 #updates-open[data-attention="error"] { color: var(--danger); }
+#updates-open[aria-busy="true"]:disabled { opacity: 1; }
 @media (max-width: 560px) {
   .practice .card-heading { flex-wrap: wrap; gap: 8px; }
   .practice-bottom .subtle { text-align: left; }
@@ -373,7 +365,6 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .practice-bottom { display: block; }
 .update-summary > span { max-width: 80px; }
 .update-summary strong { flex: none; }
-.update-consent { border-top: 1px solid var(--line); padding-top: 14px; }
 @media (max-width: 560px) {
   .practice-meter { grid-template-columns: auto minmax(30px,1fr) auto; }
   #microphone-choice-row { flex-wrap: wrap; }

@@ -35,10 +35,17 @@
 - The revisitable setup guide belongs to Settings. It observes native proofs and
   uses explicit permission/download actions. Closing it focuses the visible
   Settings heading, never a hidden practice field.
-- Update status is a compact single-line footer action. A verified offer remains
-  emphasized with its accessible version; unknown/error/up-to-date observations
-  remain distinct. The dialog retains explicit check and exact-version install
-  consent. A cached status never authorizes network activity or installation.
+- Updates stay inline in the footer, with no update or install-confirmation modal.
+  Clicking the refresh action checks the feed and spins its icon. A verified offer
+  changes that same control to Download & update with its exact version; another
+  explicit click rechecks and installs only that version, then the native updater
+  reopens HandsFree. A changed offer needs another click, never silent consent.
+  Busy states disable repeats, byte progress and failures stay inline, and ordinary
+  status polling never contacts the feed. Native idle/install/signature guards stay
+  authoritative. Reduced motion disables the spinner, not its readable status.
+- Ready setup is not repeated at the bottom of Settings. Missing requirements
+  remain actionable there and in product status. Settings omits the duplicate
+  general failure strip; the top-right control remains the direct recovery entry.
 - Recording phase means an admitted owner, not microphone readiness. The native
   capsule and dashboard show Starting until exact-session readiness is observed.
   Practice preserves Finish/Cancel eligibility while withholding speech guidance,

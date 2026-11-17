@@ -10,17 +10,28 @@ export type UpdateView = {
 };
 type Invoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 export const updateBusy = (view: UpdateView) => updatePhaseBusy(view.phase);
+function downloadProgress(view: UpdateView): string {
+  const downloaded = Number.isFinite(view.downloaded_bytes) ? Math.max(0, view.downloaded_bytes) : 0;
+  const total = Number.isFinite(view.total_bytes) && view.total_bytes! > 0 ? view.total_bytes : undefined;
+  const bytes = (value: number) => {
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const unit = Math.min(units.length - 1, Math.floor(Math.log10(Math.max(1, value)) / 3));
+    return `${(value / 1000 ** unit).toFixed(unit ? 1 : 0)} ${units[unit]}`;
+  };
+  return total === undefined ? `${bytes(downloaded)} downloaded`
+    : `${Math.min(100, Math.floor(downloaded / total * 100))}% · ${bytes(downloaded)} / ${bytes(total)}`;
+}
 export function updateIndicator(view: UpdateView): {label: string; detail: string; attention: 'available' | 'error' | 'none'} {
   switch (view.phase) {
     case 'available':
       return view.available_version
-        ? {label: 'Update available', detail: view.available_version, attention: 'available'}
+        ? {label: 'Download & update', detail: view.available_version, attention: 'available'}
         : {label: 'Updates', detail: 'Check for latest', attention: 'none'};
     case 'up_to_date': return {label: 'Up to date', detail: 'At last check', attention: 'none'};
-    case 'checking': return {label: 'Checking updates…', detail: 'Please wait', attention: 'none'};
-    case 'downloading': return {label: 'Downloading update', detail: 'View progress', attention: 'none'};
-    case 'installing': return {label: 'Installing update', detail: 'Keep HandsFree open', attention: 'none'};
-    case 'error': return {label: 'Update failed', detail: 'Open to retry', attention: 'error'};
+    case 'checking': return {label: 'Checking…', detail: 'Release metadata', attention: 'none'};
+    case 'downloading': return {label: 'Downloading…', detail: downloadProgress(view), attention: 'none'};
+    case 'installing': return {label: 'Installing…', detail: 'HandsFree will reopen', attention: 'none'};
+    case 'error': return {label: 'Retry update check', detail: 'Check again', attention: 'error'};
     default: return {label: 'Updates', detail: 'Not checked', attention: 'none'};
   }
 }
@@ -65,9 +76,19 @@ export class Updates {
     catch (error) { this.error(error); }
     finally { this.pending = false; }
   }
-  // Explicit Download intent authorizes a feed refresh, not archive bytes.
-  // Closing/navigation revokes the callback, even if the same dialog reopens.
+  // Navigation revokes pending intent, even if the same offer is shown again.
   cancelPreparation() { ++this.preparation; this.prepared = undefined; }
+  // The visible offer click authorizes only that exact version, never a newer
+  // offer discovered by the feed recheck or returned by the native installer.
+  async download(version: string): Promise<void> {
+    if (this.pending || this.view.phase !== 'available' || this.view.available_version !== version || !this.canInstall()) return;
+    const preparedVersion = await this.prepareConfirmation();
+    if (preparedVersion !== version) {
+      this.prepared = undefined;
+      return;
+    }
+    await this.install(version);
+  }
   async prepareConfirmation(): Promise<string | undefined> {
     if (this.pending || this.view.phase !== 'available' || !this.canInstall()) return;
     const preparation = ++this.preparation;

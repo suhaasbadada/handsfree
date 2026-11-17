@@ -30,7 +30,8 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
         if(command==='practice_status'){if(window.layoutLiveStatus && ['complete','empty','error'].includes(window.practiceResult.phase)){window.fixture.phase='idle';window.fixture.message='Practice finished. No text was pasted or saved.';}return {...window.practiceResult,generation:window.practiceGeneration};}
         if(command==='practice_finish'){window.practiceResult.phase='processing';if(window.layoutLiveStatus){window.fixture.phase='processing';window.fixture.message='Transcribing locally…';}return;}
         if(command==='practice_cancel'){if(window.delayCancel)await new Promise(r=>window.cancelAck=r);if(window.layoutLiveStatus){window.fixture.phase='idle';window.fixture.message='Cancelled.';}return;}
-        if(command==='update_status')return {installed_version:'0.1.1-beta.9',phase:'idle',notes:'',downloaded_bytes:0,message:'Choose Check for updates.'};
+         if(command==='update_status')return {installed_version:'0.1.1-beta.9',phase:'idle',notes:'',downloaded_bytes:0,message:'Choose Check for updates.'};
+         if(command==='check_for_updates')return {installed_version:'0.1.1-beta.9',phase:'up_to_date',notes:'',downloaded_bytes:0,message:'Up to date.'};
       }
     };
   `});
@@ -118,20 +119,19 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   await until(`window.context>window.oldContext`);
   await evaluate(`window.oldContext=window.context;window.emitNative('practice-cleared')`);
   await until(`window.context>window.oldContext && !document.getElementById('practice-start').disabled`);
-  for (const opener of [`document.querySelector('.brand').click()`,`document.getElementById('updates-open').click()`]) {
+  for (const opener of [`document.querySelector('.brand').click()`,`document.getElementById('product-status').click()`]) {
     await evaluate(`window.delayStart=true;window.startAck=undefined;window.sendPractice('press',3)`);
     await until(`typeof window.startAck==='function'`);
     await evaluate(opener);
     await until(`window.context===0`);
     await evaluate(`window.startAck();window.delayStart=false`);
     await until(`document.getElementById('practice-cancel').hidden`);
-     await evaluate(`document.getElementById('updates-dialog').close();document.getElementById('brand-overview').click();document.getElementById('nav-practice-page').click()`);
+     await evaluate(`document.getElementById('health-dialog').close();document.getElementById('brand-overview').click();document.getElementById('nav-practice-page').click()`);
     await until(`window.context>0 && !document.getElementById('practice-start').disabled`);
   }
-  await evaluate(`window.emitNative('dashboard-navigate','updates')`);
-  await until(`document.getElementById('updates-dialog').open && window.context===0`);
-  await evaluate(`document.getElementById('updates-close').click()`);
-  await until(`window.context>0`);
+  await evaluate(`window.updateChecks=window.calls.filter(c=>c.command==='check_for_updates').length;window.emitNative('dashboard-navigate','updates')`);
+  await until(`window.calls.filter(c=>c.command==='check_for_updates').length>window.updateChecks`);
+  assert.equal(await evaluate(`window.context>0 && !document.querySelector('dialog[open]') && !window.calls.some(c=>c.command==='install_update')`),true,'Tray Updates checks inline without a modal, capture teardown or implicit install');
 
   // Fresh production documents at each width: no direct controller calls or
   // screenshots masquerading as layout evidence. Compare document positions AND

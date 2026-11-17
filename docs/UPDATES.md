@@ -1,12 +1,15 @@
 # Signed in-app updates (Mac beta 7 onward)
 
-The footer shows the latest locally known update state without opening a dialog:
-**Not checked**, **Up to date**, **Update available** with its version, or
-**Update failed** with a retry destination. A verified available update is a
-prominent brand-colored action. Opening it shows the existing update dialog;
-download still refreshes the offer before exact-version confirmation. Local status
-observations outside the dialog do not contact the feed. Choose **Check for updates**
-to discover a newly published release; there is no unsolicited background check.
+The beta 21 candidate keeps updates entirely inline in the footer. Click **Updates**
+to check; the refresh icon spins while checking. A verified offer changes the same
+action to **Download & update** with its version. Clicking that offer authorizes
+only that displayed version, freshly rechecked before download. Progress and retry
+errors stay inline; there are no update or confirmation modals. Local status reads
+never contact the feed, and there is no unsolicited background download.
+
+Published older betas still use their **Check for updates** dialog and **Download & restart**
+action until upgraded. Candidate UI changes are not a claim of publication or
+installed-app replacement/restart acceptance.
 
 Introduced in [published Mac beta 7](releases/v0.1.1-beta.7.md), not a retroactive
 change to beta 6. Beta 6 and earlier need one initial DMG/Homebrew bootstrap
@@ -53,23 +56,21 @@ published beta 8 does not repair the defect.
 
 ## User flow
 
-On Apple Silicon macOS, choose **Updates** in the footer. The installed release is
-read from metadata embedded in the executable, not the latest release feed or the
-shared internal app version `0.1.1`. **Check for updates** explicitly contacts
+On Apple Silicon macOS, click **Updates** in the footer to check. The installed
+release is read from metadata embedded in the executable, not the latest release
+feed or the shared internal app version `0.1.1`. The explicit check contacts
 `https://suhaasbadada.github.io/handsfree/updates/macos-arm64.json`.
-Opening the dialog, starting the app, and status polling do not check online.
+Starting the app and ordinary status polling do not check online.
 These requests disclose ordinary connection metadata to GitHub, never audio,
 transcripts, model files, settings, or usage totals.
 
-An available update offers **Download & restart…** and a separate **Check again**
-text action. Download explicitly refreshes feed metadata **before** opening
-confirmation of the freshly returned exact distribution version. A cached offer
-therefore cannot make an already-open app install a superseded release through
-the ordinary UI flow. This is a metadata check, not an archive download. Closing
-or navigating during the refresh revokes its confirmation callback. Up-to-date,
-offline and malformed responses do not open confirmation; retry needs no restart.
-No automatic installation, downgrade, or silent
-restart is performed. A native idle barrier refuses updates during recording,
+An available update offers **Download & update** and displays its exact version.
+That explicit click is install/reopen consent for that version only. The controller
+refreshes metadata first; a changed offer is shown and requires another click,
+never silently substituted. The recheck is not an archive download. Navigation
+during preparation revokes pending intent. Up-to-date, offline and malformed
+responses never install. Failed checks expose an inline retry; no modal is needed.
+No unsolicited installation or downgrade occurs. A native idle barrier refuses updates during recording,
 transcription, practice, shortcut capture, model download, or an unpasted result.
 While downloading/installing, new work and quitting are blocked. The official
 Tauri installer verifies the artifact signature and authenticated version before
@@ -96,11 +97,11 @@ be the exact canonical versioned HandsFree GitHub `.app.tar.gz` asset. Metadata
 expires at exactly ten minutes. Local status reads clear expired offers and their
 notes without contacting the feed, except while an operation owns the state.
 Failed checks/installs also clear unusable offers while retaining the installed
-version. If confirmation outlives the cache, the same native RAII operation
+version. If explicit version intent outlives the cache, the same native RAII operation
 refreshes metadata before acquiring the FIFO idle/install lease or downloading
 any archive bytes. The same freshly verified confirmed version can proceed;
-a different version is returned as a fresh offer for review and **requires new
-confirmation**, never silent substitution. Opening/status polling still never
+a different version is returned as a fresh offer and **requires another click**,
+never silent substitution. Ordinary status polling still never
 authorize a feed request. Signature, canonical URL, pinned key, version ordering,
 install/quit exclusion and crypto-provider initialization remain mandatory.
 

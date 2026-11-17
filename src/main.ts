@@ -88,7 +88,7 @@ document.querySelector('#app')!.innerHTML = `
      <div class="setting-row listening-row"><div><h3>Recording sounds</h3></div><select id="sound-style" aria-label="Sound"><option value="clean">Clean</option><option value="warm">Warm</option></select><span id="sound-state" class="state">Off</span><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Recording sounds"><span aria-hidden="true"></span></label></div>
     <div class="setting-row volume-row"><h3><label for="sound-volume">Volume</label></h3><div class="sound-controls"><input id="sound-volume" type="range" min="0" max="100" step="1" value="50" aria-describedby="volume-percent"><output id="volume-percent" for="sound-volume">50%</output></div><button id="preview-sound" class="icon-action" aria-label="Preview sound" title="Preview sound" disabled>${icon('play')}</button></div>
   </section>
-  <section class="card setup-card" aria-labelledby="setup-title"><div class="card-heading"><h2 id="setup-title">Setup</h2><span id="setup-state" class="subtle" role="status">Checking…</span></div>
+   <section class="card setup-card" aria-labelledby="setup-title"><div class="card-heading"><h2 id="setup-title">Setup</h2><span id="setup-state" class="subtle" role="status">Checking…</span></div>
    <div id="setup-missing">
      <div id="mic-row" class="setting-row"><div><h3>Microphone</h3><p id="mic-state">Allow access to record your voice.</p></div><button id="mic">Allow</button></div>
      <div id="permissions-row" class="setting-row" hidden><div><h3>Shortcuts & paste</h3><p id="permission-state">Checking…</p></div><button id="permissions">Open settings</button></div>
@@ -96,12 +96,12 @@ document.querySelector('#app')!.innerHTML = `
     </div>
      <div id="model-row" class="setting-row" tabindex="-1"><div><h3>English model <span id="model-ready" class="subtle" hidden>· Ready</span></h3><p id="model-state">148 MB · One-time download</p><progress id="progress" max="100" value="0" hidden aria-label="Model download progress"></progress></div><button id="download">Download</button></div>
   </section>
-    <section class="local-data" aria-labelledby="data-title"><div class="setting-row"><div><h2 id="data-title">Usage totals</h2></div><button id="reset" class="danger" aria-haspopup="dialog">Reset totals</button></div><p id="privacy-detail" class="subtle">Audio and transcription stay on this device.</p></section>
+     <section class="local-data" aria-labelledby="data-title"><div class="setting-row"><div><h2 id="data-title">Usage totals</h2><p id="privacy-detail" class="subtle">Private tests are never counted.</p></div><button id="reset" class="text-action danger" aria-haspopup="dialog">Reset totals</button></div></section>
  </section>
   <div class="general-status-slot"><p id="message" class="status-detail" role="status" aria-label="Dictation status" aria-live="polite" hidden></p><button id="message-recovery" class="text-action" hidden>View problem</button></div>
  <p id="feedback" class="feedback" role="status" hidden></p><p id="storage-error" class="feedback" role="status" hidden></p>
   </main>
-  <footer><span class="footer-privacy">${icon('shield')}On-device · English</span><div class="footer-meta"><span class="footer-brand"><span class="sr-only">HandsFree</span><span id="app-version">0.1.1</span><span class="beta-badge">BETA</span></span><button id="updates-open" class="text-action" hidden>${icon('update')}<span class="update-summary"><strong id="updates-indicator-label">Updates</strong><span id="updates-indicator-detail">Not checked</span></span><span id="updates-announcement" class="sr-only" role="status" aria-live="polite"></span></button></div></footer>
+   <footer><span class="footer-privacy">${icon('shield')}On-device · English</span><div class="footer-meta"><span class="footer-brand"><span class="sr-only">HandsFree</span><span id="app-version">0.1.1</span><span class="beta-badge">BETA</span></span><button id="updates-open" class="text-action" aria-describedby="updates-feedback" hidden>${icon('update')}<span class="update-summary"><strong id="updates-indicator-label">Updates</strong><span id="updates-indicator-detail">Not checked</span></span><span id="updates-announcement" class="sr-only" role="status" aria-live="polite"></span></button></div><p id="updates-feedback" role="status" aria-live="polite" hidden></p></footer>
 </div>
  <dialog id="reset-dialog" aria-labelledby="reset-title"><h2 id="reset-title">Reset usage totals?</h2><p>Totals will return to zero. Your preferences and language model won’t change.</p><div class="dialog-actions"><button id="keep-stats" autofocus>Keep totals</button><button id="confirm-reset" class="danger">Reset totals</button></div></dialog>
  <dialog id="health-dialog" aria-labelledby="health-title" aria-describedby="health-summary">
@@ -120,18 +120,6 @@ const el = (id: string) => document.getElementById(id)!;
 const button = (id: string) => el(id) as HTMLButtonElement;
 // Setup is a Settings destination, never extra content above the private editor.
 el('settings').insertBefore(el('get-started'), el('workflow'));
-document.body.insertAdjacentHTML('beforeend', `<dialog id="updates-dialog" aria-labelledby="updates-title">
- <h2 id="updates-title" tabindex="-1" autofocus>App updates</h2>
- <div class="update-releases"><p>Installed <strong id="installed-release">Connecting…</strong></p><p id="updates-version" hidden></p></div>
- <p id="updates-message" role="status" aria-live="polite"></p>
- <section class="release-notes"><h3>Release notes</h3><p id="updates-notes" class="update-notes" hidden></p></section><progress id="updates-progress" max="100" hidden aria-label="Update download progress"></progress>
-  <p class="update-consent">Checks refresh release metadata online. Download &amp; restart checks the latest offer, then asks for confirmation before downloading a signature-verified update. Your model, settings and usage totals are kept.</p>
- <button id="updates-check-again" class="text-action" hidden>Check again</button>
- <div class="dialog-actions"><button id="updates-close">Close</button><button id="updates-check">Check for updates</button><button id="updates-install" class="primary" hidden>Download &amp; restart…</button></div>
- </dialog>
- <dialog id="update-confirm-dialog" aria-labelledby="update-confirm-title"><h2 id="update-confirm-title" tabindex="-1" autofocus>Update HandsFree?</h2>
- <p id="update-confirm-detail"></p><p>HandsFree will download, verify, install and restart. Finish dictation first. macOS may ask for administrator approval. Unsaved last-transcript text is not retained across restart.</p>
- <div class="dialog-actions"><button id="update-keep">Not now</button><button id="update-confirm" class="primary">Download &amp; restart</button></div></dialog>`);
 // Avoid presenting native actions as ready before the first backend response.
 for (const id of ['started-mic', 'started-permissions', 'started-model', 'change-shortcut', 'mic', 'permissions', 'download', 'reset', 'sounds', 'sound-style', 'sound-volume', 'recording-limit', 'recording-mode']) {
   (el(id) as HTMLInputElement | HTMLButtonElement).disabled = true;
@@ -194,7 +182,6 @@ function focusHeading(tab: Page) {
 function navigate(tab: Page) {
   ++focusIntent;
   updates.cancelPreparation();
-  if (updateConfirmDialog.open) updateConfirmDialog.close();
   if (tab !== 'practice-page') clearPractice();
   if (capturing && tab !== 'settings') void stopCapture();
   for (const name of ['overview', 'practice-page', 'settings']) {
@@ -397,6 +384,7 @@ function renderPractice() {
   button('practice-recovery').hidden = practice.view.phase !== 'error';
   renderGettingStarted();
   syncPracticeContext();
+  renderUpdates();
 }
 practiceField.oninput = () => practice.edit(practiceField.value);
 el('practice-start').onclick = () => { if (!button('practice-start').disabled) void practiceInputs.start(); };
@@ -423,13 +411,10 @@ void listen<PracticeInput>('practice-input', ({payload}) => {
 }).catch(()=>{});
 void listen<string>('dashboard-navigate', ({payload}) => {
   closeBrandMenu();
-  if(payload==='updates') button('updates-open').click();
+   if(payload==='updates') { if (current?.platform === 'macos') void updates.check(); }
    else if(payload==='get-started') openGettingStarted();
     else { navigate(payload==='settings'?'settings':payload==='practice'?'practice-page':'overview'); if(payload==='practice') practiceField.focus(); }
 }).catch(()=>{});
-const updatesDialog = el('updates-dialog') as HTMLDialogElement;
-const updateConfirmDialog = el('update-confirm-dialog') as HTMLDialogElement;
-let confirmedUpdate: string | undefined;
 const canInstallUpdate = () => current?.platform === 'macos'
   && phasePolicy(current.phase).installUpdate
   && practice.view.phase === 'idle' && !capturing && !captureStopping && !shortcutPending && !downloadPending && !modePending;
@@ -504,56 +489,32 @@ function renderUpdates() {
     if (el(id).textContent !== text) el(id).textContent = text;
   }
   button('updates-open').dataset.attention = indicator.attention;
-  button('updates-open').title = `${indicator.label}. ${indicator.detail}. Open app updates`;
+  const canDownload = canInstallUpdate();
+  const instruction = view.phase === 'available' ? canDownload ? 'Click to download, verify, install and reopen HandsFree. Models, settings and usage totals are kept.' : 'Finish dictation, clear the private test and stop shortcut recording before updating.' : 'Click to check for updates';
+  button('updates-open').title = `${indicator.label}. ${indicator.detail}. ${instruction}`;
   button('updates-open').setAttribute('aria-label', button('updates-open').title);
-  if (confirmedUpdate && (view.phase !== 'available' || confirmedUpdate !== view.available_version)) {
-    confirmedUpdate = undefined;
-    if (updateConfirmDialog.open) updateConfirmDialog.close();
-  }
-  el('installed-release').textContent = view.installed_version || 'Connecting…';
-  el('updates-message').textContent = view.message;
-  el('updates-version').hidden = !view.available_version;
-  el('updates-version').textContent = view.available_version ? `Available ${view.available_version}` : '';
-  el('updates-notes').hidden = !view.notes;
-  el('updates-notes').textContent = view.notes;
-  button('updates-check').disabled = updateBusy(view) || updateConfirmDialog.open;
-  el('updates-check').hidden = view.phase === 'available' || ['downloading', 'installing'].includes(view.phase);
-  el('updates-check-again').hidden = view.phase !== 'available';
-  button('updates-check-again').disabled = updateBusy(view) || updateConfirmDialog.open;
-  el('updates-install').hidden = view.phase !== 'available';
-  button('updates-install').disabled = !canInstallUpdate();
-  button('update-confirm').disabled = !canInstallUpdate() || view.phase !== 'available' || confirmedUpdate !== view.available_version;
-  const progress = el('updates-progress') as HTMLProgressElement;
-  progress.hidden = !['downloading', 'installing'].includes(view.phase);
-  if (view.total_bytes && view.total_bytes > 0) progress.value = Math.min(100, view.downloaded_bytes / view.total_bytes * 100);
-  else progress.removeAttribute('value');
+  button('updates-open').disabled = current?.platform !== 'macos' || updateBusy(view) || (view.phase === 'available' && !canDownload);
+  button('updates-open').dataset.phase = view.phase;
+  button('updates-open').setAttribute('aria-busy', String(updateBusy(view)));
+  button('brand-updates').textContent = view.phase === 'available' ? `${indicator.label} ${indicator.detail}` : 'Check for updates';
+  button('brand-updates').disabled = button('updates-open').disabled;
+  button('brand-updates').title = button('updates-open').title;
+  statusText('updates-feedback', view.phase === 'error' ? view.message : '');
+  el('updates-feedback').hidden = view.phase !== 'error' || !view.message;
 }
-el('updates-open').onclick = () => { if (current?.platform !== 'macos') return; updatesDialog.showModal(); renderPractice(); renderUpdates(); void updates.refresh(); };
-updatesDialog.addEventListener('beforetoggle', event => { if ((event as ToggleEvent).newState === 'closed') updates.cancelPreparation(); });
-updatesDialog.onclose = () => {
-  if (updatesDialog.open) return; // A queued close event cannot affect a reopened dialog.
-  updates.cancelPreparation(); if (updateConfirmDialog.open) updateConfirmDialog.close(); renderPractice();
+el('updates-open').onkeydown = event => {
+  if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
 };
-updatesDialog.oncancel = () => updates.cancelPreparation();
-el('updates-close').onclick = () => { updates.cancelPreparation(); updatesDialog.close(); };
-el('updates-check').onclick = () => { if (!updateConfirmDialog.open && current?.platform === 'macos') void updates.check(); };
-el('updates-check-again').onclick = el('updates-check').onclick;
-el('updates-install').onclick = async () => {
-  if (!updatesDialog.open || updateConfirmDialog.open) return;
-  const version = await updates.prepareConfirmation();
-  if (!version || !updatesDialog.open || !canInstallUpdate() || updates.view.phase !== 'available' || updates.view.available_version !== version) return;
-  confirmedUpdate = version;
-  el('update-confirm-detail').textContent = `Install ${confirmedUpdate}?`;
-  updateConfirmDialog.showModal(); renderPractice(); renderUpdates();
-};
-el('update-keep').onclick = () => { updates.cancelPreparation(); updateConfirmDialog.close(); };
-updateConfirmDialog.oncancel = () => { confirmedUpdate = undefined; updates.cancelPreparation(); };
-updateConfirmDialog.onclose = () => { if (updateConfirmDialog.open) return; confirmedUpdate = undefined; renderPractice(); renderUpdates(); };
-el('update-confirm').onclick = () => {
-  const version = confirmedUpdate;
-  if (!updateConfirmDialog.open || !updatesDialog.open || !version || !canInstallUpdate() || version !== updates.view.available_version) return;
-  updateConfirmDialog.close(); confirmedUpdate = undefined;
-  void updates.install(version);
+el('updates-open').onclick = async () => {
+  if (current?.platform !== 'macos' || button('updates-open').disabled) return;
+  const ownedFocus = document.activeElement === el('updates-open');
+  const intent = focusIntent;
+  const version = updates.view.phase === 'available' ? updates.view.available_version : undefined;
+  if (version) await updates.download(version);
+  else await updates.check();
+  renderUpdates();
+  if (ownedFocus && intent === focusIntent && document.hasFocus() && !button('updates-open').disabled
+    && (document.activeElement === document.body || document.activeElement === el('updates-open'))) button('updates-open').focus({preventScroll:true});
 };
 el('mic').onclick = () => void action('request_microphone');
 el('permissions').onclick = () => { if (current && current.platform !== 'windows') void action('request_permissions'); };
@@ -847,7 +808,6 @@ async function refreshStatus() {
     button('mic').disabled = current.microphone;
      el('mic').textContent = windows ? 'Open settings' : current.microphone ? 'Allowed' : 'Allow';
      el('mic-state').textContent = windows ? 'Connect a microphone and enable microphone access.' : 'Allow access to record your voice.';
-     el('privacy-detail').textContent = windows ? 'Audio and transcription stay on this device.' : 'Audio and transcription stay on this Mac.';
     el('permission-state').textContent = !current.accessibility ? 'Allow Accessibility for automatic paste.' : 'Allow Input Monitoring for the shortcut.';
     el('mic-row').hidden = current.microphone;
      el('permissions-row').hidden = windows || (current.accessibility && current.input_monitoring);
@@ -887,7 +847,8 @@ async function refreshStatus() {
     el('words').textContent = current.stats.words.toLocaleString();
     el('count').textContent = current.stats.transcriptions.toLocaleString();
     el('saved').textContent = formatTime(current.stats.saved_seconds);
-    const ready = readiness(current);
+     const ready = readiness(current);
+     document.querySelector<HTMLElement>('.setup-card')!.hidden = ready;
     el('setup-state').textContent = ready ? 'Ready' : 'Needs attention';
     el('setup-missing').hidden = ready;
     document.querySelector<HTMLElement>('.readiness')!.hidden = ready;
@@ -897,6 +858,7 @@ async function refreshStatus() {
     el('storage-error').hidden = !current.persistence_error;
      el('storage-error').textContent = current.persistence_error;
      renderHealth();
+     renderUpdates();
   } catch (e) { current = undefined; clearPractice(); renderPractice(); renderWorkflow(); el('phase').textContent = 'Disconnected'; el('dot').className = 'error'; connectionError = `Couldn’t connect to HandsFree: ${String(e)}`; renderHealth(); renderMicrophones(); feedback(connectionError); }
 }
 void refresh();

@@ -51,8 +51,10 @@ Failure details remain distinct from setup readiness; disconnected status is unk
    without seeing its download. Do not reject snapshots using an adjacency-only
    global reducer. Within one active update revision, however, progress cannot
    move `installing` back to `downloading`; the owning invoke reports terminal errors.
-5. **Intent precedes effects.** Updates check only on request; install/reset require
-   explicit confirmation. Practice has no external paste, clipboard or usage route.
+5. **Intent precedes effects.** Updates check only on request. Clicking the inline
+   Download & update offer is exact-version install consent; it rechecks the feed,
+   and any changed offer requires another click. Reset retains its confirmation
+   dialog. Practice has no external paste, clipboard or usage route.
    Delivery is once-only, with uncertain submission never converted into a retry.
 6. **Commit and observation differ.** Preference transactions apply/persist/rollback;
    usage persists after delivery and reports a separate save error. A green build,
@@ -68,7 +70,7 @@ Failure details remain distinct from setup readiness; disconnected status is unk
 | Wrong field, double paste, clipboard loss | `delivery`, `focus-resolution`, `clipboard` | Permission-free native/focus harnesses; real editor acceptance is separate |
 | Shortcut settings race | `shortcut-key-recognizer`, `shortcut-capture`, `preference-transaction`, `native-hook` | `tests/shortcut.test.mjs`, browser smoke |
 | Disabled/wrong action | `action-policy`, `preferences-ui`, `permissions-readiness` | Shared policy fixture in Node and Rust |
-| Update error or stale dialog | `update-operation`, `update-lifecycle`, `updates-ui`, `dialogs` | Updater Rust/Node tests, fresh-process TLS regression, isolated signed install |
+| Update error or stale offer | `update-operation`, `update-lifecycle`, `updates-ui` | Updater Rust/Node tests, inline browser checks, fresh-process TLS regression, isolated signed install |
 | Tray/Dock/reopen behavior | `dashboard-lifecycle` | Native lifecycle tests; installed readiness |
 | Pause/exclusions/login/tray Finish | `workflow-admission`, `login-registration` | Synthetic native policy/fake login adapter; Store tests; [workflow IPC](WORKFLOW.md) |
 | Paused Windows code | IDs prefixed `windows-` | Preserve code; Mac tests do not establish Windows runtime acceptance |
@@ -227,11 +229,11 @@ Failure details remain distinct from setup readiness; disconnected status is unk
 - `tests/updates.test.mjs`: revision/stale-response, unknown/incomplete snapshot,
   plus a persistent footer projection of local updater status. Only a validated
   available offer receives the prominent update action; error/unknown/expired
-  observations never imply up to date. Local status/progress IPC is coalesced even
-  with the dialog closed, without authorizing network checks or installation.
-  Coverage also includes explicit fresh preconfirmation checks, revocable preparation, exact-version
-  consent, duplicate invoke and monotonic progress behavior. Opening/status
-  polling remain local. Native status invalidates idle offers at exactly ten
+  observations never imply up to date. Local status/progress IPC is coalesced,
+  without authorizing network checks or installation. The inline offer click
+  rechecks metadata before installing only that displayed version. Coverage includes
+  revocable preparation, exact-version consent, duplicate invoke and monotonic
+  progress behavior. Ordinary polling remains local. Native status invalidates idle offers at exactly ten
   minutes; errors clear offer/version/notes, never the installed version. Expired
   confirmation refreshes within the owning RAII operation before the idle lease
   or any archive bytes; changed versions return a fresh offer requiring review.

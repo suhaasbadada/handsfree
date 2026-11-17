@@ -314,77 +314,8 @@ try {
   await evaluate(`window.dispatchEvent(new Event('blur'))`);
   await until(`document.getElementById('practice-text').value==='' && document.getElementById('practice-finish').disabled`);
   assert.equal(await evaluate(`localStorage.length===0 && sessionStorage.length===0 && window.calls.filter(c=>c.command==='copy_transcript').length===0`),true,'Practice does not persist or request normal clipboard actions');
-  // Opening Updates reads local installed metadata, never a network check. The
-  // test boundary stands in for native IPC; actual signatures are tested in Rust.
-  await evaluate(`window.updateNextVersion='0.1.1-beta.11';window.updateFixture={installed_version:'0.1.1-beta.10',phase:'idle',notes:'',downloaded_bytes:0,message:'Choose Check for updates.'};const priorUpdates=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(['update_status','check_for_updates','install_update'].includes(command)){window.calls.push({command,args});if(command==='check_for_updates'){if(window.updateCheckWait)await window.updateCheckWait;window.updateFixture={...window.updateFixture,phase:'available',available_version:window.updateNextVersion,notes:'<img src=x onerror="window.updateInjected=true">',message:'Update available.'};}if(command==='install_update')window.updateFixture={...window.updateFixture,phase:'error',available_version:undefined,notes:'',message:'Signature verification failed. Check again.'};return structuredClone(window.updateFixture);}return priorUpdates(command,args);};document.getElementById('updates-open').click()`);
-  await until(`document.getElementById('installed-release').textContent==='0.1.1-beta.10'`);
-  assert.equal(await evaluate(`window.calls.some(c=>c.command==='check_for_updates'||c.command==='install_update')`),false,'Opening never checks online or installs');
-  assert.equal(await evaluate(`document.activeElement.id==='updates-title' && getComputedStyle(document.activeElement).outlineStyle==='none'`),true,'Opening focuses the readable heading without highlighting Close');
-  await send('Input.dispatchKeyEvent', {type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
-  await send('Input.dispatchKeyEvent', {type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
-  assert.equal(await evaluate(`document.activeElement.id==='updates-close' && document.activeElement.matches(':focus-visible') && getComputedStyle(document.activeElement).outlineStyle==='solid'`),true,'Tab still gives Close a visible keyboard focus ring');
-  // Programmatic click above does not focus the opener as keyboard activation does.
-  // Reopen from an explicitly focused trigger to test native focus restoration.
-  await evaluate(`document.getElementById('updates-dialog').close();document.getElementById('updates-open').focus();document.getElementById('updates-open').click()`);
-  await send('Input.dispatchKeyEvent', {type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
-  await send('Input.dispatchKeyEvent', {type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
-  await until(`!document.getElementById('updates-dialog').open`);
-  assert.equal(await evaluate(`document.activeElement.id`),'updates-open','Escape restores focus to the opener');
-  await evaluate(`document.getElementById('updates-open').click()`);
-  assert.equal(await evaluate(`document.activeElement.id`),'updates-title','Reopening does not remember the previously focused Close button');
-  await evaluate(`document.getElementById('updates-check').click()`);
-  await until(`!document.getElementById('updates-install').hidden`);
-  assert.equal(await evaluate(`document.getElementById('updates-check').hidden`),true,'Available updates replace Check instead of awkwardly wrapping a third action');
-  assert.equal(await evaluate(`!document.getElementById('updates-check-again').hidden && !document.getElementById('updates-check-again').closest('.dialog-actions')`),true,'Check again remains available outside the two-button action row');
-  for (const width of [320,390,400,560,980]) {
-    await send('Emulation.setDeviceMetricsOverride', {width,height:820,deviceScaleFactor:1,mobile:false});
-    assert.equal(await evaluate(`(()=>{const d=document.getElementById('updates-dialog');const buttons=[...d.querySelectorAll('.dialog-actions button')].filter(b=>!b.hidden);return buttons.length===2 && d.scrollWidth<=d.clientWidth && buttons.every(b=>b.getBoundingClientRect().right<=d.getBoundingClientRect().right);})()`),true,`Two contained update actions at ${width}px`);
-    if(width>=390) assert.equal(await evaluate(`document.getElementById('updates-close').getBoundingClientRect().top===document.getElementById('updates-install').getBoundingClientRect().top`),true,'Normal dialog keeps both actions on one row');
-  }
-  await send('Emulation.setDeviceMetricsOverride', {width:980,height:820,deviceScaleFactor:1,mobile:false});
-  assert.equal(await evaluate(`document.getElementById('installed-release').textContent`),'0.1.1-beta.10','Available release must not be shown as already installed');
-  assert.equal(await evaluate(`!window.updateInjected && !document.querySelector('#updates-notes img') && document.getElementById('updates-notes').textContent.includes('<img')`),true,'Release notes remain plain text');
-  await evaluate(`window.updateNextVersion='0.1.1-beta.12';window.updateCheckWait=new Promise(resolve=>window.finishUpdateCheck=resolve);document.getElementById('updates-install').click()`);
-  assert.equal(await evaluate(`document.getElementById('update-confirm-dialog').open`),false,'Download must await the actual fresh metadata check');
-  assert.equal(await evaluate(`document.getElementById('updates-progress').hidden && !window.calls.some(c=>c.command==='install_update')`),true,'Metadata refresh does not claim to download archive bytes');
-  await evaluate(`document.getElementById('updates-install').click();window.finishUpdateCheck();window.updateCheckWait=undefined`);
-  await until(`document.getElementById('update-confirm-dialog').open`);
-  assert.equal(await evaluate(`document.getElementById('update-confirm-detail').textContent`),'Install 0.1.1-beta.12?','The existing open app confirms the latest offer, not cached beta11');
-  assert.equal(await evaluate(`document.activeElement.id==='update-confirm-title' && getComputedStyle(document.activeElement).outlineStyle==='none'`),true,'Confirmation focuses its heading, not Not now or the install action');
-  await send('Input.dispatchKeyEvent', {type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
-  await send('Input.dispatchKeyEvent', {type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
-  assert.equal(await evaluate(`document.getElementById('update-confirm-dialog').open && !window.calls.some(c=>c.command==='install_update')`),true,`Enter on the initial heading never confirms installation: ${JSON.stringify(await evaluate(`({open:document.getElementById('update-confirm-dialog').open,focus:document.activeElement.id,update:window.updateFixture,fixture:window.fixture,calls:window.calls.slice(-15)})`))}`);
-  assert.equal(await evaluate(`window.calls.some(c=>c.command==='install_update')`),false,'A download offer is not installation consent');
-  await evaluate(`document.getElementById('update-keep').click()`);
-  await until(`!document.getElementById('update-confirm-dialog').open`);
-  await evaluate(`window.updateCheckWait=new Promise(resolve=>window.finishUpdateCheck=resolve);document.getElementById('updates-install').click();document.getElementById('updates-close').click()`);
-  await until(`!document.getElementById('updates-dialog').open`);
-  await evaluate(`document.getElementById('updates-open').click();window.finishUpdateCheck();window.updateCheckWait=undefined`);
-  await until(`!document.getElementById('updates-install').hidden`);
-  assert.equal(await evaluate(`document.getElementById('update-confirm-dialog').open`),false,'Closing and reopening during preparation cannot resurrect confirmation');
-  await evaluate(`document.getElementById('updates-install').click()`);
-  await until(`document.getElementById('update-confirm-dialog').open`);
-  await evaluate(`window.updateFixture={...window.updateFixture,phase:'idle',available_version:undefined,notes:'',message:'The previous offer expired. Check again.'}`);
-  await until(`!document.getElementById('update-confirm-dialog').open`);
-  assert.equal(await evaluate(`window.calls.some(c=>c.command==='install_update')`),false,'Local expiry invalidates open confirmation without installing');
-  await evaluate(`document.getElementById('updates-check').click()`);
-  await until(`!document.getElementById('updates-install').hidden`);
-  await evaluate(`document.getElementById('updates-check-again').click()`);
-  await until(`!document.getElementById('updates-install').hidden`);
-  await evaluate(`window.fixture.phase='recording'`);
-  await until(`document.getElementById('updates-install').disabled`);
-  await evaluate(`window.fixture.phase='idle'`);
-  await until(`!document.getElementById('updates-install').disabled`);
-  await evaluate(`document.getElementById('updates-install').click()`);
-  await until(`document.getElementById('update-confirm-dialog').open`);
-  await evaluate(`document.getElementById('update-confirm').click()`);
-  await until(`document.getElementById('updates-message').textContent.includes('Signature verification failed')`);
-  assert.equal(await evaluate(`document.getElementById('updates-check').hidden`),false,'Failures restore the explicit Check retry action');
-  assert.deepEqual(await evaluate(`window.calls.filter(c=>c.command==='install_update').map(c=>c.args)`),[{version:'0.1.1-beta.12'}],'Only the freshly offered and explicitly confirmed version is sent to native installation');
-  await evaluate(`document.getElementById('updates-check').click()`);
-  await until(`!document.getElementById('updates-install').hidden`);
-  assert.equal(await evaluate(`document.getElementById('installed-release').textContent`),'0.1.1-beta.10','An explicit retry recovers without restarting or changing installed identity');
-  await evaluate(`document.getElementById('updates-close').click()`);
+  // Inline update check/install, stale-offer consent and progress are exercised
+  // by checkUpdateIndicator below. Real signatures/relaunch remain native gates.
   for (const theme of ['light','dark']) {
     await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-color-scheme',value:theme}]});
     assert.deepEqual(await evaluate(`({scheme:getComputedStyle(document.documentElement).colorScheme,bg:getComputedStyle(document.documentElement).backgroundColor,text:getComputedStyle(document.documentElement).color})`), {scheme:'light dark',bg:theme==='dark'?'rgb(32, 31, 30)':'rgb(247, 246, 243)',text:theme==='dark'?'rgb(243, 239, 234)':'rgb(48, 46, 45)'}, 'The app follows system appearance without a saved theme preference');

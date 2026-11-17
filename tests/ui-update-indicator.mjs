@@ -1,41 +1,81 @@
 import assert from 'node:assert/strict';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
+// Mock IPC only: never contacts the real feed, installs or relaunches the app.
 export async function checkUpdateIndicator({send,evaluate,until,port}) {
+  const screenshot = async name => {
+    if (!process.env.UI_SCREENSHOTS) return;
+    mkdirSync(process.env.UI_SCREENSHOTS,{recursive:true});
+    const image = await send('Page.captureScreenshot',{format:'png'});
+    writeFileSync(join(process.env.UI_SCREENSHOTS,`inline-update-${name}.png`),Buffer.from(image.data,'base64'));
+  };
   await send('Page.navigate',{url:`http://127.0.0.1:${port}`});
-  await until(`!!document.getElementById('updates-open') && !document.getElementById('updates-open').hidden`);
-  await evaluate(`window.visibleUpdateState={installed_version:'0.1.1-beta.14',phase:'idle',notes:'',downloaded_bytes:0,message:'Choose Check for updates.'};const originalIndicatorInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='update_status'){window.calls.push({command,args});return structuredClone(window.visibleUpdateState);}return originalIndicatorInvoke(command,args);};`);
+  await send('Page.bringToFront');
+  await send('Emulation.setDeviceMetricsOverride',{width:980,height:820,deviceScaleFactor:1,mobile:false});
+  await until(`window.fixture && document.getElementById('updates-open') && !document.getElementById('updates-open').hidden`);
+  await evaluate(`window.visibleUpdateState={installed_version:'0.1.1-beta.20',phase:'idle',notes:'',downloaded_bytes:0,message:'Choose Check for updates.'};window.nextUpdateVersion='0.1.1-beta.21';const inlineInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(['update_status','check_for_updates','install_update'].includes(command)){window.calls.push({command,args});if(command==='check_for_updates'){if(window.waitUpdateCheck)await window.waitUpdateCheck;window.visibleUpdateState={...window.visibleUpdateState,phase:'available',available_version:window.nextUpdateVersion,notes:'<img src=x onerror="window.updateInjected=true">',message:'Update available.'};}if(command==='install_update'){if(window.waitInstall)await window.waitInstall;window.visibleUpdateState={...window.visibleUpdateState,phase:'error',available_version:undefined,message:'Signature verification failed. Check again.'};}return structuredClone(window.visibleUpdateState);}return inlineInvoke(command,args);};`);
   await until(`document.getElementById('updates-indicator-detail').textContent==='Not checked'`);
-  const checks = await evaluate(`window.calls.filter(c=>c.command==='check_for_updates').length`);
-  const rects = () => evaluate(`['updates-open'].map(id=>{const r=document.getElementById(id).getBoundingClientRect();return [r.x,r.y+scrollY,r.width,r.height]})`);
-  const originalRects = await rects();
-  assert.equal(originalRects[0][3],30,'Updater is a compact inline 30px utility action');
-  await evaluate(`Object.assign(window.visibleUpdateState,{phase:'available',available_version:'0.1.1-beta.15',message:'Update available.'})`);
-  await until(`document.getElementById('updates-indicator-label').textContent==='Update available' && document.getElementById('updates-indicator-detail').textContent==='0.1.1-beta.15'`);
-  assert.equal(await evaluate(`!document.getElementById('updates-dialog').open && document.getElementById('updates-open').dataset.attention==='available'`),true,'Verified update stays visible outside the dialog');
-  assert.deepEqual(await rects(),originalRects,'An available update changes emphasis, not footer geometry');
-  assert.ok((await send('Accessibility.getFullAXTree')).nodes.some(n=>n.role?.value==='button' && n.name?.value==='Update available. 0.1.1-beta.15. Open app updates'),'Prominent update action has a complete accessible name');
+  assert.equal(await evaluate(`window.calls.some(c=>c.command==='check_for_updates'||c.command==='install_update')`),false,'Idle observations never contact the feed or install');
+  await evaluate(`document.getElementById('nav-settings').click()`);
+  assert.equal(await evaluate(`document.querySelector('.setup-card').hidden`),true,'Ready setup is not repeated as an empty Settings section');
+  await evaluate(`document.querySelector('main').scrollTop=document.querySelector('main').scrollHeight`);
+  await screenshot('settings-ready');
+  await evaluate(`document.querySelector('main').scrollTop=0`);
+  await evaluate(`window.fixture.model_ready=false`);
+  await until(`!document.querySelector('.setup-card').hidden`);
+  await evaluate(`window.fixture.model_ready=true`);
+  await until(`document.querySelector('.setup-card').hidden`);
+  await evaluate(`window.waitUpdateCheck=new Promise(resolve=>window.finishUpdateCheck=resolve);document.getElementById('updates-open').focus();document.getElementById('updates-open').click();document.getElementById('updates-open').click()`);
+  await until(`document.getElementById('updates-open').dataset.phase==='checking'`);
+  assert.equal(await evaluate(`document.getElementById('updates-open').disabled && getComputedStyle(document.querySelector('#updates-open > svg')).animationName==='update-spin' && !document.querySelector('dialog[open]')`),true,'Checking animates the refresh icon inline, without opening a modal');
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='check_for_updates').length`),1,'Repeated check clicks are suppressed');
+  await evaluate(`window.finishUpdateCheck();window.waitUpdateCheck=undefined`);
+  await until(`document.getElementById('updates-indicator-label').textContent==='Download & update' && !document.getElementById('updates-open').disabled`);
+  assert.equal(await evaluate(`document.activeElement.id`),'updates-open','Keyboard focus stays on the inline action after the check, without a modal');
+  assert.equal(await evaluate(`document.getElementById('updates-indicator-detail').textContent`),'0.1.1-beta.21','The action exposes its exact version');
+  await screenshot('available');
+  assert.equal(await evaluate(`!window.updateInjected && !document.querySelector('#updates-dialog,#update-confirm-dialog') && !window.calls.some(c=>c.command==='install_update')`),true,'The check result is not consent and cannot inject notes or open update modals');
+  // A changed feed must not silently turn a click for beta21 into beta22 consent.
+  await evaluate(`window.nextUpdateVersion='0.1.1-beta.22';document.getElementById('updates-open').click()`);
+  await until(`document.getElementById('updates-indicator-detail').textContent==='0.1.1-beta.22' && !document.getElementById('updates-open').disabled`);
+  assert.equal(await evaluate(`window.calls.some(c=>c.command==='install_update')`),false,'A changed offer needs a new click for that version');
+  await evaluate(`window.fixture.phase='recording'`);
+  await until(`document.getElementById('updates-open').disabled`);
+  await evaluate(`window.fixture.phase='idle'`);
+  await until(`!document.getElementById('updates-open').disabled`);
+  // Navigation revokes a pending download intent before archive bytes.
+  await evaluate(`window.waitUpdateCheck=new Promise(resolve=>window.finishUpdateCheck=resolve);document.getElementById('updates-open').click();document.getElementById('nav-overview').click();window.finishUpdateCheck();window.waitUpdateCheck=undefined`);
+  await until(`!document.getElementById('updates-open').disabled`);
+  assert.equal(await evaluate(`window.calls.some(c=>c.command==='install_update')`),false,'Navigating during preparation revokes the click, not the fresh offer');
+  await evaluate(`window.waitInstall=new Promise(resolve=>window.finishInstall=resolve);document.getElementById('updates-open').click();document.getElementById('updates-open').click()`);
+  await until(`window.calls.filter(c=>c.command==='install_update').length===1`);
+  assert.deepEqual(await evaluate(`window.calls.filter(c=>c.command==='install_update').map(c=>c.args)`),[{version:'0.1.1-beta.22'}],'One explicit click dispatches only the freshly revalidated displayed version');
+  await evaluate(`window.visibleUpdateState={...window.visibleUpdateState,phase:'downloading',downloaded_bytes:50,total_bytes:100}`);
+  await until(`document.getElementById('updates-indicator-detail').textContent.includes('50%')`);
+  assert.equal(await evaluate(`getComputedStyle(document.getElementById('updates-open')).opacity`),'1','Busy progress stays readable rather than fading with disabled controls');
+  await screenshot('downloading');
+  assert.equal(await evaluate(`document.getElementById('updates-open').disabled && !document.querySelector('dialog[open]')`),true,'Byte progress stays inline and cannot start a duplicate install');
+  await evaluate(`window.visibleUpdateState={...window.visibleUpdateState,phase:'installing'}`);
+  await until(`document.getElementById('updates-open').dataset.phase==='installing'`);
+  await evaluate(`window.visibleUpdateState={...window.visibleUpdateState,phase:'downloading',downloaded_bytes:75}`);
+  assert.equal(await evaluate(`document.getElementById('updates-open').disabled`),true,'Delayed progress never re-enables installation');
+  await evaluate(`window.finishInstall();window.waitInstall=undefined`);
+  await until(`document.getElementById('updates-feedback').textContent.includes('Signature verification failed') && !document.getElementById('updates-open').disabled`);
+  await screenshot('error');
   await evaluate(`document.getElementById('updates-open').click()`);
-  await until(`document.getElementById('updates-dialog').open && document.getElementById('updates-version').textContent.includes('0.1.1-beta.15')`);
-  await evaluate(`document.getElementById('updates-close').click();window.visibleUpdateState={...window.visibleUpdateState,phase:'error',message:'Feed unavailable.'}`);
-  await until(`document.getElementById('updates-indicator-label').textContent==='Update failed'`);
-  assert.equal(await evaluate(`document.getElementById('updates-open').dataset.attention`),'error','Error never advertises a stale offer as available or up to date');
-  await evaluate(`window.visibleUpdateState={...window.visibleUpdateState,phase:'up_to_date',available_version:undefined,message:'Up to date.'}`);
-  await until(`document.getElementById('updates-indicator-label').textContent==='Up to date'`);
-  await evaluate(`window.visibleUpdateState={...window.visibleUpdateState,phase:'idle',message:'Offer expired. Check again.'}`);
-  await until(`document.getElementById('updates-indicator-detail').textContent==='Not checked'`);
-  assert.deepEqual(await rects(),originalRects,'Expired and failed checks keep the same status slot');
-  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='check_for_updates').length`),checks,'Persistent status observes local IPC only, never unsolicited feed requests');
-  for (const [width,height] of [[980,820],[560,650]]) {
+  await until(`document.getElementById('updates-open').dataset.attention==='available'`);
+  assert.equal(await evaluate(`document.getElementById('updates-feedback').hidden`),true,'An explicit retry retires the previous error without another modal');
+  const checks=await evaluate(`window.calls.filter(c=>c.command==='check_for_updates').length`);
+  for (const [width,height] of [[980,820],[560,650],[320,650]]) {
     await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
-    const geometry = await evaluate(`['footer','#updates-open'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [r.x,r.y,r.width,r.height]})`);
     for (const phase of ['checking','available','downloading','installing','error','up_to_date','idle']) {
-      await evaluate(`window.visibleUpdateState={...window.visibleUpdateState,phase:'${phase}',available_version:'${phase==='available'?'0.1.1-beta.123456789012345678901234567890': ''}',message:'${phase==='error'?'A long network failure message. '.repeat(20):phase}',downloaded_bytes:50,total_bytes:100}`);
-      await until(`document.getElementById('updates-open').dataset.attention==='${phase==='available'?'available':phase==='error'?'error':'none'}'`);
-      // Wait for this exact phase rather than accepting the previous neutral projection.
-      await until(`document.getElementById('updates-open').title.includes('${phase==='checking'?'Checking':phase==='available'?'1234567890':phase==='downloading'?'Downloading':phase==='installing'?'Installing':phase==='error'?'failed':phase==='up_to_date'?'Up to date':'Not checked'}')`);
-      assert.deepEqual(await evaluate(`['footer','#updates-open'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [r.x,r.y,r.width,r.height]})`),geometry,`${width}px ${phase}: long offer/error cannot grow the footer`);
-      assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth && document.querySelector('footer').getBoundingClientRect().bottom<=innerHeight && document.getElementById('updates-open').scrollWidth<=document.getElementById('updates-open').clientWidth`),true,`${width}px ${phase}: compact contained update action`);
+      await evaluate(`window.visibleUpdateState={...window.visibleUpdateState,phase:'${phase}',available_version:'0.1.1-beta.123456789012345678901234567890',message:'${phase==='error'?'Network unavailable. '.repeat(20):phase}',downloaded_bytes:50,total_bytes:100}`);
+      await until(`document.getElementById('updates-open').dataset.phase==='${phase}'`);
+      assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth && document.getElementById('updates-open').scrollWidth<=document.getElementById('updates-open').clientWidth`),true,`${width}px ${phase}: update action and errors fit inline`);
+      assert.equal(await evaluate(`!document.querySelector('dialog[open]')`),true,'No update phase opens a modal');
     }
   }
+  assert.equal(await evaluate(`window.calls.filter(c=>c.command==='check_for_updates').length`),checks,'Progress/status reads never issue unsolicited feed checks');
   await send('Emulation.setDeviceMetricsOverride',{width:980,height:820,deviceScaleFactor:1,mobile:false});
 }

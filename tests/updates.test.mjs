@@ -16,12 +16,12 @@ function fixture() {
 }
 const available = () => view('available', { available_version: '0.1.1-beta.8', notes: '<script>not executable</script>' });
 test('persistent update summary distinguishes verified offers, success, errors and unknown checks', () => {
-  assert.deepEqual(updateIndicator(available()), {label:'Update available',detail:'0.1.1-beta.8',attention:'available'});
+  assert.deepEqual(updateIndicator(available()), {label:'Download & update',detail:'0.1.1-beta.8',attention:'available'});
   assert.equal(updateIndicator(view()).detail,'Not checked');
   assert.equal(updateIndicator(view('up_to_date')).label,'Up to date');
   assert.equal(updateIndicator(view('up_to_date')).detail,'At last check','Local cached success is not advertised as continuous online monitoring');
   assert.equal(updateIndicator(view('error',{available_version:'0.1.1-beta.8'})).attention,'error','A stale version on an error is not an offer or success');
-  assert.equal(updateIndicator(view('error')).label,'Update failed');
+  assert.equal(updateIndicator(view('error')).label,'Retry update check');
   for (const phase of ['checking','downloading','installing']) assert.equal(updateIndicator(view(phase)).attention,'none');
   assert.notEqual(updateIndicator(view('available')).attention,'available','An incomplete offer cannot gain a prominent update action');
 });
@@ -48,7 +48,7 @@ test('duplicate checks are suppressed and stale local snapshots cannot erase new
   assert.equal(u.view.phase, 'available');
   assert.equal(calls.filter(c => c.command === 'check_for_updates').length, 1);
 });
-test('installation requires the explicitly confirmed version and idle work, and dispatches only once', async () => {
+test('installation requires the explicitly clicked version and idle work, and dispatches only once', async () => {
   const h = fixture(), u = h.updates;
   h.responses.set('check_for_updates', available()); await u.check();
   await u.install('0.1.1-beta.9'); assert.equal(h.calls.some(c => c.command === 'install_update'), false);
@@ -171,4 +171,97 @@ test('unknown or incomplete native update snapshots fail closed', async () => {
     await u.install('0.1.1-beta.8');
     assert.equal(calls.some(c => c.command === 'install_update'), false);
   }
+});
+
+test('inline indicator shows bounded real progress and accurate install/check labels', () => {
+  assert.equal(updateIndicator(view('checking')).label, 'Checking…');
+  assert.equal(updateIndicator(view('installing')).label, 'Installing…');
+  assert.equal(updateIndicator(view('downloading', {downloaded_bytes: 250_000, total_bytes: 1_000_000})).detail, '25% · 250.0 KB / 1.0 MB');
+  assert.equal(updateIndicator(view('downloading', {downloaded_bytes: 1024})).detail, '1.0 KB downloaded');
+  assert.match(updateIndicator(view('downloading', {downloaded_bytes: 200, total_bytes: 100})).detail, /^100%/);
+  for (const total_bytes of [undefined, 0, -1, NaN, Infinity]) {
+    assert.equal(updateIndicator(view('downloading', {downloaded_bytes: 50, total_bytes})).detail, '50 B downloaded');
+  }
+  for (const downloaded_bytes of [-1, NaN, Infinity]) {
+    assert.equal(updateIndicator(view('downloading', {downloaded_bytes})).detail, '0 B downloaded');
+  }
+});
+
+test('one explicit visible-offer click rechecks then installs exactly that version once without a second confirmation', async () => {
+  const {updates:u,responses,calls} = fixture();
+  responses.set('check_for_updates', available()); await u.check();
+  const fresh = deferred(), native = deferred();
+  responses.set('check_for_updates', fresh.promise);
+  responses.set('install_update', native.promise);
+  const downloading = u.download('0.1.1-beta.8');
+  await u.download('0.1.1-beta.8');
+  assert.equal(u.view.phase, 'checking');
+  assert.equal(calls.filter(c => c.command === 'check_for_updates').length, 2);
+  assert.equal(calls.some(c => c.command === 'install_update'), false);
+  fresh.resolve(available()); await new Promise(setImmediate);
+  await u.download('0.1.1-beta.8');
+  assert.deepEqual(calls.filter(c => c.command === 'install_update'), [{command:'install_update',args:{version:'0.1.1-beta.8'}}]);
+  responses.set('update_status', view('installing')); await u.progress();
+  responses.set('update_status', view('downloading', {downloaded_bytes:50,total_bytes:100})); await u.progress();
+  assert.equal(u.view.phase, 'installing', 'Read-only progress remains monotonic during the owned command');
+  native.resolve(view('error', {message:'Signature rejected'})); await downloading;
+  assert.equal(u.view.phase, 'error'); assert.equal(u.view.message, 'Signature rejected');
+});
+
+test('a changed feed offer is exposed but needs another explicit click for its exact version', async () => {
+  const {updates:u,responses,calls} = fixture();
+  responses.set('check_for_updates', available()); await u.check();
+  const newer = view('available', {available_version:'0.1.1-beta.9'});
+  responses.set('check_for_updates', newer);
+  await u.download('0.1.1-beta.8');
+  assert.equal(u.view.available_version, '0.1.1-beta.9');
+  assert.equal(updateIndicator(u.view).detail, '0.1.1-beta.9');
+  await u.install('0.1.1-beta.9');
+  await u.download('0.1.1-beta.8');
+  assert.equal(calls.some(c => c.command === 'install_update'), false, 'Neither a stale click nor a changed offer grants consent');
+  responses.set('install_update', view('error'));
+  await u.download('0.1.1-beta.9');
+  assert.deepEqual(calls.filter(c => c.command === 'install_update').map(c => c.args), [{version:'0.1.1-beta.9'}]);
+});
+
+test('inline clicks fail closed for stale/missing offers and unavailable recheck results', async () => {
+  for (const result of [view('up_to_date'), new Error('Offline'), view('unknown'), view('available'), view('downloading')]) {
+    const {updates:u,responses,calls} = fixture();
+    await u.download('0.1.1-beta.8');
+    assert.deepEqual(calls, [], 'A click without a visible verified offer cannot check or install');
+    responses.set('check_for_updates', available()); await u.check();
+    await u.download('0.1.1-beta.9');
+    assert.equal(calls.length, 1, 'A mismatched displayed identity cannot check or install');
+    responses.set('check_for_updates', result); await u.download('0.1.1-beta.8');
+    assert.equal(calls.some(c => c.command === 'install_update'), false);
+  }
+});
+
+test('busy eligibility and navigation revoke a delayed inline download intent', async () => {
+  for (const revoke of [h => h.busy(), h => h.updates.cancelPreparation()]) {
+    const h = fixture(), u = h.updates;
+    h.responses.set('check_for_updates', available()); await u.check();
+    const fresh = deferred(); h.responses.set('check_for_updates', fresh.promise);
+    const downloading = u.download('0.1.1-beta.8'); revoke(h);
+    fresh.resolve(available()); await downloading;
+    assert.equal(u.view.phase, 'available', 'The fresh offer stays visible without authorizing bytes');
+    await u.install('0.1.1-beta.8');
+    assert.equal(h.calls.some(c => c.command === 'install_update'), false);
+  }
+  const h = fixture(); h.responses.set('check_for_updates', available()); await h.updates.check(); h.busy();
+  await h.updates.download('0.1.1-beta.8');
+  assert.equal(h.calls.length, 1, 'Busy before the click cannot even start preparation');
+});
+
+test('a newer native offer from an expired inline install never auto-chases another version', async () => {
+  const {updates:u,responses,calls} = fixture();
+  responses.set('check_for_updates', available()); await u.check();
+  const newer = view('available', {available_version:'0.1.1-beta.9'});
+  responses.set('install_update', newer); await u.download('0.1.1-beta.8');
+  assert.equal(u.view.available_version, '0.1.1-beta.9');
+  assert.deepEqual(calls.filter(c => c.command === 'install_update').map(c => c.args), [{version:'0.1.1-beta.8'}]);
+  responses.set('check_for_updates', newer);
+  responses.set('install_update', view('error'));
+  await u.download('0.1.1-beta.9');
+  assert.deepEqual(calls.filter(c => c.command === 'install_update').map(c => c.args), [{version:'0.1.1-beta.8'},{version:'0.1.1-beta.9'}]);
 });
