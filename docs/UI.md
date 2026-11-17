@@ -3,18 +3,19 @@
 - Product status is an interactive control at the top right on every destination,
   not a passive sidebar footer. Its accessible dialog explains the current failure
   separately from permission/model/shortcut checks and provides direct permission,
-  model-download, input-device and private-test actions. Opening/refreshing it never
+  model-download and input-device actions. Opening/refreshing it never
   records, prompts, downloads or changes preferences. Unknown/disconnected status
   clears stale readiness. Native guards remain authoritative; private testing still
-  needs explicit Start. The dialog follows existing Practice-context revocation,
+  needs explicit Record on Home. The dialog follows existing Practice-context revocation,
   restores focus on dismissal, and keeps recovery actions reachable in small windows.
 - Home combines Words, Time saved and Dictations with the private editor in one
   screen, fitting default 980×820 and minimum 560×650 normal ready states.
   There is no sidebar, brand menu or Overview/Practice tab bar. A static brand
   anchors the header; compact status and one accessible Settings gear sit right.
-  Settings replaces Home; a header back arrow returns focus to the accessible Home
-  heading, not the editor, without recording. Explicit Private test and tray Practice
-  actions may focus the editor; keyboard focus remains visible. The Settings gear
+  Settings replaces Home; the back arrow or Escape in ordinary Settings returns focus
+  to the accessible Home heading, not the editor, without recording. Open dialogs,
+  native selects and shortcut capture retain their own Escape handling. The tray
+  Practice action may focus the editor; keyboard focus remains visible. The Settings gear
   is transparent at rest, with a temporary hover fill rather than a selected fill.
   Settings has one content scroller; the header and
   compact footer stay in place. The stable candidate footer shows app version and
@@ -39,9 +40,10 @@
   Settings sections have no enclosing rectangles. Buttons center labels with equal
   inline padding; controls use compact 32px targets and quiet native select values
   instead of filled rectangles. Native selects have separate current-color SVG
-  chevrons (including mode, appearance and completion sound), preserving native
+  chevrons (including mode and completion sound), preserving native
   keyboard semantics, ellipsis and full-name tooltips. Microphone help is an
   accessible description, not a paragraph competing with its refresh button.
+  Appearance is a labeled icon radio group for System, Light and Dark.
   Settings order is shortcut, recording limit, sound and adjacent volume, then
   microphone, mode, appearance and General extras. Utility actions use labeled SVG icons. The app
   picker clears its divider; recovery remains separate
@@ -67,7 +69,8 @@
   and meter. Returning only restores eligibility, never starts recording.
 - Updates stay inline in the footer, with no update or install-confirmation modal.
   Clicking the refresh action checks the feed and shows a busy SVG spinner. A verified offer
-  changes that same control to a download icon and Download & update with its exact version; another
+  changes that same control to a marked download icon with Download & update and the
+  exact version in its label/tooltip; another
   explicit click rechecks and installs only that version, then the native updater
   reopens HandsFree. A changed offer needs another click, never silent consent.
   Busy states disable repeats, byte progress and failures stay inline, and ordinary

@@ -8,7 +8,7 @@ window focus or restarting clears it. **Clear practice** removes the text;
 Your configured shortcut also works while Home is focused; this tests private
 capture, not external insertion. The gear opens Settings. Setup/model download
 lives under **Settings → Setup**; the status button opens **Product status** for
-readiness and recovery, with **Private test** when ready. Appearance is under
+readiness and recovery; start a private recording directly on Home. Appearance is under
 **Settings → Dictation → Appearance**.
 
 Stable v0.1.1 passed installed private known-speech checks with the Record button

@@ -45,7 +45,7 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   await evaluate(`document.getElementById('nav-settings').click()`);
   assert.equal(await evaluate(`!document.getElementById('settings').hidden && document.getElementById('home').hidden && window.context===0`),true,'Settings replaces Home and revokes Practice context');
   await evaluate(`document.getElementById('product-status').click()`);
-  assert.equal(await evaluate(`document.getElementById('health-dialog').open && document.getElementById('health-model-state').textContent==='Ready offline'`),true,'Product status uses native proofs');
+  assert.equal(await evaluate(`document.getElementById('health-dialog').open && document.getElementById('health-model-state').textContent==='Installed · English'`),true,'Product status uses native proofs');
   assert.equal(await evaluate(`window.calls.some(c=>['request_microphone','request_permissions','download_model','practice_start'].includes(c.command))`),false,'Opening guidance never prompts, downloads or records');
   await evaluate(`Object.assign(window.fixture,{microphone:false,input_monitoring:false,model_ready:false,hotkey:false})`);
   await until(`!document.getElementById('health-model').disabled && !document.getElementById('health-model').hidden`);
@@ -53,7 +53,7 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   await evaluate(`document.getElementById('health-mic').click();document.getElementById('health-permissions').click();document.getElementById('health-model').click()`);
   await until(`['request_microphone','request_permissions','download_model'].every(command=>window.calls.filter(c=>c.command===command).length===1)`);
   await evaluate(`Object.assign(window.fixture,{microphone:true,input_monitoring:true,model_ready:true,hotkey:true})`);
-  await until(`document.getElementById('health-model-state').textContent==='Ready offline'`);
+  await until(`document.getElementById('health-model-state').textContent==='Installed · English'`);
    assert.equal(await evaluate(`window.fixture.permission_requests===3 && document.getElementById('health-dialog').open && window.context===0`),true,'Explicit recovery preserves modal revocation');
    await evaluate(`document.getElementById('health-close').click()`);
    await until(`document.activeElement.id==='product-status'`);

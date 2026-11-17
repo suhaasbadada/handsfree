@@ -19,12 +19,22 @@ export async function checkKeyboardRecovery({send,evaluate,until,port}) {
     await evaluate(`document.getElementById('nav-settings').focus()`); await key(opener);
     assert.equal(await focused(),'settings-title');
     assert.equal(await evaluate(`window.context===0 && document.getElementById('home').hidden`),true,'Keyboard Settings revokes private context');
-    for (const id of ['recording-mode','appearance-choice','sound-style']) {
+    for (const id of ['recording-mode','sound-style']) {
       await evaluate(`document.getElementById('${id}').focus()`);
       assert.equal(await focused(),id,'Native select is keyboard focusable');
       assert.equal(await evaluate(`(()=>{const e=document.getElementById('${id}'),s=getComputedStyle(e.parentElement.querySelector('svg'));return e.tagName==='SELECT' && s.display!=='none' && parseFloat(s.width)>=12 && s.pointerEvents==='none' && s.color===getComputedStyle(document.body).color;})()`),true,'Theme-safe visible chevron does not intercept native control');
     }
-    await evaluate(`document.getElementById('home-back').focus()`); await key(opener);
+    await evaluate(`document.getElementById('product-status').click()`);
+    await until(`document.getElementById('health-dialog').open`);
+    await key('Escape');
+    await until(`!document.getElementById('health-dialog').open`);
+    assert.equal(await evaluate(`document.getElementById('home').hidden`), true, 'Closing Product status must not leave Settings');
+    await evaluate(`document.getElementById('change-shortcut').click()`);
+    await until(`document.getElementById('change-shortcut').getAttribute('aria-pressed')==='true'`);
+    await key('Escape');
+    await until(`document.getElementById('change-shortcut').getAttribute('aria-pressed')==='false'`);
+    assert.equal(await evaluate(`document.getElementById('home').hidden`), true, 'Escape cancels recording a shortcut before navigating');
+    await evaluate(`document.getElementById('home-back').focus()`); await key(opener === 'Enter' ? 'Escape' : opener);
     assert.equal(await focused(),'home-title','Back announces Home without unsolicited editor focus');
     assert.equal(await evaluate(`document.getElementById('practice-text').tabIndex`),0,'Home return must not remove the editor from sequential keyboard navigation');
     await until(`window.context>0`);

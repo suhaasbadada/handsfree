@@ -27,7 +27,7 @@ export async function checkAppearance({send,evaluate,until,port}) {
     const before = await evaluate(`JSON.stringify(window.fixture)`);
     const bounds = await evaluate(`(()=>{const r=document.getElementById('practice-title').closest('section').getBoundingClientRect();return [r.x,r.y,r.width,r.height];})()`);
     const choose = async mode => {
-      await evaluate(`(()=>{const s=document.getElementById('appearance-choice');s.value=${JSON.stringify(mode)};s.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+      await evaluate(`document.querySelector('#appearance-choice input[value="${mode}"]').click()`);
       await until(`document.documentElement.dataset.appearance===${JSON.stringify(mode)} && !document.getElementById('appearance-choice').disabled`);
     };
     for (const mode of ['system','light','dark']) {
@@ -50,23 +50,23 @@ export async function checkAppearance({send,evaluate,until,port}) {
     const unchanged = await evaluate(`(()=>{const f={...window.fixture};f.appearance='system';return JSON.stringify(f);})()`);
     assert.equal(unchanged,before,'No capture, timer, shortcut or usage state changes');
     assert.equal(await evaluate(`window.calls.some(c=>['practice_start','practice_cancel','practice_clear','reset_stats','toggle'].includes(c.command))`),false);
-    await evaluate(`(()=>{document.getElementById('nav-settings').click();window.delayAppearance=true;const s=document.getElementById('appearance-choice');s.value='dark';s.dispatchEvent(new Event('change'));})()`);
+    await evaluate(`document.getElementById('nav-settings').click();window.delayAppearance=true;document.querySelector('#appearance-choice input[value="dark"]').click()`);
     await until(`typeof window.appearanceAck==='function'`);
     const writes = await evaluate(`window.calls.filter(c=>c.command==='set_appearance').length`);
-    await evaluate(`document.getElementById('appearance-choice').dispatchEvent(new Event('change'))`);
+    await evaluate(`document.querySelector('#appearance-choice input[value="system"]').click()`);
     assert.equal(await evaluate(`window.calls.filter(c=>c.command==='set_appearance').length`),writes,'Pending duplicate ignored');
-    await until(`document.getElementById('appearance-choice').disabled && document.getElementById('appearance-choice').value==='dark' && document.documentElement.dataset.appearance==='light'`);
+    await until(`document.getElementById('appearance-choice').disabled && document.querySelector('#appearance-choice input:checked').value==='dark' && document.documentElement.dataset.appearance==='light'`);
     await evaluate(`window.appearanceAck();window.delayAppearance=false`);
     await until(`!document.getElementById('appearance-choice').disabled && document.documentElement.dataset.appearance==='dark'`);
-    await evaluate(`(()=>{window.rejectAppearance=true;const s=document.getElementById('appearance-choice');s.value='system';s.dispatchEvent(new Event('change'));})()`);
+    await evaluate(`window.rejectAppearance=true;document.querySelector('#appearance-choice input[value="system"]').click()`);
     await until(`!document.getElementById('appearance-choice').disabled && document.getElementById('feedback').textContent.includes('Appearance save failed')`);
-    assert.equal(await evaluate(`document.getElementById('appearance-choice').value`),'dark','Failure restores saved native choice');
+    assert.equal(await evaluate(`document.querySelector('#appearance-choice input:checked').value`),'dark','Failure restores saved native choice');
     for (const saved of ['dark','system']) {
       // The mock backend survives reload, just as persisted native Store does.
       await send('Page.removeScriptToEvaluateOnNewDocument',{identifier:script.identifier});
       script=await send('Page.addScriptToEvaluateOnNewDocument',{source:source(saved)});
       await send('Page.reload');
-      await until(`document.documentElement.dataset.appearance===${JSON.stringify(saved)} && document.getElementById('appearance-choice').value===${JSON.stringify(saved)} && !document.getElementById('appearance-choice').disabled`);
+      await until(`document.documentElement.dataset.appearance===${JSON.stringify(saved)} && document.querySelector('#appearance-choice input:checked').value===${JSON.stringify(saved)} && !document.getElementById('appearance-choice').disabled`);
     }
   } finally { await send('Page.removeScriptToEvaluateOnNewDocument',{identifier:script.identifier}); }
   console.log('Appearance DOM: six mode/OS combinations, live changes, landing CSS, geometry, pending/failure and saved reload passed');

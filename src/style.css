@@ -196,7 +196,7 @@ select { position: absolute; inset: 0; height: 32px; width: 100%; min-width: 0; 
 .select-wrap { position: relative; display: inline-flex; align-items: center; height: 32px; width: max-content; min-width: 0; max-width: 100%; flex: 0 1 auto; }
 .select-label { display: block; visibility: hidden; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 25px 0 7px; min-width: 0; }
 .select-wrap > svg { position: absolute; top: 50%; transform: translateY(-50%); right: 5px; width: 16px; height: 16px; pointer-events: none; color: var(--text); }
-.microphone-controls > .select-wrap, .health-input-controls > .select-wrap, .workflow-app-controls > .select-wrap { width: 100%; flex: 1 1 0; }
+.workflow-app-controls > .select-wrap { flex: 1 1 0; }
 .microphone-controls select, .health-input-controls select, .workflow-app-controls select { width: 100%; }
 select:hover:not(:disabled) { background-color: var(--button); }
 .state { color: var(--muted); }
@@ -250,7 +250,7 @@ footer { grid-column: 1; width: 100%; max-width: 760px; min-height: 58px; displa
 [aria-busy="true"] > svg { animation: update-spin 1s linear infinite; }
 @keyframes update-spin { to { transform: rotate(360deg); } }
 .footer-privacy, .footer-meta { display: flex; align-items: center; gap: 8px; }
-.footer-meta { gap: 16px; }
+.footer-meta { gap: 8px; margin-inline-start: auto; }
 .footer-privacy svg { width: 14px; height: 14px; }
 .footer-brand { display: flex; align-items: center; gap: 6px; }
 dialog { width: 420px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); overflow-y: auto; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 16px; padding: 24px; box-shadow: 0 20px 90px #0003; }
@@ -266,12 +266,10 @@ dialog::backdrop { background: #0005; backdrop-filter: blur(5px); }
 .health-checks button { flex: none; max-width: 48%; white-space: normal; }
 .health-heading, .health-tools { display: flex; align-items: center; gap: 4px; }
 .health-heading { justify-content: space-between; gap: 12px; }
-#health-input .health-input-controls { display: flex; flex: 0 1 280px; gap: 4px; align-items: center; }
+#health-input .health-input-controls { display: flex; flex: 0 1 auto; min-width: 0; max-width: 65%; gap: 4px; align-items: center; }
 .health-input-controls select { min-width: 0; max-width: 100%; width: 100%; flex: 1 1 140px; }
 #health-input > div:first-child { flex: 0 1 auto; }
 #health-summary { overflow-wrap: anywhere; }
-#health-dialog .dialog-actions { position: sticky; bottom: -24px; margin-inline: -24px; padding: 12px 24px; margin-bottom: -24px; background: var(--surface); flex-wrap: wrap; }
-#health-dialog .dialog-actions:has(#health-practice[hidden]) { display: none; }
 dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .dialog-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
 @keyframes pulse { 50% { opacity: .4; } }
@@ -320,7 +318,7 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .practice-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .practice-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--text); }
 .practice-badge svg { width: 15px; height: 15px; color: var(--accent); }
-#nav-settings { width: 36px; height: 36px; border-radius: 10px; background: transparent; }
+#nav-settings { width: 36px; height: 36px; border-radius: 10px; background: transparent; color: var(--muted); }
 #nav-settings:hover:not(:disabled) { background: var(--active); }
 #nav-settings svg { width: 21px; height: 21px; stroke-width: 1.8; }
 .practice textarea { font-size: 16px; line-height: 1.65; padding: 16px; border-radius: 12px; }
@@ -328,7 +326,7 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .practice-bottom .subtle { text-align: right; font-size: 10px; line-height: 1.6; }
 .icon-action { display: inline-flex; align-items: center; justify-content: center; width: 32px; min-width: 32px; height: 32px; padding: 0; background: transparent; }
 .icon-action svg { width: 17px; height: 17px; }
-.practice-actions .primary, #health-practice { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 32px; padding-inline: 10px; white-space: nowrap; }
+.practice-actions .primary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 32px; padding-inline: 10px; white-space: nowrap; }
 .practice-actions .primary svg { width: 16px; height: 16px; }
 .practice label { font-weight: 600; }
 .practice textarea { width: 100%; box-sizing: border-box; resize: vertical; height: clamp(140px, 24vh, 210px); min-height: 104px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 9px; background: var(--input); color: inherit; font: inherit; line-height: 1.65; }
@@ -344,16 +342,26 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .stable-copy { display: grid; min-width: 0; }
 .stable-copy > * { grid-area: 1 / 1; }
 .copy-reserve { visibility: hidden; pointer-events: none; }
-.microphone-controls { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 0 1 280px; max-width: 60%; }
+.microphone-controls { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 0 1 auto; max-width: 65%; margin-inline-start: auto; }
 .microphone-controls select { flex: 1; }
 .microphone-controls select { min-width: 0; max-width: 100%; }
 .practice-sample { color: var(--muted); font-size: 13px; line-height: 1.6; }
 #updates-open { display: inline-flex; align-items: center; gap: 5px; min-width: 0; min-height: 24px; height: auto; padding: 0; background: transparent; color: var(--muted); }
 #updates-open svg { width: 14px; height: 14px; }
-.update-summary { display: flex; align-items: center; gap: 5px; text-align: left; min-width: 0; }
-.update-summary strong { font-size: 11px; font-weight: 600; }
-.update-summary > span { font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#updates-open { width: 220px; height: 30px; min-height: 30px; padding: 4px 6px; border: 1px solid transparent; justify-content: flex-start; }
+#updates-open { position: relative; width: 32px; height: 32px; min-height: 32px; justify-content: center; }
+#updates-open:hover:not(:disabled), #repository-link:hover { background: var(--button); }
+#updates-open[data-attention="available"]::after { content: ''; position: absolute; inset: 5px 4px auto auto; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+#repository-link { color: inherit; border-radius: 8px; }
+#repository-link svg { width: 16px; height: 16px; }
+#appearance-choice { display: flex; gap: 4px; padding: 0; margin: 0; border: 0; min-inline-size: 0; }
+#appearance-choice label { position: relative; }
+#appearance-choice input { position: absolute; inset: 0; margin: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+#appearance-choice label > span { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 7px; border: 1px solid transparent; color: var(--muted); }
+#appearance-choice svg { width: 16px; height: 16px; }
+#appearance-choice input:checked + span { color: var(--text); background: var(--active); border-color: currentColor; }
+#appearance-choice input:hover:not(:disabled) + span { background: var(--button); }
+#appearance-choice input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 1px; }
+#appearance-choice:disabled { opacity: .55; }
 #updates-open[data-attention="available"] { color: var(--accent); }
 #updates-open[data-attention="available"]:hover { text-decoration: underline; text-underline-offset: 3px; }
 #updates-open[data-attention="error"] { color: var(--danger); }
@@ -373,14 +381,14 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 #shortcut-evidence { min-height: 1.5em; font-size: 11px; line-height: 1.5; }
 #practice-privacy { font-size: 11px; }
 .practice-bottom { display: block; }
-.update-summary > span { max-width: 80px; }
-.update-summary strong { flex: none; }
 @media (max-width: 560px) {
   .practice-meter { grid-template-columns: auto minmax(30px,1fr) auto; }
   #microphone-choice-row { flex-wrap: wrap; }
-  .microphone-controls { max-width: 100%; width: 100%; }
+  .microphone-controls { max-width: 100%; }
 }
-.workflow-app-controls { display:flex; gap:8px; flex-wrap:wrap; padding-top: 14px; }
+.workflow-app-controls { display:flex; gap:8px; min-width:0; padding-top: 14px; }
+.workflow-app-controls button { flex: none; }
+#excluded-app-choice:focus-visible { outline-offset: -3px; }
 .workflow-app-controls select { min-width:0; max-width:100%; flex:1 1 180px; }
 #excluded-apps { list-style:none; padding:0; margin:12px 0 0; }
 #excluded-apps li { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 0; }

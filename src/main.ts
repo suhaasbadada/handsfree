@@ -15,6 +15,7 @@ import { phasePolicy, updateInstalling, type DictationPhase } from './state.ts';
 
 type Status = { appearance?: Appearance; microphone_uid?: string | null; platform?: 'windows' | 'macos'; compatibility_paste?: boolean; phase: DictationPhase; message: string; progress: number; model_ready: boolean; microphone: boolean; accessibility: boolean; input_monitoring: boolean; hotkey: boolean; transcript: string; sounds: boolean; sound_volume: number; sound_style: 'clean' | 'warm'; recording_limit: number; recording_mode?: 'toggle' | 'push_to_talk'; shortcut: Shortcut; shortcut_label: string; stats: { transcriptions: number; words: number; speech_seconds: number; saved_seconds: number }; persistence_error: string };
 const logo = new URL('../src-tauri/icons/icon.png', import.meta.url).href;
+const repositoryUrl = 'https://github.com/suhaasbadada/handsfree';
 const glyphs: Record<string,string> = {
  mic:'<rect x="8" y="3" width="8" height="12" rx="4"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/>',
  check:'<path d="m5 12 4 4L19 6"/>', close:'<path d="m6 6 12 12M18 6 6 18"/>',
@@ -22,6 +23,9 @@ const glyphs: Record<string,string> = {
  settings:'<path d="M9.32 5.53 9.98 3.23h4.04l.66 2.3 2.09-1.16 2.86 2.86-1.16 2.09 2.3.66v4.04l-2.3.66 1.16 2.09-2.86 2.86-2.09-1.16-.66 2.3H9.98l-.66-2.3-2.09 1.16-2.86-2.86 1.16-2.09-2.3-.66V9.98l2.3-.66-1.16-2.09 2.86-2.86Z"/><circle cx="12" cy="12" r="3"/>',
  back:'<path d="m12 5-7 7 7 7M5 12h15"/>',
  spinner:'<path d="M21 12a9 9 0 1 1-6-8.5"/>',
+ system:'<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M12 17v4m-4 0h8"/>',
+ light:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',
+ dark:'<path d="M20.9 13.3A9 9 0 0 1 10.7 3.1 9 9 0 1 0 20.9 13.3Z"/>',
  download:'<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>',
  shield:'<path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Z"/><path d="m8 12 3 3 5-6"/>',
  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
@@ -59,7 +63,7 @@ document.querySelector('#app')!.innerHTML = `
     <div class="setting-row volume-row"><h3><label for="sound-volume">Volume</label></h3><div class="sound-controls"><input id="sound-volume" type="range" min="0" max="100" step="1" value="50" aria-describedby="volume-percent"><output id="volume-percent" for="sound-volume">50%</output></div><button id="preview-sound" class="icon-action" aria-label="Preview sound" title="Preview sound" disabled>${icon('play')}</button></div>
     <div id="microphone-choice-row" class="setting-row" hidden><div><h3><label for="microphone-choice">Microphone</label></h3><p id="microphone-choice-help" class="sr-only">Next recording. Unavailable selections never fall back silently.</p></div><div class="microphone-controls"><select id="microphone-choice" aria-describedby="microphone-choice-help" disabled><option value="">System default</option></select><button id="microphone-refresh" class="icon-action" aria-label="Refresh microphones" title="Refresh microphones" disabled>${icon('update')}</button></div></div>
     <div class="setting-row"><div><h3><label for="recording-mode">Recording mode</label></h3><p id="recording-mode-help" class="sr-only" hidden>Hold the shortcut; release to finish. Other keys or focus changes cancel.</p></div><select id="recording-mode" aria-describedby="recording-mode-help"><option value="toggle">Toggle</option><option value="push_to_talk">Push to talk</option></select></div>
-     <div class="setting-row"><div><h3><label for="appearance-choice">Appearance</label></h3></div><select id="appearance-choice" disabled><option value="light">Light</option><option value="dark">Dark</option><option value="system" selected>System</option></select></div>
+      <div class="setting-row"><div><h3 id="appearance-title">Appearance</h3></div><fieldset id="appearance-choice" aria-labelledby="appearance-title" disabled><label title="System"><input type="radio" name="appearance" value="system" checked><span>${icon('system')}<span class="sr-only">System</span></span></label><label title="Light"><input type="radio" name="appearance" value="light"><span>${icon('light')}<span class="sr-only">Light</span></span></label><label title="Dark"><input type="radio" name="appearance" value="dark"><span>${icon('dark')}<span class="sr-only">Dark</span></span></label></fieldset></div>
   </section>
     <section id="workflow" class="card" aria-labelledby="workflow-title" hidden><h2 id="workflow-title">General</h2>
      <div id="compatibility-row" class="setting-row" hidden><div><h3>Compatibility paste</h3><p id="compatibility-help">For apps that hide their text field. Pastes once in the same app/window; the exact field cannot be verified.</p></div><label class="switch"><input id="compatibility-paste" type="checkbox" role="switch" aria-label="Compatibility paste" aria-describedby="compatibility-help"><span aria-hidden="true"></span></label></div>
@@ -75,14 +79,14 @@ document.querySelector('#app')!.innerHTML = `
      <div id="permissions-row" class="setting-row" hidden><div><h3>Shortcuts & paste</h3><p id="permission-state">Checking…</p></div><button id="permissions">Open settings</button></div>
      <div id="hotkey-row" class="setting-row" hidden><div><h3 id="hotkey-title">Shortcut disconnected</h3><p id="hotkey-detail">Checking shortcut…</p></div></div>
     </div>
-     <div id="model-row" class="setting-row" tabindex="-1"><div><h3>English model <span id="model-ready" class="subtle" hidden>· Ready</span></h3><p id="model-state">148 MB · One-time download</p><progress id="progress" max="100" value="0" hidden aria-label="Model download progress"></progress></div><button id="download">Download</button></div>
+      <div id="model-row" class="setting-row" tabindex="-1"><div><h3>Speech model</h3><p id="model-state">English · 148 MB</p><progress id="progress" max="100" value="0" hidden aria-label="Model download progress"></progress></div><span id="model-ready" class="state" hidden>Installed</span><button id="download">Download</button></div>
   </section>
      <section class="local-data" aria-labelledby="data-title"><div class="setting-row"><div><h2 id="data-title">Usage totals</h2><p id="privacy-detail" class="subtle">Private tests are never counted.</p></div><button id="reset" class="icon-action danger" aria-label="Reset usage totals" title="Reset usage totals" aria-haspopup="dialog">${icon('clear')}</button></div></section>
  </section>
   <div class="general-status-slot"><p id="message" class="status-detail" role="status" aria-label="Dictation status" aria-live="polite" hidden></p><button id="message-recovery" class="text-action" hidden>View problem</button></div>
  <p id="feedback" class="feedback" role="status" hidden></p><p id="storage-error" class="feedback" role="status" hidden></p>
   </main>
-   <footer><span class="footer-privacy">${icon('shield')}On-device · English</span><div class="footer-meta"><span class="footer-brand"><span class="sr-only">HandsFree</span><span id="app-version">0.1.1</span></span><button id="updates-open" class="text-action" aria-describedby="updates-feedback" hidden>${icon('update')}<span class="update-summary"><strong id="updates-indicator-label">Updates</strong><span id="updates-indicator-detail">Not checked</span></span><span id="updates-announcement" class="sr-only" role="status" aria-live="polite"></span></button></div><p id="updates-feedback" role="status" aria-live="polite" hidden></p></footer>
+   <footer><span class="footer-privacy">${icon('shield')}On-device · English</span><div class="footer-meta"><a id="repository-link" class="icon-action" href="${repositoryUrl}" aria-label="HandsFree on GitHub" title="HandsFree on GitHub" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 .75A11.25 11.25 0 0 0 8.44 22.67c.56.1.77-.24.77-.54v-2.1c-3.13.68-3.79-1.33-3.79-1.33-.51-1.3-1.25-1.65-1.25-1.65-1.02-.7.08-.69.08-.69 1.13.08 1.73 1.16 1.73 1.16 1 1.72 2.64 1.22 3.28.93.1-.73.39-1.22.71-1.5-2.5-.28-5.13-1.25-5.13-5.56 0-1.23.44-2.24 1.16-3.03-.12-.28-.5-1.43.11-2.98 0 0 .95-.3 3.09 1.16a10.7 10.7 0 0 1 5.63 0c2.14-1.46 3.08-1.16 3.08-1.16.62 1.55.23 2.7.11 2.98.73.79 1.16 1.8 1.16 3.03 0 4.32-2.63 5.27-5.14 5.55.4.35.76 1.03.76 2.08v3.11c0 .3.2.65.78.54A11.25 11.25 0 0 0 12 .75Z"/></svg></a><span class="footer-brand"><span class="sr-only">HandsFree</span><span id="app-version">0.1.1</span></span><button id="updates-open" class="text-action" aria-describedby="updates-feedback" hidden>${icon('update')}<span class="sr-only" aria-hidden="true"><strong id="updates-indicator-label">Updates</strong><span id="updates-indicator-detail">Not checked</span></span></button><span id="updates-announcement" class="sr-only" role="status" aria-live="polite"></span></div><p id="updates-feedback" role="status" aria-live="polite" hidden></p></footer>
 </div>
  <dialog id="reset-dialog" aria-labelledby="reset-title"><h2 id="reset-title">Reset usage totals?</h2><p>Totals will return to zero. Your preferences and language model won’t change.</p><div class="dialog-actions"><button id="keep-stats" autofocus>Keep totals</button><button id="confirm-reset" class="danger">Reset totals</button></div></dialog>
  <dialog id="health-dialog" aria-labelledby="health-title" aria-describedby="health-summary">
@@ -91,11 +95,10 @@ document.querySelector('#app')!.innerHTML = `
    <li><div><strong>Microphone access</strong><span id="health-mic-state">Checking…</span></div><button id="health-mic" hidden>Allow microphone</button></li>
    <li id="health-permissions-row"><div><strong>Shortcuts &amp; paste access</strong><span id="health-permissions-state">Checking…</span></div><button id="health-permissions" hidden>Open macOS permissions</button></li>
    <li><div><strong>Shortcut connection</strong><span id="health-hook-state">Checking…</span></div></li>
-   <li><div><strong>English model</strong><span id="health-model-state">Checking…</span></div><button id="health-model" hidden>Download model</button></li>
+   <li><div><strong>Speech model</strong><span id="health-model-state">Checking…</span></div><button id="health-model" hidden>Download model</button></li>
    <li id="health-input" hidden><div><strong><label for="health-microphone">Microphone</label></strong><span id="health-input-help" class="sr-only">Applies to the next recording. An unavailable saved device never switches silently.</span></div><div class="health-input-controls"><select id="health-microphone" aria-describedby="health-input-help" disabled></select><button id="health-microphone-refresh" class="icon-action" aria-label="Refresh microphones" title="Refresh microphones" disabled>${icon('update')}</button></div></li>
   </ul>
   <p id="health-error" class="feedback" role="status" hidden></p><p class="sr-only">These checks don’t record audio. Permission checks are not proof that microphone capture works.</p>
-  <div class="dialog-actions"><button id="health-practice" class="primary" hidden>${icon('mic')}<span>Private test</span></button></div>
  </dialog>`;
 const el = (id: string) => document.getElementById(id)!;
 const button = (id: string) => el(id) as HTMLButtonElement;
@@ -216,8 +219,8 @@ async function action(command: string, args?: Record<string, unknown>): Promise<
 }
 el('home-back').onclick = () => { navigate('home'); focusHeading('home'); };
 el('nav-settings').onclick = () => { navigate('settings'); focusHeading('settings'); };
+el('repository-link').onclick = event => { event.preventDefault(); void action('open_project_repository'); };
 const healthDialog = el('health-dialog') as HTMLDialogElement;
-let healthReturnsHome = false;
 function renderHealth() {
   const s = current;
   const mac = s?.platform === 'macos';
@@ -234,35 +237,31 @@ function renderHealth() {
     : s.phase === 'error' || s.phase === 'not_pasted' ? el('message').textContent || 'The last dictation failed. Review the checks below, then try a private test.'
     : s.phase === 'recording' ? s.audio_ready === false ? 'Preparing the microphone. Capture is not ready yet.' : 'Dictation is listening. Close this panel to continue.'
     : s.phase === 'processing' ? 'Finishing the current dictation. Wait before testing again.'
-    : s.phase === 'downloading' ? `Downloading the English model… ${Math.round(s.progress)}%.`
+    : s.phase === 'downloading' ? `Downloading the speech model… ${Math.round(s.progress)}%.`
     : s.persistence_error ? `Settings or usage couldn’t be saved. ${s.persistence_error}`
     : inputUnavailable() ? 'Microphone unavailable. Reconnect it or choose another input.'
-    : readiness(s) ? 'Permissions, shortcut and model are ready. Use a private test to check actual capture.' : readinessDetail(s));
+    : readiness(s) ? 'Permissions, shortcut and model are ready. To check actual capture, record privately on Home.' : readinessDetail(s));
   el('health-mic-state').textContent = !s ? 'Unknown' : s.microphone ? 'Allowed' : 'Access needed';
   el('health-permissions-row').hidden = !mac;
   el('health-permissions-state').textContent = !s ? 'Unknown' : s.accessibility && s.input_monitoring ? 'Allowed' : [!s.accessibility && 'Accessibility needed', !s.input_monitoring && 'Input Monitoring needed'].filter(Boolean).join(' · ');
   el('health-hook-state').textContent = !s ? 'Unknown' : s.hotkey ? 'Connected' : mac ? 'Disconnected. Quit and reopen HandsFree after granting access.' : 'Unavailable. Choose another shortcut in Settings.';
-  el('health-model-state').textContent = !s ? 'Unknown' : s.model_ready ? 'Ready offline' : s.phase === 'downloading' ? `Downloading… ${Math.round(s.progress)}%` : 'Download needed · ~148 MB';
+  el('health-model-state').textContent = !s ? 'Unknown' : s.model_ready ? 'Installed · English' : s.phase === 'downloading' ? `Downloading… ${Math.round(s.progress)}%` : 'Download needed · ~148 MB';
   button('health-mic').hidden = !s || s.microphone;
   button('health-mic').disabled = !s || installingUpdate() || !phasePolicy(s.phase).editConfiguration;
   button('health-permissions').hidden = !mac || Boolean(s?.accessibility && s.input_monitoring);
   button('health-permissions').disabled = button('health-mic').disabled;
   button('health-model').hidden = !s || s.model_ready;
   button('health-model').disabled = !s || installingUpdate() || button('download').disabled;
-  button('health-practice').hidden = !mac;
-  button('health-practice').disabled = !s || !readiness(s) || inputUnavailable() || !phasePolicy(s.phase).previewSound || installingUpdate();
   el('health-input').hidden = !mac;
 }
 button('product-status').onclick = () => {
-  healthReturnsHome = false;
   renderHealth(); healthDialog.showModal(); renderPractice();
   void refresh(); void refreshMicrophones();
 };
 button('health-close').onclick = () => healthDialog.close();
 healthDialog.addEventListener('close', () => {
   renderPractice();
-  if (!healthReturnsHome) button('product-status').focus({preventScroll:true});
-  healthReturnsHome = false;
+  button('product-status').focus({preventScroll:true});
 });
 button('health-refresh').onclick = async () => {
   button('health-refresh').disabled = true; busyIcon('health-refresh', true);
@@ -271,11 +270,6 @@ button('health-refresh').onclick = async () => {
 button('health-mic').onclick = () => { if (!button('health-mic').disabled) void action('request_microphone'); };
 button('health-permissions').onclick = () => { if (!button('health-permissions').disabled && current?.platform === 'macos') void action('request_permissions'); };
 button('health-model').onclick = () => { if (!button('health-model').disabled) button('download').click(); };
-button('health-practice').onclick = () => {
-  if (button('health-practice').disabled) return;
-  healthReturnsHome = true;
-  healthDialog.close(); navigate('home'); practiceField.focus({preventScroll:true});
-};
 const practiceField = el('practice-text') as HTMLTextAreaElement;
 let windowActive = document.hasFocus();
 const practiceVisible = () => windowActive && !el('home').hidden && !document.hidden && document.hasFocus() && !document.querySelector('dialog[open]');
@@ -586,6 +580,14 @@ recorder.onkeyup = e => {
   e.preventDefault(); e.stopPropagation();
   queueRecordedShortcut(recordedKeys.key(e, false, current?.platform));
 };
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape' || event.repeat || event.defaultPrevented || event.isComposing
+    || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || el('settings').hidden
+    || document.querySelector('dialog[open]') || capturing || captureStopping || shortcutPending
+    || installingUpdate() || (event.target instanceof Element && event.target.closest('select'))) return;
+  event.preventDefault();
+  el('home-back').click();
+});
 window.addEventListener('pointerdown', () => recordedKeys.interrupt());
 window.addEventListener('wheel', () => recordedKeys.interrupt(), { passive: true });
 window.addEventListener('pagehide', () => { recordedKeys.reset(); if (capturing) void stopCapture(); });
@@ -613,16 +615,22 @@ soundStyle.onchange = async () => {
 };
 const recordingLimit = el('recording-limit') as HTMLSelectElement;
 const microphoneChoice = el('microphone-choice') as HTMLSelectElement;
-const appearanceChoice = el('appearance-choice') as HTMLSelectElement;
+const appearanceChoice = el('appearance-choice') as HTMLFieldSetElement;
+const appearanceRadios = Array.from(appearanceChoice.querySelectorAll<HTMLInputElement>('input'));
 const appearance = new AppearancePreference(invoke, () => {
   document.documentElement.dataset.appearance = appearance.value;
-  appearanceChoice.value = appearance.selection;
+  for (const radio of appearanceRadios) radio.checked = radio.value === appearance.selection;
   appearanceChoice.disabled = appearance.pending || !current || current.platform !== 'macos' || installingUpdate();
 });
-appearanceChoice.onchange = async () => {
-  if (appearanceChoice.disabled) return;
-  await appearance.change(appearanceValue(appearanceChoice.value));
+appearanceChoice.onchange = async event => {
+  const radio = event.target;
+  if (appearanceChoice.disabled || !(radio instanceof HTMLInputElement) || !radio.checked) return;
+  const ownedFocus = document.activeElement === radio;
+  const intent = focusIntent;
+  await appearance.change(appearanceValue(radio.value));
   feedback(appearance.error);
+  if (ownedFocus && intent === focusIntent && document.hasFocus() && document.activeElement === document.body
+    && !appearanceChoice.disabled && !el('settings').hidden) appearanceRadios.find(input => input.checked)?.focus({preventScroll:true});
 };
 function renderMicrophones() {
   el('microphone-choice-row').hidden = current?.platform !== 'macos';
@@ -733,7 +741,8 @@ async function refreshStatus() {
       const configuration = JSON.stringify([current.shortcut, current.recording_mode]);
       if (configuration !== tutorialConfiguration) { tutorialConfiguration = configuration; shortcutReceived = false; }
      const windows = current.platform === 'windows';
-      el('updates-open').hidden = current.platform !== 'macos';
+    el('updates-open').hidden = current.platform !== 'macos';
+      el('repository-link').hidden = current.platform !== 'macos';
       renderWorkflow(); void workflow.refresh();
      if (current.platform === 'macos') { void updates.refresh(); void updates.progress(); }
     button('reset').disabled = false;
@@ -766,12 +775,10 @@ async function refreshStatus() {
      button('permissions').disabled = windows || (current.accessibility && current.input_monitoring);
     el('permissions').textContent = current.accessibility && current.input_monitoring ? 'Allowed' : 'Open settings';
     const downloading = current.phase === 'downloading';
-    const modelDetail = downloading ? `Downloading… ${Math.round(current.progress)}%` : '148 MB · One-time download · English only';
-    el('model-state').textContent = modelDetail;
-    el('model-state').hidden = current.model_ready;
+    el('model-state').textContent = current.model_ready ? 'English' : 'English · 148 MB';
     el('download').hidden = current.model_ready;
     button('download').disabled = current.model_ready || downloadPending || !canEditShortcut();
-    el('download').textContent = current.model_ready ? 'Ready offline' : current.phase === 'downloading' ? `${Math.round(current.progress)}%` : 'Download';
+    el('download').textContent = downloading ? `Downloading ${Math.round(current.progress)}%` : 'Download';
     el('progress').hidden = current.phase !== 'downloading';
     (el('progress') as HTMLProgressElement).value = current.progress;
     el('cancel').hidden = !canCancel(current.phase);

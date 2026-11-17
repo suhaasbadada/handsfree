@@ -11,7 +11,7 @@ const template = source.split("document.querySelector('#app')!.innerHTML = `")[1
 const glyphText = source.split('const glyphs: Record<string,string> = ')[1].split(';\nconst icon')[0];
 const glyphs = Function('return (' + glyphText + ')')();
 const icon = name => '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + glyphs[name] + '</svg>';
-const html = Function('logo', 'icon', 'return `' + template + '`')('', icon);
+const html = Function('logo', 'icon', 'repositoryUrl', 'return `' + template + '`')('', icon, 'https://github.com/suhaasbadada/handsfree');
 const css = read('src/style.css') + read('src/typography.css');
 const app = $.NSApplication.sharedApplication;
 app.setActivationPolicy($.NSApplicationActivationPolicyProhibited);
@@ -63,7 +63,7 @@ evaluate(`
       dialog:metric(document.getElementById('health-dialog')),healthInput:metric(document.getElementById('health-input')),
       controls:metric(document.querySelector('.microphone-controls')),mainOverflow:getComputedStyle(main).overflowX,
       selectOverflow:getComputedStyle(document.getElementById('microphone-choice')).overflow,
-      chevrons:['recording-mode','appearance-choice','sound-style'].every(id=>{
+      chevrons:['recording-mode','sound-style'].every(id=>{
         const e=document.getElementById(id),c=e.parentElement.querySelector('svg'),s=getComputedStyle(c),r=e.getBoundingClientRect(),a=c.getBoundingClientRect(),canvas=document.createElement('canvas').getContext('2d');
         canvas.font=getComputedStyle(e).font;
         const gap=r.width-canvas.measureText(e.selectedOptions[0].textContent).width;

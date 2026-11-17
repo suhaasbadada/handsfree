@@ -26,10 +26,10 @@ export async function checkProductStatus({send,evaluate,until,port}) {
   await evaluate(`document.getElementById('health-close').click();window.fixture.persistence_error=''`);
   await until(`document.getElementById('phase').textContent==='Ready'`);
   await evaluate(`window.healthInputInvoke=window.__TAURI_INTERNALS__.invoke;window.noDefaultInput=true;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{const result=await window.healthInputInvoke(command,args);return command==='list_microphones' && window.noDefaultInput?{devices:[],default_uid:null}:result;};window.fixture.microphone_uid=null;document.getElementById('product-status').click()`);
-  await until(`document.getElementById('phase').textContent==='Needs attention' && document.getElementById('health-practice').disabled`);
+  await until(`document.getElementById('phase').textContent==='Needs attention'`);
   assert.match(await evaluate(`document.getElementById('health-summary').textContent`),/Microphone unavailable/,'No actual system-default input is not green Ready or authorization to record');
   await evaluate(`window.noDefaultInput=false;document.getElementById('health-microphone-refresh').click()`);
-  await until(`document.getElementById('phase').textContent==='Ready' && !document.getElementById('health-practice').disabled`);
+  await until(`document.getElementById('phase').textContent==='Ready'`);
   await evaluate(`document.getElementById('health-close').click();window.__TAURI_INTERNALS__.invoke=window.healthInputInvoke`);
   await evaluate(`window.fixture.phase='error';window.fixture.message='Microphone capture failed. Please check your input device.'`);
   await until(`document.getElementById('phase').textContent==='Needs attention'`);
@@ -43,7 +43,7 @@ export async function checkProductStatus({send,evaluate,until,port}) {
     await until(`document.getElementById('health-dialog').open`);
     assert.equal(await evaluate(`document.getElementById('health-summary').textContent`),'Microphone capture failed. Please check your input device.','Runtime failure is explained even with setup ready');
     assert.equal(await evaluate(`document.getElementById('health-mic-state').textContent`),'Allowed','Permission is not confused with actual capture');
-    assert.equal(await evaluate(`document.getElementById('health-model-state').textContent`),'Ready offline');
+    assert.equal(await evaluate(`document.getElementById('health-model-state').textContent`),'Installed · English');
     assert.equal(await evaluate(`document.getElementById('settings').hidden`),true,'Status explains the problem without navigating to Settings');
     assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('#health-dialog button,#health-dialog select')).filter(e=>e.getClientRects().length && (e.getBoundingClientRect().left<0 || e.getBoundingClientRect().right>innerWidth)).map(e=>e.id)`),[],'Direct recovery controls fit the window');
     if (process.env.UI_SCREENSHOTS) {
@@ -75,7 +75,7 @@ export async function checkProductStatus({send,evaluate,until,port}) {
   await until(`document.getElementById('dot').className==='recording' && !document.getElementById('phase').classList.contains('sr-only')`);
   assert.equal(await evaluate(`document.getElementById('phase').textContent==='Listening'`),true,'Real audio readiness alone retires the startup indicator');
   await evaluate(`Object.assign(window.fixture,{phase:'idle',message:'',audio_ready:true,microphone:true,accessibility:true,model_ready:true,hotkey:true})`);
-  await until(`!document.getElementById('health-practice').disabled`);
+  await until(`!document.getElementById('health-microphone').disabled`);
   await evaluate(`window.statusBeforeDevice=window.calls.filter(c=>c.command==='set_microphone').length;document.getElementById('health-microphone').value='';document.getElementById('health-microphone').dispatchEvent(new Event('change'))`);
   await until(`window.calls.filter(c=>c.command==='set_microphone').length===window.statusBeforeDevice+1 && !document.getElementById('health-microphone').disabled`);
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='set_microphone').at(-1).args.uid`),null,'Direct device picker shares the guarded native preference transaction');
@@ -83,9 +83,10 @@ export async function checkProductStatus({send,evaluate,until,port}) {
   await until(`document.getElementById('phase').textContent==='Disconnected'`);
   assert.equal(await evaluate(`document.getElementById('health-mic-state').textContent==='Unknown' && document.getElementById('health-microphone').disabled`),true,'Disconnected status never retains a stale Ready proof or device authorization');
   await evaluate(`window.healthDisconnected=false;document.getElementById('health-refresh').click()`);
-  await until(`document.getElementById('phase').textContent==='Ready' && !document.getElementById('health-practice').disabled`);
+  await until(`document.getElementById('phase').textContent==='Ready'`);
   assert.equal(await evaluate(`document.getElementById('health-error').hidden`),true,'Successful reconnect retires the obsolete connection failure');
-  await evaluate(`document.getElementById('health-practice').click()`);
+  assert.equal(await evaluate(`Array.from(document.querySelectorAll('#health-dialog button')).some(button=>/private test/i.test(button.textContent))`),false);
+  await evaluate(`document.getElementById('health-close').click()`);
   await until(`!document.getElementById('home').hidden && window.context>0`);
   assert.equal(await evaluate(`window.calls.some(c=>c.command==='practice_start')`),false,'Opening the private test still requires explicit Start');
   await evaluate(`document.getElementById('product-status').click()`);
