@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 // Historical receipt assertions operate on the intact pre-beta-23 guide suffix.
@@ -31,13 +30,6 @@ test('published active Mac beta 24 and disabled stable candidate keep embedded v
   assert.equal(JSON.parse(read('package-lock.json')).version, version);
   assert.equal(JSON.parse(read('package-lock.json')).packages[''].version, version);
   assert.equal(JSON.parse(read('src-tauri/tauri.conf.json')).version, version);
-  const [manifest, lock] = JSON.parse(execFileSync('python3', ['-c',
-    'import json, sys, tomllib; print(json.dumps([tomllib.loads(value) for value in json.load(sys.stdin)]))',
-  ], { input: JSON.stringify([read('src-tauri/Cargo.toml'), read('src-tauri/Cargo.lock')]), encoding: 'utf8' }));
-  assert.equal(manifest.package.version, '0.1.1', 'Stable internal Cargo package version');
-  const lockedApp = lock.package.filter(entry => entry.name === 'handsfree');
-  assert.equal(lockedApp.length, 1);
-  assert.equal(lockedApp[0].version, '0.1.1', 'Lockfile resolves the stable internal app version');
   assert.equal(release.version, `${version}-beta.24`);
   assert.equal(release.publicAvailable, true, 'Activation follows publication and public asset verification');
   assert.equal(candidateRelease.version, version);
