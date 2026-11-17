@@ -22,22 +22,22 @@ test('active docs disclose stable while historical beta notes and app identity r
   assert.equal(config.identifier, 'com.handsfree.local');
 });
 
-test('published Mac stable activation matches the audited embedded version', async () => {
+test('published Mac stable stays live while the next embedded version is prepared', async () => {
   const { release, candidateRelease } = await import('../site/release.js');
   const { candidate, tag } = await import('../scripts/check-release.mjs');
   const version = JSON.parse(read('package.json')).version;
-  assert.equal(version, '0.1.2');
+  assert.equal(version, '0.1.3');
   assert.equal(JSON.parse(read('package-lock.json')).version, version);
   assert.equal(JSON.parse(read('package-lock.json')).packages[''].version, version);
   assert.equal(JSON.parse(read('src-tauri/tauri.conf.json')).version, version);
-  assert.equal(release.version, version);
+  assert.equal(release.version, '0.1.2');
   assert.equal(release.publicAvailable, true, 'Activation follows publication and public asset verification');
   assert.equal(candidateRelease.version, version);
   assert.equal(candidateRelease.publicAvailable, false, 'Candidate must not activate public downloads');
   assert.ok(release.dmgUrl.endsWith(`/releases/download/v${release.version}/HandsFree-${release.version}-macos-arm64.dmg`));
-  assert.equal(release.dmgUrl, candidateRelease.dmgUrl, 'Activation selects the published audited candidate');
+  assert.notEqual(release.dmgUrl, candidateRelease.dmgUrl, 'Candidate preparation must not replace the active download');
   assert.equal(candidateRelease.schemaVersion, 1);
-  assert.match(candidateRelease.status, /Stable v0\.1\.2 signed candidate accepted and published/);
+  assert.match(candidateRelease.status, /Stable v0\.1\.3 candidate preparation/);
   assert.match(candidateRelease.status, /pending/);
   assert.match(candidateRelease.status, /self-signed, not notarized/i);
   assert.equal(JSON.parse(read('src-tauri/distribution.json')).version, candidateRelease.version);

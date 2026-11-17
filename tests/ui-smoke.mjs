@@ -1,6 +1,7 @@
 // Optional local browser smoke check. Does not launch HandsFree or use the mic.
 // BROWSER_BINARY='/path/to/Chromium' node tests/ui-smoke.mjs
 import assert from 'node:assert/strict';
+import packageMetadata from '../package.json' with { type: 'json' };
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -17,6 +18,7 @@ import { checkRefinement } from './ui-refinement.mjs';
 import { checkStableBugs } from './ui-stable-bugs.mjs';
 
 const binary = process.env.BROWSER_BINARY;
+const packagedVersion = packageMetadata.version;
 const port = process.env.UI_PORT ?? '5187';
 // Optional focused reruns; the default still executes every base and DOM check.
 const selected = process.env.UI_CHECKS?.split(',');
@@ -74,7 +76,7 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: 980, height: 820, deviceScaleFactor: 1, mobile: false });
   await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-color-scheme',value:'light'},{name:'prefers-reduced-motion',value:'no-preference'}]});
   await until(`Boolean(document.getElementById('nav-settings'))`);
-  assert.equal(await evaluate(`!document.querySelector('.beta-badge') && !document.querySelector('main footer') && document.getElementById('app-version').textContent==='0.1.2' && document.querySelector('footer .footer-privacy').textContent.includes('English')`), true, 'Stable version and language metadata live in the actual footer without a beta badge');
+  assert.equal(await evaluate(`!document.querySelector('.beta-badge') && !document.querySelector('main footer') && document.getElementById('app-version').textContent===${JSON.stringify(packagedVersion)} && document.querySelector('footer .footer-privacy').textContent.includes('English')`), true, 'Stable version and language metadata live in the actual footer without a beta badge');
    assert.equal(await evaluate(`['change-shortcut','mic','permissions','download','reset','sounds','sound-volume'].every(id=>document.getElementById(id).disabled)`), true, 'Native controls are unavailable before the backend connects');
    assert.equal(await evaluate(`document.getElementById('permissions-row').hidden && document.getElementById('saved-shortcut').textContent==='…' && !document.body.textContent.includes('this Mac')`), true, 'Unknown native platform has neutral, disabled setup');
   await evaluate(`window.calls = []; window.fixture = {phase:'idle',message:'Select a text field and press Fn.', progress:0,model_ready:true,microphone:true,accessibility:true,input_monitoring:true,hotkey:true,transcript:'',sounds:true,sound_volume:50,sound_style:'clean',shortcut:{code:'Fn',modifiers:0},shortcut_label:'Fn',stats:{words:0,transcriptions:0,speech_seconds:0,saved_seconds:0},persistence_error:''}; window.__TAURI_INTERNALS__ = { invoke: async (command,args) => { window.calls.push({command,args}); if(command==='status') return structuredClone(window.fixture); if(command==='set_sounds') window.fixture.sounds=args.enabled; if(command==='set_sound_style') window.fixture.sound_style=args.style; if(command==='set_shortcut'){if(window.rejectShortcut) throw 'Could not save shortcut'; window.fixture.shortcut=args.shortcut;window.fixture.shortcut_label=args.shortcut.code==='Fn'?'Fn':args.shortcut.code==='Space'?'Option + Space':'Control + Shift + J';} if(command==='reset_stats') window.fixture.stats={words:0,transcriptions:0,speech_seconds:0,saved_seconds:0}; } }; document.getElementById('feedback').hidden=true;`);
