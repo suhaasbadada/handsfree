@@ -245,7 +245,7 @@ main:has(#home:not([hidden])) #message[hidden] { display: block !important; visi
 #dot.processing, #dot.downloading { animation: pulse 1.6s infinite; }
 #dot.error, #dot.not_pasted { background: var(--danger); }
 .feedback { background: var(--warning); color: var(--text); border-radius: 10px; padding: 12px; overflow-wrap: anywhere; line-height: 1.6; }
-footer { grid-column: 1; width: 100%; max-width: 760px; min-height: 58px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; color: var(--muted); margin: 0 auto; padding: 12px 0; border-top: 1px solid var(--line); }
+footer { grid-column: 1; min-height: 58px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; color: var(--muted); padding: 12px 0; border-top: 1px solid var(--line); }
 #updates-feedback { flex-basis: 100%; margin: 0; max-height: 3.2em; overflow: auto; overflow-wrap: anywhere; color: var(--danger); font-size: 12px; line-height: 1.6; }
 [aria-busy="true"] > svg { animation: update-spin 1s linear infinite; }
 @keyframes update-spin { to { transform: rotate(360deg); } }

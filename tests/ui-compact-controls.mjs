@@ -12,8 +12,9 @@ export async function checkCompactControls({send,evaluate,until,port}) {
     await evaluate(`window.fixture.appearance='${theme}'`);
     await until(`document.documentElement.dataset.appearance==='${theme}'`);
     assert.equal(await evaluate(`(()=>{const p=document.createElement('span');p.style.color='var(--accent)';document.body.append(p);const c=getComputedStyle(p).color;p.remove();return getComputedStyle(document.getElementById('practice-shortcut')).color===c && getComputedStyle(document.getElementById('saved-shortcut')).color===c;})()`),true,'Configured shortcut is red without replacing its key box');
-    for (const [width,height] of [[980,820],[980,600],[560,650],[320,650]]) {
+    for (const [width,height] of [[1200,820],[980,820],[980,600],[560,650],[320,650]]) {
       await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
+      assert.equal(await evaluate(`(()=>{const header=document.querySelector('.product-header'),footer=document.querySelector('footer'),a=header.getBoundingClientRect(),b=footer.getBoundingClientRect();return getComputedStyle(header).borderBottomWidth==='1px' && getComputedStyle(footer).borderTopWidth==='1px' && Math.abs(a.left-b.left)<1 && Math.abs(a.right-b.right)<1;})()`),true,`${width}/${theme}: header and footer divider endpoints match`);
       await evaluate(`document.getElementById('nav-settings').click()`);
       await until(`!document.getElementById('microphone-choice').disabled`);
       assert.equal(await evaluate(`['recording-limit','sound-style','recording-mode','microphone-choice'].every(id=>{const s=document.getElementById(id),r=s.getBoundingClientRect(),a=s.parentElement.querySelector('svg').getBoundingClientRect(),c=document.createElement('canvas').getContext('2d');c.font=getComputedStyle(s).font;const text=c.measureText(s.selectedOptions[0].textContent).width;return Math.abs(a.top+a.height/2-r.top-r.height/2)<1 && r.width-text<=42 && r.width>=32;})`),true,`${width}/${theme}: chevrons stay centered without excessive reserved width`);
