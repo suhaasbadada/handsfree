@@ -653,7 +653,8 @@ mod tests {
     }
     #[test]
     fn distribution_and_prerelease_ordering() {
-        assert_eq!(installed_version(), "0.1.4");
+        assert_eq!(installed_version(), "0.1.5");
+        assert!(validate_feed(&feed("0.1.5"), "0.1.4").unwrap().1);
         assert!(validate_feed(&feed("0.1.4"), "0.1.3").unwrap().1);
         assert!(validate_feed(&feed("0.1.3"), "0.1.2").unwrap().1);
         assert!(validate_feed(&feed("0.1.2"), "0.1.3").is_err());
