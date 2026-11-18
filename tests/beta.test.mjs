@@ -13,7 +13,7 @@ const beta22ReleaseGuide = () => {
 };
 
 test('active docs disclose stable while historical beta notes and app identity remain unchanged', () => {
-  assert.match(read('README.md'), /!\[Mac stable: v0\.1\.6\]\(https:\/\/img.shields.io\/badge\/Mac_stable-v0\.1\.6-a64a45.svg\)/);
+  assert.match(read('README.md'), /!\[Mac stable: v0\.1\.7\]\(https:\/\/img.shields.io\/badge\/Mac_stable-v0\.1\.7-a64a45.svg\)/);
   assert.match(read('docs/releases/v0.1.1-beta.2.md'), /# HandsFree v0\.1\.1-beta\.2/);
   assert.match(read('docs/releases/v0.1.1-beta.2.md'), /Prerelease · Beta testing/);
   assert.match(read('docs/INSTALL.md'), /# Install HandsFree \(Mac stable\)/);
@@ -22,7 +22,7 @@ test('active docs disclose stable while historical beta notes and app identity r
   assert.equal(config.identifier, 'com.handsfree.local');
 });
 
-test('Mac stable candidate matches the embedded version without activating downloads', async () => {
+test('Published Mac stable matches the audited embedded version', async () => {
   const { release, candidateRelease } = await import('../site/release.js');
   const { candidate, tag } = await import('../scripts/check-release.mjs');
   const version = JSON.parse(read('package.json')).version;
@@ -30,14 +30,14 @@ test('Mac stable candidate matches the embedded version without activating downl
   assert.equal(JSON.parse(read('package-lock.json')).version, version);
   assert.equal(JSON.parse(read('package-lock.json')).packages[''].version, version);
   assert.equal(JSON.parse(read('src-tauri/tauri.conf.json')).version, version);
-  assert.equal(release.version, '0.1.6');
+  assert.equal(release.version, '0.1.7');
   assert.equal(release.publicAvailable, true, 'Activation follows publication and public asset verification');
   assert.equal(candidateRelease.version, version);
   assert.equal(candidateRelease.publicAvailable, false, 'Candidate must not activate public downloads');
   assert.ok(release.dmgUrl.endsWith(`/releases/download/v${release.version}/HandsFree-${release.version}-macos-arm64.dmg`));
-  assert.notEqual(release.dmgUrl, candidateRelease.dmgUrl, 'Candidate preparation leaves the published download unchanged');
+  assert.equal(release.dmgUrl, candidateRelease.dmgUrl, 'Activation selects the audited candidate');
   assert.equal(candidateRelease.schemaVersion, 1);
-  assert.match(candidateRelease.status, /Stable v0\.1\.7 candidate preparation/);
+  assert.match(candidateRelease.status, /Stable v0\.1\.7 signed candidate accepted and published/);
   assert.match(candidateRelease.status, /pending/);
   assert.match(candidateRelease.status, /self-signed, not notarized/i);
   assert.equal(JSON.parse(read('src-tauri/distribution.json')).version, candidateRelease.version);
@@ -562,7 +562,9 @@ test('beta 6 publication evidence remains historical', () => {
 
 test('Mac stable activation coordinates current docs and all static download links', async () => {
   const { release } = await import('../site/release.js');
-  assert.equal(release.version, '0.1.6');
+  assert.equal(release.version, '0.1.7');
+  assert.equal(createHash('sha256').update(read('docs/releases/artifacts/v0.1.6-macos-arm64.json')).digest('hex'),
+    '43c16960c0797e3430c60e19c3a58e56226c0cfa699d9bb6b52b5c779d32f479');
   assert.equal(createHash('sha256').update(read('docs/releases/artifacts/v0.1.5-macos-arm64.json')).digest('hex'),
     '804af365125eb4b917a78e623b6a88df401bb3f24e02fd8e090c7056a3b99861');
   assert.equal(createHash('sha256').update(read('docs/releases/artifacts/v0.1.4-macos-arm64.json')).digest('hex'),
@@ -573,8 +575,8 @@ test('Mac stable activation coordinates current docs and all static download lin
     '139c4f42f65cf32e211b5ecfb495963c9241a6c73caad3415dc767b8b1686420');
   const feed = read('site/updates/macos-arm64.json');
   assert.equal(createHash('sha256').update(feed).digest('hex'),
-    '43c16960c0797e3430c60e19c3a58e56226c0cfa699d9bb6b52b5c779d32f479',
-    'Activation preserves exact anonymously audited v0.1.6 signed feed bytes');
+    '6bdbd4ee48ab8d94d1857cc8421a2a3b4e9e7df5d96ca010d2c49858bbe2b79d',
+    'Activation preserves exact anonymously audited v0.1.7 signed feed bytes');
   assert.equal(JSON.parse(feed).version, release.version);
   assert.equal(JSON.parse(feed).platforms['darwin-aarch64'].url,
     release.dmgUrl.replace('.dmg', '.app.tar.gz'));

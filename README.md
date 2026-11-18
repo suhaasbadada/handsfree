@@ -7,9 +7,9 @@
 Local-first dictation for your Mac. Tap a shortcut, speak, and put text in the field you started in.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-706b68.svg)](LICENSE)
-[![Mac stable: v0.1.6](https://img.shields.io/badge/Mac_stable-v0.1.6-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.6)
+[![Mac stable: v0.1.7](https://img.shields.io/badge/Mac_stable-v0.1.7-a64a45.svg)](https://github.com/suhaasbadada/handsfree/releases/tag/v0.1.7)
 
-[Website](https://suhaasbadada.github.io/handsfree/) · [Release notes](docs/releases/v0.1.6.md) · [Report a bug](https://github.com/suhaasbadada/handsfree/issues)
+[Website](https://suhaasbadada.github.io/handsfree/) · [Release notes](docs/releases/v0.1.7.md) · [Report a bug](https://github.com/suhaasbadada/handsfree/issues)
 
 ## Download & install
 
@@ -21,7 +21,7 @@ Local-first dictation for your Mac. Tap a shortcut, speak, and put text in the f
 brew install --cask suhaasbadada/handsfree/handsfree
 ```
 
-Homebrew is released separately; see the [tap](https://github.com/suhaasbadada/homebrew-handsfree) for its current version. For **v0.1.6**, [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.6/HandsFree-0.1.6-macos-arm64.dmg), then drag HandsFree to Applications before opening.
+Homebrew is released separately; see the [tap](https://github.com/suhaasbadada/homebrew-handsfree) for its current version. For **v0.1.7**, [Download for Mac (.dmg)](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.7/HandsFree-0.1.7-macos-arm64.dmg), then drag HandsFree to Applications before opening.
 
 **Self-signed, not Apple notarized.** macOS security prompts still apply. If Homebrew requests cask trust, review the [tap repository](https://github.com/suhaasbadada/homebrew-handsfree#readme) first; cask trust is not Apple approval. Follow the [installation guide](docs/INSTALL.md) for security prompts, permissions, existing-app conflicts and older-beta upgrades. Never disable system security to install.
 
