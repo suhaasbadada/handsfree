@@ -455,7 +455,6 @@ function renderUpdates() {
   const expanded = view.phase === 'available' || updateBusy(view);
   summary.classList.toggle('update-summary', expanded);
   summary.classList.toggle('sr-only', !expanded);
-  button('updates-open').dataset.reopens = String(view.phase === 'available' && canInstallUpdate());
   const canDownload = canInstallUpdate();
   const instruction = view.phase === 'available' ? canDownload ? 'Click to download, verify, install and reopen HandsFree. Models, settings and usage totals are kept.' : 'Finish dictation, clear the private test and stop shortcut recording before updating.' : updateBusy(view) ? 'Update in progress' : 'Click to check for updates';
   button('updates-open').title = `${indicator.label}. ${indicator.detail}. ${instruction}`;

@@ -20,6 +20,11 @@ export async function checkUpdateIndicator({send,evaluate,until,port}) {
   await until(`window.fixture && document.getElementById('updates-open') && !document.getElementById('updates-open').hidden`);
   await evaluate(`window.visibleUpdateState={installed_version:'0.1.1-beta.20',phase:'idle',notes:'',downloaded_bytes:0,message:'Choose Check for updates.'};window.nextUpdateVersion='0.1.1-beta.21';const inlineInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(['update_status','check_for_updates','install_update'].includes(command)){window.calls.push({command,args});if(command==='check_for_updates'){if(window.waitUpdateCheck)await window.waitUpdateCheck;window.visibleUpdateState={...window.visibleUpdateState,phase:'available',available_version:window.nextUpdateVersion,notes:'<img src=x onerror="window.updateInjected=true">',message:'Update available.'};}if(command==='install_update'){if(window.waitInstall)await window.waitInstall;window.visibleUpdateState={...window.visibleUpdateState,phase:'error',available_version:undefined,message:'Signature verification failed. Check again.'};}return structuredClone(window.visibleUpdateState);}return inlineInvoke(command,args);};`);
   await until(`document.getElementById('updates-indicator-detail').textContent==='Not checked'`);
+  const footerLayout = () => evaluate(`(() => {
+    const footer = document.querySelector('footer').getBoundingClientRect();
+    const main = document.querySelector('main').getBoundingClientRect();
+    return [footer.top, footer.height, main.height];
+  })()`);
   assert.equal(await evaluate(`window.calls.some(c=>c.command==='check_for_updates'||c.command==='install_update')`),false,'Idle observations never contact the feed or install');
   await evaluate(`document.getElementById('nav-settings').click()`);
   assert.equal(await evaluate(`document.querySelector('.setup-card').hidden`),true,'Ready setup is not repeated as an empty Settings section');
@@ -30,6 +35,7 @@ export async function checkUpdateIndicator({send,evaluate,until,port}) {
   await until(`!document.querySelector('.setup-card').hidden`);
   await evaluate(`window.fixture.model_ready=true`);
   await until(`document.querySelector('.setup-card').hidden`);
+  const idleLayout = await footerLayout();
   await evaluate(`window.waitUpdateCheck=new Promise(resolve=>window.finishUpdateCheck=resolve);document.getElementById('updates-open').focus();document.getElementById('updates-open').click();document.getElementById('updates-open').click()`);
   await until(`document.getElementById('updates-open').dataset.phase==='checking'`);
   assert.equal(await evaluate(`document.getElementById('updates-open').disabled && document.getElementById('updates-open').getAttribute('aria-busy')==='true' && document.querySelector('#updates-open > svg').dataset.glyph==='spinner' && getComputedStyle(document.querySelector('#updates-open > svg')).animationName==='update-spin' && !document.querySelector('dialog[open]')`),true,'Checking animates the accessible busy spinner inline, without opening a modal');
@@ -38,6 +44,8 @@ export async function checkUpdateIndicator({send,evaluate,until,port}) {
   await until(`document.getElementById('updates-indicator-label').textContent==='Download & update' && !document.getElementById('updates-open').disabled`);
   assert.equal(await evaluate(`document.activeElement.id`),'updates-open','Keyboard focus stays on the inline action after the check, without a modal');
   assert.equal(await evaluate(`document.getElementById('updates-indicator-detail').textContent`),'0.1.1-beta.21','The action exposes its exact version');
+  assert.deepEqual(await footerLayout(), idleLayout, 'An update offer does not lift the footer or resize the main pane');
+  assert.match(await evaluate(`document.getElementById('updates-open').getAttribute('aria-label')`), /install and reopen HandsFree/);
   assert.equal(await evaluate(`(()=>{const b=document.getElementById('updates-open'),a=b.getBoundingClientRect();return ['updates-indicator-label','updates-indicator-detail'].every(id=>{const r=document.getElementById(id).getBoundingClientRect();return r.width>1 && r.height>1 && r.left>=a.left && r.right<=a.right && r.bottom<=a.bottom;});})()`),true,'The exact offer and action are visible before consent');
   assert.equal(await evaluate(`document.getElementById('updates-open').getAttribute('aria-busy')==='false' && document.querySelector('#updates-open > svg').dataset.glyph==='download' && getComputedStyle(document.querySelector('#updates-open > svg')).animationName==='none'`),true,'Available offer has a static download icon, never an idle loader');
   await screenshot('available');
@@ -76,10 +84,14 @@ export async function checkUpdateIndicator({send,evaluate,until,port}) {
   const checks=await evaluate(`window.calls.filter(c=>c.command==='check_for_updates').length`);
   for (const [width,height] of [[980,820],[560,650],[320,650]]) {
     await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
+    await evaluate(`window.visibleUpdateState={...window.visibleUpdateState,phase:'idle',available_version:undefined}`);
+    await until(`document.getElementById('updates-open').dataset.phase==='idle'`);
+    const baseline = await footerLayout();
     for (const phase of ['checking','available','downloading','installing','error','up_to_date','idle']) {
       await evaluate(`window.visibleUpdateState={...window.visibleUpdateState,phase:'${phase}',available_version:'0.1.1-beta.123456789012345678901234567890',message:'${phase==='error'?'Network unavailable. '.repeat(20):phase}',downloaded_bytes:50,total_bytes:100}`);
       await until(`document.getElementById('updates-open').dataset.phase==='${phase}'`);
       assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth && document.getElementById('updates-open').scrollWidth<=document.getElementById('updates-open').clientWidth`),true,`${width}px ${phase}: update action and errors fit inline`);
+      if (phase !== 'error') assert.deepEqual(await footerLayout(), baseline, `${width}px ${phase}: footer stays at its idle position`);
       assert.equal(await evaluate(`!document.querySelector('dialog[open]')`),true,'No update phase opens a modal');
     }
   }
