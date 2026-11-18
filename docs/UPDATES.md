@@ -1,11 +1,12 @@
 # Signed in-app updates (Mac beta 7 onward)
 
 Since v0.1.2, updates are entirely inline in the footer. Click the **update icon**
-to check; the refresh icon spins while checking. A verified offer changes the same
-action to **Download & update** with its version. Clicking that offer authorizes
-only that displayed version, freshly rechecked before download. Progress and retry
-errors stay inline; there are no update or confirmation modals. Local status reads
-never contact the feed, and there is no unsolicited background download.
+to check. In v0.1.5, a verified offer swaps the refresh icon for a download arrow
+in the same spot. Its tooltip and accessible label show **Download & update** and
+the exact version. Clicking it authorizes that version only, freshly rechecked
+before download. Progress and retry details are available from the same control
+without expanding the footer or opening a dialog. Local status reads never contact
+the feed, and there is no unsolicited background download.
 
 In v0.1.1 the footer check is labeled **Updates**. Homebrew releases are tracked
 separately from this feed.
