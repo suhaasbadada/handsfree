@@ -451,14 +451,11 @@ function renderUpdates() {
     if (el(id).textContent !== text) el(id).textContent = text;
   }
   button('updates-open').dataset.attention = indicator.attention;
-  const summary = el('updates-indicator-label').parentElement!;
-  const expanded = view.phase === 'available' || updateBusy(view);
-  summary.classList.toggle('update-summary', expanded);
-  summary.classList.toggle('sr-only', !expanded);
   const canDownload = canInstallUpdate();
   const instruction = view.phase === 'available' ? canDownload ? 'Click to download, verify, install and reopen HandsFree. Models, settings and usage totals are kept.' : 'Finish dictation, clear the private test and stop shortcut recording before updating.' : updateBusy(view) ? 'Update in progress' : 'Click to check for updates';
-  button('updates-open').title = `${indicator.label}. ${indicator.detail}. ${instruction}`;
-  button('updates-open').setAttribute('aria-label', button('updates-open').title);
+  const tooltip = `${indicator.label}. ${indicator.detail}. ${instruction}`;
+  button('updates-open').title = view.phase === 'error' && view.message ? `${tooltip}. ${view.message}` : tooltip;
+  button('updates-open').setAttribute('aria-label', tooltip);
   button('updates-open').disabled = current?.platform !== 'macos' || updateBusy(view) || (view.phase === 'available' && !canDownload);
   button('updates-open').dataset.phase = view.phase;
   button('updates-open').setAttribute('aria-busy', String(updateBusy(view)));

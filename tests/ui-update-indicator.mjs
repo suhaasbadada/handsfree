@@ -23,7 +23,7 @@ export async function checkUpdateIndicator({send,evaluate,until,port}) {
   const footerLayout = () => evaluate(`(() => {
     const footer = document.querySelector('footer').getBoundingClientRect();
     const main = document.querySelector('main').getBoundingClientRect();
-    const fixed = ['.footer-privacy', '#repository-link', '#app-version'].map(selector => {
+    const fixed = ['.footer-privacy', '#repository-link', '#app-version', '#updates-open'].map(selector => {
       const {left,top,width,height} = document.querySelector(selector).getBoundingClientRect();
       return [left,top,width,height];
     });
@@ -50,7 +50,9 @@ export async function checkUpdateIndicator({send,evaluate,until,port}) {
   assert.equal(await evaluate(`document.getElementById('updates-indicator-detail').textContent`),'0.1.1-beta.21','The action exposes its exact version');
   assert.deepEqual(await footerLayout(), idleLayout, 'An update offer does not lift the footer or resize the main pane');
   assert.match(await evaluate(`document.getElementById('updates-open').getAttribute('aria-label')`), /install and reopen HandsFree/);
-  assert.equal(await evaluate(`(()=>{const b=document.getElementById('updates-open'),a=b.getBoundingClientRect();return ['updates-indicator-label','updates-indicator-detail'].every(id=>{const r=document.getElementById(id).getBoundingClientRect();return r.width>1 && r.height>1 && r.left>=a.left && r.right<=a.right && r.bottom<=a.bottom;});})()`),true,'The exact offer and action are visible before consent');
+  for (const attribute of ['title', 'aria-label']) {
+    assert.match(await evaluate(`document.getElementById('updates-open').getAttribute('${attribute}')`), /^Download & update\. 0\.1\.1-beta\.21\./);
+  }
   assert.equal(await evaluate(`document.getElementById('updates-open').getAttribute('aria-busy')==='false' && document.querySelector('#updates-open > svg').dataset.glyph==='download' && getComputedStyle(document.querySelector('#updates-open > svg')).animationName==='none'`),true,'Available offer has a static download icon, never an idle loader');
   await screenshot('available');
   assert.equal(await evaluate(`!window.updateInjected && !document.querySelector('#updates-dialog,#update-confirm-dialog') && !window.calls.some(c=>c.command==='install_update')`),true,'The check result is not consent and cannot inject notes or open update modals');
@@ -81,6 +83,7 @@ export async function checkUpdateIndicator({send,evaluate,until,port}) {
   assert.equal(await evaluate(`document.getElementById('updates-open').disabled`),true,'Delayed progress never re-enables installation');
   await evaluate(`window.finishInstall();window.waitInstall=undefined`);
   await until(`document.getElementById('updates-feedback').textContent.includes('Signature verification failed') && !document.getElementById('updates-open').disabled`);
+  assert.match(await evaluate(`document.getElementById('updates-open').title`), /Signature verification failed/);
   await screenshot('error');
   await evaluate(`document.getElementById('updates-open').click()`);
   await until(`document.getElementById('updates-open').dataset.attention==='available'`);
@@ -91,11 +94,16 @@ export async function checkUpdateIndicator({send,evaluate,until,port}) {
     await evaluate(`window.visibleUpdateState={...window.visibleUpdateState,phase:'idle',available_version:undefined}`);
     await until(`document.getElementById('updates-open').dataset.phase==='idle'`);
     const baseline = await footerLayout();
+    assert.equal(await evaluate(`(() => {
+      const [repo, version, update] = ['#repository-link', '#app-version', '#updates-open'].map(s => document.querySelector(s).getBoundingClientRect());
+      return version.left - repo.right === 8 && update.left - version.right === 8 && update.width === 32 && update.height === 32;
+    })()`), true, `${width}px: compact footer has no reserved update space`);
     for (const phase of ['checking','available','downloading','installing','error','up_to_date','idle']) {
       await evaluate(`window.visibleUpdateState={...window.visibleUpdateState,phase:'${phase}',available_version:'0.1.1-beta.123456789012345678901234567890',message:'${phase==='error'?'Network unavailable. '.repeat(20):phase}',downloaded_bytes:50,total_bytes:100}`);
       await until(`document.getElementById('updates-open').dataset.phase==='${phase}'`);
       assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth && document.getElementById('updates-open').scrollWidth<=document.getElementById('updates-open').clientWidth`),true,`${width}px ${phase}: update action and errors fit inline`);
-      if (phase !== 'error') assert.deepEqual(await footerLayout(), baseline, `${width}px ${phase}: footer stays at its idle position`);
+      assert.deepEqual(await footerLayout(), baseline, `${width}px ${phase}: footer stays at its idle position`);
+      assert.equal(await evaluate(`document.getElementById('updates-indicator-label').parentElement.classList.contains('sr-only')`), true, `${width}px ${phase}: updater stays icon-only`);
       assert.equal(await evaluate(`!document.querySelector('dialog[open]')`),true,'No update phase opens a modal');
     }
   }

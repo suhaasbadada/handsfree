@@ -10,9 +10,9 @@ import { updaterFeed } from './package-updater.mjs';
 import { verifyHardwareEvidence } from './check-release-smoke.mjs';
 import { releaseVersion } from './release-version.mjs';
 
-export const candidate = 'HandsFree-0.1.4-macos-arm64.dmg';
-export const tag = 'v0.1.4';
-export const archiveName = 'HandsFree-0.1.4-macos-arm64.app.tar.gz';
+export const candidate = 'HandsFree-0.1.5-macos-arm64.dmg';
+export const tag = 'v0.1.5';
+export const archiveName = 'HandsFree-0.1.5-macos-arm64.app.tar.gz';
 export const payloadNames = [candidate, 'PROVENANCE.txt', archiveName, `${archiveName}.sig`, 'UPDATER-PROVENANCE.txt', 'macos-arm64.json'];
 export const names = [...payloadNames, 'SHA256SUMS'];
 const repo = 'suhaasbadada/handsfree';
