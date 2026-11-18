@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const assets = [
-  { name: 'current.js', bytes: Buffer.from('<section id="home"><h2>Usage totals</h2></section><button id="nav-settings"></button><button id="home-back"></button>Recording mode <option value="toggle">Toggle</option><option value="push_to_talk">Push to talk</option> set_recording_mode Compatibility paste compatibility-paste set_compatibility_paste compatibility_paste the exact field cannot be verified Try your voice practice-toolbar practice-badge practice-start Practice dictation No clipboard or usage counted. practice-input practice_context practice_start practice_finish practice_cancel practice_status') },
+  { name: 'current.js', bytes: Buffer.from('<section id="home"><h2>Usage totals</h2></section><button id="nav-settings"></button><button id="home-back"></button>Recording mode <fieldset id="recording-mode"><label><input type="radio" name="recording-mode" value="toggle">Toggle</label><label><input type="radio" name="recording-mode" value="push_to_talk">Push to Talk</label></fieldset> set_recording_mode Compatibility paste compatibility-paste set_compatibility_paste compatibility_paste the exact field cannot be verified Try your voice practice-toolbar practice-badge practice-start Practice dictation No clipboard or usage counted. practice-input practice_context practice_start practice_finish practice_cancel practice_status') },
   { name: 'current.css', bytes: Buffer.from('.metrics { display: grid; }') },
 ];
 const cached = assets.map(asset => brotliCompressSync(asset.bytes));
@@ -46,7 +46,7 @@ test('fresh dist and cache beside stale executable cannot pass', () => {
 test('a stale frontend cache cannot pass against fresh dist', () => {
   assert.throws(() => verifyEmbeddedFrontend(executable, assets, [Buffer.from('old cache')]), /not embedded/);
 });
-for (const marker of ['Recording mode', 'value="toggle"', 'value="push_to_talk"', 'Push to talk', 'set_recording_mode']) {
+for (const marker of ['Recording mode', '<fieldset id="recording-mode"', 'type="radio" name="recording-mode" value="toggle"', 'type="radio" name="recording-mode" value="push_to_talk"', 'Push to Talk', 'set_recording_mode']) {
   test(`compiled push-to-talk audit rejects missing ${marker}`, () => {
     const stale = [{ ...assets[0], bytes: Buffer.from(assets[0].bytes.toString().replace(marker, 'old')) }, assets[1]];
     const cache = stale.map(asset => brotliCompressSync(asset.bytes));
