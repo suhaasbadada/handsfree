@@ -43,8 +43,10 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   assert.equal(await evaluate(`!document.getElementById('home').hidden && !document.querySelector('aside,nav,#brand-menu,#get-started')`),true,'Home replaces sidebar, tabs and setup guide');
   await until(`window.context>0 && window.listeners.has('practice-input') && !document.getElementById('practice-start').disabled`);
   assert.equal(await evaluate(`['words','saved','count','practice-text'].every(id=>document.getElementById(id).getClientRects().length) && window.context>0`),true,'Visible focused Home combines totals and private editor and grants context');
+  await evaluate(`window.fixture.message='Test diagnostic before paste.'`);
+  await until(`document.getElementById('message').textContent==='Test diagnostic before paste.'`);
   await evaluate(`window.fixture.message='Paste shortcut sent to your original field (insertion not confirmed).'`);
-  await until(`document.getElementById('message').classList.contains('quiet-completion')`);
+  await until(`document.getElementById('message').textContent===''`);
   assert.equal(await evaluate(`document.getElementById('message').textContent==='' && document.querySelector('.general-status-slot').getBoundingClientRect().height===0`), true, 'Routine external paste status leaves no text or gap under the Private editor');
   await evaluate(`window.fixture.message=''`);
   await until(`!document.getElementById('message').classList.contains('quiet-completion')`);
@@ -160,6 +162,7 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
       const actual = await evaluate(`window.layoutSnapshot()`);
       assert.deepEqual(actual,pristine,`${width}px ${state}: practice, textarea, actions, activity, footer and scroll must stay pristine`);
       assert.equal(await evaluate(`document.getElementById('cancel').hidden`), true, `${width}px ${state}: no redundant header cancel for Practice`);
+      assert.equal(await evaluate(`(()=>{const editor=document.querySelector('.practice-editor'),actions=editor.querySelector('.practice-actions'),row=actions.getBoundingClientRect(),slots=[...actions.children].filter(e=>!e.hidden);return slots.every(e=>{const r=e.getBoundingClientRect();return e.textContent==='' && r.width===32 && r.height===32 && (e.tagName!=='BUTTON'||e.title&&e.getAttribute('aria-label'));}) && Math.abs(editor.getBoundingClientRect().bottom-row.bottom-1)<1 && getComputedStyle(actions).justifyContent==='center' && document.querySelector('.general-status-slot').offsetHeight===0;})()`),true,`${width}px ${state}: compact editor actions and no status row below`);
       assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth && [...document.querySelectorAll('#practice button,#practice textarea,#practice meter')].filter(e=>e.getClientRects().length).every(e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth;})`),true,`${width}px ${state}: contained controls`);
     };
     await evaluate(`window.delayStart=true;document.getElementById('practice-start').click()`);
@@ -183,13 +186,14 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
     await evaluate(`window.holdGlobalProcessing=true;window.practiceResult={phase:'complete',text:'Completed privately.'}`);
     await until(`document.getElementById('practice-text').value==='Completed privately.'`);
     assert.equal(await evaluate(`document.getElementById('phase').textContent==='Processing' && document.getElementById('cancel').hidden`),true,'A completed Practice result cannot expose Cancel from its older global snapshot');
-    await evaluate(`window.holdGlobalProcessing=false;window.fixture.phase='idle';window.fixture.practice_capture=false`);
+    await evaluate(`window.holdGlobalProcessing=false;window.fixture.phase='idle';window.fixture.practice_capture=false;window.fixture.message='Practice finished. No text was pasted or saved.'`);
     await until(`document.getElementById('phase').textContent==='Ready'`);
     await stable('complete / record again');
+    assert.equal(await evaluate(`document.getElementById('message').textContent`),'','Native Practice completion is not announced a second time');
     await evaluate(`window.rejectStart='Selected microphone unavailable. '.repeat(40);document.getElementById('practice-start').click()`);
     await until(`document.getElementById('practice-message').textContent.startsWith('Selected microphone unavailable')`);
-    await stable('long start error with bounded overflow');
-    assert.equal(await evaluate(`document.getElementById('practice-message').scrollHeight>document.getElementById('practice-message').clientHeight`),true,'Genuine long errors remain accessible by bounded scrolling');
+    await stable('long start error without visible copy');
+    assert.equal(await evaluate(`!document.getElementById('practice-recovery').hidden && document.getElementById('practice-message').classList.contains('sr-only')`),true,'Genuine errors remain accessible above the editor');
     await evaluate(`window.rejectStart='';window.practiceResult={phase:'recording',text:''};document.getElementById('practice-start').click()`);
     await until(`!document.getElementById('practice-finish').hidden`);
     await stable('retry');

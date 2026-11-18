@@ -79,6 +79,10 @@
 - Ready setup is not repeated at the bottom of Settings. Missing requirements
   remain actionable there and in product status. Settings omits the duplicate
   general failure strip; the top-right control remains the direct recovery entry.
+- On macOS, Practice has centered icon-only Record/Finish and Clear/Cancel
+  controls inside the editor. No status text or status space sits below it.
+  Live regions announce results; the Practice problem icon above the editor and
+  the Product status control open actionable diagnostics without starting capture.
 - Recording phase means an admitted owner, not microphone readiness. The native
   capsule and dashboard show Starting until exact-session readiness is observed.
   Practice preserves Finish/Cancel eligibility while withholding speech guidance,
@@ -88,4 +92,4 @@
   normal/minimum/tiny viewports, actual keyboard focus, update states and private
   context teardown. `tests/ui-stable-bugs.mjs` covers action-content geometry and
   navigation focus; `tests/ui-webkit-layout.jxa` also measures completed/empty
-  labels in WebKit. These checks are not native VoiceOver or microphone acceptance.
+  icon layout in WebKit. These checks are not native VoiceOver or microphone acceptance.

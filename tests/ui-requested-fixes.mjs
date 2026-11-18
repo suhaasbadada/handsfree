@@ -53,8 +53,11 @@ export async function checkRequestedFixes({send,evaluate,until,port}) {
     assert.equal(await evaluate(`getComputedStyle(document.querySelector('#practice-waveform span')).transitionDuration`),'0s','Reduced motion disables waveform transitions');
     await send('Emulation.setEmulatedMedia',{features:[]});
     await evaluate(`window.fixture.phase='error';window.fixture.message='Microphone capture failed. Please check your input device.'`);
-    await until(`!document.getElementById('message-recovery').hidden`);
-    assert.equal(await evaluate(`(()=>{const c=document.getElementById('practice'),r=document.getElementById('message-recovery'),m=document.getElementById('message');return r.getBoundingClientRect().top>c.getBoundingClientRect().bottom && m.getBoundingClientRect().right<r.getBoundingClientRect().left;})()`),true,'Home editor and recovery remain separate and aligned');
+    await until(`document.getElementById('dot').className==='error'`);
+    assert.equal(await evaluate(`document.getElementById('message').classList.contains('sr-only') && document.querySelector('.general-status-slot').offsetHeight===0`),true,'External failure does not put copy below Practice');
+    await evaluate(`document.getElementById('product-status').click()`);
+    await until(`document.getElementById('health-summary').textContent.includes('Microphone capture failed')`);
+    await evaluate(`document.getElementById('health-close').click()`);
     await shot(`${theme}-overview-error`);
     await evaluate(`window.fixture.phase='idle';window.fixture.message=''`);
     await until(`document.getElementById('phase').textContent==='Ready'`);

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const assets = [
-  { name: 'current.js', bytes: Buffer.from('<section id="home"><h2>Usage totals</h2></section><button id="nav-settings"></button><button id="home-back"></button>Recording mode <fieldset id="recording-mode"><label><input type="radio" name="recording-mode" value="toggle">Toggle</label><label><input type="radio" name="recording-mode" value="push_to_talk">Push to Talk</label></fieldset> set_recording_mode Compatibility paste compatibility-paste set_compatibility_paste compatibility_paste the exact field cannot be verified Try your voice practice-toolbar practice-badge practice-start Practice dictation No clipboard or usage counted. practice-input practice_context practice_start practice_finish practice_cancel practice_status') },
+  { name: 'current.js', bytes: Buffer.from('<section id="home"><h2>Usage totals</h2></section><button id="nav-settings"></button><button id="home-back"></button>Recording mode <fieldset id="recording-mode"><label><input type="radio" name="recording-mode" value="toggle">Toggle</label><label><input type="radio" name="recording-mode" value="push_to_talk">Push to Talk</label></fieldset> set_recording_mode Compatibility paste compatibility-paste set_compatibility_paste compatibility_paste the exact field cannot be verified Try your voice practice-toolbar practice-badge practice-start Practice dictation No clipboard or usage counted. practice-input practice_context practice_start practice_finish practice_cancel practice_status <button id="reset">Delete data</button><div aria-label="Practice controls"></div><p id="practice-message" class="sr-only"></p>') },
   { name: 'current.css', bytes: Buffer.from('.metrics { display: grid; }') },
 ];
 const cached = assets.map(asset => brotliCompressSync(asset.bytes));
@@ -39,6 +39,13 @@ test('pre-feature stats/push-to-talk frontend cannot pass merely because it is e
 });
 test('asset audit proves exact compiled frontend bytes are in the executable', () => {
   assert.doesNotThrow(() => verifyEmbeddedFrontend(executable, assets, cached));
+});
+test('older embedded Practice status rows and reset labels fail the compact UI audit', () => {
+  for (const [before, after] of [['class="sr-only"', 'class="practice-status-slot"'], ['Delete data', 'Delete usage totals']]) {
+    const stale = [{ ...assets[0], bytes: Buffer.from(assets[0].bytes.toString().replace(before, after)) }, assets[1]];
+    const cache = stale.map(asset => brotliCompressSync(asset.bytes));
+    assert.throws(() => verifyEmbeddedFrontend(Buffer.concat(cache), stale, cache), /Stale compact Practice or Settings UI/);
+  }
 });
 test('fresh dist and cache beside stale executable cannot pass', () => {
   assert.throws(() => verifyEmbeddedFrontend(Buffer.from('old executable'), assets, cached), /not embedded/);

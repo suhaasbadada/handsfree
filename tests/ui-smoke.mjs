@@ -393,8 +393,8 @@ try {
       await until(`document.getElementById('setup-state').textContent==='Ready'`);
     }
   }
-  // Status text shares space with a dot and (while busy) Cancel. Exercise real
-  // wrapping and geometry, not just the document width, including unbroken errors.
+  // Status shares the header with the dot and Cancel. Long macOS diagnostics
+  // stay accessible without pushing the editor or footer around.
   for (const phase of ['idle','recording','processing','downloading','error']) {
     await evaluate(`window.fixture.phase=${JSON.stringify(phase)};window.fixture.message=${JSON.stringify('Long local status: ' + 'diagnostic-path/'.repeat(30))}`);
     await until(`document.getElementById('dot').className===${JSON.stringify(phase)}`);
@@ -405,13 +405,14 @@ try {
         const title=document.getElementById('phase').getBoundingClientRect();
         const text=document.getElementById('phase').getBoundingClientRect();
         const cancel=document.getElementById('cancel').getBoundingClientRect();
+        const message=document.getElementById('message');
         return {fits:document.documentElement.scrollWidth<=innerWidth,
           aligned:dot.top>=title.top && dot.bottom<=title.bottom,
-          wraps:document.getElementById('message').scrollWidth<=document.querySelector('main').clientWidth+1,
+          detailFits:message.classList.contains('sr-only') ? message.offsetHeight<=1 && message.parentElement.offsetHeight===0 && !message.hasAttribute('tabindex') : message.scrollWidth<=document.querySelector('main').clientWidth+1,
           separated:!cancel.width || cancel.top>=text.bottom || cancel.left>=text.right,
           label:document.getElementById('phase').textContent};
       })()`);
-      assert.ok(geometry.fits && geometry.aligned && geometry.wraps && geometry.separated, `${phase} status fits and aligns at ${width}px: ${JSON.stringify(geometry)}`);
+      assert.ok(geometry.fits && geometry.aligned && geometry.detailFits && geometry.separated, `${phase} status fits and aligns at ${width}px: ${JSON.stringify(geometry)}`);
       if (phase==='idle') assert.equal(geometry.label,'Ready');
     }
   }

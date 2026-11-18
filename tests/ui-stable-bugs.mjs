@@ -23,10 +23,10 @@ export async function checkStableBugs({send,evaluate,until,port}) {
       await until(`document.documentElement.dataset.appearance===${JSON.stringify(theme)}`);
       for(const phase of ['complete','empty']) {
         await evaluate(`window.practiceResult={phase:${JSON.stringify(phase)},text:${JSON.stringify(phase==='complete'?'Known layout fixture.':'')}};document.getElementById('practice-start').click()`);
-        await until(`!document.getElementById('practice-start').hidden && document.getElementById('practice-start').querySelector('span').textContent==='Record again'`);
+        await until(`!document.getElementById('practice-start').hidden && document.getElementById('practice-start').getAttribute('aria-label')==='Record again'`);
         for(const size of [14,28]) {
-          const fit=await evaluate(`(()=>{const b=document.getElementById('practice-start'),t=b.querySelector('span');t.style.fontSize='${size}px';const r=b.getBoundingClientRect(),s=getComputedStyle(b),range=document.createRange();range.selectNodeContents(t);const p={l:parseFloat(s.paddingLeft)+parseFloat(s.borderLeftWidth),r:parseFloat(s.paddingRight)+parseFloat(s.borderRightWidth),t:parseFloat(s.paddingTop)+parseFloat(s.borderTopWidth),b:parseFloat(s.paddingBottom)+parseFloat(s.borderBottomWidth)};return [...range.getClientRects(),b.querySelector('svg').getBoundingClientRect()].every(c=>c.left>=r.left+p.l-1 && c.right<=r.right-p.r+1 && c.top>=r.top+p.t-1 && c.bottom<=r.bottom-p.b+1) && r.left>=0 && r.right<=innerWidth && b.scrollWidth<=b.clientWidth && document.documentElement.scrollWidth<=innerWidth;})()`);
-          check(fit,`#1 ${width}/${theme}/${phase}/${size}px: full label/icon must fit button padding and viewport`);
+          const fit=await evaluate(`(()=>{const b=document.getElementById('practice-start'),clear=document.getElementById('practice-clear');b.style.fontSize='${size}px';const r=b.getBoundingClientRect(),c=b.querySelector('svg').getBoundingClientRect(),row=b.parentElement.getBoundingClientRect();return !b.textContent && !clear.textContent && b.title===${JSON.stringify(phase==='empty'?'No speech detected. Record again':'Record again')} && c.left>=r.left && c.right<=r.right && c.top>=r.top && c.bottom<=r.bottom && r.width===32 && r.height===32 && Math.abs(row.left+row.right-r.left-clear.getBoundingClientRect().right)<=1 && document.documentElement.scrollWidth<=innerWidth;})()`);
+          check(fit,`#1 ${width}/${theme}/${phase}/${size}px: icon-only controls stay centered and the result is reflected in the tooltip`);
           if(process.env.UI_SCREENSHOTS) {
             await evaluate(`document.getElementById('practice-start').scrollIntoView({block:'center'})`);
             mkdirSync(process.env.UI_SCREENSHOTS,{recursive:true});
@@ -34,7 +34,7 @@ export async function checkStableBugs({send,evaluate,until,port}) {
             writeFileSync(join(process.env.UI_SCREENSHOTS,`bug1-${width}-${theme}-${phase}-${size}px.png`),Buffer.from(image.data,'base64'));
           }
         }
-        await evaluate(`document.getElementById('practice-start').querySelector('span').style.fontSize='';document.getElementById('practice-clear').click()`);
+        await evaluate(`document.getElementById('practice-start').style.fontSize='';document.getElementById('practice-clear').click()`);
         await until(`document.getElementById('practice-text').value==='' && !document.getElementById('practice-start').disabled`);
       }
       const starts=await evaluate(`window.calls.filter(c=>c.command==='practice_start').length`);
