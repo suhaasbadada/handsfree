@@ -97,8 +97,9 @@ export async function checkUpdateIndicator({send,evaluate,until,port}) {
     await until(`document.getElementById('updates-open').dataset.phase==='idle'`);
     const baseline = await footerLayout();
     assert.equal(await evaluate(`(() => {
-      const [repo, version, update] = ['#repository-link', '#app-version', '#updates-open'].map(s => document.querySelector(s).getBoundingClientRect());
-      return version.left - repo.right === 8 && update.left - version.right === 8 && update.width === 32 && update.height === 32;
+      const [repo, version, update, group, footer, privacy] = ['#repository-link', '#app-version', '#updates-open', '.footer-meta', 'footer', '.footer-privacy'].map(s => document.querySelector(s).getBoundingClientRect());
+      return version.left - repo.right === 17 && Math.abs(group.left + group.right - footer.left - footer.right) <= 1
+        && (privacy.right <= group.left || privacy.bottom <= group.top) && update.left >= group.right && update.right === footer.right && update.width === 32 && update.height === 32;
     })()`), true, `${width}px: compact footer has no reserved update space`);
     for (const phase of ['checking','available','downloading','installing','error','up_to_date','idle']) {
       await evaluate(`window.visibleUpdateState={...window.visibleUpdateState,phase:'${phase}',available_version:'0.1.1-beta.123456789012345678901234567890',message:'${phase==='error'?'Network unavailable. '.repeat(20):phase}',downloaded_bytes:50,total_bytes:100}`);

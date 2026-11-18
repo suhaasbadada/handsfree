@@ -48,8 +48,10 @@ document.querySelector('#app')!.innerHTML = `
         <div class="practice-toolbar"><span class="practice-badge">${icon('shield')}<span>Private</span></span><p id="shortcut-tutorial"><span id="practice-gesture" class="sr-only">Press</span> <kbd id="practice-shortcut">…</kbd><span id="practice-instruction" class="sr-only"> to start / finish.</span></p></div><p id="shortcut-evidence" class="sr-only" role="status">Shortcut not tested yet.</p>
       <div class="practice-meter"><label for="input-level">Microphone</label><meter id="input-level" class="sr-only" min="0" max="1" value="0" aria-describedby="input-level-help"></meter><div id="practice-waveform" class="input-waveform" aria-hidden="true">${Array.from({length:9},()=>'<span></span>').join('')}</div><span id="practice-timer" aria-label="Recording time">— / —</span><span id="input-level-help" class="sr-only">Start a private test to check input. No audio file is saved.</span></div>
     <label for="practice-text" class="sr-only">Practice dictation</label>
-    <textarea id="practice-text" rows="6" autocomplete="off" spellcheck="false" aria-describedby="practice-privacy" placeholder="Dictate or type here…"></textarea>
-     <div class="practice-bottom"><div class="practice-actions"><button id="practice-start" class="primary" disabled>${icon('mic')}<span>Record</span></button><button id="practice-finish" class="primary" disabled hidden>${icon('check')}<span>Finish</span></button><button id="practice-cancel" class="icon-action" aria-label="Cancel practice" title="Cancel practice" disabled hidden>${icon('close')}</button><button id="practice-clear" class="icon-action" aria-label="Clear practice" title="Clear practice">${icon('clear')}</button></div></div>
+    <div class="practice-editor">
+      <textarea id="practice-text" rows="6" autocomplete="off" spellcheck="false" aria-describedby="practice-privacy" placeholder="Dictate or type here…"></textarea>
+      <div class="practice-actions"><button id="practice-start" class="primary" disabled>${icon('mic')}<span>Record</span></button><button id="practice-finish" class="primary" disabled hidden>${icon('check')}<span>Finish</span></button><button id="practice-cancel" aria-label="Cancel practice" disabled hidden>Cancel</button><button id="practice-clear" aria-label="Clear practice">Clear</button></div>
+    </div>
      <p id="practice-privacy" class="sr-only">No clipboard or usage counted. Clears when you leave.</p>
     <div class="practice-status-slot"><p id="practice-message" role="status" aria-label="Practice status" aria-live="polite"></p><button id="practice-recovery" class="text-action" hidden>View problem</button></div>
    </section>
@@ -63,7 +65,7 @@ document.querySelector('#app')!.innerHTML = `
      <div class="setting-row listening-row"><div><h3>Completion sound</h3></div><select id="sound-style" aria-label="Sound"><option value="clean">Clean</option><option value="warm">Warm</option></select><span id="sound-state" class="state">Off</span><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Completion sound"><span aria-hidden="true"></span></label></div>
     <div class="setting-row volume-row"><h3><label for="sound-volume">Volume</label></h3><div class="sound-controls"><input id="sound-volume" type="range" min="0" max="100" step="1" value="50" aria-describedby="volume-percent"><output id="volume-percent" for="sound-volume">50%</output></div><button id="preview-sound" class="icon-action" aria-label="Preview sound" title="Preview sound" disabled>${icon('play')}</button></div>
     <div id="microphone-choice-row" class="setting-row" hidden><div><h3><label for="microphone-choice">Microphone</label></h3><p id="microphone-choice-help" class="sr-only">Next recording. Unavailable selections never fall back silently.</p></div><div class="microphone-controls"><select id="microphone-choice" aria-describedby="microphone-choice-help" disabled><option value="">System default</option></select><button id="microphone-refresh" class="icon-action" aria-label="Refresh microphones" title="Refresh microphones" disabled>${icon('update')}</button></div></div>
-    <div class="setting-row"><div><h3><label for="recording-mode">Recording mode</label></h3><p id="recording-mode-help" class="sr-only" hidden>Hold the shortcut; release to finish. Other keys or focus changes cancel.</p></div><select id="recording-mode" aria-describedby="recording-mode-help"><option value="toggle">Toggle</option><option value="push_to_talk">Push to talk</option></select></div>
+    <div class="setting-row recording-mode-row"><div><h3 id="recording-mode-title">Recording mode</h3><p id="recording-mode-help" class="sr-only" hidden>Hold the shortcut; release to finish. Other keys or focus changes cancel.</p></div><fieldset id="recording-mode" aria-labelledby="recording-mode-title" aria-describedby="recording-mode-help" disabled><label><input type="radio" name="recording-mode" value="toggle" checked><span>${icon('check')}Toggle</span></label><label><input type="radio" name="recording-mode" value="push_to_talk"><span>${icon('check')}Push to Talk</span></label></fieldset></div>
       <div class="setting-row"><div><h3 id="appearance-title">Appearance</h3></div><fieldset id="appearance-choice" aria-labelledby="appearance-title" disabled><label title="Light"><input type="radio" name="appearance" value="light"><span>${icon('light')}<span class="sr-only">Light</span></span></label><label title="Dark"><input type="radio" name="appearance" value="dark"><span>${icon('dark')}<span class="sr-only">Dark</span></span></label><label title="System"><input type="radio" name="appearance" value="system" checked><span>${icon('system')}<span class="sr-only">System</span></span></label></fieldset></div>
   </section>
     <section id="workflow" class="card" aria-labelledby="workflow-title" hidden><h2 id="workflow-title">General</h2>
@@ -71,8 +73,8 @@ document.querySelector('#app')!.innerHTML = `
      <div class="setting-row"><div><h3>Keyboard shortcuts</h3><p id="workflow-pause-state">Checking…</p></div><button id="workflow-pause" class="icon-action" aria-label="Pause shortcuts" title="Pause shortcuts" disabled>${icon('pause')}</button></div>
     <div class="setting-row"><div><h3>Launch at login</h3><p id="login-state" role="status">Checking…</p><button id="login-settings" class="text-action" hidden>Open Login Items</button><button id="login-cancel" class="text-action" hidden>Cancel pending registration</button></div><label class="switch"><input id="launch-at-login" type="checkbox" role="switch" aria-label="Launch at login" aria-describedby="login-state" disabled><span aria-hidden="true"></span></label></div>
     <div class="setting-row"><div><h3><label for="excluded-app-choice">Excluded apps</label></h3><p>Block new external dictation in these apps.</p></div></div>
-    <div class="workflow-app-controls"><select id="excluded-app-choice" aria-label="Running app to exclude" disabled><option value="">Choose a running app</option></select><button id="excluded-app-add" class="icon-action" aria-label="Add excluded app" title="Add excluded app" disabled>${icon('plus')}</button><button id="excluded-app-refresh" class="icon-action" aria-label="Refresh running apps" title="Refresh running apps" disabled>${icon('update')}</button></div>
-    <ul id="excluded-apps" aria-label="Excluded apps"></ul><p id="workflow-error" class="feedback" role="status" hidden></p>
+    <div class="workflow-app-controls"><select id="excluded-app-choice" aria-label="Running app to exclude" disabled><option value="">Choose a running app</option></select><button id="excluded-app-add" aria-label="Add excluded app" disabled>Add</button><button id="excluded-app-refresh" class="icon-action" aria-label="Refresh running apps" title="Refresh running apps" disabled>${icon('update')}</button></div>
+    <p id="excluded-apps-empty" class="subtle" hidden>No excluded apps.</p><ul id="excluded-apps" aria-label="Excluded apps"></ul><p id="workflow-error" class="feedback" role="status" hidden></p>
   </section>
    <section class="card setup-card" aria-labelledby="setup-title"><div class="card-heading"><h2 id="setup-title">Setup</h2><span id="setup-state" class="subtle" role="status">Checking…</span></div>
    <div id="setup-missing">
@@ -412,21 +414,23 @@ function renderWorkflow() {
   el('login-cancel').hidden = status?.login.status !== 'approval_required';
   button('login-cancel').disabled = !allowed || workflow.pending.login;
   const choice = el('excluded-app-choice') as HTMLSelectElement;
-  const key = JSON.stringify([workflow.apps,status?.excluded_bundle_ids]);
+  el('excluded-apps-empty').hidden = !status || status.excluded_bundle_ids.length > 0;
+  const key = JSON.stringify([workflow.apps,status?.excluded_bundle_ids,workflow.pending.apps]);
   if(key !== workflowAppKey) {
     workflowAppKey = key; const selected = choice.value;
-    choice.replaceChildren(new Option('Choose a running app',''));
-    for(const app of workflow.apps) if(!status?.excluded_bundle_ids.includes(app.bundle_id)) choice.add(new Option(`${app.name} · ${app.bundle_id}`,app.bundle_id));
+    const choices = workflow.apps.filter(app => !status?.excluded_bundle_ids.includes(app.bundle_id));
+    choice.replaceChildren(new Option(workflow.pending.apps ? 'Loading running apps…' : 'Choose a running app',''));
+    for(const app of choices) choice.add(new Option(app.name,app.bundle_id));
     choice.value = Array.from(choice.options).some(option=>option.value===selected) ? selected : '';
     const existing = new Map(Array.from(el('excluded-apps').children, item => [(item as HTMLElement).dataset.bundleId!, item]));
     for(const id of status?.excluded_bundle_ids ?? []) {
       const item = existing.get(id) ?? document.createElement('li'); existing.delete(id);
       (item as HTMLElement).dataset.bundleId = id;
-      const name = item.querySelector('span') ?? document.createElement('span'), remove = item.querySelector('button') ?? document.createElement('button');
+      const name = item.querySelector('strong') ?? document.createElement('strong'), detail = item.querySelector('small') ?? document.createElement('small'), remove = item.querySelector('button') ?? document.createElement('button');
       const app = workflow.apps.find(app=>app.bundle_id===id);
-      name.textContent = app ? `${app.name} · ${id}` : id;
-      if (!remove.firstElementChild) remove.innerHTML = icon('clear');
-      remove.className = 'icon-action'; remove.setAttribute('aria-label',`Remove ${id}`); remove.title = app ? `Remove ${app.name}` : `Remove ${id}`;
+      name.textContent = app?.name ?? id;
+      detail.textContent = app ? id : 'Not in the running app list';
+      remove.textContent = 'Remove'; remove.setAttribute('aria-label',`Remove ${id}`); remove.title = app ? `Remove ${app.name}` : `Remove ${id}`;
       remove.onclick = () => {
         const index = Array.from(el('excluded-apps').children).indexOf(item);
         void workflowFocus(remove, () => workflow.exclusions(workflow.status!.excluded_bundle_ids.filter(saved=>saved!==id)), () => {
@@ -434,7 +438,7 @@ function renderWorkflow() {
           return item.isConnected ? remove : remaining[index] ?? remaining[index-1] ?? choice;
         });
       };
-      if (!name.parentNode) item.append(name,remove);
+      if (!name.parentNode) { const identity = document.createElement('span'); identity.append(name,detail); item.append(identity,remove); }
       if (!item.parentNode) el('excluded-apps').append(item);
     }
     for (const item of existing.values()) item.remove();
@@ -509,24 +513,30 @@ function renderShortcut() {
   el('shortcut-fn').textContent = current?.platform === 'windows' ? 'Use default' : 'Use Fn';
   button('shortcut-fn').disabled = modePending || shortcutPending || captureStopping || !canEditShortcut();
 }
+const modeChoices = el('recording-mode') as HTMLFieldSetElement;
+const modeRadios = Array.from(modeChoices.querySelectorAll<HTMLInputElement>('input'));
 function renderMode() {
-  const select = el('recording-mode') as HTMLSelectElement;
-  select.disabled = modePending || capturing || captureStopping || shortcutPending || !canEditShortcut();
-  if (!modePending) select.value = current?.recording_mode ?? 'toggle';
+  modeChoices.disabled = modePending || capturing || captureStopping || shortcutPending || !canEditShortcut();
+  if (!modePending) for (const radio of modeRadios) radio.checked = radio.value === (current?.recording_mode ?? 'toggle');
   el('compatibility-row').hidden = current?.platform !== 'macos';
   const compatibility = el('compatibility-paste') as HTMLInputElement;
-  compatibility.disabled = select.disabled;
+  compatibility.disabled = modeChoices.disabled;
   if (!modePending) compatibility.checked = current?.compatibility_paste ?? false;
   const hold = current?.recording_mode === 'push_to_talk';
   el('recording-mode-help').hidden = !hold;
 }
-el('recording-mode').onchange = async () => {
+modeChoices.onchange = async event => {
+  const radio = event.target;
+  if (!(radio instanceof HTMLInputElement) || !modeRadios.includes(radio) || !radio.checked) return;
   if (modePending || capturing || captureStopping || shortcutPending || !canEditShortcut()) { renderMode(); return; }
-  const select = el('recording-mode') as HTMLSelectElement;
-  const mode = select.value;
+  const mode = radio.value;
+  const ownedFocus = document.activeElement === radio;
+  const intent = focusIntent;
   modePending = true; renderShortcut();
   await action('set_recording_mode', { mode });
   modePending = false; renderShortcut();
+  if (ownedFocus && intent === focusIntent && document.hasFocus() && !modeChoices.disabled
+    && !el('settings').hidden && document.activeElement === document.body) modeRadios.find(input => input.checked)?.focus({preventScroll:true});
 };
 el('compatibility-paste').onchange = async () => {
   if (current?.platform !== 'macos' || modePending || capturing || captureStopping || shortcutPending || !canEditShortcut()) { renderMode(); return; }

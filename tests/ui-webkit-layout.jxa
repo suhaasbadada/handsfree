@@ -63,7 +63,7 @@ evaluate(`
       dialog:metric(document.getElementById('health-dialog')),healthInput:metric(document.getElementById('health-input')),
       controls:metric(document.querySelector('.microphone-controls')),mainOverflow:getComputedStyle(main).overflowX,
       selectOverflow:getComputedStyle(document.getElementById('microphone-choice')).overflow,
-      chevrons:['recording-mode','sound-style'].every(id=>{
+      chevrons:['sound-style'].every(id=>{
         const e=document.getElementById(id),c=e.parentElement.querySelector('svg'),s=getComputedStyle(c),r=e.getBoundingClientRect(),a=c.getBoundingClientRect(),canvas=document.createElement('canvas').getContext('2d');
         canvas.font=getComputedStyle(e).font;
         const gap=r.width-canvas.measureText(e.selectedOptions[0].textContent).width;
@@ -175,8 +175,9 @@ for (const [width,height] of [[980,820],[560,650],[480,650],[320,650]]) {
     const header = document.querySelector('.product-header').getBoundingClientRect();
     const row = footer.getBoundingClientRect();
     const [repo, version, update] = ['#repository-link','#app-version','#updates-open'].map(selector => document.querySelector(selector).getBoundingClientRect());
+    const group = document.querySelector('.footer-meta').getBoundingClientRect();
     return JSON.stringify({idle, offer:bounds(), aligned: header.left === row.left && header.right === row.right,
-      compact: version.left - repo.right === 8 && update.left - version.right === 8 && update.width === 32 && update.height === 32,
+      compact: Math.abs(group.left + group.right - row.left - row.right) <= 1 && version.left - repo.right === 17 && update.left >= group.right && update.right === row.right && update.width === 32 && update.height === 32,
       iconOnly: summary.classList.contains('sr-only') && document.documentElement.scrollWidth <= innerWidth});
   })()`));
   if (String(result.idle) !== String(result.offer) || !result.aligned || !result.compact || !result.iconOnly) {
