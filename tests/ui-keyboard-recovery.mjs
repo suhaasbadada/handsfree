@@ -45,26 +45,24 @@ export async function checkKeyboardRecovery({send,evaluate,until,port}) {
   await evaluate(`window.rejectStart='Selected microphone unavailable. Reconnect it or choose another microphone. '.repeat(80);document.getElementById('practice-start').click()`);
   await until(`!document.getElementById('practice-recovery').hidden`);
   await evaluate(`window.fixture.phase='error';window.fixture.message='Delivery failed. Check the original field; do not paste again blindly. '.repeat(80)`);
-  await until(`!document.getElementById('message-recovery').hidden`);
+  await until(`document.getElementById('dot').className==='error'`);
   const errorAX = await send('Accessibility.getFullAXTree');
   for (const name of ['Practice status','Dictation status']) assert.ok(errorAX.nodes.some(n=>n.name?.value===name && !n.ignored),name);
   for (const id of ['practice-message','message']) {
-    await evaluate(`document.getElementById('${id}').focus();window.statusMutations=0;window.statusObserver=new MutationObserver(()=>window.statusMutations++);window.statusObserver.observe(document.getElementById('${id}'),{childList:true,characterData:true,subtree:true});window.errorPositions=['practice','.activity','footer'].map(s=>{const r=document.querySelector(s==='practice'?'#practice':s).getBoundingClientRect();return [r.y+scrollY,r.height]})`);
-    await key('ArrowDown'); await key('PageDown');
-    await until(`document.getElementById('${id}').scrollTop>0`);
-    await evaluate(`window.savedScroll=document.getElementById('${id}').scrollTop;window.pollCount=window.calls.filter(c=>c.command==='status').length`);
+    assert.equal(await evaluate(`document.getElementById('${id}').classList.contains('sr-only') && !document.getElementById('${id}').hasAttribute('tabindex')`),true,'Announcements do not create invisible keyboard stops');
+    await evaluate(`window.statusMutations=0;window.statusObserver=new MutationObserver(()=>window.statusMutations++);window.statusObserver.observe(document.getElementById('${id}'),{childList:true,characterData:true,subtree:true});window.pollCount=window.calls.filter(c=>c.command==='status').length`);
     await until(`window.calls.filter(c=>c.command==='status').length>window.pollCount+1`);
-    assert.equal(await evaluate(`window.statusMutations===0 && document.getElementById('${id}').scrollTop>=window.savedScroll`),true,'Polling preserves text nodes and scroll');
-    assert.deepEqual(await evaluate(`['#practice','.activity','footer'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [r.y+scrollY,r.height]})`),await evaluate(`window.errorPositions`),'Keyboard scrolling does not reflow reserved slots');
+    assert.equal(await evaluate(`window.statusMutations===0`),true,'Polling does not repeat announcements');
     await evaluate(`window.statusObserver.disconnect()`);
   }
   await evaluate(`document.getElementById('practice-recovery').click()`);
   assert.equal(await focused(),'health-title','Explicit recovery opens the direct product-status panel, not another Settings button');
+  assert.equal(await evaluate(`document.getElementById('health-practice-error').textContent.startsWith('Selected microphone unavailable') && document.getElementById('health-summary').textContent.startsWith('Delivery failed')`),true,'Product status preserves both actionable diagnostics');
   await evaluate(`document.getElementById('health-close').click()`);
   await evaluate(`window.fixture.phase='idle';window.fixture.message='';window.rejectStart='';document.getElementById('home-back').click()`);
-  await until(`document.getElementById('practice-message').textContent==='' && document.getElementById('message').hidden`);
+  await until(`document.getElementById('practice-message').textContent==='' && document.getElementById('message').textContent===''`);
   assert.equal(await evaluate(`document.querySelector('.practice-badge').textContent==='Private' && document.getElementById('practice-text').getAttribute('aria-describedby')==='practice-privacy' && getComputedStyle(document.getElementById('practice-privacy')).position==='absolute'`),true,'Idle Home keeps a compact privacy label and accessible description, not another explanatory paragraph');
-  assert.equal(await evaluate(`['practice-message','message'].every(id=>!document.getElementById(id).hasAttribute('tabindex'))`),true,'Empty reserved status is not a tab stop');
+  assert.equal(await evaluate(`['practice-message','message'].every(id=>!document.getElementById(id).hasAttribute('tabindex'))`),true,'Empty announcements are not tab stops');
 
   await evaluate(`document.getElementById('nav-settings').click()`);
   await until(`!document.getElementById('launch-at-login').disabled`);

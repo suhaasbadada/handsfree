@@ -124,7 +124,7 @@ console.log('CASES='+cases);
 console.log('FAILURES='+failures);
 if(cases!==48||failures!==0)throw Error('WKWebView layout regression');
 
-// Issue #1: execute actual WebKit text layout, not only control outer bounds.
+// Finished/empty Practice has centered icon controls and no status row in WebKit.
 let homeCases=0,homeFailures=0;
 for(const size of [[980,820],[560,650],[320,650]])
 for(const theme of ['light','dark'])
@@ -139,17 +139,18 @@ for(const fontSize of [14,28]) {
     document.getElementById('practice').hidden=false;
     document.getElementById('practice-start').disabled=false;
     document.getElementById('practice-start').hidden=false;
-    document.getElementById('practice-start').querySelector('span').textContent='Record again';
-    document.getElementById('practice-start').querySelector('span').style.fontSize='${fontSize}px';
+    document.getElementById('practice-start').style.fontSize='${fontSize}px';
     document.getElementById('practice-message').textContent=${JSON.stringify(phase==='complete'?'Practice complete. Nothing was pasted or saved. Clear to try again.':'No speech detected. Clear and try again.')};
-    (()=>{const b=document.getElementById('practice-start'),r=b.getBoundingClientRect(),s=getComputedStyle(b),range=document.createRange();range.selectNodeContents(b.querySelector('span'));const rects=[...range.getClientRects(),b.querySelector('svg').getBoundingClientRect()],p={l:parseFloat(s.paddingLeft)+parseFloat(s.borderLeftWidth),r:parseFloat(s.paddingRight)+parseFloat(s.borderRightWidth),t:parseFloat(s.paddingTop)+parseFloat(s.borderTopWidth),b:parseFloat(s.paddingBottom)+parseFloat(s.borderBottomWidth)};return JSON.stringify({fits:rects.every(c=>c.left>=r.left+p.l-1&&c.right<=r.right-p.r+1&&c.top>=r.top+p.t-1&&c.bottom<=r.bottom-p.b+1),contained:r.left>=0&&r.right<=innerWidth&&document.documentElement.scrollWidth<=innerWidth,button:[r.width,r.height]});})()
+    document.getElementById('message').classList.add('sr-only');
+    document.getElementById('message').textContent='Practice finished. No text was pasted or saved.';
+    (()=>{const b=document.getElementById('practice-start'),clear=document.getElementById('practice-clear'),r=b.getBoundingClientRect(),c=b.querySelector('svg').getBoundingClientRect(),row=b.parentElement.getBoundingClientRect();return JSON.stringify({fits:!b.textContent&&!clear.textContent&&r.width===32&&r.height===32&&c.left>=r.left&&c.right<=r.right&&c.top>=r.top&&c.bottom<=r.bottom,contained:r.left>=0&&r.right<=innerWidth&&document.documentElement.scrollWidth<=innerWidth,centered:Math.abs(row.left+row.right-r.left-clear.getBoundingClientRect().right)<=1,quiet:document.querySelector('.general-status-slot').offsetHeight===0&&document.getElementById('practice-message').offsetHeight===1,button:[r.width,r.height]});})()
   `));
-  const ok=result.fits&&result.contained;homeCases++;if(!ok)homeFailures++;
+  const ok=result.fits&&result.contained&&result.centered&&result.quiet;homeCases++;if(!ok)homeFailures++;
   console.log('HOME='+JSON.stringify({size,theme,phase,fontSize,ok,...result}));
 }
 console.log('HOME_CASES='+homeCases);
 console.log('HOME_FAILURES='+homeFailures);
-if(homeCases!==24||homeFailures!==0)throw Error('WKWebView completed Practice label regression');
+if(homeCases!==24||homeFailures!==0)throw Error('WKWebView Practice toolbar or status regression');
 
 // Native layout must keep the compact icon slot and normal gaps in both states.
 for (const [width,height] of [[980,820],[560,650],[480,650],[320,650]]) {

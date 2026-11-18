@@ -21,6 +21,7 @@ const glyphs: Record<string,string> = {
  mic:'<rect x="8" y="3" width="8" height="12" rx="4"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/>',
  check:'<path d="m5 12 4 4L19 6"/>', close:'<path d="m6 6 12 12M18 6 6 18"/>',
  clear:'<path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/>',
+ problem:'<circle cx="12" cy="12" r="9"/><path d="M12 7v6m0 4h.01"/>',
  settings:'<path d="M9.32 5.53 9.98 3.23h4.04l.66 2.3 2.09-1.16 2.86 2.86-1.16 2.09 2.3.66v4.04l-2.3.66 1.16 2.09-2.86 2.86-2.09-1.16-.66 2.3H9.98l-.66-2.3-2.09 1.16-2.86-2.86 1.16-2.09-2.3-.66V9.98l2.3-.66-1.16-2.09 2.86-2.86Z"/><circle cx="12" cy="12" r="3"/>',
  back:'<path d="m12 5-7 7 7 7M5 12h15"/>',
  spinner:'<path d="M21 12a9 9 0 1 1-6-8.5"/>',
@@ -40,20 +41,21 @@ document.querySelector('#app')!.innerHTML = `
 <div class="shell">
  <header class="product-header"><div class="home-brand"><button id="home-back" class="icon-action" aria-label="Back to Home" title="Back to Home" hidden>${icon('back')}</button><img src="${logo}" alt="" width="36" height="36"><span>HandsFree</span></div><div class="header-actions"><section class="status" aria-label="App status"><button id="product-status" aria-haspopup="dialog" aria-controls="health-dialog" title="View product status and resolve problems"><span id="dot" aria-hidden="true"></span><strong id="phase" aria-live="polite">Connecting…</strong></button><button id="cancel" hidden aria-label="Cancel dictation" title="Cancel dictation">×</button></section><button id="nav-settings" class="icon-action" aria-label="Settings" title="Settings">${icon('settings')}</button></div></header>
  <main>
+ <div class="action-feedback"><p id="feedback" class="feedback" role="status" hidden></p><p id="storage-error" class="feedback" role="status" hidden></p></div>
   <section id="home" aria-label="Home">
      <h1 id="home-title" class="sr-only" tabindex="-1">Home</h1>
       <section class="activity" aria-labelledby="activity-title"><h2 id="activity-title" class="sr-only">Usage totals</h2><div class="metrics" aria-label="Real dictation only; practice tests excluded"><article><span>${icon('words')}Words</span><strong id="words">0</strong></article><article><span tabindex="0" title="Estimate per dictation: typing at 40 words/minute, minus recording time, never below zero. Not a productivity measurement.">${icon('clock')}Time saved<small>Estimated</small></span><strong id="saved">0 sec</strong></article><article><span>${icon('wave')}Dictations</span><strong id="count">0</strong></article></div></section>
     <section id="practice" class="card practice" aria-labelledby="practice-title" hidden>
       <h2 id="practice-title" class="sr-only">Try your voice</h2>
-        <div class="practice-toolbar"><span class="practice-badge">${icon('shield')}<span>Private</span></span><p id="shortcut-tutorial"><span id="practice-gesture" class="sr-only">Press</span> <kbd id="practice-shortcut">…</kbd><span id="practice-instruction" class="sr-only"> to start / finish.</span></p></div><p id="shortcut-evidence" class="sr-only" role="status">Shortcut not tested yet.</p>
+        <div class="practice-toolbar"><span class="practice-badge">${icon('shield')}<span>Private</span></span><div class="practice-tools"><button id="practice-recovery" class="icon-action" aria-label="View practice problem" title="View practice problem" aria-haspopup="dialog" hidden>${icon('problem')}</button><p id="shortcut-tutorial"><span id="practice-gesture" class="sr-only">Press</span> <kbd id="practice-shortcut">…</kbd><span id="practice-instruction" class="sr-only"> to start / finish.</span></p></div></div><p id="shortcut-evidence" class="sr-only" role="status">Shortcut not tested yet.</p>
       <div class="practice-meter"><label for="input-level">Microphone</label><meter id="input-level" class="sr-only" min="0" max="1" value="0" aria-describedby="input-level-help"></meter><div id="practice-waveform" class="input-waveform" aria-hidden="true">${Array.from({length:9},()=>'<span></span>').join('')}</div><span id="practice-timer" aria-label="Recording time">— / —</span><span id="input-level-help" class="sr-only">Start a private test to check input. No audio file is saved.</span></div>
     <label for="practice-text" class="sr-only">Practice dictation</label>
     <div class="practice-editor">
       <textarea id="practice-text" rows="6" autocomplete="off" spellcheck="false" aria-describedby="practice-privacy" placeholder="Dictate or type here…"></textarea>
-      <div class="practice-actions"><button id="practice-start" class="primary" disabled>${icon('mic')}<span>Record</span></button><button id="practice-finish" class="primary" disabled hidden>${icon('check')}<span>Finish</span></button><button id="practice-cancel" aria-label="Cancel practice" disabled hidden>Cancel</button><button id="practice-clear" aria-label="Clear practice">Clear</button></div>
+      <div class="practice-actions" role="group" aria-label="Practice controls"><button id="practice-start" class="primary icon-action" aria-label="Record" title="Record" disabled>${icon('mic')}</button><button id="practice-finish" class="primary icon-action" aria-label="Finish" title="Finish" disabled hidden>${icon('check')}</button><span id="practice-busy" class="icon-action" aria-hidden="true" hidden>${icon('spinner')}</span><button id="practice-cancel" class="icon-action" aria-label="Cancel practice" title="Cancel practice" disabled hidden>${icon('close')}</button><button id="practice-clear" class="icon-action" aria-label="Clear practice" title="Clear practice">${icon('clear')}</button></div>
     </div>
      <p id="practice-privacy" class="sr-only">No clipboard or usage counted. Clears when you leave.</p>
-    <div class="practice-status-slot"><p id="practice-message" role="status" aria-label="Practice status" aria-live="polite"></p><button id="practice-recovery" class="text-action" hidden>View problem</button></div>
+     <p id="practice-message" class="sr-only" role="status" aria-label="Practice status" aria-live="polite"></p>
    </section>
     <p id="practice-platform-help" class="subtle" hidden>Private practice is available on macOS.</p>
  </section>
@@ -65,7 +67,7 @@ document.querySelector('#app')!.innerHTML = `
      <div class="setting-row listening-row"><div><h3>Completion sound</h3></div><select id="sound-style" aria-label="Sound"><option value="clean">Clean</option><option value="warm">Warm</option></select><span id="sound-state" class="state">Off</span><label class="switch"><input id="sounds" type="checkbox" role="switch" aria-label="Completion sound"><span aria-hidden="true"></span></label></div>
     <div class="setting-row volume-row"><h3><label for="sound-volume">Volume</label></h3><div class="sound-controls"><input id="sound-volume" type="range" min="0" max="100" step="1" value="50" aria-describedby="volume-percent"><output id="volume-percent" for="sound-volume">50%</output></div><button id="preview-sound" class="icon-action" aria-label="Preview sound" title="Preview sound" disabled>${icon('play')}</button></div>
     <div id="microphone-choice-row" class="setting-row" hidden><div><h3><label for="microphone-choice">Microphone</label></h3><p id="microphone-choice-help" class="sr-only">Next recording. Unavailable selections never fall back silently.</p></div><div class="microphone-controls"><select id="microphone-choice" aria-describedby="microphone-choice-help" disabled><option value="">System default</option></select><button id="microphone-refresh" class="icon-action" aria-label="Refresh microphones" title="Refresh microphones" disabled>${icon('update')}</button></div></div>
-    <div class="setting-row recording-mode-row"><div><h3 id="recording-mode-title">Recording mode</h3><p id="recording-mode-help" class="sr-only" hidden>Hold the shortcut; release to finish. Other keys or focus changes cancel.</p></div><fieldset id="recording-mode" aria-labelledby="recording-mode-title" aria-describedby="recording-mode-help" disabled><label><input type="radio" name="recording-mode" value="toggle" checked><span>${icon('check')}Toggle</span></label><label><input type="radio" name="recording-mode" value="push_to_talk"><span>${icon('check')}Push to Talk</span></label></fieldset></div>
+    <div class="setting-row recording-mode-row"><div><h3 id="recording-mode-title">Recording mode</h3><p id="recording-mode-help" class="sr-only" hidden>Hold the shortcut; release to finish. Other keys or focus changes cancel.</p></div><fieldset id="recording-mode" aria-labelledby="recording-mode-title" aria-describedby="recording-mode-help" disabled><label><input type="radio" name="recording-mode" value="toggle" checked><span>Toggle</span></label><label><input type="radio" name="recording-mode" value="push_to_talk"><span>Push to Talk</span></label></fieldset></div>
       <div class="setting-row"><div><h3 id="appearance-title">Appearance</h3></div><fieldset id="appearance-choice" aria-labelledby="appearance-title" disabled><label title="Light"><input type="radio" name="appearance" value="light"><span>${icon('light')}<span class="sr-only">Light</span></span></label><label title="Dark"><input type="radio" name="appearance" value="dark"><span>${icon('dark')}<span class="sr-only">Dark</span></span></label><label title="System"><input type="radio" name="appearance" value="system" checked><span>${icon('system')}<span class="sr-only">System</span></span></label></fieldset></div>
   </section>
     <section id="workflow" class="card" aria-labelledby="workflow-title" hidden><h2 id="workflow-title">General</h2>
@@ -84,15 +86,14 @@ document.querySelector('#app')!.innerHTML = `
     </div>
       <div id="model-row" class="setting-row" tabindex="-1"><div><h3>Speech model</h3><p id="model-state">English · 148 MB</p><progress id="progress" max="100" value="0" hidden aria-label="Model download progress"></progress></div><span id="model-ready" class="state" hidden>Installed</span><button id="download">Download</button></div>
   </section>
-     <section class="local-data" aria-labelledby="data-title"><div class="setting-row"><div><h3 id="data-title">Usage totals</h3></div><button id="reset" class="danger" aria-haspopup="dialog">Delete usage totals</button></div></section>
+     <section class="local-data" aria-labelledby="data-title"><div class="setting-row"><div><h3 id="data-title">Usage totals</h3></div><button id="reset" class="danger" aria-haspopup="dialog">Delete data</button></div></section>
  </section>
-  <div class="general-status-slot"><p id="message" class="status-detail" role="status" aria-label="Dictation status" aria-live="polite" hidden></p><button id="message-recovery" class="text-action" hidden>View problem</button></div>
- <p id="feedback" class="feedback" role="status" hidden></p><p id="storage-error" class="feedback" role="status" hidden></p>
+  <div class="general-status-slot"><p id="message" class="status-detail" role="status" aria-label="Dictation status" aria-live="polite"></p><button id="message-recovery" class="text-action" hidden>View problem</button></div>
   </main>
    <footer><span class="footer-privacy">${icon('shield')}On-device · English</span><div class="footer-meta"><a id="repository-link" class="icon-action" href="${repositoryUrl}" aria-label="HandsFree on GitHub" title="HandsFree on GitHub" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 .75A11.25 11.25 0 0 0 8.44 22.67c.56.1.77-.24.77-.54v-2.1c-3.13.68-3.79-1.33-3.79-1.33-.51-1.3-1.25-1.65-1.25-1.65-1.02-.7.08-.69.08-.69 1.13.08 1.73 1.16 1.73 1.16 1 1.72 2.64 1.22 3.28.93.1-.73.39-1.22.71-1.5-2.5-.28-5.13-1.25-5.13-5.56 0-1.23.44-2.24 1.16-3.03-.12-.28-.5-1.43.11-2.98 0 0 .95-.3 3.09 1.16a10.7 10.7 0 0 1 5.63 0c2.14-1.46 3.08-1.16 3.08-1.16.62 1.55.23 2.7.11 2.98.73.79 1.16 1.8 1.16 3.03 0 4.32-2.63 5.27-5.14 5.55.4.35.76 1.03.76 2.08v3.11c0 .3.2.65.78.54A11.25 11.25 0 0 0 12 .75Z"/></svg></a><span class="footer-brand"><span class="sr-only">HandsFree</span><span id="app-version">0.1.1</span></span><button id="updates-open" class="text-action" aria-describedby="updates-feedback" hidden>${icon('update')}<span class="sr-only" aria-hidden="true"><strong id="updates-indicator-label">Updates</strong><span id="updates-indicator-detail">Not checked</span></span></button><span id="updates-announcement" class="sr-only" role="status" aria-live="polite"></span></div><p id="updates-feedback" role="status" aria-live="polite" hidden></p></footer>
 </div>
  <dialog id="reset-dialog" aria-labelledby="reset-title"><h2 id="reset-title">Reset usage totals?</h2><p>Totals will return to zero. Your preferences and language model won’t change.</p><div class="dialog-actions"><button id="keep-stats" autofocus>Keep totals</button><button id="confirm-reset" class="danger">Reset totals</button></div></dialog>
- <dialog id="health-dialog" aria-labelledby="health-title" aria-describedby="health-summary">
+ <dialog id="health-dialog" aria-labelledby="health-title" aria-describedby="health-summary health-practice-error">
   <div class="health-heading"><h2 id="health-title" tabindex="-1" autofocus>Product status</h2><div class="health-tools"><button id="health-refresh" class="icon-action" aria-label="Refresh status" title="Refresh status">${icon('update')}</button><button id="health-close" class="icon-action" aria-label="Close product status" title="Close product status">${icon('close')}</button></div></div><p id="health-summary" role="status" aria-live="polite">Connecting to HandsFree…</p>
   <ul class="health-checks" aria-label="Dictation requirements">
    <li><div><strong>Microphone access</strong><span id="health-mic-state">Checking…</span></div><button id="health-mic" hidden>Allow microphone</button></li>
@@ -101,7 +102,7 @@ document.querySelector('#app')!.innerHTML = `
    <li><div><strong>Speech model</strong><span id="health-model-state">Checking…</span></div><button id="health-model" hidden>Download model</button></li>
    <li id="health-input" hidden><div><strong><label for="health-microphone">Microphone</label></strong><span id="health-input-help" class="sr-only">Applies to the next recording. An unavailable saved device never switches silently.</span></div><div class="health-input-controls"><select id="health-microphone" aria-describedby="health-input-help" disabled></select><button id="health-microphone-refresh" class="icon-action" aria-label="Refresh microphones" title="Refresh microphones" disabled>${icon('update')}</button></div></li>
   </ul>
-  <p id="health-error" class="feedback" role="status" hidden></p><p class="sr-only">These checks don’t record audio. Permission checks are not proof that microphone capture works.</p>
+  <p id="health-practice-error" class="feedback" hidden></p><p id="health-error" class="feedback" role="status" hidden></p><p class="sr-only">These checks don’t record audio. Permission checks are not proof that microphone capture works.</p>
  </dialog>`;
 const el = (id: string) => document.getElementById(id)!;
 const button = (id: string) => el(id) as HTMLButtonElement;
@@ -187,7 +188,7 @@ async function workflowFocus(source: HTMLElement, effect: () => Promise<void>, t
 function statusText(id: string, text: string) {
   const node = el(id);
   if (node.textContent !== text) node.textContent = text;
-  if (text) node.tabIndex = 0; else node.removeAttribute('tabindex');
+  if (text && !node.closest('.sr-only')) node.tabIndex = 0; else node.removeAttribute('tabindex');
 }
 type Page = 'home' | 'settings';
 function focusHeading(tab: Page) {
@@ -214,7 +215,10 @@ function feedback(message: string) {
   el('feedback').hidden = !message; statusText('feedback', message);
   el('health-error').hidden = !message; el('health-error').textContent = message;
   el('feedback').setAttribute('aria-label','Action feedback');
-  button('message-recovery').hidden = !message && current?.phase !== 'error' && current?.phase !== 'not_pasted';
+  renderGeneralRecovery();
+}
+function renderGeneralRecovery() {
+  button('message-recovery').hidden = current?.platform === 'macos' || (current?.phase !== 'error' && current?.phase !== 'not_pasted' && el('feedback').hidden);
 }
 async function action(command: string, args?: Record<string, unknown>): Promise<boolean> {
   try { await invoke(command, args); feedback(''); await refresh(); return true; }
@@ -247,7 +251,8 @@ function renderHealth() {
     : s.phase === 'downloading' ? `Downloading the speech model… ${Math.round(s.progress)}%.`
     : s.persistence_error ? `Settings or usage couldn’t be saved. ${s.persistence_error}`
     : inputUnavailable() ? 'Microphone unavailable. Reconnect it or choose another input.'
-    : readiness(s) ? 'Permissions, shortcut and model are ready. To check actual capture, record privately on Home.' : readinessDetail(s));
+    : readiness(s) ? el('message').textContent || 'Permissions, shortcut and model are ready. To check actual capture, record privately on Home.' : readinessDetail(s));
+  el('health-summary').title = s?.phase === 'copied' ? s.message : '';
   el('health-mic-state').textContent = !s ? 'Unknown' : s.microphone ? 'Allowed' : 'Access needed';
   el('health-permissions-row').hidden = !mac;
   el('health-permissions-state').textContent = !s ? 'Unknown' : s.accessibility && s.input_monitoring ? 'Allowed' : [!s.accessibility && 'Accessibility needed', !s.input_monitoring && 'Input Monitoring needed'].filter(Boolean).join(' · ');
@@ -265,17 +270,25 @@ const productStatus = button('product-status');
 const clearPointerDismissal = () => { delete productStatus.dataset.pointerDismissed; };
 document.addEventListener('keydown', clearPointerDismissal, true);
 productStatus.addEventListener('blur', clearPointerDismissal);
-productStatus.onclick = () => {
+function openHealth(practiceError = '') {
   clearPointerDismissal();
-  productStatus.focus({preventScroll:true});
+  const detail = el('health-practice-error');
+  detail.textContent = practiceError;
+  detail.hidden = !practiceError;
   renderHealth(); healthDialog.showModal(); renderPractice();
   void refresh(); void refreshMicrophones();
+}
+productStatus.onclick = () => {
+  productStatus.focus({preventScroll:true});
+  openHealth();
 };
 button('health-close').onclick = event => {
   healthDialog.close();
   if (event.detail > 0) productStatus.dataset.pointerDismissed = 'true';
 };
 healthDialog.addEventListener('close', () => {
+  el('health-practice-error').textContent = '';
+  el('health-practice-error').hidden = true;
   renderPractice();
   if (!document.querySelector('dialog[open]') && document.activeElement === document.body) {
     button('product-status').focus({preventScroll:true});
@@ -306,7 +319,6 @@ function syncPracticeContext() {
 const practice = new Practice(invoke, view => {
   // Assign a value, never HTML; no normal dictation payload is read here.
   if (practiceField.value !== view.text) practiceField.value = view.text;
-  statusText('practice-message', view.message);
   renderPractice();
 }, practiceVisible);
 const practiceInputs = new PracticeInputs(practice, practiceVisible);
@@ -314,9 +326,6 @@ function clearPractice() { shortcutReceived = false; practiceInputs.reset(); voi
 function renderPractice() {
   el('cancel').hidden = !current || !canCancel(current.phase) || current.practice_capture === true || practice.ownsCapture;
   statusText('practice-message', practice.view.message);
-  const preparing = practice.view.phase === 'starting' || practice.view.phase === 'recording' && practice.view.elapsedSeconds === null && practice.view.inputLevel === null;
-  el('practice-message').classList.toggle('quiet-status', preparing);
-  if (preparing || !practice.view.message) el('practice-message').removeAttribute('tabindex');
   const focusedAction = document.activeElement;
   if (focusedAction instanceof HTMLButtonElement && focusedAction.closest('.practice-actions')) {
     // Retire a contextual control without browser focus/scroll recovery.
@@ -349,12 +358,17 @@ function renderPractice() {
   const active = ['starting', 'recording', 'processing'].includes(practice.view.phase);
   button('practice-start').disabled = !current || !readiness(current) || inputUnavailable() || !canEditShortcut() || capturing || captureStopping || shortcutPending || modePending || downloadPending || !practiceVisible() || !['idle', 'error','complete','empty'].includes(practice.view.phase);
   button('practice-start').hidden = active || practice.view.phase==='cancelling';
-  button('practice-start').querySelector('span')!.textContent = ['complete','empty'].includes(practice.view.phase) ? 'Record again' : 'Record';
+  const recordLabel = ['complete','empty'].includes(practice.view.phase) ? 'Record again' : 'Record';
+  const start = button('practice-start');
+  if (start.getAttribute('aria-label') !== recordLabel) start.setAttribute('aria-label', recordLabel);
+  const recordHint = practice.view.phase === 'empty' ? 'No speech detected. Record again' : recordLabel;
+  if (start.title !== recordHint) start.title = recordHint;
   button('practice-finish').disabled = practice.view.phase !== 'recording';
   button('practice-finish').hidden = practice.view.phase !== 'recording';
   button('practice-cancel').disabled = !active;
   button('practice-cancel').hidden = !active;
   button('practice-clear').hidden = active || practice.view.phase==='cancelling';
+  el('practice-busy').hidden = !['starting','processing','cancelling'].includes(practice.view.phase);
   if (practice.view.phase !== 'error' && document.activeElement === el('practice-recovery')) practiceField.focus({preventScroll:true});
   button('practice-recovery').hidden = practice.view.phase !== 'error';
   syncPracticeContext();
@@ -365,7 +379,11 @@ el('practice-start').onclick = () => { if (!button('practice-start').disabled) v
 el('practice-finish').onclick = () => void practice.finish();
 el('practice-cancel').onclick = clearPractice;
 el('practice-clear').onclick = clearPractice;
-el('practice-recovery').onclick = () => button('product-status').click();
+el('practice-recovery').onclick = () => {
+  if (practice.view.phase !== 'error') return;
+  // Opening Product status revokes Practice; keep only the diagnostic, not the draft.
+  openHealth(practice.view.message);
+};
 el('message-recovery').onclick = () => button('product-status').click();
 window.addEventListener('blur', () => { windowActive=false; syncPracticeContext(); clearPractice(); });
 window.addEventListener('pagehide', () => { windowActive=false; syncPracticeContext(); clearPractice(); });
@@ -785,15 +803,15 @@ async function refreshStatus() {
       if (!healthDialog.open) button('product-status').click();
     }
     const audioStarting = current.platform === 'macos' && current.phase === 'recording' && current.audio_ready === false;
-    // Keep diagnostics outside the compact header; never render dictation payloads.
+    // Practice owns its results, even after the native capture flag resets.
     const idleHint = `Select a text field and press ${current.shortcut_label}.`;
     const pasteSent = current.message.startsWith('Paste shortcut sent');
-    el('message').classList.toggle('quiet-completion', pasteSent);
+    const practiceStatus = current.practice_capture || current.message === 'Practice finished. No text was pasted or saved.';
     const message = current.message.startsWith('Copied.') ? 'Text copied. Switch to your app and paste when you’re ready.' : current.message;
-    statusText('message', audioStarting || pasteSent || (current.phase === 'idle' && current.message === idleHint) ? '' : message);
-    el('message').title = pasteSent ? '' : current.message;
-    el('message').hidden = !el('message').textContent;
-    button('message-recovery').hidden = current.phase !== 'error' && current.phase !== 'not_pasted' && el('feedback').hidden;
+    el('message').classList.toggle('sr-only', current.platform === 'macos');
+    statusText('message', audioStarting || pasteSent || practiceStatus || (current.phase === 'idle' && current.message === idleHint) ? '' : message);
+    el('message').title = current.platform !== 'macos' && !pasteSent ? current.message : '';
+    renderGeneralRecovery();
     button('mic').disabled = current.microphone;
      el('mic').textContent = windows ? 'Open settings' : current.microphone ? 'Allowed' : 'Allow';
      el('mic-state').textContent = windows ? 'Connect a microphone and enable microphone access.' : 'Allow access to record your voice.';

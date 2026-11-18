@@ -21,6 +21,7 @@ export function verifyEmbeddedFrontend(executable, assets, cached) {
   for (const marker of ['Try your voice', 'practice-toolbar', 'practice-badge', 'practice-start', 'Practice dictation', 'No clipboard or usage counted.', 'practice-input', 'practice_context', 'practice_start', 'practice_finish', 'practice_cancel', 'practice_status']) {
     requireThat(javascript.includes(marker), `Missing compiled practice UI: ${marker}`);
   }
+  requireThat(['>Delete data</button>', 'aria-label="Practice controls"', 'id="practice-message" class="sr-only"'].every(marker => javascript.includes(marker)) && !/practice-status-slot|Delete usage totals/.test(javascript), 'Stale compact Practice or Settings UI');
   for (const asset of assets) {
     const embedded = cached.some(bytes => {
       let decoded;
