@@ -2,13 +2,13 @@
 
 Requires **Apple Silicon (M-series), macOS 14+, English**. This is the only current product and development target. In Apple menu → About This Mac, check that **Chip** names an Apple M-series chip. Intel Macs, Windows, Linux, and mobile are not currently supported. Windows work is paused; no Windows or Linux port or release date is promised.
 
-**Stable v0.1.2 — self-signed and not notarized.** Published public artifacts passed anonymous byte verification. Exact signed candidate built-in capture/finish/cancel, button and synthetic Fn private dictation, and visual Dock/Command-Tab checks passed. Installed v0.1.2 in-app OTA/restart and preservation acceptance are pending; Homebrew still offers v0.1.1. Separate-Mac installation, physical Fn and universal Bluetooth behavior are not verified. See the [release record](releases/v0.1.2.md) for evidence and limits. No paid account, Apple Developer membership, payment, or certificate installation is required.
+**Stable v0.1.3 — self-signed and not notarized.** Published public artifacts passed anonymous byte verification. See the [release record](releases/v0.1.3.md) for candidate checks and pending installed acceptance. No paid account, Apple Developer membership, payment, or certificate installation is required.
 
 <a id="homebrew-option"></a>
 
 ## Homebrew option — recommended
 
-The separate Homebrew tap currently offers stable v0.1.1, not the v0.1.2 direct download below. Its v0.1.2 update and verification are pending.
+Check the [separate Homebrew tap](https://github.com/suhaasbadada/homebrew-handsfree) for its current version. It can lag the direct download below.
 
 1. If needed, [install Homebrew from its official website](https://brew.sh/).
 2. Open **Terminal** (Applications → Utilities) and paste this command for the [HandsFree tap](https://github.com/suhaasbadada/homebrew-handsfree#readme):
@@ -38,13 +38,13 @@ brew update
 brew upgrade --cask suhaasbadada/handsfree/handsfree
 ```
 
-Reopen the Applications copy afterward. The current direct Mac distribution and embedded app version are `0.1.2`; Homebrew still selects `0.1.1` using the cask's distribution version. Updates are reviewed manually, not promised on a schedule. Prior v0.1.1 Homebrew publication/readback and tap CI passed; that evidence does not verify v0.1.2 Homebrew delivery.
+Reopen the Applications copy afterward. The current direct Mac distribution and embedded app version are `0.1.3`; Homebrew selects the version pinned in the cask. Updates are reviewed manually, not promised on a schedule.
 
 Normal updates preserve your existing model, settings, and usage totals; they do not restart onboarding or reset permissions. Do not use `--zap`, delete HandsFree's data folders, or reset totals to update. Existing permissions may still need reauthorization if macOS requests it. Installed OTA acceptance is recorded separately from artifact checks; clean-machine onboarding remains unverified.
 
 ## DMG alternative
 
-Download the [Mac DMG](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.2/HandsFree-0.1.2-macos-arm64.dmg). Open it and drag **HandsFree.app** onto **Applications**. Keep the disk image: its `Licenses` folder (project license, dependency notices and corresponding sources) accompanies redistributions. No ZIP extraction or developer tools are needed. Eject the image after copying. Do not launch the copy inside the disk image.
+Download the [Mac DMG](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.3/HandsFree-0.1.3-macos-arm64.dmg). Open it and drag **HandsFree.app** onto **Applications**. Keep the disk image: its `Licenses` folder (project license, dependency notices and corresponding sources) accompanies redistributions. No ZIP extraction or developer tools are needed. Eject the image after copying. Do not launch the copy inside the disk image.
 
 For optional manual DMG updates, quit HandsFree, replace the Applications copy,
 then reopen. Beta 6 and earlier need this or Homebrew as a one-time bootstrap.
@@ -52,7 +52,7 @@ Permissions may need reauthorization. Prefer the explicit in-app updater for nor
 
 ## Signed in-app updates — beta 7 onward
 
-In v0.1.2 choose the footer **update icon** to check (v0.1.1 labels it **Updates**), then **Download & update** for the
+In v0.1.2 and later choose the footer **update icon** to check (v0.1.1 labels it **Updates**), then **Download & update** for the
 displayed exact version. Checks, progress and errors stay inline; no update modals
 remain. A freshly rechecked different offer requires another click. Older betas
 use **Check for updates → Download & restart…** in their dialog until upgraded.
@@ -63,7 +63,7 @@ restarting: in-memory results do not survive restart. Updates require an idle,
 normal `/Applications/HandsFree.app`; errors including HTTP 404 are shown, not
 reported as up to date. Model/settings/usage remain outside the replaced bundle.
 Beta 7 and beta 8 have a download-time TLS defect and need one manual DMG/Homebrew
-upgrade to beta 9 or later, including stable v0.1.2 via the direct DMG. Retrying their in-app updater does not repair it.
+upgrade to beta 9 or later, including stable v0.1.3 via the direct DMG. Retrying their in-app updater does not repair it.
 See [trust and safeguards](UPDATES.md) and [beta 9 evidence](releases/v0.1.1-beta.9.md).
 
 ## First launch — both install methods
@@ -79,7 +79,7 @@ Focus a text field, tap your shortcut to speak, and tap again to transcribe. Esc
 speak, then **Finish**. The temporary editable result does not paste, change the
 clipboard or count toward usage. This is not a shortcut or external-insertion
 test. See [practice safeguards](practice.md) and the
-[release evidence and remaining acceptance checks](releases/v0.1.2.md).
+[release evidence and remaining acceptance checks](releases/v0.1.3.md).
 
 **Toggle remains the default.** For optional hold-to-record behavior, select
 **Settings → Recording mode → Push to talk**: hold Fn / Globe or your saved

@@ -1,14 +1,14 @@
 # Signed in-app updates (Mac beta 7 onward)
 
-Published v0.1.2 keeps updates entirely inline in the footer. Click the **update icon**
+Since v0.1.2, updates are entirely inline in the footer. Click the **update icon**
 to check; the refresh icon spins while checking. A verified offer changes the same
 action to **Download & update** with its version. Clicking that offer authorizes
 only that displayed version, freshly rechecked before download. Progress and retry
 errors stay inline; there are no update or confirmation modals. Local status reads
 never contact the feed, and there is no unsolicited background download.
 
-In v0.1.1 the footer check is labeled **Updates**. Installed v0.1.2 OTA/restart and
-preservation acceptance are pending; Homebrew still offers v0.1.1.
+In v0.1.1 the footer check is labeled **Updates**. Homebrew releases are tracked
+separately from this feed.
 
 Published older betas still use their **Check for updates** dialog and **Download & restart**
 action until upgraded. Stable v0.1.1 installed-app replacement/restart and private

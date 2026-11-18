@@ -94,7 +94,7 @@ try {
     await send('Page.navigate', { url });
     let ready = false;
     for (let i = 0; i < 100; i++) {
-      ready = await evaluate(`location.href === ${JSON.stringify(url)} && document.readyState === 'complete' && !!document.getElementById('primary-download') && document.getElementById('release-status').textContent.startsWith('Mac stable v0.1.2')`);
+      ready = await evaluate(`location.href === ${JSON.stringify(url)} && document.readyState === 'complete' && !!document.getElementById('primary-download') && document.getElementById('release-status').textContent.startsWith('Mac stable v${release.version}')`);
       if (ready) break;
       await delay(30);
     }
@@ -131,10 +131,9 @@ try {
   assert.equal(await evaluate(`document.querySelector('.site-header .beta-badge').textContent`), 'STABLE');
   assert.equal(await evaluate(`document.querySelector('.brand').getAttribute('aria-label')`), 'HandsFree home');
   assert.equal(await evaluate(`document.querySelector('.platform-card.available .pill').textContent`), 'Mac stable');
-  assert.match(await evaluate(`document.querySelector('meta[name="description"]').content`), /Mac stable v0\.1\.2/);
+  assert.ok((await evaluate(`document.querySelector('meta[name="description"]').content`)).includes(`Mac stable v${release.version}`));
   assert.match(await evaluate(`document.getElementById('hero-homebrew').textContent`), /Self-signed, not Apple notarized/);
-  assert.match(await evaluate(`document.getElementById('release-status').textContent`), /v0\.1\.2 installed in-app update\/restart and preservation checks are pending/);
-  assert.match(await evaluate(`document.getElementById('release-status').textContent`), /Homebrew still offers v0\.1\.1/);
+  assert.ok((await evaluate(`document.getElementById('release-status').textContent`)).includes(release.status));
   assert.equal(await evaluate(`document.getElementById('primary-download').getAttribute('href')`), release.dmgUrl);
   assert.equal(await evaluate(`document.querySelectorAll('a[href*=".exe"]').length`), 0);
   assert.equal(await evaluate(visible('primary-windows-icon')), false);
@@ -187,9 +186,7 @@ try {
   await assertPublicJourney();
   await assertPublicJourney();
   assert.equal(await evaluate(`document.querySelector('.site-header .beta-badge').textContent`), 'STABLE', 'Stable identity without JS');
-  assert.match(await evaluate(`document.getElementById('release-status').textContent`), /Stable Mac v0\.1\.2 published and public bytes verified/);
-  assert.match(await evaluate(`document.getElementById('release-status').textContent`), /v0\.1\.2 installed in-app update\/restart and preservation checks are pending/);
-  assert.match(await evaluate(`document.getElementById('release-status').textContent`), /Homebrew still offers v0\.1\.1/);
+  assert.ok((await evaluate(`document.getElementById('release-status').textContent`)).includes(`Stable Mac v${release.version} published and public bytes verified`));
   assert.equal(await evaluate(visible('hero-homebrew')), true, 'No-JS recommendation stays available and explicitly Mac-labeled');
   assert.equal(await evaluate(`document.querySelector('[data-copy-brew]').hidden`), true, 'No-JS never shows a nonfunctional copy button');
   assert.equal(await evaluate(`document.querySelectorAll('a[href*=".exe"], #windows-card-download').length`), 0, 'No Windows CTA without JS');
