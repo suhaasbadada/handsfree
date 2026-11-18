@@ -251,6 +251,8 @@ footer { grid-column: 1; min-height: 58px; display: flex; flex-wrap: wrap; align
 @keyframes update-spin { to { transform: rotate(360deg); } }
 .footer-privacy, .footer-meta { display: flex; align-items: center; gap: 8px; }
 .footer-meta { gap: 8px; margin-inline-start: auto; }
+.footer-meta:has(#updates-open:not([hidden])) { display: grid; grid-template-columns: auto auto min(190px, 66vw); }
+.footer-meta:has(#updates-open:not([hidden])) .footer-brand { grid-column: 2; }
 .footer-privacy svg { width: 14px; height: 14px; }
 .footer-brand { display: flex; align-items: center; gap: 6px; }
 dialog { width: 420px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); overflow-y: auto; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 16px; padding: 24px; box-shadow: 0 20px 90px #0003; }
@@ -348,14 +350,13 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .practice-sample { color: var(--muted); font-size: 13px; line-height: 1.6; }
 #updates-open { display: inline-flex; align-items: center; gap: 5px; min-width: 0; min-height: 24px; height: auto; padding: 0; background: transparent; color: var(--muted); }
 #updates-open svg { width: 14px; height: 14px; }
-#updates-open { position: relative; width: 32px; height: 32px; min-height: 32px; justify-content: center; }
+#updates-open { position: relative; width: 32px; height: 32px; min-height: 32px; justify-content: center; grid-column: 3; justify-self: end; }
 #updates-open:has(.update-summary) { width: auto; max-width: min(190px, 66vw); padding: 0 8px; }
 #updates-open > svg { flex: none; }
 .update-summary { display: flex; align-items: baseline; gap: 6px; min-width: 0; white-space: nowrap; font-size: 11px; }
 .update-summary strong { flex: none; }
 .update-summary #updates-indicator-detail { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 #updates-open:hover:not(:disabled), #repository-link:hover { background: var(--button); }
-#updates-open[data-attention="available"]::after { content: ''; position: absolute; inset: 5px 4px auto auto; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 #repository-link { color: inherit; border-radius: 8px; }
 #repository-link svg { width: 16px; height: 16px; }
 #appearance-choice { display: flex; gap: 4px; padding: 0; margin: 0; border: 0; min-inline-size: 0; }
@@ -367,8 +368,8 @@ dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 #appearance-choice input:hover:not(:disabled) + span { background: var(--button); }
 #appearance-choice input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 1px; }
 #appearance-choice:disabled { opacity: .55; }
-#updates-open[data-attention="available"] { color: var(--accent); }
-#updates-open[data-attention="available"]:hover { text-decoration: underline; text-underline-offset: 3px; }
+#updates-open[data-attention="available"] { color: var(--primary-fg); background: var(--primary-bg); }
+#updates-open[data-attention="available"]:hover:not(:disabled) { background: var(--primary-hover); }
 #updates-open[data-attention="error"] { color: var(--danger); }
 #updates-open[aria-busy="true"]:disabled { opacity: 1; }
 @media (max-width: 560px) {

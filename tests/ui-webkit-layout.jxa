@@ -160,7 +160,11 @@ for (const [width,height] of [[980,820],[560,650],[480,650],[320,650]]) {
     const detail = document.getElementById('updates-indicator-detail');
     const summary = label.parentElement;
     const footer = document.querySelector('footer');
-    const bounds = () => [footer.getBoundingClientRect().top, footer.offsetHeight, document.querySelector('main').offsetHeight];
+    const bounds = () => [footer.getBoundingClientRect().top, footer.offsetHeight, document.querySelector('main').offsetHeight,
+      ...['.footer-privacy','#repository-link','#app-version'].map(selector => {
+        const rect = document.querySelector(selector).getBoundingClientRect();
+        return [rect.left, rect.top, rect.width, rect.height];
+      })];
     button.hidden = document.getElementById('repository-link').hidden = false;
     summary.className = 'sr-only';
     const idle = bounds();

@@ -23,7 +23,11 @@ export async function checkUpdateIndicator({send,evaluate,until,port}) {
   const footerLayout = () => evaluate(`(() => {
     const footer = document.querySelector('footer').getBoundingClientRect();
     const main = document.querySelector('main').getBoundingClientRect();
-    return [footer.top, footer.height, main.height];
+    const fixed = ['.footer-privacy', '#repository-link', '#app-version'].map(selector => {
+      const {left,top,width,height} = document.querySelector(selector).getBoundingClientRect();
+      return [left,top,width,height];
+    });
+    return [footer.top, footer.height, main.height, fixed];
   })()`);
   assert.equal(await evaluate(`window.calls.some(c=>c.command==='check_for_updates'||c.command==='install_update')`),false,'Idle observations never contact the feed or install');
   await evaluate(`document.getElementById('nav-settings').click()`);
