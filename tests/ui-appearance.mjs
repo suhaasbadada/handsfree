@@ -23,6 +23,7 @@ export async function checkAppearance({send,evaluate,until,port}) {
   try {
     await send('Page.navigate',{url:`http://127.0.0.1:${port}`});
     await until(`document.documentElement.dataset.appearance==='system' && !document.getElementById('appearance-choice').disabled`);
+    assert.deepEqual(await evaluate(`[...document.querySelectorAll('#appearance-choice input')].map(r=>r.value)`), ['light','dark','system']);
     await evaluate(`document.getElementById('home-back').click()`);
     const before = await evaluate(`JSON.stringify(window.fixture)`);
     const bounds = await evaluate(`(()=>{const r=document.getElementById('practice-title').closest('section').getBoundingClientRect();return [r.x,r.y,r.width,r.height];})()`);

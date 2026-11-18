@@ -17,6 +17,9 @@ export class Practice {
   private render: (view: PracticeView) => void;
   private allowed: () => boolean;
   view: PracticeView = { phase: 'idle', text: '', message: '', inputLevel: null, elapsedSeconds: null, limitSeconds: null };
+  get ownsCapture() {
+    return this.cancelling !== undefined || (this.token !== undefined && ['starting', 'recording', 'processing'].includes(this.view.phase));
+  }
   constructor(invoke: Invoke, render: (view: PracticeView) => void, allowed: () => boolean) {
     this.invoke = invoke; this.render = render; this.allowed = allowed;
   }

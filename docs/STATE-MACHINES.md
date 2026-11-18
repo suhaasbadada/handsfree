@@ -263,6 +263,9 @@ cannot paint green Ready or enable the Record action; metadata never proves capt
   status header and Home diagnostic area. Contextual controls reuse grid
   positions; retiring focused controls transfers focus without scrolling. Real
   long errors scroll within their status slot instead of moving the card/activity.
+  The normal header cancel is hidden while the Practice controller owns a live
+  or retiring request; the Private editor keeps its own cancel path. This is
+  presentation only and does not change native capture authorization.
   Fresh-document CDP assertions cover pending/recording/meter/timer/processing/
   complete/error/retry/cancel at 320/400/740/980px, including native status changes.
   Populated practice/general status regions are named keyboard tab stops with

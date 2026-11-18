@@ -38,7 +38,7 @@ const glyphs: Record<string,string> = {
 const icon = (name: string) => `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${glyphs[name]}</svg>`;
 document.querySelector('#app')!.innerHTML = `
 <div class="shell">
- <header class="product-header"><div class="home-brand"><button id="home-back" class="icon-action" aria-label="Back to Home" title="Back to Home" hidden>${icon('back')}</button><img src="${logo}" alt="" width="36" height="36"><span>HandsFree</span></div><div class="header-actions"><section class="status" aria-label="App status"><button id="product-status" aria-haspopup="dialog" aria-controls="health-dialog" title="View product status and resolve problems"><span id="dot" aria-hidden="true"></span><strong id="phase" aria-live="polite">Connecting…</strong>${icon('chevron')}</button><button id="cancel" hidden aria-label="Cancel dictation" title="Cancel dictation">×</button></section><button id="nav-settings" class="icon-action" aria-label="Settings" title="Settings">${icon('settings')}</button></div></header>
+ <header class="product-header"><div class="home-brand"><button id="home-back" class="icon-action" aria-label="Back to Home" title="Back to Home" hidden>${icon('back')}</button><img src="${logo}" alt="" width="36" height="36"><span>HandsFree</span></div><div class="header-actions"><section class="status" aria-label="App status"><button id="product-status" aria-haspopup="dialog" aria-controls="health-dialog" title="View product status and resolve problems"><span id="dot" aria-hidden="true"></span><strong id="phase" aria-live="polite">Connecting…</strong></button><button id="cancel" hidden aria-label="Cancel dictation" title="Cancel dictation">×</button></section><button id="nav-settings" class="icon-action" aria-label="Settings" title="Settings">${icon('settings')}</button></div></header>
  <main>
   <section id="home" aria-label="Home">
      <h1 id="home-title" class="sr-only" tabindex="-1">Home</h1>
@@ -64,7 +64,7 @@ document.querySelector('#app')!.innerHTML = `
     <div class="setting-row volume-row"><h3><label for="sound-volume">Volume</label></h3><div class="sound-controls"><input id="sound-volume" type="range" min="0" max="100" step="1" value="50" aria-describedby="volume-percent"><output id="volume-percent" for="sound-volume">50%</output></div><button id="preview-sound" class="icon-action" aria-label="Preview sound" title="Preview sound" disabled>${icon('play')}</button></div>
     <div id="microphone-choice-row" class="setting-row" hidden><div><h3><label for="microphone-choice">Microphone</label></h3><p id="microphone-choice-help" class="sr-only">Next recording. Unavailable selections never fall back silently.</p></div><div class="microphone-controls"><select id="microphone-choice" aria-describedby="microphone-choice-help" disabled><option value="">System default</option></select><button id="microphone-refresh" class="icon-action" aria-label="Refresh microphones" title="Refresh microphones" disabled>${icon('update')}</button></div></div>
     <div class="setting-row"><div><h3><label for="recording-mode">Recording mode</label></h3><p id="recording-mode-help" class="sr-only" hidden>Hold the shortcut; release to finish. Other keys or focus changes cancel.</p></div><select id="recording-mode" aria-describedby="recording-mode-help"><option value="toggle">Toggle</option><option value="push_to_talk">Push to talk</option></select></div>
-      <div class="setting-row"><div><h3 id="appearance-title">Appearance</h3></div><fieldset id="appearance-choice" aria-labelledby="appearance-title" disabled><label title="System"><input type="radio" name="appearance" value="system" checked><span>${icon('system')}<span class="sr-only">System</span></span></label><label title="Light"><input type="radio" name="appearance" value="light"><span>${icon('light')}<span class="sr-only">Light</span></span></label><label title="Dark"><input type="radio" name="appearance" value="dark"><span>${icon('dark')}<span class="sr-only">Dark</span></span></label></fieldset></div>
+      <div class="setting-row"><div><h3 id="appearance-title">Appearance</h3></div><fieldset id="appearance-choice" aria-labelledby="appearance-title" disabled><label title="Light"><input type="radio" name="appearance" value="light"><span>${icon('light')}<span class="sr-only">Light</span></span></label><label title="Dark"><input type="radio" name="appearance" value="dark"><span>${icon('dark')}<span class="sr-only">Dark</span></span></label><label title="System"><input type="radio" name="appearance" value="system" checked><span>${icon('system')}<span class="sr-only">System</span></span></label></fieldset></div>
   </section>
     <section id="workflow" class="card" aria-labelledby="workflow-title" hidden><h2 id="workflow-title">General</h2>
      <div id="compatibility-row" class="setting-row" hidden><div><h3>Compatibility paste</h3><p id="compatibility-help">For apps that hide their text field. Pastes once in the same app/window; the exact field cannot be verified.</p></div><label class="switch"><input id="compatibility-paste" type="checkbox" role="switch" aria-label="Compatibility paste" aria-describedby="compatibility-help"><span aria-hidden="true"></span></label></div>
@@ -82,7 +82,7 @@ document.querySelector('#app')!.innerHTML = `
     </div>
       <div id="model-row" class="setting-row" tabindex="-1"><div><h3>Speech model</h3><p id="model-state">English · 148 MB</p><progress id="progress" max="100" value="0" hidden aria-label="Model download progress"></progress></div><span id="model-ready" class="state" hidden>Installed</span><button id="download">Download</button></div>
   </section>
-     <section class="local-data" aria-labelledby="data-title"><div class="setting-row"><div><h2 id="data-title">Usage totals</h2><p id="privacy-detail" class="subtle">Private tests are never counted.</p></div><button id="reset" class="icon-action danger" aria-label="Reset usage totals" title="Reset usage totals" aria-haspopup="dialog">${icon('clear')}</button></div></section>
+     <section class="local-data" aria-labelledby="data-title"><div class="setting-row"><div><h3 id="data-title">Usage totals</h3></div><button id="reset" class="danger" aria-haspopup="dialog">Delete usage totals</button></div></section>
  </section>
   <div class="general-status-slot"><p id="message" class="status-detail" role="status" aria-label="Dictation status" aria-live="polite" hidden></p><button id="message-recovery" class="text-action" hidden>View problem</button></div>
  <p id="feedback" class="feedback" role="status" hidden></p><p id="storage-error" class="feedback" role="status" hidden></p>
@@ -259,12 +259,20 @@ function renderHealth() {
   button('health-model').disabled = !s || installingUpdate() || button('download').disabled;
   el('health-input').hidden = !mac;
 }
-button('product-status').onclick = () => {
-  button('product-status').focus({preventScroll:true});
+const productStatus = button('product-status');
+const clearPointerDismissal = () => { delete productStatus.dataset.pointerDismissed; };
+document.addEventListener('keydown', clearPointerDismissal, true);
+productStatus.addEventListener('blur', clearPointerDismissal);
+productStatus.onclick = () => {
+  clearPointerDismissal();
+  productStatus.focus({preventScroll:true});
   renderHealth(); healthDialog.showModal(); renderPractice();
   void refresh(); void refreshMicrophones();
 };
-button('health-close').onclick = () => healthDialog.close();
+button('health-close').onclick = event => {
+  healthDialog.close();
+  if (event.detail > 0) productStatus.dataset.pointerDismissed = 'true';
+};
 healthDialog.addEventListener('close', () => {
   renderPractice();
   if (!document.querySelector('dialog[open]') && document.activeElement === document.body) {
@@ -302,6 +310,7 @@ const practice = new Practice(invoke, view => {
 const practiceInputs = new PracticeInputs(practice, practiceVisible);
 function clearPractice() { shortcutReceived = false; practiceInputs.reset(); void practice.clear(); }
 function renderPractice() {
+  el('cancel').hidden = !current || !canCancel(current.phase) || practice.ownsCapture;
   statusText('practice-message', practice.view.message);
   const preparing = practice.view.phase === 'starting' || practice.view.phase === 'recording' && practice.view.elapsedSeconds === null && practice.view.inputLevel === null;
   el('practice-message').classList.toggle('quiet-status', preparing);
@@ -766,9 +775,11 @@ async function refreshStatus() {
     const audioStarting = current.platform === 'macos' && current.phase === 'recording' && current.audio_ready === false;
     // Keep diagnostics outside the compact header; never render dictation payloads.
     const idleHint = `Select a text field and press ${current.shortcut_label}.`;
-    const message = current.message.startsWith('Copied.') ? 'Text copied. Switch to your app and paste when you’re ready.' : current.message.startsWith('Paste shortcut sent') ? 'Paste sent to your app. Check the original field.' : current.message;
-    statusText('message', audioStarting ? '' : current.phase === 'idle' && current.message === idleHint ? '' : message);
-    el('message').title = current.message;
+    const pasteSent = current.message.startsWith('Paste shortcut sent');
+    el('message').classList.toggle('quiet-completion', pasteSent);
+    const message = current.message.startsWith('Copied.') ? 'Text copied. Switch to your app and paste when you’re ready.' : current.message;
+    statusText('message', audioStarting || pasteSent || (current.phase === 'idle' && current.message === idleHint) ? '' : message);
+    el('message').title = pasteSent ? '' : current.message;
     el('message').hidden = !el('message').textContent;
     button('message-recovery').hidden = current.phase !== 'error' && current.phase !== 'not_pasted' && el('feedback').hidden;
     button('mic').disabled = current.microphone;
@@ -790,7 +801,6 @@ async function refreshStatus() {
     el('download').textContent = downloading ? `Downloading ${Math.round(current.progress)}%` : 'Download';
     el('progress').hidden = current.phase !== 'downloading';
     (el('progress') as HTMLProgressElement).value = current.progress;
-    el('cancel').hidden = !canCancel(current.phase);
     if (!soundsPending) {
       sounds.checked = current.sounds;
       el('sound-state').textContent = current.sounds ? 'On' : 'Off';

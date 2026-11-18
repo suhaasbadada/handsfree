@@ -43,6 +43,11 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   assert.equal(await evaluate(`!document.getElementById('home').hidden && !document.querySelector('aside,nav,#brand-menu,#get-started')`),true,'Home replaces sidebar, tabs and setup guide');
   await until(`window.context>0 && window.listeners.has('practice-input') && !document.getElementById('practice-start').disabled`);
   assert.equal(await evaluate(`['words','saved','count','practice-text'].every(id=>document.getElementById(id).getClientRects().length) && window.context>0`),true,'Visible focused Home combines totals and private editor and grants context');
+  await evaluate(`window.fixture.message='Paste shortcut sent to your original field (insertion not confirmed).'`);
+  await until(`document.getElementById('message').classList.contains('quiet-completion')`);
+  assert.equal(await evaluate(`document.getElementById('message').textContent==='' && document.querySelector('.general-status-slot').getBoundingClientRect().height===0`), true, 'Routine external paste status leaves no text or gap under the Private editor');
+  await evaluate(`window.fixture.message=''`);
+  await until(`!document.getElementById('message').classList.contains('quiet-completion')`);
   const baseline = await evaluate(`JSON.stringify(window.fixture.stats)`);
   assert.equal(await evaluate(`!document.getElementById('get-started')`),true,'No setup guide DOM');
   await evaluate(`document.getElementById('nav-settings').click()`);
@@ -154,6 +159,7 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
     const stable = async state => {
       const actual = await evaluate(`window.layoutSnapshot()`);
       assert.deepEqual(actual,pristine,`${width}px ${state}: practice, textarea, actions, activity, footer and scroll must stay pristine`);
+      assert.equal(await evaluate(`document.getElementById('cancel').hidden`), true, `${width}px ${state}: no redundant header cancel for Practice`);
       assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth && [...document.querySelectorAll('#practice button,#practice textarea,#practice meter')].filter(e=>e.getClientRects().length).every(e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth;})`),true,`${width}px ${state}: contained controls`);
     };
     await evaluate(`window.delayStart=true;document.getElementById('practice-start').click()`);
