@@ -11,10 +11,10 @@ export const release = Object.freeze({
 // Disabled even after publication; not a second availability switch.
 export const candidateRelease = Object.freeze({
   schemaVersion: 1,
-  version: '0.1.6',
+  version: '0.1.7',
   publicAvailable: false,
-  status: 'Stable v0.1.6 signed candidate accepted and published; public bytes verified. Installed update/restart acceptance pending. Self-signed, not notarized; not an availability switch.',
-  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.6/HandsFree-0.1.6-macos-arm64.dmg',
+  status: 'Stable v0.1.7 candidate preparation; signed acceptance and publication pending. Self-signed, not notarized; not an availability switch.',
+  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.7/HandsFree-0.1.7-macos-arm64.dmg',
 });
 
 // Historical coordinates only. Windows development and public promotion are paused.

@@ -7,7 +7,7 @@ cd "$ROOT"
 fail() { printf '%s\n' "$*" >&2; exit 1; }
 [[ $# == 0 ]] || fail 'Usage: bash scripts/package-release.sh (no arguments)'
 [[ $(uname -s) == Darwin && $(uname -m) == arm64 ]] || fail 'Apple Silicon macOS required.'
-VERSION=0.1.6
+VERSION=0.1.7
 NAME=HandsFree-$VERSION-macos-arm64
 OUT="$ROOT/release"
 mkdir -p "$OUT"
