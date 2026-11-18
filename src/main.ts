@@ -134,7 +134,7 @@ syncSelectLabels();
 for (const id of ['change-shortcut', 'mic', 'permissions', 'download', 'reset', 'sounds', 'sound-style', 'sound-volume', 'recording-limit', 'recording-mode']) {
   (el(id) as HTMLInputElement | HTMLButtonElement).disabled = true;
 }
-type AudioStatus = Status & { audio_ready?: boolean };
+type AudioStatus = Status & { audio_ready?: boolean; practice_capture?: boolean };
 let current: AudioStatus | undefined;
 let connectionError = '';
 const displayShortcut = (status: Status) => status.platform === 'windows' ? shortcutLabel(status.shortcut, 'windows') : status.shortcut_label;
@@ -312,7 +312,7 @@ const practice = new Practice(invoke, view => {
 const practiceInputs = new PracticeInputs(practice, practiceVisible);
 function clearPractice() { shortcutReceived = false; practiceInputs.reset(); void practice.clear(); }
 function renderPractice() {
-  el('cancel').hidden = !current || !canCancel(current.phase) || practice.ownsCapture;
+  el('cancel').hidden = !current || !canCancel(current.phase) || current.practice_capture === true || practice.ownsCapture;
   statusText('practice-message', practice.view.message);
   const preparing = practice.view.phase === 'starting' || practice.view.phase === 'recording' && practice.view.elapsedSeconds === null && practice.view.inputLevel === null;
   el('practice-message').classList.toggle('quiet-status', preparing);
@@ -420,7 +420,9 @@ function renderWorkflow() {
     workflowAppKey = key; const selected = choice.value;
     const choices = workflow.apps.filter(app => !status?.excluded_bundle_ids.includes(app.bundle_id));
     choice.replaceChildren(new Option(workflow.pending.apps ? 'Loading running apps…' : 'Choose a running app',''));
-    for(const app of choices) choice.add(new Option(app.name,app.bundle_id));
+    const nameCounts = new Map<string, number>();
+    for (const app of choices) nameCounts.set(app.name, (nameCounts.get(app.name) ?? 0) + 1);
+    for (const app of choices) choice.add(new Option(nameCounts.get(app.name) === 1 ? app.name : `${app.name} · ${app.bundle_id}`, app.bundle_id));
     choice.value = Array.from(choice.options).some(option=>option.value===selected) ? selected : '';
     const existing = new Map(Array.from(el('excluded-apps').children, item => [(item as HTMLElement).dataset.bundleId!, item]));
     for(const id of status?.excluded_bundle_ids ?? []) {

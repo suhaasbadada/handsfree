@@ -19,7 +19,7 @@ export async function installPracticeFixture({send,evaluate}) {
          if(command==='workflow_status')return structuredClone(window.workflow);
          if(command==='set_paused'){if(window.delayPause)await new Promise(r=>window.pauseAck=r);window.workflow.paused=args.paused;return structuredClone(window.workflow);}
          if(command==='set_launch_at_login'){if(window.delayLogin)await new Promise(r=>window.loginAck=r);if(window.rejectLogin)throw 'Login registration failed';window.workflow.login={status:args.enabled?(window.loginResult||'approval_required'):'not_registered',error:null};return structuredClone(window.workflow.login);}
-         if(command==='running_apps')return [{bundle_id:'com.running.app',name:'<b>Running app</b>'}];
+         if(command==='running_apps')return [{bundle_id:'com.running.app',name:'<b>Running app</b>'},{bundle_id:'com.other.app',name:'<b>Running app</b>'}];
          if(command==='set_excluded_apps'){if(window.delayExclusions)await new Promise(r=>window.exclusionsAck=r);if(window.rejectExclusions)throw 'Exclusion save failed';window.workflow.excluded_bundle_ids=args.bundleIds;return structuredClone(window.workflow);}
         if(command==='list_microphones')return {devices:[{uid:'built-in',name:'Built-in microphone'},{uid:'usb-input',name:'USB input'}],default_uid:'built-in'};
         if(command==='set_microphone'){if(window.rejectMicrophone)throw 'Could not save microphone';window.fixture.microphone_uid=args.uid;return;}
@@ -27,8 +27,8 @@ export async function installPracticeFixture({send,evaluate}) {
         if(command==='request_permissions')window.fixture.permission_requests=(window.fixture.permission_requests||0)|2;
         if(command==='practice_context'){window.context=args.active?args.revision:0;return;}
         if(command==='practice_start'){if(window.delayStart)await new Promise(r=>window.startAck=r);if(window.rejectStart)throw window.rejectStart;if(window.layoutLiveStatus){window.fixture.phase='recording';window.fixture.message='Press Fn to finish, Escape to cancel. Maximum 2 minutes.';}return ++window.practiceGeneration;}
-        if(command==='practice_status'){if(window.layoutLiveStatus && ['complete','empty','error'].includes(window.practiceResult.phase)){window.fixture.phase='idle';window.fixture.message='Practice finished. No text was pasted or saved.';}return {...window.practiceResult,generation:window.practiceGeneration};}
-        if(command==='practice_finish'){window.practiceResult.phase='processing';if(window.layoutLiveStatus){window.fixture.phase='processing';window.fixture.message='Transcribing locally…';}return;}
+        if(command==='practice_status'){if(window.layoutLiveStatus && !window.holdGlobalProcessing && ['complete','empty','error'].includes(window.practiceResult.phase)){window.fixture.phase='idle';window.fixture.practice_capture=false;window.fixture.message='Practice finished. No text was pasted or saved.';}return {...window.practiceResult,generation:window.practiceGeneration};}
+        if(command==='practice_finish'){window.practiceResult.phase='processing';if(window.layoutLiveStatus){window.fixture.phase='processing';window.fixture.practice_capture=true;window.fixture.message='Transcribing locally…';}return;}
         if(command==='practice_cancel'){if(window.delayCancel)await new Promise(r=>window.cancelAck=r);if(window.layoutLiveStatus){window.fixture.phase='idle';window.fixture.message='Cancelled.';}return;}
          if(command==='update_status')return {installed_version:'0.1.1-beta.9',phase:'idle',notes:'',downloaded_bytes:0,message:'Choose Check for updates.'};
          if(command==='check_for_updates')return {installed_version:'0.1.1-beta.9',phase:'up_to_date',notes:'',downloaded_bytes:0,message:'Up to date.'};
@@ -180,8 +180,10 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
     await until(`document.getElementById('practice-message').textContent.includes('Transcribing')`);
     await until(`document.getElementById('phase')?.textContent==='Processing'`);
     await stable('processing');
-    await evaluate(`window.practiceResult={phase:'complete',text:'Completed privately.'}`);
+    await evaluate(`window.holdGlobalProcessing=true;window.practiceResult={phase:'complete',text:'Completed privately.'}`);
     await until(`document.getElementById('practice-text').value==='Completed privately.'`);
+    assert.equal(await evaluate(`document.getElementById('phase').textContent==='Processing' && document.getElementById('cancel').hidden`),true,'A completed Practice result cannot expose Cancel from its older global snapshot');
+    await evaluate(`window.holdGlobalProcessing=false;window.fixture.phase='idle';window.fixture.practice_capture=false`);
     await until(`document.getElementById('phase').textContent==='Ready'`);
     await stable('complete / record again');
     await evaluate(`window.rejectStart='Selected microphone unavailable. '.repeat(40);document.getElementById('practice-start').click()`);
@@ -216,6 +218,8 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   await until(`window.fixture.microphone_uid===null && !document.getElementById('microphone-choice').disabled`);
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='set_microphone').at(-1).args.uid`),null,'System default is persisted as null, never a device ID/name');
   await until(`!document.getElementById('workflow-pause').disabled`);
+  await until(`document.getElementById('excluded-app-choice').options.length===3`);
+  assert.deepEqual(await evaluate(`[...document.getElementById('excluded-app-choice').options].slice(1).map(o=>o.textContent)`), ['<b>Running app</b> · com.running.app','<b>Running app</b> · com.other.app']);
   assert.equal(await evaluate(`document.getElementById('excluded-apps').textContent.includes('com.absent.app')`),true,'Saved absent app remains visible');
   const appReads = await evaluate(`window.calls.filter(c=>c.command==='running_apps').length`);
   const statusReads = await evaluate(`window.calls.filter(c=>c.command==='workflow_status').length`);

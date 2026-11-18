@@ -14,7 +14,7 @@ function fixture() {
   return { provenance, hashes, checksums: Object.entries(hashes).map(([name, hash]) => `${hash}  ${name}\n`).join(''), commit, tree, status: '' };
 }
 test('clean candidate has exact source commit/tree and six verified payload checksums', () => {
-  assert.deepEqual(payloadNames, ['HandsFree-0.1.5-macos-arm64.dmg', 'PROVENANCE.txt', 'HandsFree-0.1.5-macos-arm64.app.tar.gz', 'HandsFree-0.1.5-macos-arm64.app.tar.gz.sig', 'UPDATER-PROVENANCE.txt', 'macos-arm64.json']);
+  assert.deepEqual(payloadNames, ['HandsFree-0.1.6-macos-arm64.dmg', 'PROVENANCE.txt', 'HandsFree-0.1.6-macos-arm64.app.tar.gz', 'HandsFree-0.1.6-macos-arm64.app.tar.gz.sig', 'UPDATER-PROVENANCE.txt', 'macos-arm64.json']);
   assert.equal(validateMetadata(fixture()), commit);
 });
 for (const name of payloadNames) test(`manifest rejects altered ${name} bytes`, () => {
@@ -23,7 +23,7 @@ for (const name of payloadNames) test(`manifest rejects altered ${name} bytes`, 
   assert.throws(() => validateMetadata(f), /SHA-256 mismatch/);
 });
 test('updater feed and provenance bind exact target, source, signature and executable', () => {
-  assert.equal(archiveName, 'HandsFree-0.1.5-macos-arm64.app.tar.gz');
+  assert.equal(archiveName, 'HandsFree-0.1.6-macos-arm64.app.tar.gz');
   const signature = 'uploaded-signature';
   const executableHash = digest('sealed executable');
   const provenance = `Distribution: ${tag.slice(1)}\nSource commit: ${commit}\nApp executable SHA-256: ${executableHash}\n`;
@@ -58,15 +58,14 @@ for (const [label, mutate, message] of [
 
 const sizes = Object.fromEntries(names.map((name, index) => [name, 123 + index]));
 test('draft audit requires the matching website manifest to remain unavailable', () => {
-  assert.equal(tag, 'v0.1.5');
-  assert.equal(candidate, 'HandsFree-0.1.5-macos-arm64.dmg');
+  assert.equal(tag, 'v0.1.6');
+  assert.equal(candidate, 'HandsFree-0.1.6-macos-arm64.dmg');
   assert.equal(release.publicAvailable, false);
   assert.throws(() => validateAvailability(publishedRelease), /manifest disabled/);
   assert.doesNotThrow(() => validateAvailability(release, true), 'Public audit mode accepts stable candidate coordinates without activating downloads');
   assert.equal(publishedRelease.version, '0.1.5');
-  const previousStable = { ...publishedRelease, version: '0.1.4', dmgUrl: publishedRelease.dmgUrl.replaceAll('0.1.5', '0.1.4') };
-  assert.throws(() => validateAvailability(previousStable, true), /manifest disabled/, 'Previous stable download cannot substitute for the candidate');
-  assert.doesNotThrow(() => validateAvailability(publishedRelease, true), 'Public audit mode accepts activated coordinates for the exact candidate');
+  assert.throws(() => validateAvailability(publishedRelease, true), /manifest disabled/, 'Previous stable download cannot substitute for the candidate');
+  assert.doesNotThrow(() => validateAvailability({ ...release, publicAvailable: true }, true), 'Public audit mode accepts activated coordinates for the exact candidate');
   for (const version of ['beta.5', 'beta.6', 'beta.7', 'beta.8', 'beta.9', 'beta.10', 'beta.11', 'beta.12', 'beta.13', 'beta.14', 'beta.15', 'beta.16', 'beta.17', 'beta.18', 'beta.19', 'beta.20', 'beta.21', 'beta.22', 'beta.23', 'beta.24']) {
     const historical = { ...release, version: `0.1.1-${version}`, dmgUrl: `https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-${version}/HandsFree-0.1.1-${version}-macos-arm64.dmg` };
     for (const publicMode of [false, true]) {
