@@ -19,7 +19,8 @@ export async function checkKeyboardRecovery({send,evaluate,until,port}) {
     await evaluate(`document.getElementById('nav-settings').focus()`); await key(opener);
     assert.equal(await focused(),'settings-title');
     assert.equal(await evaluate(`window.context===0 && document.getElementById('home').hidden`),true,'Keyboard Settings revokes private context');
-    for (const id of ['recording-mode','sound-style']) {
+    assert.deepEqual(await evaluate(`[...document.querySelectorAll('#recording-mode input')].map(r=>r.value)`), ['toggle','push_to_talk']);
+    for (const id of ['sound-style']) {
       await evaluate(`document.getElementById('${id}').focus()`);
       assert.equal(await focused(),id,'Native select is keyboard focusable');
       assert.equal(await evaluate(`(()=>{const e=document.getElementById('${id}'),s=getComputedStyle(e.parentElement.querySelector('svg'));return e.tagName==='SELECT' && s.display!=='none' && parseFloat(s.width)>=12 && s.pointerEvents==='none' && s.color===getComputedStyle(document.body).color;})()`),true,'Theme-safe visible chevron does not intercept native control');
@@ -104,7 +105,7 @@ export async function checkKeyboardRecovery({send,evaluate,until,port}) {
   await until(`document.querySelector('[aria-label="Remove com.delayed"]')`);
   await evaluate(`window.exclusionsAck=null;document.querySelector('[aria-label="Remove com.delayed"]').focus();document.activeElement.click()`);
   await until(`typeof window.exclusionsAck==='function'`);
-  await evaluate(`document.getElementById('recording-mode').focus();window.exclusionsAck()`);
+  await evaluate(`document.querySelector('#recording-mode input:checked').focus();window.exclusionsAck()`);
   await until(`!document.querySelector('[aria-label="Remove com.delayed"]')`);
-  assert.equal(await focused(),'recording-mode','Other interactions revoke removal focus ownership');
+  assert.equal(await evaluate(`document.activeElement.matches('#recording-mode input:checked')`),true,'Other interactions revoke removal focus ownership');
 }

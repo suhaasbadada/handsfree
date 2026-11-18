@@ -12,7 +12,7 @@ export function verifyEmbeddedFrontend(executable, assets, cached) {
   requireThat(assets.some(asset => asset.name.endsWith('.css')), 'Missing built frontend CSS');
   const javascript = assets.filter(asset => asset.name.endsWith('.js')).map(asset => asset.bytes.toString()).join('\n');
   requireThat(['Usage totals', 'id="home"', 'id="nav-settings"', 'id="home-back"'].every(marker => javascript.includes(marker)) && !/Last transcript|<details\b|<summary\b|nav-practice-page|practice-page-title|setup-guide/i.test(javascript), 'Stale dashboard: expected combined Home without sidebar, separate Practice navigation or setup guide');
-  for (const marker of ['Recording mode', 'value="toggle"', 'value="push_to_talk"', 'Push to talk', 'set_recording_mode']) {
+  for (const marker of ['Recording mode', '<fieldset id="recording-mode"', 'type="radio" name="recording-mode" value="toggle"', 'type="radio" name="recording-mode" value="push_to_talk"', 'Push to Talk', 'set_recording_mode']) {
     requireThat(javascript.includes(marker), `Missing compiled push-to-talk UI: ${marker}`);
   }
   for (const marker of ['Compatibility paste', 'compatibility-paste', 'set_compatibility_paste', 'compatibility_paste', 'the exact field cannot be verified']) {

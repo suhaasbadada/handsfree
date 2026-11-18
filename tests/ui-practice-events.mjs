@@ -19,7 +19,7 @@ export async function installPracticeFixture({send,evaluate}) {
          if(command==='workflow_status')return structuredClone(window.workflow);
          if(command==='set_paused'){if(window.delayPause)await new Promise(r=>window.pauseAck=r);window.workflow.paused=args.paused;return structuredClone(window.workflow);}
          if(command==='set_launch_at_login'){if(window.delayLogin)await new Promise(r=>window.loginAck=r);if(window.rejectLogin)throw 'Login registration failed';window.workflow.login={status:args.enabled?(window.loginResult||'approval_required'):'not_registered',error:null};return structuredClone(window.workflow.login);}
-         if(command==='running_apps')return [{bundle_id:'com.running.app',name:'<b>Running app</b>'}];
+         if(command==='running_apps')return [{bundle_id:'com.running.app',name:'<b>Running app</b>'},{bundle_id:'com.other.app',name:'<b>Running app</b>'}];
          if(command==='set_excluded_apps'){if(window.delayExclusions)await new Promise(r=>window.exclusionsAck=r);if(window.rejectExclusions)throw 'Exclusion save failed';window.workflow.excluded_bundle_ids=args.bundleIds;return structuredClone(window.workflow);}
         if(command==='list_microphones')return {devices:[{uid:'built-in',name:'Built-in microphone'},{uid:'usb-input',name:'USB input'}],default_uid:'built-in'};
         if(command==='set_microphone'){if(window.rejectMicrophone)throw 'Could not save microphone';window.fixture.microphone_uid=args.uid;return;}
@@ -27,8 +27,8 @@ export async function installPracticeFixture({send,evaluate}) {
         if(command==='request_permissions')window.fixture.permission_requests=(window.fixture.permission_requests||0)|2;
         if(command==='practice_context'){window.context=args.active?args.revision:0;return;}
         if(command==='practice_start'){if(window.delayStart)await new Promise(r=>window.startAck=r);if(window.rejectStart)throw window.rejectStart;if(window.layoutLiveStatus){window.fixture.phase='recording';window.fixture.message='Press Fn to finish, Escape to cancel. Maximum 2 minutes.';}return ++window.practiceGeneration;}
-        if(command==='practice_status'){if(window.layoutLiveStatus && ['complete','empty','error'].includes(window.practiceResult.phase)){window.fixture.phase='idle';window.fixture.message='Practice finished. No text was pasted or saved.';}return {...window.practiceResult,generation:window.practiceGeneration};}
-        if(command==='practice_finish'){window.practiceResult.phase='processing';if(window.layoutLiveStatus){window.fixture.phase='processing';window.fixture.message='Transcribing locally…';}return;}
+        if(command==='practice_status'){if(window.layoutLiveStatus && !window.holdGlobalProcessing && ['complete','empty','error'].includes(window.practiceResult.phase)){window.fixture.phase='idle';window.fixture.practice_capture=false;window.fixture.message='Practice finished. No text was pasted or saved.';}return {...window.practiceResult,generation:window.practiceGeneration};}
+        if(command==='practice_finish'){window.practiceResult.phase='processing';if(window.layoutLiveStatus){window.fixture.phase='processing';window.fixture.practice_capture=true;window.fixture.message='Transcribing locally…';}return;}
         if(command==='practice_cancel'){if(window.delayCancel)await new Promise(r=>window.cancelAck=r);if(window.layoutLiveStatus){window.fixture.phase='idle';window.fixture.message='Cancelled.';}return;}
          if(command==='update_status')return {installed_version:'0.1.1-beta.9',phase:'idle',notes:'',downloaded_bytes:0,message:'Choose Check for updates.'};
          if(command==='check_for_updates')return {installed_version:'0.1.1-beta.9',phase:'up_to_date',notes:'',downloaded_bytes:0,message:'Up to date.'};
@@ -43,6 +43,11 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   assert.equal(await evaluate(`!document.getElementById('home').hidden && !document.querySelector('aside,nav,#brand-menu,#get-started')`),true,'Home replaces sidebar, tabs and setup guide');
   await until(`window.context>0 && window.listeners.has('practice-input') && !document.getElementById('practice-start').disabled`);
   assert.equal(await evaluate(`['words','saved','count','practice-text'].every(id=>document.getElementById(id).getClientRects().length) && window.context>0`),true,'Visible focused Home combines totals and private editor and grants context');
+  await evaluate(`window.fixture.message='Paste shortcut sent to your original field (insertion not confirmed).'`);
+  await until(`document.getElementById('message').classList.contains('quiet-completion')`);
+  assert.equal(await evaluate(`document.getElementById('message').textContent==='' && document.querySelector('.general-status-slot').getBoundingClientRect().height===0`), true, 'Routine external paste status leaves no text or gap under the Private editor');
+  await evaluate(`window.fixture.message=''`);
+  await until(`!document.getElementById('message').classList.contains('quiet-completion')`);
   const baseline = await evaluate(`JSON.stringify(window.fixture.stats)`);
   assert.equal(await evaluate(`!document.getElementById('get-started')`),true,'No setup guide DOM');
   await evaluate(`document.getElementById('nav-settings').click()`);
@@ -154,6 +159,7 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
     const stable = async state => {
       const actual = await evaluate(`window.layoutSnapshot()`);
       assert.deepEqual(actual,pristine,`${width}px ${state}: practice, textarea, actions, activity, footer and scroll must stay pristine`);
+      assert.equal(await evaluate(`document.getElementById('cancel').hidden`), true, `${width}px ${state}: no redundant header cancel for Practice`);
       assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth && [...document.querySelectorAll('#practice button,#practice textarea,#practice meter')].filter(e=>e.getClientRects().length).every(e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth;})`),true,`${width}px ${state}: contained controls`);
     };
     await evaluate(`window.delayStart=true;document.getElementById('practice-start').click()`);
@@ -174,8 +180,10 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
     await until(`document.getElementById('practice-message').textContent.includes('Transcribing')`);
     await until(`document.getElementById('phase')?.textContent==='Processing'`);
     await stable('processing');
-    await evaluate(`window.practiceResult={phase:'complete',text:'Completed privately.'}`);
+    await evaluate(`window.holdGlobalProcessing=true;window.practiceResult={phase:'complete',text:'Completed privately.'}`);
     await until(`document.getElementById('practice-text').value==='Completed privately.'`);
+    assert.equal(await evaluate(`document.getElementById('phase').textContent==='Processing' && document.getElementById('cancel').hidden`),true,'A completed Practice result cannot expose Cancel from its older global snapshot');
+    await evaluate(`window.holdGlobalProcessing=false;window.fixture.phase='idle';window.fixture.practice_capture=false`);
     await until(`document.getElementById('phase').textContent==='Ready'`);
     await stable('complete / record again');
     await evaluate(`window.rejectStart='Selected microphone unavailable. '.repeat(40);document.getElementById('practice-start').click()`);
@@ -210,6 +218,8 @@ export async function checkPracticeEvents({send,evaluate,until,port}) {
   await until(`window.fixture.microphone_uid===null && !document.getElementById('microphone-choice').disabled`);
   assert.equal(await evaluate(`window.calls.filter(c=>c.command==='set_microphone').at(-1).args.uid`),null,'System default is persisted as null, never a device ID/name');
   await until(`!document.getElementById('workflow-pause').disabled`);
+  await until(`document.getElementById('excluded-app-choice').options.length===3`);
+  assert.deepEqual(await evaluate(`[...document.getElementById('excluded-app-choice').options].slice(1).map(o=>o.textContent)`), ['<b>Running app</b> · com.running.app','<b>Running app</b> · com.other.app']);
   assert.equal(await evaluate(`document.getElementById('excluded-apps').textContent.includes('com.absent.app')`),true,'Saved absent app remains visible');
   const appReads = await evaluate(`window.calls.filter(c=>c.command==='running_apps').length`);
   const statusReads = await evaluate(`window.calls.filter(c=>c.command==='workflow_status').length`);

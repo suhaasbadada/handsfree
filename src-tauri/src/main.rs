@@ -277,6 +277,7 @@ fn enqueue_at(control: Control, epoch: u64) {
 
 #[derive(Clone, Serialize)]
 struct Status {
+    practice_capture: bool,
     audio_ready: bool,
     audio_reason: String,
     audio_generation: u64,
@@ -471,7 +472,9 @@ fn refresh_status() -> Status {
             );
         }
     }
-    let snapshot = inner.status.clone();
+    let mut snapshot = inner.status.clone();
+    snapshot.practice_capture =
+        inner.practice.is_some() && matches!(snapshot.phase.as_str(), "recording" | "processing");
     drop(inner);
     write_diagnostic(&s, &snapshot, p, hook_state, hook_reason);
     snapshot
@@ -2159,6 +2162,7 @@ fn main() {
                     session_epoch: CANCELLATION.current(),
                     practice: None,
                     status: Status {
+                        practice_capture: false,
                         audio_ready: false,
                         audio_reason: "inactive".into(),
                         audio_generation: 0,

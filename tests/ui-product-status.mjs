@@ -6,6 +6,11 @@ export async function checkProductStatus({send,evaluate,until,port}) {
   await send('Page.navigate',{url:`http://127.0.0.1:${port}`});
   await send('Page.bringToFront');
   await until(`window.fixture && document.getElementById('phase')?.textContent==='Ready'`);
+  assert.equal(await evaluate(`document.querySelector('#product-status svg')`), null, 'Product status is a dialog trigger, without a dropdown chevron');
+  const click = async id => {
+    const point = await evaluate(`(() => { const r = document.getElementById('${id}').getBoundingClientRect(); return {x: r.x + r.width/2, y: r.y + r.height/2}; })()`);
+    for (const type of ['mousePressed','mouseReleased']) await send('Input.dispatchMouseEvent',{type,...point,button:'left',clickCount:1});
+  };
   for (const theme of ['light','dark','system']) {
     await evaluate(`window.fixture.appearance='${theme}'`);
     await until(`document.documentElement.dataset.appearance==='${theme}'`);
@@ -18,6 +23,11 @@ export async function checkProductStatus({send,evaluate,until,port}) {
     assert.equal(await evaluate(`document.getElementById('dot').className==='error'`),true,'Permission-ready capture errors are not relabeled green');
     await evaluate(`window.fixture.phase='idle';window.fixture.message=''`);
     await until(`document.getElementById('phase').textContent==='Ready'`);
+    await click('product-status');
+    await until(`document.getElementById('health-dialog').open`);
+    await click('health-close');
+    await until(`!document.getElementById('health-dialog').open && document.activeElement.id==='product-status'`);
+    assert.equal(await evaluate(`getComputedStyle(document.getElementById('product-status')).outlineStyle`), 'none', `${theme}: pointer dismissal does not leave a ring`);
   }
   await evaluate(`window.fixture.persistence_error='Could not save local changes.'`);
   await until(`document.getElementById('phase').textContent==='Needs attention' && document.getElementById('dot').className==='error'`);
@@ -54,6 +64,7 @@ export async function checkProductStatus({send,evaluate,until,port}) {
     await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
     await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
     await until(`!document.getElementById('health-dialog').open && document.activeElement.id==='product-status'`);
+    assert.equal(await evaluate(`document.getElementById('product-status').matches(':focus-visible')`), true, 'Keyboard dismissal restores visible focus');
   }
   assert.equal(await evaluate(`window.calls.some(c=>['practice_start','request_microphone','request_permissions','download_model','set_microphone'].includes(c.command))`),false,'Opening/closing status does not record, request access, download or change devices');
   await evaluate(`document.getElementById('product-status').click();Object.assign(window.fixture,{microphone:false,accessibility:false,model_ready:false,hotkey:false})`);

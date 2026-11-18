@@ -122,18 +122,18 @@ try {
   assert.equal(await evaluate(`document.getElementById('home').hidden && !document.getElementById('settings').hidden`), true);
   assert.equal(await evaluate(`!document.querySelector('.readiness')`), true, 'No duplicate readiness card');
   await until(`!document.getElementById('recording-limit').disabled`);
-  assert.equal(await evaluate(`document.getElementById('recording-mode').value`), 'toggle', 'Old status defaults to Toggle');
-  await evaluate(`const modeInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='set_recording_mode'){if(window.rejectMode)throw 'Could not save recording mode';if(window.delayMode)await new Promise(resolve=>window.releaseMode=resolve);window.fixture.recording_mode=args.mode;}return modeInvoke(command,args);};window.delayMode=true;document.getElementById('recording-mode').value='push_to_talk';document.getElementById('recording-mode').dispatchEvent(new Event('change'))`);
+  assert.equal(await evaluate(`document.querySelector('#recording-mode input:checked').value`), 'toggle', 'Old status defaults to Toggle');
+  await evaluate(`const modeInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=async(command,args)=>{if(command==='set_recording_mode'){if(window.rejectMode)throw 'Could not save recording mode';if(window.delayMode)await new Promise(resolve=>window.releaseMode=resolve);window.fixture.recording_mode=args.mode;}return modeInvoke(command,args);};window.delayMode=true;document.querySelector('#recording-mode input[value="push_to_talk"]').click()`);
   await until(`document.getElementById('recording-mode').disabled`);
   await delay(1000);
-  assert.equal(await evaluate(`document.getElementById('recording-mode').value==='push_to_talk' && document.getElementById('change-shortcut').disabled`), true, 'Pending choice survives polls and blocks shortcut editing');
+  assert.equal(await evaluate(`document.querySelector('#recording-mode input:checked').value==='push_to_talk' && document.getElementById('change-shortcut').disabled`), true, 'Pending choice survives polls and blocks shortcut editing');
   await evaluate(`window.releaseMode();window.delayMode=false`);
   await until(`!document.getElementById('recording-mode').disabled && document.getElementById('practice-gesture').textContent==='Hold'`);
   assert.equal(await evaluate(`!document.getElementById('recording-mode-help').hidden && document.getElementById('practice-instruction').textContent.includes('release')`), true);
-  await evaluate(`window.rejectMode=true;document.getElementById('recording-mode').value='toggle';document.getElementById('recording-mode').dispatchEvent(new Event('change'))`);
-  await until(`!document.getElementById('recording-mode').disabled && document.getElementById('recording-mode').value==='push_to_talk'`);
+  await evaluate(`window.rejectMode=true;document.querySelector('#recording-mode input[value="toggle"]').click()`);
+  await until(`!document.getElementById('recording-mode').disabled && document.querySelector('#recording-mode input:checked').value==='push_to_talk'`);
   assert.equal(await evaluate(`document.getElementById('feedback').textContent.includes('Could not save recording mode')`), true);
-  await evaluate(`window.rejectMode=false;document.getElementById('recording-mode').value='toggle';document.getElementById('recording-mode').dispatchEvent(new Event('change'))`);
+  await evaluate(`window.rejectMode=false;document.querySelector('#recording-mode input[value="toggle"]').click()`);
   await until(`!document.getElementById('recording-mode').disabled && document.getElementById('practice-gesture').textContent==='Press'`);
   assert.deepEqual(await evaluate(`Array.from(document.getElementById('recording-limit').options,o=>o.value)`), ['120','180','240','300']);
   await evaluate(`document.getElementById('recording-limit').value='300'; document.getElementById('recording-limit').dispatchEvent(new Event('change'))`);
@@ -472,7 +472,7 @@ try {
    assert.equal(await evaluate(`document.getElementById('saved-shortcut').textContent`), 'Ctrl + Alt + Win + J', 'Windows registration failure restores the previous binding');
    await evaluate(`window.rejectShortcut=false;document.getElementById('shortcut-fn').click()`);
     await until(`${stopped} && document.getElementById('saved-shortcut').textContent==='Right Ctrl'`);
-    await evaluate(`document.getElementById('recording-mode').value='push_to_talk';document.getElementById('recording-mode').dispatchEvent(new Event('change'))`);
+    await evaluate(`document.querySelector('#recording-mode input[value="push_to_talk"]').click()`);
     await until(`!document.getElementById('recording-mode').disabled && document.getElementById('practice-gesture').textContent==='Hold'`);
     assert.equal(await evaluate(`document.getElementById('practice-shortcut').textContent==='Right Ctrl' && window.fixture.recording_mode==='push_to_talk'`), true, 'Windows hold instructions use the actual native shortcut');
     for (const width of [320,390,400,560,740,980,1280]) {
@@ -482,7 +482,7 @@ try {
         assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth`), true, `Push to talk fits ${width}px ${tab}`);
       }
     }
-    await evaluate(`document.getElementById('recording-mode').value='toggle';document.getElementById('recording-mode').dispatchEvent(new Event('change'))`);
+    await evaluate(`document.querySelector('#recording-mode input[value="toggle"]').click()`);
     await until(`!document.getElementById('recording-mode').disabled && document.getElementById('practice-gesture').textContent==='Press'`);
    assert.deepEqual(await evaluate(`window.calls.filter(c=>c.command==='set_shortcut').at(-1).args.shortcut`), {code:'ControlRight',modifiers:0}, 'Use default persists Right Ctrl, never Fn');
    // Actual modifier-first sequences: never finalize a modifier keydown.
