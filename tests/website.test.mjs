@@ -7,7 +7,7 @@ import { homebrewCommand } from '../site/install.js';
 import { release, windowsRelease } from '../site/release.js';
 
 // Static defaults and JavaScript must select the same verified public release.
-const publishedMacUrl = 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.2/HandsFree-0.1.2-macos-arm64.dmg';
+const publishedMacUrl = 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.3/HandsFree-0.1.3-macos-arm64.dmg';
 
 const root = new URL('../', import.meta.url);
 const html = readFileSync(new URL('site/index.html', root), 'utf8');
@@ -50,7 +50,7 @@ test('Homebrew is recommended and visible in the hero, with safe setup across do
   assert.match(install, /Do not use `--zap`, delete HandsFree's data folders, or reset totals to update/);
 });
 
-test('activation distinguishes v0.1.2 controls and pending distribution gates from v0.1.1', () => {
+test('activation preserves update guidance and treats the Homebrew tap separately', () => {
   const readme = readFileSync(new URL('README.md', root), 'utf8');
   const install = readFileSync(new URL('docs/INSTALL.md', root), 'utf8');
   const updates = readFileSync(new URL('docs/UPDATES.md', root), 'utf8');
@@ -59,11 +59,8 @@ test('activation distinguishes v0.1.2 controls and pending distribution gates fr
     assert.match(copy, /English model/);
     assert.match(copy, /English-only/);
   }
-  for (const copy of [readme, install, updates, html, release.status]) {
-    assert.match(copy, /Homebrew (?:currently|still) offers (?:\*\*)?v0\.1\.1/);
-    assert.match(copy, /v0\.1\.2[\s\S]*(?:update|OTA)\/restart[\s\S]*pending/);
-    assert.doesNotMatch(copy, /Homebrew offers the same release/);
-  }
+  for (const copy of [readme, install, html]) assert.match(copy, /github\.com\/suhaasbadada\/homebrew-handsfree/);
+  assert.match(release.status, /Homebrew parity and v0\.1\.3 installed update\/restart acceptance are pending/);
   for (const copy of [readme, install, updates, html]) {
     assert.match(copy, /update icon/);
     assert.match(copy, /v0\.1\.1/);
@@ -162,7 +159,7 @@ test('website is dependency-free with accessible, honest platform copy', () => {
   assert.match(css, /color-scheme:light;/);
   assert.doesNotMatch(css, /prefers-color-scheme/);
   assert.match(css, /focus-visible/);
-  assert.match(html, /Stable Mac v0\.1\.2 published and public bytes verified/);
+  assert.match(html, /Stable Mac v0\.1\.3 published and public bytes verified/);
   assert.match(html, /Windows development is paused/);
   assert.match(html, /Windows and Linux are not supported/);
   assert.equal(windowsRelease.publicAvailable, false);

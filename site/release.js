@@ -1,10 +1,10 @@
 // Flip publicAvailable only AFTER publishing and verifying the public DMG asset.
 export const release = Object.freeze({
   schemaVersion: 1,
-  version: '0.1.2',
+  version: '0.1.3',
   publicAvailable: true,
-  status: 'Stable Mac v0.1.2 published and public bytes verified. Exact signed candidate capture/finish/cancel, private dictation and Dock/Command-Tab checks passed. Homebrew still offers v0.1.1; v0.1.2 installed in-app update/restart and preservation checks are pending. Self-signed, not notarized; separate-Mac installation, physical Fn and universal Bluetooth behavior are not verified.',
-  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.2/HandsFree-0.1.2-macos-arm64.dmg',
+  status: 'Stable Mac v0.1.3 published and public bytes verified. Signed candidate microphone capture, cancellation and built-in private dictation passed. Homebrew parity and v0.1.3 installed update/restart acceptance are pending. Self-signed, not notarized.',
+  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.3/HandsFree-0.1.3-macos-arm64.dmg',
 });
 
 // Candidate audit coordinates; the active release above is authoritative.
@@ -13,7 +13,7 @@ export const candidateRelease = Object.freeze({
   schemaVersion: 1,
   version: '0.1.3',
   publicAvailable: false,
-  status: 'Stable v0.1.3 candidate preparation; signed candidate acceptance and publication pending. Self-signed, not notarized; not an availability switch.',
+  status: 'Stable v0.1.3 signed candidate accepted and published; public bytes verified. Installed update/restart acceptance pending. Self-signed, not notarized; not an availability switch.',
   dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.3/HandsFree-0.1.3-macos-arm64.dmg',
 });
 
