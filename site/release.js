@@ -1,10 +1,10 @@
 // Flip publicAvailable only AFTER publishing and verifying the public DMG asset.
 export const release = Object.freeze({
   schemaVersion: 1,
-  version: '0.1.5',
+  version: '0.1.6',
   publicAvailable: true,
-  status: 'Stable Mac v0.1.5 published and public bytes verified. Signed candidate microphone capture, cancellation and built-in private dictation passed. Homebrew parity and v0.1.5 installed update/restart acceptance are pending. Self-signed, not notarized.',
-  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.5/HandsFree-0.1.5-macos-arm64.dmg',
+  status: 'Stable Mac v0.1.6 published and public bytes verified. Signed candidate microphone capture, cancellation and built-in private dictation passed. Homebrew parity and v0.1.6 installed update/restart acceptance are pending. Self-signed, not notarized.',
+  dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.6/HandsFree-0.1.6-macos-arm64.dmg',
 });
 
 // Candidate audit coordinates; the active release above is authoritative.
@@ -13,7 +13,7 @@ export const candidateRelease = Object.freeze({
   schemaVersion: 1,
   version: '0.1.6',
   publicAvailable: false,
-  status: 'Stable v0.1.6 candidate preparation; signed acceptance and publication pending. Self-signed, not notarized; not an availability switch.',
+  status: 'Stable v0.1.6 signed candidate accepted and published; public bytes verified. Installed update/restart acceptance pending. Self-signed, not notarized; not an availability switch.',
   dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.6/HandsFree-0.1.6-macos-arm64.dmg',
 });
 

@@ -2,7 +2,7 @@
 
 Requires **Apple Silicon (M-series), macOS 14+, English**. This is the only current product and development target. In Apple menu → About This Mac, check that **Chip** names an Apple M-series chip. Intel Macs, Windows, Linux, and mobile are not currently supported. Windows work is paused; no Windows or Linux port or release date is promised.
 
-**Stable v0.1.5 — self-signed and not notarized.** Published public artifacts passed anonymous byte verification. See the [release record](releases/v0.1.5.md) for candidate checks and pending installed acceptance. No paid account, Apple Developer membership, payment, or certificate installation is required.
+**Stable v0.1.6 — self-signed and not notarized.** Published public artifacts passed anonymous byte verification. See the [release record](releases/v0.1.6.md) for candidate checks and pending installed acceptance. No paid account, Apple Developer membership, payment, or certificate installation is required.
 
 <a id="homebrew-option"></a>
 
@@ -38,13 +38,13 @@ brew update
 brew upgrade --cask suhaasbadada/handsfree/handsfree
 ```
 
-Reopen the Applications copy afterward. The current direct Mac distribution and embedded app version are `0.1.5`; Homebrew selects the version pinned in the cask. Updates are reviewed manually, not promised on a schedule.
+Reopen the Applications copy afterward. The current direct Mac distribution and embedded app version are `0.1.6`; Homebrew selects the version pinned in the cask. Updates are reviewed manually, not promised on a schedule.
 
 Normal updates preserve your existing model, settings, and usage totals; they do not restart onboarding or reset permissions. Do not use `--zap`, delete HandsFree's data folders, or reset totals to update. Existing permissions may still need reauthorization if macOS requests it. Installed OTA acceptance is recorded separately from artifact checks; clean-machine onboarding remains unverified.
 
 ## DMG alternative
 
-Download the [Mac DMG](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.5/HandsFree-0.1.5-macos-arm64.dmg). Open it and drag **HandsFree.app** onto **Applications**. Keep the disk image: its `Licenses` folder (project license, dependency notices and corresponding sources) accompanies redistributions. No ZIP extraction or developer tools are needed. Eject the image after copying. Do not launch the copy inside the disk image.
+Download the [Mac DMG](https://github.com/suhaasbadada/handsfree/releases/download/v0.1.6/HandsFree-0.1.6-macos-arm64.dmg). Open it and drag **HandsFree.app** onto **Applications**. Keep the disk image: its `Licenses` folder (project license, dependency notices and corresponding sources) accompanies redistributions. No ZIP extraction or developer tools are needed. Eject the image after copying. Do not launch the copy inside the disk image.
 
 For optional manual DMG updates, quit HandsFree, replace the Applications copy,
 then reopen. Beta 6 and earlier need this or Homebrew as a one-time bootstrap.
@@ -63,7 +63,7 @@ restarting: in-memory results do not survive restart. Updates require an idle,
 normal `/Applications/HandsFree.app`; errors including HTTP 404 are shown, not
 reported as up to date. Model/settings/usage remain outside the replaced bundle.
 Beta 7 and beta 8 have a download-time TLS defect and need one manual DMG/Homebrew
-upgrade to beta 9 or later, including stable v0.1.5 via the direct DMG. Retrying their in-app updater does not repair it.
+upgrade to beta 9 or later, including stable v0.1.6 via the direct DMG. Retrying their in-app updater does not repair it.
 See [trust and safeguards](UPDATES.md) and [beta 9 evidence](releases/v0.1.1-beta.9.md).
 
 ## First launch — both install methods
@@ -79,7 +79,7 @@ Focus a text field, tap your shortcut to speak, and tap again to transcribe. Esc
 speak, then **Finish**. The temporary editable result does not paste, change the
 clipboard or count toward usage. This is not a shortcut or external-insertion
 test. See [practice safeguards](practice.md) and the
-[release evidence and remaining acceptance checks](releases/v0.1.5.md).
+[release evidence and remaining acceptance checks](releases/v0.1.6.md).
 
 **Toggle remains the default.** For optional hold-to-record behavior, select
 **Settings → Recording mode → Push to talk**: hold Fn / Globe or your saved

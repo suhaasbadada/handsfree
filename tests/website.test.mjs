@@ -7,7 +7,7 @@ import { homebrewCommand } from '../site/install.js';
 import { release, windowsRelease } from '../site/release.js';
 
 // Static defaults and JavaScript must select the same verified public release.
-const publishedMacUrl = 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.5/HandsFree-0.1.5-macos-arm64.dmg';
+const publishedMacUrl = 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.6/HandsFree-0.1.6-macos-arm64.dmg';
 
 const root = new URL('../', import.meta.url);
 const html = readFileSync(new URL('site/index.html', root), 'utf8');
@@ -60,7 +60,7 @@ test('activation preserves update guidance and treats the Homebrew tap separatel
     assert.match(copy, /English-only/);
   }
   for (const copy of [readme, install, html]) assert.match(copy, /github\.com\/suhaasbadada\/homebrew-handsfree/);
-  assert.match(release.status, /Homebrew parity and v0\.1\.5 installed update\/restart acceptance are pending/);
+  assert.match(release.status, /Homebrew parity and v0\.1\.6 installed update\/restart acceptance are pending/);
   for (const copy of [readme, install, updates, html]) {
     assert.match(copy, /update icon/);
     assert.match(copy, /v0\.1\.1/);
@@ -159,7 +159,7 @@ test('website is dependency-free with accessible, honest platform copy', () => {
   assert.match(css, /color-scheme:light;/);
   assert.doesNotMatch(css, /prefers-color-scheme/);
   assert.match(css, /focus-visible/);
-  assert.match(html, /Stable Mac v0\.1\.5 published and public bytes verified/);
+  assert.match(html, /Stable Mac v0\.1\.6 published and public bytes verified/);
   assert.match(html, /Windows development is paused/);
   assert.match(html, /Windows and Linux are not supported/);
   assert.equal(windowsRelease.publicAvailable, false);
