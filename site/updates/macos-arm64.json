@@ -1,10 +1,10 @@
 {
-  "version": "0.1.6",
+  "version": "0.1.7",
   "notes": "",
   "platforms": {
     "darwin-aarch64": {
-      "url": "https://github.com/suhaasbadada/handsfree/releases/download/v0.1.6/HandsFree-0.1.6-macos-arm64.app.tar.gz",
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUZElJbWEvYXFOcU1EaEk3Q25XU0d6Rkd2NFVBUXdWclJjWFdCL1lEZTRFUUcxNW5rVU9SS1AxTzYyM3dxU1dvVldENjlFQjg5U0ZLYWRvZGV1akEyMkRxVE5SUjRacFFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0OTgxNjAyCWZpbGU6SGFuZHNGcmVlLTAuMS42LW1hY29zLWFybTY0LmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuNgp5c0dkZlRHckpwTGVIZ1E3bEgwQzEvdU5wMUJPanJkNFBxOHpCRloyMjNzVWd6RVBiNy90VFFOcDNVUkxhS1dqNCtBR3hYa3dHYlFvZkxqekhhWm5BZz09Cg=="
+      "url": "https://github.com/suhaasbadada/handsfree/releases/download/v0.1.7/HandsFree-0.1.7-macos-arm64.app.tar.gz",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUZElJbWEvYXFOcUlLUU9KYThZeVlqb1JaSTgzcUw0aWMySDdXU3hqVVJucmdCWHFLUWdnZHNhc1AvekZCL0lzRXBKREErWEp2YXRGajlSalo1bExYVVdRVzZSR0lkK3dVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0OTkwNzUyCWZpbGU6SGFuZHNGcmVlLTAuMS43LW1hY29zLWFybTY0LmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuNwpTZ05YMTc5RDM0SDhQcm1oY04vWEE4SWxXZ1pOWGpoRHd6b2JPSThqM1VJazBib1dPQkFBaGRkZjlTNHJGSXk3ek5FdnFBNFFCVTlMcnFLMEhIS3VBdz09Cg=="
     }
   }
 }

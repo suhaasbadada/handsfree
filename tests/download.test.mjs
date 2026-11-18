@@ -101,10 +101,10 @@ test('visible release status identifies the active stable channel and preserves 
   const document = fixtureDocument();
   renderDownload(document, { os: 'mac', arch: 'arm64' }, release);
   const status = document.getElementById('release-status');
-  assert.ok(status.textContent.startsWith('Mac stable v0.1.6 · DMG · Self-signed, not notarized.'));
+  assert.ok(status.textContent.startsWith('Mac stable v0.1.7 · DMG · Self-signed, not notarized.'));
   assert.ok(status.textContent.includes(release.status));
   assert.match(status.textContent, /Signed candidate microphone capture, cancellation and built-in private dictation passed/);
-  assert.match(status.textContent, /Homebrew parity and v0\.1\.6 installed update\/restart acceptance are pending/);
+  assert.match(status.textContent, /Homebrew parity and v0\.1\.7 installed update\/restart acceptance are pending/);
   const beta = { ...release, version: '0.1.1-beta.24',
     dmgUrl: 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.1-beta.24/HandsFree-0.1.1-beta.24-macos-arm64.dmg', status: 'Historical beta fixture.' };
   renderDownload(document, { os: 'mac', arch: 'arm64' }, beta);
@@ -119,8 +119,8 @@ test('historical Windows coordinates are retained but public availability is pau
   assert.equal(windowsRelease.appVersion, '0.1.1');
   assert.equal(publishedWindowsUrl(windowsRelease), null);
   assert.equal(publishedWindowsUrl(windowsDisabled), null);
-  assert.equal(release.publicAvailable, true, 'Mac stable v0.1.6 is available');
-  assert.equal(release.dmgUrl, 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.6/HandsFree-0.1.6-macos-arm64.dmg');
+  assert.equal(release.publicAvailable, true, 'Mac stable v0.1.7 is available');
+  assert.equal(release.dmgUrl, 'https://github.com/suhaasbadada/handsfree/releases/download/v0.1.7/HandsFree-0.1.7-macos-arm64.dmg');
   for (const arch of ['unknown', 'intel', 'arm64']) {
     const state = downloadState({ os: 'windows', arch }, enabled, windowsDisabled);
     assert.equal(state.url, enabled.dmgUrl);
