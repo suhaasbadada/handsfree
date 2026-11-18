@@ -150,3 +150,35 @@ for(const fontSize of [14,28]) {
 console.log('HOME_CASES='+homeCases);
 console.log('HOME_FAILURES='+homeFailures);
 if(homeCases!==24||homeFailures!==0)throw Error('WKWebView completed Practice label regression');
+
+// A real stable update offer must not change the shell's vertical layout.
+for (const [width,height] of [[980,820],[560,650],[480,650],[320,650]]) {
+  web.setFrameSize($.NSMakeSize(width,height));
+  const result = JSON.parse(evaluate(`(() => {
+    const button = document.getElementById('updates-open');
+    const label = document.getElementById('updates-indicator-label');
+    const detail = document.getElementById('updates-indicator-detail');
+    const summary = label.parentElement;
+    const footer = document.querySelector('footer');
+    const bounds = () => [footer.getBoundingClientRect().top, footer.offsetHeight, document.querySelector('main').offsetHeight,
+      ...['.footer-privacy','#repository-link','#app-version'].map(selector => {
+        const rect = document.querySelector(selector).getBoundingClientRect();
+        return [rect.left, rect.top, rect.width, rect.height];
+      })];
+    button.hidden = document.getElementById('repository-link').hidden = false;
+    summary.className = 'sr-only';
+    const idle = bounds();
+    summary.className = 'update-summary';
+    button.dataset.attention = 'available';
+    button.dataset.reopens = 'true';
+    label.textContent = 'Download & update';
+    detail.textContent = '0.1.4';
+    const header = document.querySelector('.product-header').getBoundingClientRect();
+    const row = footer.getBoundingClientRect();
+    return JSON.stringify({idle, offer:bounds(), aligned: header.left === row.left && header.right === row.right,
+      visible: detail.clientWidth > 0 && detail.scrollWidth <= detail.clientWidth && document.documentElement.scrollWidth <= innerWidth});
+  })()`));
+  if (String(result.idle) !== String(result.offer) || !result.aligned || !result.visible) {
+    throw Error('WKWebView footer moved or clipped at ' + width + ': ' + JSON.stringify(result));
+  }
+}
